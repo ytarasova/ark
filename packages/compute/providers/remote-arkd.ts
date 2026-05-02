@@ -39,6 +39,18 @@ interface RemoteConfig {
   tags?: Record<string, string>;
   arkd_url?: string;
   /**
+   * Conductor URL baked into cloud-init for arkd to call back to. From
+   * inside the EC2 instance, the legacy `localhost:19100` default points
+   * at the EC2 loopback (the conductor is on the operator's laptop), not
+   * the conductor -- so any callback over that URL is silently misrouted.
+   * Set this on the compute row when arkd needs a real callback path
+   * (e.g. legacy in-VPC dispatch where there's no SSM port-forward
+   * tunnelling /events back). The pure-SSM dispatch model preferred by
+   * the conductor doesn't need this set: arkd serves long-poll events
+   * over the same forward tunnel and never initiates a callback.
+   */
+  conductor_url?: string;
+  /**
    * Local port on the conductor where the SSM port-forward is listening,
    * tunneling to remote `localhost:19300`. Set by
    * `EC2Compute.setupTransport` after the forward is established; read by
@@ -62,6 +74,17 @@ interface RemoteConfig {
 }
 
 // ── Shared remote base ──────────────────────────────────────────────────────
+
+/**
+ * Resolve the conductor URL baked into cloud-init for an EC2 provision.
+ * Pure: no I/O. Exported for unit-testing F4 (audit finding) -- making sure
+ * an operator-supplied `cfg.conductor_url` wins over the
+ * `localhost:19100` default that arkd would otherwise see as its own
+ * loopback.
+ */
+export function resolveProvisionConductorUrl(cfg: { conductor_url?: string }): string {
+  return cfg.conductor_url ?? DEFAULT_CONDUCTOR_URL;
+}
 
 abstract class RemoteArkdBase extends ArkdBackedProvider {
   readonly singleton = false;
@@ -190,7 +213,19 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       const { poll } = await import("../util.js");
 
       log("Building cloud-init script with arkd...");
-      const conductorUrl = DEFAULT_CONDUCTOR_URL;
+      // Prefer per-compute `cfg.conductor_url` over the package-level
+      // DEFAULT_CONDUCTOR_URL fallback. DEFAULT_CONDUCTOR_URL hardcodes
+      // `http://localhost:19100`, which from inside an EC2 instance
+      // resolves to the instance's loopback -- not the operator's
+      // conductor. That worked when SSH had a -R reverse tunnel; it
+      // breaks under the SSM-only model, where the conductor is
+      // unreachable from the instance unless explicitly threaded
+      // through. For the pure-SSM dispatch model the operator can
+      // leave this unset and arkd uses long-poll over the
+      // forward tunnel rather than initiating a callback. Audit
+      // finding F4. Mirrors the pattern `EC2Compute.provision` already
+      // uses (`cfg.conductorUrl` -> buildUserData).
+      const conductorUrl = resolveProvisionConductorUrl(cfg);
       const userData = await buildUserDataWithArkd({
         idleMinutes: cfg.idle_minutes ?? 60,
         isolation: this.isolationType,
