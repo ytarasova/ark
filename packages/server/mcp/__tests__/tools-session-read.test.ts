@@ -55,3 +55,19 @@ describe("session_events", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 });
+
+describe("session_events with type filter", () => {
+  it("only returns events of the requested type", async () => {
+    const created = await h.app.sessions.create({ summary: "filter-test", flow: "bare" });
+    // Use whatever signature app.events.log accepts. Reference call sites in
+    // packages/core/services/dispatch/post-launch.ts.
+    await h.app.events.log(created.id, "alpha_event", { actor: "system" });
+    await h.app.events.log(created.id, "beta_event", { actor: "system" });
+    await h.app.events.log(created.id, "alpha_event", { actor: "system" });
+    const result = (await h.callTool("session_events", { sessionId: created.id, type: "alpha_event" })) as {
+      type: string;
+    }[];
+    expect(result.length).toBe(2);
+    expect(result.every((e) => e.type === "alpha_event")).toBe(true);
+  });
+});
