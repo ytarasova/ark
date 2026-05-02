@@ -3026,10 +3026,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/di/storage.ts`
 
 - fan-in: 1
-- fan-out: 5
+- fan-out: 6
 - imports:
   - `packages/core/config.ts`
   - `packages/core/container.ts`
+  - `packages/core/modes/app-mode.ts`
   - `packages/core/storage/blob-store.ts`
   - `packages/core/storage/local-disk.ts`
   - `packages/core/storage/s3.ts`
@@ -4006,7 +4007,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/modes/app-mode.ts`
 
-- fan-in: 8
+- fan-in: 9
 - fan-out: 5
 - imports:
   - `packages/core/app.ts`
