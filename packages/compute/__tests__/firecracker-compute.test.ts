@@ -363,6 +363,57 @@ describe("getArkdUrl", async () => {
   });
 });
 
+describe("ensureReachable", async () => {
+  // The Firecracker reuse-path is the simplest of the three providers:
+  // it re-runs `ensureBridge` (idempotent) and `waitForArkdReady`. Both
+  // should fire on every call (no PID-based gating like k8s/ec2 -- there
+  // is no host-side process to recycle). The tests below pin the
+  // idempotency contract: second call doesn't double-spawn anything,
+  // and a probe failure surfaces the underlying error.
+
+  it("second call with healthy state runs bridge+probe but does NOT createVm again", async () => {
+    const h = await compute.provision({ tags: { name: "vm1" } });
+    // After provision, the call counts are baseline 1.
+    expect(log.ensureBridge).toEqual(["fc0"]);
+    expect(log.waitForArkdReady).toHaveLength(1);
+    expect(log.createVm).toHaveLength(1);
+
+    // First ensureReachable call.
+    await compute.ensureReachable!(h, { app, sessionId: "s-1" });
+    expect(log.ensureBridge).toEqual(["fc0", "fc0"]);
+    expect(log.waitForArkdReady).toHaveLength(2);
+    // Crucially: NO new VM was constructed -- the kernel boot is one-shot.
+    expect(log.createVm).toHaveLength(1);
+    // No TAP teardown either.
+    expect(log.removeTap).toEqual([]);
+
+    // Second ensureReachable call.
+    await compute.ensureReachable!(h, { app, sessionId: "s-1" });
+    expect(log.ensureBridge).toEqual(["fc0", "fc0", "fc0"]);
+    expect(log.waitForArkdReady).toHaveLength(3);
+    expect(log.createVm).toHaveLength(1);
+  });
+
+  it("ensureReachable surfaces probe failure as a step error", async () => {
+    const h = await compute.provision({ tags: { name: "vm1" } });
+
+    // Swap waitForArkdReady to fail on the next call. The Firecracker
+    // ensureReachable path doesn't auto-respawn; a guest that no longer
+    // serves arkd is a real failure. The contract says: throw a
+    // ProvisionStepError-equivalent so dispatch can surface it.
+    let calls = 0;
+    compute.setDepsForTesting({
+      waitForArkdReady: async (url: string, timeoutMs: number) => {
+        calls += 1;
+        log.waitForArkdReady.push({ url, timeoutMs });
+        if (calls === 1) throw new Error("guest arkd is gone");
+      },
+    });
+
+    (await expect(compute.ensureReachable!(h, { app, sessionId: "s-1" }))).rejects.toThrow(/guest arkd is gone/);
+  });
+});
+
 describe("snapshot / restore", async () => {
   it("snapshot() delegates to the VM manager and returns metadata with artifact paths", async () => {
     const h = await compute.provision({ tags: { name: "vm1" } });

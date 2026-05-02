@@ -88,12 +88,44 @@ export interface K8sComputeDeps {
   spawnPortForward(args: string[]): ChildProcess;
   /** Allocate a free ephemeral port on the host. */
   allocatePort(): Promise<number>;
+  /**
+   * GET <url> with a short timeout; returns true on a 2xx response. Used
+   * by the reuse-path of `setupPortForward` so a stale tunnel (recycled
+   * PID, evicted pod, port stolen by an unrelated process) is detected
+   * before we hand the port to the conductor.
+   */
+  fetchHealth(url: string, timeoutMs: number): Promise<boolean>;
+  /** Liveness check for a PID; mirrors the EC2 helper. */
+  isPidAlive(pid: number): boolean;
+  /** Send SIGTERM to a PID; swallows ESRCH so a stale meta is safe. */
+  killProcess(pid: number): void;
+}
+
+async function defaultFetchHealth(url: string, timeoutMs: number): Promise<boolean> {
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+function defaultKillProcess(pid: number): void {
+  if (pid <= 0) return;
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    logDebug("compute", "process may already be gone");
+  }
 }
 
 const DEFAULT_DEPS: K8sComputeDeps = {
   loadK8sModule: async () => await import("@kubernetes/client-node"),
   spawnPortForward: (args) => spawn("kubectl", args, { stdio: "ignore", detached: false }),
   allocatePort,
+  fetchHealth: defaultFetchHealth,
+  isPidAlive,
+  killProcess: defaultKillProcess,
 };
 
 const ARKD_POD_PORT = 19300;
@@ -241,9 +273,22 @@ export class K8sCompute implements Compute {
 
   // ── setupPortForward (private; shared by provision + ensureReachable) ────
   //
-  // Reuse the running `kubectl port-forward` if its PID is alive. Otherwise
-  // allocate a fresh host port + spawn a new one. Mutates handle.meta.k8s
-  // so subsequent `getArkdUrl(h)` calls resolve to the live tunnel.
+  // Reuse the running `kubectl port-forward` if its PID is alive AND arkd
+  // answers /health through it. Otherwise allocate a fresh host port +
+  // spawn a new one. Mutates handle.meta.k8s so subsequent
+  // `getArkdUrl(h)` calls resolve to the live tunnel.
+  //
+  // The /health probe matters for the reuse-path because `isPidAlive`
+  // alone has three failure modes that look "alive" but don't actually
+  // serve traffic:
+  //   1. a kubectl process that's still running but its pod has been
+  //      evicted / restarted (kubectl will reconnect, but the local
+  //      socket is stalled until it does);
+  //   2. a recycled PID -- the original kubectl exited and the OS
+  //      handed the same number to an unrelated process;
+  //   3. a stale local port held by a third party that crashed before
+  //      we recorded our own PID.
+  // EC2's reuse-path does the same probe; mirror it here.
   private async setupPortForward(
     h: ComputeHandle,
     opts: { app?: AppContext; sessionId?: string; onLog?: (msg: string) => void } = {},
@@ -253,14 +298,25 @@ export class K8sCompute implements Compute {
     const stepCtx = { compute: h.name, podName: meta.podName, namespace: meta.namespace };
 
     const fn = async (): Promise<void> => {
-      // Idempotent reuse: if we already recorded a port-forward and its PID
-      // is still alive, keep using it.
+      // Idempotent reuse: PID alive AND arkd answers /health through the
+      // recorded port. Either gate failing means we kill any orphan and
+      // respawn.
       if (meta.portForwardPid !== null && meta.portForwardPid > 0 && meta.arkdLocalPort > 0) {
-        if (isPidAlive(meta.portForwardPid)) {
-          return;
+        const pidAlive = this.deps.isPidAlive(meta.portForwardPid);
+        if (pidAlive) {
+          const probeUrl = `http://localhost:${meta.arkdLocalPort}/health`;
+          const healthy = await this.deps.fetchHealth(probeUrl, 2000);
+          if (healthy) {
+            return;
+          }
+          // PID lives but the tunnel is dead -- pod evicted, port stolen,
+          // or kubectl is "still here" but not actually forwarding. Tear
+          // the orphan down before spawning fresh so we don't leak it.
+          this.deps.killProcess(meta.portForwardPid);
+          meta.portForwardPid = null;
+          this.writeMeta(h, meta);
         }
-        // Stale PID -- the previous kubectl process is gone. Fall through
-        // to spawn a fresh one.
+        // PID gone (or just-killed) -- fall through to the spawn block.
       }
 
       const arkdLocalPort = await this.deps.allocatePort();

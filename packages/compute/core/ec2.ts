@@ -391,6 +391,14 @@ export class EC2Compute implements Compute {
   }
 
   // ── provision ────────────────────────────────────────────────────────────
+  //
+  // Ordering invariant (see `setupTransport` for the long form): provision
+  // calls setupTransport with `{ log }` only -- no `app`/`sessionId`. That
+  // skips the events-consumer phase. Dispatch MUST follow up with
+  // `ensureReachable(handle, { app, sessionId })` to subscribe the
+  // session's hook-event stream. Standalone callers (CLI, raw provision
+  // tests) get a reachable arkd but no event stream, which is the right
+  // behaviour for their use case.
 
   async provision(opts: ProvisionOpts): Promise<ComputeHandle> {
     const name = (opts.tags?.name as string | undefined) ?? opts.tags?.computeName ?? `ec2-${Date.now()}`;
@@ -516,6 +524,28 @@ export class EC2Compute implements Compute {
   //
   // Mutates `handle.meta.ec2.arkdLocalPort` + `sshPid` so subsequent
   // `getArkdUrl(h)` calls resolve to the live tunnel.
+  //
+  // ── Ordering invariant ───────────────────────────────────────────────────
+  //
+  // `provision` calls this with `{ log }` only -- no `app`, no `sessionId`.
+  // That deliberately skips Phase 0 (the connectivity check, which would
+  // double up on what `provision` itself already polled) AND Phase 3 (the
+  // events-consumer, which has no session to attach to yet). The
+  // dispatcher's contract picks up the slack: every dispatch runs
+  // `Compute.ensureReachable(handle, { app, sessionId })` after either a
+  // fresh `provision` or a rehydrate, and that pass starts the
+  // events-consumer for the session that's about to launch.
+  //
+  // We intentionally chose Option B from the review feedback (see the
+  // matching note on `provision` -- not Option A which would have threaded
+  // sessionId into ProvisionOpts). Reason: standalone provision callers
+  // (CLI `ark compute provision`, raw provision tests) genuinely have no
+  // session, and Option B keeps `provision` honest about that. The cost is
+  // that any future code path that calls `provision` without a follow-up
+  // `ensureReachable` gets a working tunnel but no event stream -- callers
+  // outside the dispatcher must call `ensureReachable` themselves if they
+  // want hook events. `dispatch.runTargetLifecycle` enforces this for
+  // dispatch (see its callers in services/dispatch).
   //
   // When `opts.app` and `opts.sessionId` are provided (the ensureReachable
   // case), each phase is wrapped in `provisionStep` so the timeline shows

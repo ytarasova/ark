@@ -62,6 +62,15 @@ interface Harness {
   missingNamespace: boolean;
   deps: K8sComputeDeps;
   lastPod: Record<string, any> | null;
+  /** Default response for `fetchHealth`. Tests override per-test. */
+  healthy: boolean;
+  /** Recorded kill calls -- (pid). */
+  killCalls: number[];
+  /**
+   * `isPidAlive` override result. Defaults to true so the reuse-path's
+   * second gate (the /health probe) is the one that decides the test.
+   */
+  pidAlive: boolean;
 }
 
 function makeHarness(overrides: Partial<Harness> = {}): Harness {
@@ -72,6 +81,9 @@ function makeHarness(overrides: Partial<Harness> = {}): Harness {
     nextPort: 35789,
     missingNamespace: false,
     lastPod: null,
+    healthy: true,
+    killCalls: [],
+    pidAlive: true,
     deps: undefined as unknown as K8sComputeDeps,
     ...overrides,
   };
@@ -114,6 +126,11 @@ function makeHarness(overrides: Partial<Harness> = {}): Harness {
       return new FakeChildProcess(harness.nextPid) as unknown as ChildProcess;
     },
     allocatePort: async () => harness.nextPort,
+    fetchHealth: async () => harness.healthy,
+    isPidAlive: () => harness.pidAlive,
+    killProcess: (pid: number) => {
+      harness.killCalls.push(pid);
+    },
   };
 
   return harness;
@@ -315,6 +332,75 @@ describe("K8sCompute", async () => {
         name: (h.meta as any).k8s.podName,
         namespace: "ns",
       });
+    });
+  });
+
+  describe("ensureReachable", async () => {
+    // Idempotency tests for the dispatch-time reuse logic. The reuse-path
+    // checks BOTH `isPidAlive` AND `fetchHealth(/health)`; failing either
+    // gate must trigger a kill+respawn.
+
+    it("second call with healthy reused tunnel does not spawn again", async () => {
+      const harness = makeHarness();
+      const c = makeK8sCompute(harness.deps);
+
+      // First, provision so we have a recorded PID + port. The provision
+      // path itself spawns once (fresh meta has no recorded PID).
+      const h = await c.provision({ tags: { name: "w" }, config: {} });
+      expect(harness.spawnedArgs).toHaveLength(1);
+
+      // Now call ensureReachable twice. Both gates pass (pidAlive=true,
+      // healthy=true) so neither call should respawn.
+      await c.ensureReachable!(h, { app, sessionId: "s-1" });
+      await c.ensureReachable!(h, { app, sessionId: "s-1" });
+
+      expect(harness.spawnedArgs).toHaveLength(1);
+      expect(harness.killCalls).toEqual([]);
+    });
+
+    it("second call with stale PID kills orphan and respawns", async () => {
+      // PID alive, but /health probe returns false -- the most realistic
+      // failure mode (kubectl up but the pod is evicted / not forwarding).
+      // The reuse-path should kill and respawn.
+      const harness = makeHarness({ healthy: false });
+      const c = makeK8sCompute(harness.deps);
+
+      const h = await c.provision({ tags: { name: "w" }, config: {} });
+      expect(harness.spawnedArgs).toHaveLength(1);
+      const originalPid = (h.meta as any).k8s.portForwardPid;
+
+      // Give the next spawn a different PID so the meta swap is observable.
+      harness.nextPid = 5555;
+      harness.nextPort = 60002;
+
+      await c.ensureReachable!(h, { app, sessionId: "s-1" });
+
+      // The orphan kubectl PID must have been killed.
+      expect(harness.killCalls).toEqual([originalPid]);
+      // A fresh `kubectl port-forward` was spawned.
+      expect(harness.spawnedArgs).toHaveLength(2);
+      // Meta now points at the freshly spawned PID + port.
+      expect((h.meta as any).k8s.portForwardPid).toBe(5555);
+      expect((h.meta as any).k8s.arkdLocalPort).toBe(60002);
+    });
+
+    it("second call with dead PID respawns without trying to kill", async () => {
+      // PID NOT alive -- the orphan is already gone, so no kill is needed
+      // (and calling kill on a dead PID would just record a wasted ESRCH).
+      const harness = makeHarness({ pidAlive: false });
+      const c = makeK8sCompute(harness.deps);
+
+      const h = await c.provision({ tags: { name: "w" }, config: {} });
+      expect(harness.spawnedArgs).toHaveLength(1);
+
+      harness.nextPid = 7777;
+      await c.ensureReachable!(h, { app, sessionId: "s-1" });
+
+      // Dead PID -- no kill expected.
+      expect(harness.killCalls).toEqual([]);
+      // But a fresh spawn is still required.
+      expect(harness.spawnedArgs).toHaveLength(2);
+      expect((h.meta as any).k8s.portForwardPid).toBe(7777);
     });
   });
 

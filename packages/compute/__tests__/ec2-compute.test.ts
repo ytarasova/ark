@@ -416,6 +416,104 @@ describe("EC2Compute", async () => {
     });
   });
 
+  describe("ensureReachable", async () => {
+    // The two tests below exercise the idempotency claim that the
+    // Compute.ensureReachable contract makes:
+    //   1. healthy reuse -- second call must NOT spawn a fresh tunnel.
+    //   2. stale-PID kill + respawn -- when /health probes false, the
+    //      old PID must be killed AND a fresh openSshTunnel happen.
+    // The makeHelpers fixture above doesn't capture this directly because
+    // its `fetchHealth` is a constant boolean. We override it locally with
+    // a closure so the second invocation sees a different result.
+
+    it("second call with healthy reused tunnel does not spawn again", async () => {
+      const { helpers, calls } = makeHelpers();
+      const c = new EC2Compute(app);
+      c.setHelpersForTesting(helpers);
+
+      const handle = makeProvisionedHandle({ sshPid: 12345, arkdLocalPort: 60001 });
+
+      // First call -- the recorded sshPid is alive AND fetchHealth returns
+      // true (default), so the reuse branch should fire on Phase 1 and we
+      // expect zero `openSshTunnel` calls.
+      await c.ensureReachable!(handle, { app, sessionId: "s-1" });
+      let openCalls = calls.filter((call) => call.fn === "openSshTunnel");
+      expect(openCalls.length).toBe(0);
+
+      // Second call -- still healthy. Same expectation.
+      await c.ensureReachable!(handle, { app, sessionId: "s-1" });
+      openCalls = calls.filter((call) => call.fn === "openSshTunnel");
+      expect(openCalls.length).toBe(0);
+
+      // The kill helper must NOT have fired -- nothing was stale.
+      const kills = calls.filter((call) => call.fn === "killSshTunnel");
+      expect(kills.length).toBe(0);
+    });
+
+    it("second call with a dead tunnel kills the orphan and respawns", async () => {
+      // Custom helpers: the rehydrate-time `fetchHealth` (URL-targeted at
+      // the recorded port) returns false. After the kill+respawn the
+      // /health poll for the *new* port returns true so the test path
+      // converges. The /health URL identifies which probe each call is.
+      const recordedPort = 60001;
+      const recordedPid = 12345;
+
+      let openSshCount = 0;
+      let killCount = 0;
+      const kills: number[] = [];
+      const opens: Array<Record<string, unknown>> = [];
+
+      const helpers: EC2ComputeHelpers = {
+        generateSshKey: async () => ({ publicKeyPath: "/k.pub", privateKeyPath: "/k" }),
+        sshExec: async () => ({ stdout: "ok", stderr: "", exitCode: 0 }),
+        buildUserData: async () => "",
+        provisionStack: async () => ({ ip: null, instance_id: "i", stack_name: "s" }),
+        destroyStack: async () => {},
+        startInstance: async () => ({ publicIp: null, privateIp: null }),
+        stopInstance: async () => {},
+        describeInstance: async () => ({ publicIp: null, privateIp: null }),
+        openSshTunnel: (o) => {
+          openSshCount += 1;
+          opens.push(o);
+          return 90000 + openSshCount;
+        },
+        killSshTunnel: (pid) => {
+          killCount += 1;
+          kills.push(pid);
+        },
+        allocatePort: async () => recordedPort + 1, // freshly allocated port
+        fetchHealth: async (url) => {
+          // The reuse-path probe targets the recorded port; mark it dead.
+          // The Phase-2 probe targets the freshly allocated port; mark it
+          // alive so the call sequence converges.
+          if (url.includes(`localhost:${recordedPort}`)) return false;
+          return true;
+        },
+        poll: async (check) => {
+          for (let i = 0; i < 3; i++) if (await check()) return true;
+          return false;
+        },
+      };
+
+      const c = new EC2Compute(app);
+      c.setHelpersForTesting(helpers);
+
+      const handle = makeProvisionedHandle({ sshPid: recordedPid, arkdLocalPort: recordedPort });
+
+      await c.ensureReachable!(handle, { app, sessionId: "s-1" });
+
+      // The orphaned ssh process must have been killed before respawn.
+      expect(killCount).toBe(1);
+      expect(kills[0]).toBe(recordedPid);
+      // A fresh tunnel must have been spawned.
+      expect(openSshCount).toBe(1);
+      // The freshly-allocated port must be the one we record.
+      const meta = (handle.meta as { ec2: EC2HandleMeta }).ec2;
+      expect(meta.arkdLocalPort).toBe(recordedPort + 1);
+      expect(meta.sshPid).toBe(90001);
+    });
+  });
+
   describe("snapshot / restore", async () => {
     it("throws NotSupportedError on snapshot (deferred)", async () => {
       const c = new EC2Compute(app);

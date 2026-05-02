@@ -153,8 +153,10 @@ export class FirecrackerCompute implements Compute {
     // 2. Host networking. ensureBridge + createTap + assignGuestIp produce
     //    a /30 where host is .1 and guest is .2. We pass those addresses to
     //    the guest via the kernel boot args so networking is up by the time
-    //    arkd binds (no DHCP round-trip).
-    await this.deps.ensureBridge(BRIDGE_NAME);
+    //    arkd binds (no DHCP round-trip). ensureBridge is the only piece
+    //    shared with `ensureReachable` -- factored through `ensureBridgeOnly`
+    //    so the bridge-creation call site is identical in both paths.
+    await this.ensureBridgeOnly();
     await this.deps.createTap(tapName, BRIDGE_NAME);
     let guestAddr;
     try {
@@ -198,9 +200,12 @@ export class FirecrackerCompute implements Compute {
     }
 
     // 4. Wait for arkd inside the VM. Polling over the bridge from the host.
+    //    Same probe call lives in `ensureReachable` -- both paths route
+    //    through `probeArkdOnly` so a future change (e.g. swapping the
+    //    readiness endpoint) only has to land in one place.
     const arkdUrl = `http://${guestAddr.guestIp}:${GUEST_ARKD_PORT}`;
     try {
-      await this.deps.waitForArkdReady(arkdUrl, ARKD_READY_TIMEOUT_MS);
+      await this.probeArkdOnly(arkdUrl);
     } catch (err) {
       await safe(async () => vm.stop());
       await safe(async () => this.deps.removeTap(tapName));
@@ -277,30 +282,49 @@ export class FirecrackerCompute implements Compute {
   // (createTap is not, so we don't touch the TAP itself); waitForArkdReady
   // is the probe. Together they give the conductor confidence that the
   // recorded `arkdUrl` still answers before it dispatches.
+  //
+  // Both `provision` (fresh boot) and `ensureReachable` (rehydrate / multi-
+  // stage) route through `ensureNetworkAndProbe`. Provision wraps the raw
+  // helpers (no per-step events because there's no sessionId yet); the
+  // ensureReachable path wraps each helper in `provisionStep` so the
+  // session timeline shows started/ok/failed for each phase.
 
   async ensureReachable(h: ComputeHandle, opts: EnsureReachableOpts): Promise<void> {
+    await this.ensureNetworkAndProbe(h, opts);
+  }
+
+  // ── shared helpers (private; called from provision + ensureReachable) ────
+  //
+  // `ensureNetworkAndProbe` runs the two pieces that must be live before the
+  // conductor can talk to the guest's arkd: (1) the host-side bridge, (2)
+  // a successful probe of `arkdUrl`. Splitting it from `provision` -- which
+  // also has to set up the TAP, assign /30 addresses, and createVm -- means
+  // the rehydrate path doesn't accidentally reach for any of those one-shot
+  // steps.
+  //
+  // The two `*Only` wrappers exist so `provision` (no sessionId) and
+  // `ensureNetworkAndProbe` (sessionId present) call the *same* underlying
+  // dep without duplicating the call site -- if a future fix changes how we
+  // ensure the bridge or how we probe arkd, the change lands once.
+  private async ensureBridgeOnly(): Promise<void> {
+    await this.deps.ensureBridge(BRIDGE_NAME);
+  }
+
+  private async probeArkdOnly(arkdUrl: string): Promise<void> {
+    await this.deps.waitForArkdReady(arkdUrl, ARKD_READY_TIMEOUT_MS);
+  }
+
+  private async ensureNetworkAndProbe(h: ComputeHandle, opts: EnsureReachableOpts): Promise<void> {
     const meta = readMeta(h);
     const stepCtx = { compute: h.name, vmId: meta.vmId };
 
-    await provisionStep(
-      opts.app,
-      opts.sessionId,
-      "firecracker-bridge",
-      async () => {
-        await this.deps.ensureBridge(BRIDGE_NAME);
-      },
-      { context: stepCtx },
-    );
+    await provisionStep(opts.app, opts.sessionId, "firecracker-bridge", () => this.ensureBridgeOnly(), {
+      context: stepCtx,
+    });
 
-    await provisionStep(
-      opts.app,
-      opts.sessionId,
-      "firecracker-arkd-probe",
-      async () => {
-        await this.deps.waitForArkdReady(meta.arkdUrl, ARKD_READY_TIMEOUT_MS);
-      },
-      { context: { ...stepCtx, arkdUrl: meta.arkdUrl } },
-    );
+    await provisionStep(opts.app, opts.sessionId, "firecracker-arkd-probe", () => this.probeArkdOnly(meta.arkdUrl), {
+      context: { ...stepCtx, arkdUrl: meta.arkdUrl },
+    });
   }
 
   /**
