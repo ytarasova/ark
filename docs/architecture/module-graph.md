@@ -3454,7 +3454,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/infra/tmux.ts`
 
-- fan-in: 14
+- fan-in: 16
 - fan-out: 1
 - imports:
   - `packages/core/observability/structured-log.ts`
@@ -5243,20 +5243,22 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/services/session/suspend.ts`
 
 - fan-in: 1
-- fan-out: 2
+- fan-out: 3
 - imports:
+  - `packages/core/infra/tmux.ts`
   - `packages/core/services/session/types.ts`
   - `packages/types/index.ts`
 
 ### `packages/core/services/session/terminate.ts`
 
 - fan-in: 1
-- fan-out: 12
+- fan-out: 13
 - imports:
   - `packages/compute/core/compute-target.ts`
   - `packages/compute/types.ts`
   - `packages/core/claude/claude.ts`
   - `packages/core/executors/process-tree.ts`
+  - `packages/core/infra/tmux.ts`
   - `packages/core/observability.ts`
   - `packages/core/observability/otlp.ts`
   - `packages/core/observability/structured-log.ts`

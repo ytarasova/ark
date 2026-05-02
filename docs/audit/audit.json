@@ -7159,6 +7159,8 @@
         "packages/core/observability/status-detect.ts",
         "packages/core/prereqs.ts",
         "packages/core/send-reliable.ts",
+        "packages/core/services/session/suspend.ts",
+        "packages/core/services/session/terminate.ts",
         "packages/core/session/checkpoint.ts",
         "packages/server/handlers/resource-compute.ts",
         "packages/server/handlers/session.ts"
@@ -9805,6 +9807,7 @@
     {
       "path": "packages/core/services/session/suspend.ts",
       "imports": [
+        "packages/core/infra/tmux.ts",
         "packages/core/services/session/types.ts",
         "packages/types/index.ts"
       ],
@@ -9819,6 +9822,7 @@
         "packages/compute/types.ts",
         "packages/core/claude/claude.ts",
         "packages/core/executors/process-tree.ts",
+        "packages/core/infra/tmux.ts",
         "packages/core/observability.ts",
         "packages/core/observability/otlp.ts",
         "packages/core/observability/structured-log.ts",
