@@ -124,9 +124,29 @@ export function registerRuntime(container: AppContainer): void {
       dispose: (r: StatusPollerRegistry) => r.dispose(),
     }),
 
-    snapshotStore: asFunction((c: { config: ArkConfig }) => new FsSnapshotStore(join(c.config.dirs.ark, "snapshots")), {
-      lifetime: Lifetime.SINGLETON,
-    }),
+    // Snapshot store. Local mode uses the FS-backed store at
+    // `<arkDir>/snapshots/`. Hosted mode refuses the FS fallback at boot --
+    // snapshots are pod-ephemeral and not visible across replicas, so any
+    // session pause/resume that lands on a different pod would silently fail.
+    // Hand-tuned to throw with a clear configuration error so the operator
+    // wires up an `S3SnapshotStore` (TODO #fixme) before turning hosted mode
+    // on. The interface stays unchanged so the eventual S3 implementation
+    // drops in here without rippling through callers.
+    snapshotStore: asFunction(
+      (c: { config: ArkConfig; mode: import("../modes/app-mode.js").AppMode }) => {
+        if (c.mode.kind === "hosted") {
+          throw new Error(
+            "snapshotStore: hosted mode requires a non-fs snapshot backend " +
+              "(FsSnapshotStore is pod-ephemeral and not multi-replica safe). " +
+              "Wire up an S3SnapshotStore implementation before enabling hosted mode.",
+          );
+        }
+        return new FsSnapshotStore(join(c.config.dirs.ark, "snapshots"));
+      },
+      {
+        lifetime: Lifetime.SINGLETON,
+      },
+    ),
 
     // ── Infra launchers (every one has start/stop; disposers tear down) ─
 
