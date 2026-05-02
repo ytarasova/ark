@@ -118,7 +118,7 @@ extra `ark.` prefix would be redundant. All tools take JSON params,
 return JSON results. Schemas defined inline below; auto-generated from
 `packages/types/` in implementation.
 
-### Read tools (13)
+### Read tools (14)
 
 | Tool | Params | Returns |
 |------|--------|---------|
@@ -272,7 +272,7 @@ Reuse the existing test harness — no new test infra.
 ## Success criteria
 
 1. `curl -X POST http://localhost:19400/mcp` with the right MCP
-   headers + a valid bearer returns the tool list (28 tools).
+   headers + a valid bearer returns the tool list (27 tools).
 2. From a fresh Claude Code with this MCP configured, the user can
    say "start a bare flow on ec2-ssm" and Claude's `session_start`
    call lands a session that completes end-to-end (verified by
