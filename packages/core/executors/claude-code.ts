@@ -72,6 +72,38 @@ export function resolveRemoteWorkdirs(opts: {
   return { launcher: REMOTE_HOME_FALLBACK, runTarget: null };
 }
 
+/**
+ * Audit finding F6 guard. Remote dispatch must receive an explicit
+ * `channelConfig` from the provider (e.g. RemoteWorktreeProvider's
+ * `buildChannelConfig` returns `${REMOTE_HOME}/.ark/bin/ark channel` --
+ * the binary path on the agent's host). When `channelConfig` is null /
+ * undefined / empty, `buildChannelConfig` in mcp-config.ts falls back to
+ * `channelMcpConfig` -> `channelLaunchSpec()` -> `process.execPath`,
+ * i.e. the *conductor's* bun/ark binary path. That path doesn't exist on
+ * EC2/k8s; the agent's claude tries to spawn the channel server, fails on
+ * ENOENT, and the session never establishes a channel.
+ *
+ * Returns null on success (channelConfig is acceptable), or a descriptive
+ * error message string on failure (caller surfaces this through the
+ * launcher's normal error path).
+ *
+ * Pure: no I/O. Easy to unit-test.
+ */
+export function assertRemoteChannelConfig(
+  channelConfig: Record<string, unknown> | null | undefined,
+  providerName: string | undefined,
+): string | null {
+  if (!channelConfig || typeof channelConfig !== "object" || Object.keys(channelConfig).length === 0) {
+    return (
+      `channel config required for remote dispatch but provider '${providerName ?? "<unknown>"}' ` +
+      `returned no channelConfig. The conductor's process.execPath would be embedded in .mcp.json, ` +
+      `which doesn't exist on the remote host. Fix: provider.buildChannelConfig must return a non-null ` +
+      `record (see RemoteWorktreeProvider.buildChannelConfig for the canonical shape).`
+    );
+  }
+  return null;
+}
+
 export const claudeCodeExecutor: Executor = {
   name: "claude-code",
 
@@ -173,6 +205,16 @@ export const claudeCodeExecutor: Executor = {
     const mcpRelPath = ".mcp.json";
 
     if (isRemote) {
+      // Audit finding F6: REMOTE dispatch MUST receive an explicit
+      // `channelConfig` from the provider (see assertRemoteChannelConfig
+      // for the full rationale). Fail fast instead of producing a broken
+      // `.mcp.json` that embeds the conductor's binary path.
+      const channelErr = assertRemoteChannelConfig(channelConfig, provider?.name);
+      if (channelErr) {
+        log(`CRITICAL: ${channelErr}`);
+        return { ok: false, handle: "", message: channelErr };
+      }
+
       // Build JSON content for both files (no I/O on the conductor).
       const channel = claude.buildChannelConfig(session.id, stage, channelPort, {
         conductorUrl,

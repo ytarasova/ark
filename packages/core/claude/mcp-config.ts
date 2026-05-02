@@ -16,6 +16,21 @@ import { logDebug } from "../observability/structured-log.js";
 
 // ── Channel MCP config ──────────────────────────────────────────────────────
 
+/**
+ * Local-mode channel MCP config -- spec.command resolves against the
+ * CONDUCTOR's filesystem (process.execPath in compiled mode, bun + the
+ * conductor's repo in dev mode). Only correct when the agent runs on the
+ * conductor's host.
+ *
+ * REMOTE DISPATCH MUST NOT use this. For remote dispatch the channel MCP
+ * config has to come from `provider.buildChannelConfig` (e.g.
+ * `RemoteWorktreeProvider.buildChannelConfig` -- returns
+ * `${REMOTE_HOME}/.ark/bin/ark channel`, the binary path that exists on
+ * the agent's host). `claude-code.ts:executor.launch` enforces this with
+ * an explicit assertion (audit finding F6); without that guard, a falsy
+ * `channelConfig` would silently fall back here and embed the conductor's
+ * binary path in the agent's `.mcp.json`.
+ */
 export function channelMcpConfig(
   sessionId: string,
   stage: string,
