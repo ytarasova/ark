@@ -14,6 +14,7 @@ import "./tools/agent.js"; // side-effect register
 import "./tools/skill.js"; // side-effect register
 import "./tools/recipe.js"; // side-effect register
 import "./tools/compute.js"; // side-effect register
+import "./tools/secrets.js"; // side-effect register
 
 export { handleMcpRequest, sharedRegistry } from "./transport.js";
 export type { ToolDef, ToolHandlerCtx } from "./registry.js";
