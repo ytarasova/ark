@@ -10,6 +10,7 @@
 
 import "./tools/session.js"; // side-effect register
 import "./tools/flow.js"; // side-effect register
+import "./tools/agent.js"; // side-effect register
 
 export { handleMcpRequest, sharedRegistry } from "./transport.js";
 export type { ToolDef, ToolHandlerCtx } from "./registry.js";
