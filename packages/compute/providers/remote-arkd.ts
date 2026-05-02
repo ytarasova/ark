@@ -501,12 +501,53 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   }
 
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
-    if (!session.workdir) return;
+    // `session.workdir` is the conductor's local-filesystem path (e.g.
+    // `/Users/paytmlabs/Projects/ark`). `rm -rf` of that path on EC2 is at
+    // best a silent no-op (path doesn't exist on Ubuntu) and at worst could
+    // delete the wrong tree if a future build path happens to collide. We
+    // need the *remote* workdir, which `RemoteWorktreeProvider.resolveWorkdir`
+    // computes as `${REMOTE_HOME}/Projects/<sessionId>/<repoBasename>`.
+    //
+    // Subclasses that don't expose a workdir (RemoteDocker, RemoteFirecracker)
+    // either use a container-internal path or no workdir at all, and they
+    // override cleanupSession or override resolveWorkdir explicitly. For
+    // those, resolveWorkdir returns null and we skip the rm rather than
+    // guessing -- skipping leaks at most a directory until the EC2 instance
+    // cycles, while a wrong rm is destructive.
+    const remoteWorkdir = this.resolveWorkdir?.(compute, session) ?? null;
+    if (!remoteWorkdir) {
+      logDebug(
+        "compute",
+        `[remote] cleanupSession: no remote workdir resolved for ${session.id} on ${compute.name}; skipping rm`,
+      );
+      return;
+    }
+    // Defensive: NEVER rm a conductor-shaped path. macOS conductors live
+    // under /Users/...; Linux conductors under /home/<user> -- but the
+    // remote here is always an EC2 ubuntu host, so the only valid prefixes
+    // for cleanup are /home/ubuntu/ (REMOTE_HOME) and /workspace/. Bail out
+    // loudly on anything else so a future regression in resolveWorkdir
+    // can't turn this back into a footgun.
+    if (!remoteWorkdir.startsWith(`${REMOTE_HOME}/`) && !remoteWorkdir.startsWith("/workspace/")) {
+      logError(
+        "compute",
+        `[remote] cleanupSession: refusing to rm '${remoteWorkdir}' on ${compute.name} -- not a remote-safe path`,
+        { compute: compute.name, session: session.id, path: remoteWorkdir },
+      );
+      return;
+    }
     const client = this.getClient(compute);
     await safeAsync(`[remote] cleanupSession: rm workdir for ${session.id} on ${compute.name}`, async () => {
-      await client.run({ command: "rm", args: ["-rf", session.workdir!] });
+      await client.run({ command: "rm", args: ["-rf", remoteWorkdir] });
     });
   }
+
+  /**
+   * Subclasses MAY implement this to translate the conductor-side workdir
+   * path to the remote host. Default returns null (caller skips path-scoped
+   * cleanup). Mirrors `Compute.resolveWorkdir`.
+   */
+  resolveWorkdir?(_compute: Compute, _session: Session): string | null;
 }
 
 // ── Remote Worktree Provider (was "ec2") ────────────────────────────────────
