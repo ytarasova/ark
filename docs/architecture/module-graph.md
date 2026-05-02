@@ -8,7 +8,7 @@ Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types
 
 | module | fan-in |
 | --- | --- |
-| `packages/core/observability/structured-log.ts` | 170 |
+| `packages/core/observability/structured-log.ts` | 171 |
 | `packages/core/app.ts` | 148 |
 | `packages/types/index.ts` | 106 |
 | `packages/web/src/lib/utils.ts` | 94 |
@@ -3092,7 +3092,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/executors/claude-code.ts`
 
 - fan-in: 1
-- fan-out: 12
+- fan-out: 13
 - imports:
   - `packages/compute/arc-json.ts`
   - `packages/core/claude/claude.ts`
@@ -3102,6 +3102,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/executors/router-env.ts`
   - `packages/core/infra/tmux.ts`
   - `packages/core/install-paths.ts`
+  - `packages/core/observability/structured-log.ts`
   - `packages/core/recordings.ts`
   - `packages/core/services/dispatch/target-lifecycle.ts`
   - `packages/core/services/dispatch/target-resolver.ts`
@@ -4109,7 +4110,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/observability/structured-log.ts`
 
-- fan-in: 170
+- fan-in: 171
 - fan-out: 0
 
 ### `packages/core/observability/telemetry.ts`
