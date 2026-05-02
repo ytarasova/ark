@@ -38,6 +38,7 @@ import type {
   ComputeHandle,
   ComputeKind,
   EnsureReachableOpts,
+  FlushPlacementOpts,
   PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
@@ -47,6 +48,8 @@ import type {
 import { NotSupportedError } from "../types.js";
 import { cloneWorkspaceViaArkd } from "../workspace-clone.js";
 import { provisionStep } from "../../../core/services/provisioning-steps.js";
+import { FirecrackerPlacementCtx } from "../../providers/firecracker-placement-ctx.js";
+import type { PlacementCtx } from "../../../core/secrets/placement-types.js";
 import { isFirecrackerAvailable } from "./availability.js";
 import { assignGuestIp, createTap, ensureBridge, removeTap } from "./network.js";
 import { vmSnapshotPaths, vmWorkDir } from "./paths.js";
@@ -335,6 +338,37 @@ export class FirecrackerCompute implements Compute {
       source: opts.source,
       remoteWorkdir: opts.remoteWorkdir,
     });
+  }
+
+  // ── flushPlacement ──────────────────────────────────────────────────────
+  //
+  // Replay queued typed-secret placement ops onto a `FirecrackerPlacementCtx`.
+  //
+  // Today's `FirecrackerPlacementCtx` is a `NoopPlacementCtx` subclass
+  // (Phase 2 -- file-typed secrets are dropped with a debug log). When that's
+  // swapped for a real impl in Phase 3 (likely SSH into the microVM on its
+  // loopback / TAP-bridge IP), nothing here needs to change: the queue
+  // contract and the PlacementCtx interface stay stable.
+  //
+  // No-op when the deferred queue is empty (env-only sessions).
+
+  /**
+   * Test-only: swap the FirecrackerPlacementCtx factory so unit tests can
+   * assert the factory was invoked with the right meta-derived fields
+   * without exercising the NoopPlacementCtx underneath.
+   */
+  setPlacementCtxFactoryForTesting(fn: (deps: { vmId: string; guestIp: string }) => PlacementCtx): void {
+    this.placementCtxFactory = fn;
+  }
+
+  private placementCtxFactory: (deps: { vmId: string; guestIp: string }) => PlacementCtx = () =>
+    new FirecrackerPlacementCtx();
+
+  async flushPlacement(h: ComputeHandle, opts: FlushPlacementOpts): Promise<void> {
+    if (!opts.placement.hasDeferred()) return;
+    const meta = readMeta(h);
+    const ctx = this.placementCtxFactory({ vmId: meta.vmId, guestIp: meta.guestIp });
+    await opts.placement.flush(ctx);
   }
 
   // ── ensureReachable ──────────────────────────────────────────────────────

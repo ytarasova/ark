@@ -129,6 +129,24 @@ export interface PrepareWorkspaceOpts {
   onLog?: (msg: string) => void;
 }
 
+/**
+ * Options threaded into `Compute.flushPlacement`. Carries the deferred
+ * placement context the dispatcher accumulated during `buildLaunchEnv`,
+ * the session id (for log correlation), and an optional log sink.
+ */
+export interface FlushPlacementOpts {
+  /**
+   * The deferred placement context the dispatcher accumulated during
+   * `buildLaunchEnv`. Carries queued writeFile / appendFile / setEnv
+   * ops the runtime needs delivered onto the compute's medium before
+   * the agent launches (SSH-private-key files, ssh config blocks,
+   * known_hosts entries, ...).
+   */
+  placement: import("../../core/secrets/deferred-placement-ctx.js").DeferredPlacementCtx;
+  sessionId: string;
+  onLog?: (msg: string) => void;
+}
+
 // ── Errors ─────────────────────────────────────────────────────────────────
 
 /**
@@ -234,6 +252,29 @@ export interface Compute {
    * this; ad-hoc callers must do the same.
    */
   prepareWorkspace?(h: ComputeHandle, opts: PrepareWorkspaceOpts): Promise<void>;
+
+  /**
+   * Replay queued typed-secret placement ops onto the compute's medium.
+   *
+   *   - LocalCompute: flushes onto a `LocalPlacementCtx` that writes
+   *     files directly via `fs.promises.writeFile`.
+   *   - EC2Compute: flushes onto an `EC2PlacementCtx` that pipes
+   *     `tar c | ssh tar x` to deliver bytes (mode-preserving) and
+   *     `sed -i` for marker-keyed appends.
+   *   - K8sCompute: flushes onto a `K8sPlacementCtx` that uses
+   *     `kubectl cp` for writes and `kubectl exec` for appends.
+   *   - FirecrackerCompute: flushes onto a microVM-aware ctx (over
+   *     guest ssh).
+   *
+   * Idempotent: appendFile is marker-keyed (sed-rewrite block); writeFile
+   * overwrites by path. A second call with an empty queue is a no-op.
+   *
+   * Ordering invariant: `ensureReachable` MUST have run on this handle
+   * before `flushPlacement` so the compute medium (SSH tunnel, kubectl
+   * port-forward, microVM bridge) is live; some impls (e.g. EC2) read
+   * transport fields from `handle.meta` that ensureReachable populates.
+   */
+  flushPlacement?(h: ComputeHandle, opts: FlushPlacementOpts): Promise<void>;
 
   /** Snapshot support. Throws `NotSupportedError` if `!capabilities.snapshot`. */
   snapshot(h: ComputeHandle): Promise<Snapshot>;

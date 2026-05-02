@@ -8,8 +8,17 @@
  */
 
 import type { AppContext } from "../../core/app.js";
-import type { Compute, ComputeCapabilities, ComputeHandle, ComputeKind, ProvisionOpts, Snapshot } from "./types.js";
+import type {
+  Compute,
+  ComputeCapabilities,
+  ComputeHandle,
+  ComputeKind,
+  FlushPlacementOpts,
+  ProvisionOpts,
+  Snapshot,
+} from "./types.js";
 import { NotSupportedError } from "./types.js";
+import { LocalPlacementCtx } from "../providers/local-placement-ctx.js";
 
 export class LocalCompute implements Compute {
   readonly kind: ComputeKind = "local";
@@ -56,6 +65,38 @@ export class LocalCompute implements Compute {
   // resolveWorkdir intentionally omitted: LocalCompute shares the
   // conductor's filesystem layout, so callers fall back to
   // `session.workdir` (the conductor-side path is the right path).
+
+  // ── flushPlacement ────────────────────────────────────────────────────────
+  //
+  // Replay queued typed-secret placement ops onto the local filesystem. The
+  // conductor's filesystem IS the compute's filesystem, so writes land where
+  // the agent will read.
+  //
+  // Today's `LocalPlacementCtx` is a `NoopPlacementCtx` subclass (Phase 2 --
+  // file-typed secrets are dropped with a debug log). When that's swapped for
+  // a real impl in Phase 3 nothing here needs to change: the queue contract
+  // and the PlacementCtx interface stay stable.
+  //
+  // No-op when the deferred queue is empty (env-only sessions). Idempotent:
+  // appendFile is marker-keyed; writeFile overwrites by path.
+
+  /**
+   * Test-only: swap the LocalPlacementCtx factory so unit tests can assert
+   * which ctx the flush replays onto without exercising the real
+   * file-system / NoopPlacementCtx pair.
+   */
+  setPlacementCtxFactoryForTesting(fn: () => import("../../core/secrets/placement-types.js").PlacementCtx): void {
+    this.placementCtxFactory = fn;
+  }
+
+  private placementCtxFactory: () => import("../../core/secrets/placement-types.js").PlacementCtx = () =>
+    new LocalPlacementCtx();
+
+  async flushPlacement(_h: ComputeHandle, opts: FlushPlacementOpts): Promise<void> {
+    if (!opts.placement.hasDeferred()) return;
+    const ctx = this.placementCtxFactory();
+    await opts.placement.flush(ctx);
+  }
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {
     throw new NotSupportedError(this.kind, "snapshot");

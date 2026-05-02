@@ -32,6 +32,7 @@ import type {
   ComputeHandle,
   ComputeKind,
   EnsureReachableOpts,
+  FlushPlacementOpts,
   PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
@@ -40,6 +41,8 @@ import { NotSupportedError } from "./types.js";
 import { cloneWorkspaceViaArkd } from "./workspace-clone.js";
 import { logDebug } from "../../core/observability/structured-log.js";
 import { provisionStep } from "../../core/services/provisioning-steps.js";
+import { K8sPlacementCtx } from "../providers/k8s-placement-ctx.js";
+import type { PlacementCtx } from "../../core/secrets/placement-types.js";
 
 /**
  * Config payload read from `ProvisionOpts.config`. Same shape as the legacy
@@ -425,6 +428,39 @@ export class K8sCompute implements Compute {
       source: opts.source,
       remoteWorkdir: opts.remoteWorkdir,
     });
+  }
+
+  // ── flushPlacement ──────────────────────────────────────────────────────
+  //
+  // Replay queued typed-secret placement ops onto a `K8sPlacementCtx`.
+  //
+  // Today's `K8sPlacementCtx` is a `NoopPlacementCtx` subclass (Phase 2 --
+  // file-typed secrets are dropped with a debug log). When that's swapped
+  // for a real impl in Phase 3 (kubectl cp + kubectl exec), nothing here
+  // needs to change: the queue contract and the PlacementCtx interface
+  // stay stable.
+  //
+  // No-op when the deferred queue is empty (env-only sessions). KataCompute
+  // inherits this method unchanged -- the placement medium is the same
+  // (kubectl into the pod), regardless of the runtime class.
+
+  /**
+   * Test-only: swap the K8sPlacementCtx factory so unit tests can assert
+   * the factory was invoked with the right meta-derived fields without
+   * exercising the NoopPlacementCtx underneath.
+   */
+  setPlacementCtxFactoryForTesting(fn: (deps: { namespace: string; podName: string }) => PlacementCtx): void {
+    this.placementCtxFactory = fn;
+  }
+
+  protected placementCtxFactory: (deps: { namespace: string; podName: string }) => PlacementCtx = () =>
+    new K8sPlacementCtx();
+
+  async flushPlacement(h: ComputeHandle, opts: FlushPlacementOpts): Promise<void> {
+    if (!opts.placement.hasDeferred()) return;
+    const meta = this.readMeta(h);
+    const ctx = this.placementCtxFactory({ namespace: meta.namespace, podName: meta.podName });
+    await opts.placement.flush(ctx);
   }
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {
