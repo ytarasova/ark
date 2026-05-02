@@ -9,8 +9,10 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import type { AppContext } from "../app.js";
+import type { Executor, ExecutorStatus } from "../executor.js";
 import { getExecutor } from "../executor.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
+import { resolveProvider } from "../compute-resolver.js";
 
 /**
  * Read the exit-code sentinel for a session, if the launcher wrote one.
@@ -74,6 +76,51 @@ export class StatusPollerRegistry {
   }
 }
 
+/**
+ * Probe whether the agent's tmux session is still live.
+ *
+ * The naive `executor.status(handle)` only queries the conductor's local
+ * tmux daemon, which is wrong for remote dispatches: the tmux session
+ * lives on EC2 / k8s / Firecracker, not on the conductor. Local probe
+ * always returns `not_found` for remote handles, and the poller flips
+ * the session to `completed` ~3s after launch even though the agent is
+ * happily running on the remote host.
+ *
+ * Fix: prefer the compute provider's `checkSession`, which is implemented
+ * by `ArkdBackedProvider` in terms of arkd's `/agent/status` endpoint.
+ * For remote dispatches that endpoint is reached over the SSM forward
+ * tunnel and probes tmux on the remote host. For local dispatches it
+ * probes the local arkd which already shares its tmux daemon with the
+ * conductor, so the answer matches what `executor.status` would have
+ * returned. Falls back to `executor.status` only when there is no
+ * provider/compute on the session (e.g. dispatch without compute_name).
+ *
+ * Transient probe failures (arkd unreachable, network timeout) keep the
+ * status as `running` rather than tripping a false `not_found` -- a
+ * single failed probe must not flip a healthy session to completed.
+ */
+async function probeSessionStatus(
+  app: AppContext,
+  sessionId: string,
+  handle: string,
+  executor: Executor,
+): Promise<ExecutorStatus> {
+  const session = await app.sessions.get(sessionId);
+  if (session?.compute_name) {
+    try {
+      const { provider, compute } = await resolveProvider(app, session);
+      if (provider && compute) {
+        const running = await provider.checkSession(compute, handle);
+        return running ? { state: "running" } : { state: "not_found" };
+      }
+    } catch (err: any) {
+      logWarn("status", `provider.checkSession failed for ${sessionId}: ${err?.message ?? err}; keeping running`);
+      return { state: "running" };
+    }
+  }
+  return executor.status(handle);
+}
+
 export function startStatusPoller(app: AppContext, sessionId: string, handle: string, executorName: string): void {
   const pollers = app.statusPollers;
   // Don't double-poll
@@ -129,7 +176,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         return;
       }
 
-      const status = await executor.status(handle);
+      const status = await probeSessionStatus(app, sessionId, handle, executor);
 
       // Every 5th tick (~15s), snapshot the process tree for observability
       if (tick % 5 === 0 && status.state === "running") {
