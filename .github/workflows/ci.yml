@@ -40,8 +40,14 @@ jobs:
         run: bunx --bun prettier --check "packages/**/*.{ts,tsx,js,jsx,json,css}"
 
       - name: Unit tests (excludes E2E and integration)
+        # `--concurrency 4` matches `make test` locally (~7 min). The
+        # previous `--concurrency 1` ran serially and consistently
+        # exceeded the 15-min job timeout on macos-latest. Per CLAUDE.md
+        # the suite is concurrency-4 safe -- each test file boots/teardown
+        # its own AppContext via `forTestAsync()` with per-call ports +
+        # arkDir, so workers don't collide.
         run: |
-          bun test --concurrency 1 --timeout 30000 \
+          bun test --concurrency 4 --timeout 30000 \
             $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | grep -v local-arkd | grep -v local-provider | grep -v /dist/ | sort)
 
   # Integration tests that need Docker (LocalStack-backed S3 round-trip).
