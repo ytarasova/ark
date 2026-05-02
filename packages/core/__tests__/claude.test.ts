@@ -617,10 +617,7 @@ describe("buildLauncher initialPrompt", () => {
       initialPrompt: "Fix the login bug",
     });
     const channelFlagIdx = content.indexOf("--dangerously-load-development-channels=");
-    const separatorIdx = content.indexOf(
-      " -- ",
-      channelFlagIdx + "--dangerously-load-development-channels=".length,
-    );
+    const separatorIdx = content.indexOf(" -- ", channelFlagIdx + "--dangerously-load-development-channels=".length);
     const promptIdx = content.indexOf("'Fix the login bug'");
     expect(separatorIdx).toBeGreaterThan(channelFlagIdx);
     expect(promptIdx).toBeGreaterThan(separatorIdx);

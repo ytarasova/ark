@@ -394,8 +394,12 @@ function collectDbTables(project: Project): DbTable[] {
   }
 
   // Migration history: scan packages/core/migrations/**/*.ts for table name.
+  // Filter out the framework files (registry/runner/index/types) by basename
+  // so the substring check doesn't accidentally exclude every migration when
+  // the absolute path contains those words (e.g. CI on `/home/runner/...`).
+  const FRAMEWORK_FILES = new Set(["registry.ts", "runner.ts", "index.ts", "types.ts"]);
   const migFiles = walkFiles(join(REPO_ROOT, "packages/core/migrations")).filter(
-    (f) => !f.includes("registry") && !f.includes("runner") && !f.includes("index") && !f.includes("types"),
+    (f) => !FRAMEWORK_FILES.has(basename(f)),
   );
   for (const t of tables) {
     const tableRe = new RegExp(`\\b${t.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
