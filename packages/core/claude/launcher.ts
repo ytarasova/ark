@@ -50,13 +50,19 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   // --remote-control was dropped: it wrote session metadata into the host
   // workspace and nothing on the Ark side consumed it.
   //
-  // We register the channel via `--channels server:ark-channel` (the
-  // production form). The deprecated `--dangerously-load-development-channels`
-  // alias triggers an interactive "Loading development channels" warning
-  // every launch with no persistable acknowledgement -- not viable for
-  // headless dispatch. The non-`dangerously-` flag accepts the same
-  // `server:<name>` syntax (verified against the binary's `--help`).
-  const extraFlags = `--channels server:ark-channel`;
+  // `--dangerously-load-development-channels=server:ark-channel` is the
+  // sole flag that loads `ark-channel` non-interactively in Claude Code
+  // 2.1.x. It both whitelists the server AND satisfies the dev-channel
+  // ack that `.mcp.json`-defined channels require -- using `--channels`
+  // alone leaves Claude printing `entries need --dangerously-load-
+  // development-channels` and the channel never registers (verified
+  // against 2.1.126).
+  //
+  // The `=value` syntax matters: the dev-channels flag is greedy and
+  // would consume positional arguments otherwise -- it would swallow
+  // the prompt we append below. Using `=` binds the value tightly so
+  // the prompt arg can stay positional.
+  const extraFlags = `--dangerously-load-development-channels=server:ark-channel`;
 
   const envExports = Object.entries(opts.env ?? {})
     .map(([k, v]) => `export ${k}=${shellQuote(v)}`)
@@ -74,9 +80,9 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   //
   // When initialPrompt is provided, append it as the last positional arg
   // to trigger immediate processing. Separate it from option values with
-  // `--`: `--dangerously-load-development-channels` is greedy and would
-  // otherwise consume the prompt as another channel entry. The `--` tells
-  // Claude's arg parser "everything after this is a positional".
+  // `--`: belt-and-braces with the `=value` form above so any future flag
+  // change (rename, additional channel arg, etc.) can't silently consume
+  // the prompt as another channel entry.
   const promptArg = opts.initialPrompt ? ` \\\n  -- ${shellQuote(opts.initialPrompt)}` : "";
 
   // Wrap the claude invocation so a non-zero exit is surfaced back to Ark.

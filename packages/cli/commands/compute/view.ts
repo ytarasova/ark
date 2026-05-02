@@ -27,8 +27,8 @@ export function registerViewCommands(computeCmd: Command) {
       );
       for (const h of computes) {
         const ip = (h.config as { ip?: string })?.ip ?? "-";
-        const ck = String(h.compute_kind ?? "-").padEnd(12);
-        const ik = String(h.isolation_kind ?? "-").padEnd(12);
+        const ck = String(h.compute ?? h.compute_kind ?? "-").padEnd(12);
+        const ik = String(h.isolation ?? h.isolation_kind ?? "-").padEnd(12);
         const kind = (h.is_template ? "template" : "compute").padEnd(9);
         console.log(
           `  ${String(h.name).padEnd(20)} ${kind} ${ck} ${ik} ${String(h.provider).padEnd(10)} ${String(h.status).padEnd(14)} ${ip}`,
