@@ -312,7 +312,21 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
 
   async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
     const cfg = compute.config as Record<string, unknown>;
-    const workdir = (cfg.workdir as string) || process.cwd();
+    // Audit finding F5: pre-fix this fell back to `process.cwd()` when
+    // `cfg.workdir` was unset, which is non-deterministic -- the daemon's
+    // cwd at provision time leaked into the devcontainer config row and
+    // every later session inherited it. Require the caller to set
+    // `cfg.workdir` explicitly. Sessions that legitimately don't have a
+    // workdir at compute-create time can re-provision once the session
+    // is dispatched and the workdir is known.
+    const workdir = cfg.workdir as string | undefined;
+    if (!workdir) {
+      throw new Error(
+        `LocalDevcontainerProvider.provision: compute '${compute.name}' has no \`workdir\` in config. ` +
+          `Set it explicitly when creating the compute (e.g. \`ark compute create devcontainer --workdir <path>\`); ` +
+          `the daemon's cwd is not a valid fallback.`,
+      );
+    }
 
     const { detectDevcontainer, buildDevcontainer } = await import("./docker/devcontainer.js");
     if (!detectDevcontainer(workdir)) {
@@ -335,7 +349,15 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
 
   async start(compute: Compute): Promise<void> {
     const cfg = compute.config as Record<string, unknown>;
-    const workdir = (cfg.workdir as string) || process.cwd();
+    // Same F5 fix as `provision`: don't fall back to `process.cwd()`. By
+    // the time `start` runs, `provision` already persisted the explicit
+    // workdir; if it's missing now, the row is corrupt -- fail loudly.
+    const workdir = cfg.workdir as string | undefined;
+    if (!workdir) {
+      throw new Error(
+        `LocalDevcontainerProvider.start: compute '${compute.name}' has no \`workdir\` in config -- re-provision it.`,
+      );
+    }
     const { buildDevcontainer } = await import("./docker/devcontainer.js");
     await buildDevcontainer(workdir);
     this.app.computes.update(compute.name, { status: "running" });
