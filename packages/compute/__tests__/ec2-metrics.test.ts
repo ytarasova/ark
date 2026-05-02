@@ -1,5 +1,11 @@
 import { describe, it, expect } from "bun:test";
-import { SSH_FAST_CMD, SSH_DOCKER_CMD, parseSnapshot, fetchMetrics, fetchDocker } from "../providers/ec2/metrics.js";
+import {
+  FAST_METRICS_CMD,
+  DOCKER_METRICS_CMD,
+  parseSnapshot,
+  fetchMetrics,
+  fetchDocker,
+} from "../providers/ec2/metrics.js";
 
 const SAMPLE_OUTPUT = `=== CPU ===
 23.5
@@ -162,22 +168,22 @@ up 1 hour
   });
 
   // -----------------------------------------------------------------------
-  // SSH command strings
+  // Shell command strings
   // -----------------------------------------------------------------------
-  describe("SSH commands", () => {
-    it("SSH_FAST_CMD is a non-empty string", () => {
-      expect(typeof SSH_FAST_CMD).toBe("string");
-      expect(SSH_FAST_CMD.length).toBeGreaterThan(0);
+  describe("Shell commands", () => {
+    it("FAST_METRICS_CMD is a non-empty string", () => {
+      expect(typeof FAST_METRICS_CMD).toBe("string");
+      expect(FAST_METRICS_CMD.length).toBeGreaterThan(0);
     });
 
-    it("SSH_DOCKER_CMD is a non-empty string", () => {
-      expect(typeof SSH_DOCKER_CMD).toBe("string");
-      expect(SSH_DOCKER_CMD.length).toBeGreaterThan(0);
+    it("DOCKER_METRICS_CMD is a non-empty string", () => {
+      expect(typeof DOCKER_METRICS_CMD).toBe("string");
+      expect(DOCKER_METRICS_CMD.length).toBeGreaterThan(0);
     });
 
-    it("SSH_FAST_CMD includes top fallback for CPU", () => {
-      expect(SSH_FAST_CMD).toContain("mpstat");
-      expect(SSH_FAST_CMD).toContain("top");
+    it("FAST_METRICS_CMD includes top fallback for CPU", () => {
+      expect(FAST_METRICS_CMD).toContain("mpstat");
+      expect(FAST_METRICS_CMD).toContain("top");
     });
   });
 

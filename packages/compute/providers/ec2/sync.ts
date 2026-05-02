@@ -6,24 +6,24 @@
  * EC2 host. Also pushes per-project sync files (e.g. arc.json "sync"
  * entries like .env, terraform.tfvars).
  *
+ * Transport: pure AWS SSM. Files travel as base64-encoded blobs inside an
+ * `AWS-RunShellScript` SendCommand. Pull (host -> local) is implemented by
+ * `cat <file> | base64` on the remote and decoding the captured stdout.
+ *
  * SSH credentials are NOT synced here. They flow via typed-secret
  * placement (see packages/core/secrets/placers/ssh-private-key.ts and
  * the EC2 placement context in packages/compute/providers/ec2/placement-ctx.ts).
- *
- * Transport: SSH/rsync run over an SSM Session Manager tunnel; the
- * `target` argument is an EC2 instance_id and every helper takes
- * `region` + optional `awsProfile`.
  */
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "fs";
-import { homedir, tmpdir, userInfo } from "os";
-import { join } from "path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
+import { homedir, userInfo } from "os";
+import { join, relative } from "path";
 
-import { rsyncPush, rsyncPull, sshExec, sshExecArgs, buildSsmProxyArgs, type SsmConnectOpts } from "./ssh.js";
+import { ssmExec, ssmExecArgs, type SsmConnectOpts } from "./ssm.js";
 import { shellEscape } from "./shell-escape.js";
-import { REMOTE_USER, REMOTE_HOME } from "./constants.js";
+import { REMOTE_HOME } from "./constants.js";
 import { safeAsync } from "../../../core/safe.js";
 
 const execFileAsync = promisify(execFile);
@@ -50,42 +50,96 @@ export function rewritePaths(content: string, direction: "push" | "pull"): strin
 }
 
 // ---------------------------------------------------------------------------
+// Generic push/pull helpers (base64 over SSM SendCommand)
+// ---------------------------------------------------------------------------
+
+/** Push a single local file to a remote absolute path via SSM. */
+async function pushFile(instanceId: string, localPath: string, remotePath: string, ssm: SsmConnectOpts): Promise<void> {
+  if (!existsSync(localPath)) return;
+  const bytes = readFileSync(localPath);
+  const encoded = bytes.toString("base64");
+  const dirIdx = remotePath.lastIndexOf("/");
+  const dir = dirIdx >= 0 ? remotePath.slice(0, dirIdx) || "/" : ".";
+  const cmd = [
+    `mkdir -p ${shellEscape(dir)}`,
+    `printf %s ${shellEscape(encoded)} | base64 -d > ${shellEscape(remotePath)}`,
+  ].join(" && ");
+  await ssmExec({ instanceId, region: ssm.region, awsProfile: ssm.awsProfile, command: cmd, timeoutMs: 120_000 });
+}
+
+/** Push a local directory tree (files only) to a remote directory via SSM. */
+async function pushDir(instanceId: string, localDir: string, remoteDir: string, ssm: SsmConnectOpts): Promise<void> {
+  if (!existsSync(localDir)) return;
+  const queue: string[] = [localDir];
+  while (queue.length > 0) {
+    const cur = queue.pop()!;
+    for (const entry of readdirSync(cur, { withFileTypes: true })) {
+      const full = join(cur, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(full);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const rel = relative(localDir, full);
+      const dest = `${remoteDir.replace(/\/$/, "")}/${rel}`;
+      await pushFile(instanceId, full, dest, ssm);
+    }
+  }
+}
+
+/** Pull a single remote file to a local path via SSM (cat | base64). */
+async function pullFile(instanceId: string, remotePath: string, localPath: string, ssm: SsmConnectOpts): Promise<void> {
+  const cmd = `if [ -f ${shellEscape(remotePath)} ]; then base64 ${shellEscape(remotePath)}; fi`;
+  const { stdout } = await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: cmd,
+    timeoutMs: 120_000,
+  });
+  if (!stdout.trim()) return;
+  const dirIdx = localPath.lastIndexOf("/");
+  if (dirIdx >= 0) mkdirSync(localPath.slice(0, dirIdx), { recursive: true });
+  writeFileSync(localPath, Buffer.from(stdout.trim(), "base64"));
+}
+
+// ---------------------------------------------------------------------------
 // Sync steps
 // ---------------------------------------------------------------------------
 
 export interface SyncStep {
   name: string;
-  push: (key: string, instanceId: string, ssm: SsmConnectOpts) => Promise<void>;
-  pull: (key: string, instanceId: string, ssm: SsmConnectOpts) => Promise<void>;
+  push: (instanceId: string, ssm: SsmConnectOpts) => Promise<void>;
+  pull: (instanceId: string, ssm: SsmConnectOpts) => Promise<void>;
 }
 
-async function syncAwsPush(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<void> {
+async function syncAwsPush(instanceId: string, ssm: SsmConnectOpts): Promise<void> {
   const awsDir = join(homedir(), ".aws");
-  await sshExec(key, instanceId, "mkdir -p ~/.aws", ssm);
+  await ssmExec({ instanceId, region: ssm.region, awsProfile: ssm.awsProfile, command: "mkdir -p ~/.aws" });
   if (existsSync(join(awsDir, "config"))) {
-    await rsyncPush(key, instanceId, join(awsDir, "config"), "~/.aws/", ssm);
+    await pushFile(instanceId, join(awsDir, "config"), `${REMOTE_HOME}/.aws/config`, ssm);
   }
   if (existsSync(join(awsDir, "credentials"))) {
-    await rsyncPush(key, instanceId, join(awsDir, "credentials"), "~/.aws/", ssm);
+    await pushFile(instanceId, join(awsDir, "credentials"), `${REMOTE_HOME}/.aws/credentials`, ssm);
   }
 }
 
-async function syncAwsPull(_key: string, _instanceId: string, _ssm: SsmConnectOpts): Promise<void> {
+async function syncAwsPull(_instanceId: string, _ssm: SsmConnectOpts): Promise<void> {
   // AWS credentials are push-only
 }
 
-async function syncGitPush(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<void> {
+async function syncGitPush(instanceId: string, ssm: SsmConnectOpts): Promise<void> {
   const gitconfig = join(homedir(), ".gitconfig");
   if (existsSync(gitconfig)) {
-    await rsyncPush(key, instanceId, gitconfig, "~/", ssm);
+    await pushFile(instanceId, gitconfig, `${REMOTE_HOME}/.gitconfig`, ssm);
   }
 }
 
-async function syncGitPull(_key: string, _instanceId: string, _ssm: SsmConnectOpts): Promise<void> {
+async function syncGitPull(_instanceId: string, _ssm: SsmConnectOpts): Promise<void> {
   // Git config is push-only
 }
 
-async function syncGhPush(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<void> {
+async function syncGhPush(instanceId: string, ssm: SsmConnectOpts): Promise<void> {
   await safeAsync("[ec2] syncGhPush: gh auth token", async () => {
     const { stdout } = await execFileAsync("gh", ["auth", "token"], {
       encoding: "utf-8",
@@ -94,124 +148,126 @@ async function syncGhPush(key: string, instanceId: string, ssm: SsmConnectOpts):
     const token = stdout.trim();
     if (!token) return;
     const encoded = Buffer.from(token).toString("base64");
-    await sshExec(key, instanceId, `echo ${encoded} | base64 -d | gh auth login --with-token 2>/dev/null`, {
-      ...ssm,
-      timeout: 15_000,
+    await ssmExec({
+      instanceId,
+      region: ssm.region,
+      awsProfile: ssm.awsProfile,
+      command: `echo ${shellEscape(encoded)} | base64 -d | gh auth login --with-token 2>/dev/null`,
+      timeoutMs: 15_000,
     });
   });
 }
 
-async function syncGhPull(_key: string, _instanceId: string, _ssm: SsmConnectOpts): Promise<void> {
+async function syncGhPull(_instanceId: string, _ssm: SsmConnectOpts): Promise<void> {
   // GH token is push-only
 }
 
-async function syncClaudePush(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<void> {
+async function syncClaudePush(instanceId: string, ssm: SsmConnectOpts): Promise<void> {
   const claudeDir = join(homedir(), ".claude");
   if (!existsSync(claudeDir)) return;
 
-  await sshExec(key, instanceId, "mkdir -p ~/.claude", ssm);
+  await ssmExec({ instanceId, region: ssm.region, awsProfile: ssm.awsProfile, command: "mkdir -p ~/.claude" });
 
-  // Copy to a temp dir so we can rewrite paths without modifying local files
-  const tmp = mkdtempSync(join(tmpdir(), "ark-claude-push-"));
-  try {
-    // rsync local .claude/ into temp
-    await execFileAsync("rsync", ["-a", claudeDir + "/", tmp + "/"], {
-      encoding: "utf-8",
-      timeout: 30_000,
-    });
-
-    // Rewrite paths in all JSON files within temp
-    rewriteJsonFiles(tmp, "push");
-
-    // Push rewritten temp dir to remote
-    await rsyncPush(key, instanceId, tmp + "/", "~/.claude/", ssm);
-  } finally {
-    await execFileAsync("rm", ["-rf", tmp]);
+  // Walk the local .claude tree, rewriting paths in JSON files inline before push.
+  // Avoids the legacy rsync+temp-dir dance by encoding each file separately.
+  const queue: string[] = [claudeDir];
+  while (queue.length > 0) {
+    const cur = queue.pop()!;
+    for (const entry of readdirSync(cur, { withFileTypes: true })) {
+      const full = join(cur, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(full);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const rel = relative(claudeDir, full);
+      const dest = `${REMOTE_HOME}/.claude/${rel}`;
+      let bytes: Buffer = readFileSync(full);
+      if (entry.name.endsWith(".json")) {
+        try {
+          const rewritten = rewritePaths(bytes.toString("utf-8"), "push");
+          bytes = Buffer.from(rewritten);
+        } catch {
+          // best-effort -- leave bytes as-is on parse/decode failure
+        }
+      }
+      const encoded = bytes.toString("base64");
+      const dirIdx = dest.lastIndexOf("/");
+      const dir = dirIdx >= 0 ? dest.slice(0, dirIdx) : ".";
+      const cmd = [
+        `mkdir -p ${shellEscape(dir)}`,
+        `printf %s ${shellEscape(encoded)} | base64 -d > ${shellEscape(dest)}`,
+      ].join(" && ");
+      await ssmExec({
+        instanceId,
+        region: ssm.region,
+        awsProfile: ssm.awsProfile,
+        command: cmd,
+        timeoutMs: 120_000,
+      });
+    }
   }
 
   // Sync auth + onboarding from ~/.claude.json so Claude skips first-run setup
   const claudeJsonPath = join(homedir(), ".claude.json");
   if (existsSync(claudeJsonPath)) {
-    const local = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
-    if (local.oauthAccount) {
-      const remote: Record<string, unknown> = {
-        oauthAccount: local.oauthAccount,
-        hasCompletedOnboarding: true,
-        numStartups: 1,
-        autoUpdates: false,
-      };
-      const tmp = mkdtempSync(join(tmpdir(), "ark-claudejson-"));
-      try {
-        const tmpFile = join(tmp, ".claude.json");
-        writeFileSync(tmpFile, JSON.stringify(remote, null, 2));
-        // scp directly -- rsync has edge cases with dotfiles and --update.
-        // Use the SSM ProxyCommand so scp is also tunneled through SSM.
-        await execFileAsync(
-          "scp",
-          [
-            "-i",
-            key,
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-o",
-            "ConnectTimeout=10",
-            ...buildSsmProxyArgs(ssm),
-            tmpFile,
-            `${REMOTE_USER}@${instanceId}:${REMOTE_HOME}/.claude.json`,
-          ],
-          { encoding: "utf-8", timeout: 30_000 },
-        );
-      } finally {
-        await execFileAsync("rm", ["-rf", tmp]);
+    try {
+      const local = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
+      if (local.oauthAccount) {
+        const remote: Record<string, unknown> = {
+          oauthAccount: local.oauthAccount,
+          hasCompletedOnboarding: true,
+          numStartups: 1,
+          autoUpdates: false,
+        };
+        const encoded = Buffer.from(JSON.stringify(remote, null, 2)).toString("base64");
+        const dest = `${REMOTE_HOME}/.claude.json`;
+        const cmd = `printf %s ${shellEscape(encoded)} | base64 -d > ${shellEscape(dest)}`;
+        await ssmExec({
+          instanceId,
+          region: ssm.region,
+          awsProfile: ssm.awsProfile,
+          command: cmd,
+          timeoutMs: 30_000,
+        });
       }
+    } catch (e: any) {
+      console.error(`[ec2] syncClaudePush: failed to push .claude.json:`, e?.message ?? e);
     }
   }
 }
 
-async function syncClaudePull(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<void> {
+async function syncClaudePull(instanceId: string, ssm: SsmConnectOpts): Promise<void> {
   const claudeDir = join(homedir(), ".claude");
   mkdirSync(claudeDir, { recursive: true });
 
-  // Pull into a temp dir first so we can rewrite paths
-  const tmp = mkdtempSync(join(tmpdir(), "ark-claude-pull-"));
-  try {
-    await rsyncPull(key, instanceId, "~/.claude/", tmp + "/", ssm);
-
-    // Rewrite paths in all JSON files within temp (reverse direction)
-    rewriteJsonFiles(tmp, "pull");
-
-    // Copy rewritten files to local .claude/
-    await execFileAsync("rsync", ["-a", tmp + "/", claudeDir + "/"], {
-      encoding: "utf-8",
-      timeout: 30_000,
-    });
-  } finally {
-    await execFileAsync("rm", ["-rf", tmp]);
-  }
-}
-
-/** Rewrite paths in a single JSON file, logging errors without throwing. */
-function rewriteSingleJsonFile(path: string, direction: "push" | "pull"): void {
-  try {
-    const content = readFileSync(path, "utf-8");
-    const rewritten = rewritePaths(content, direction);
-    if (rewritten !== content) writeFileSync(path, rewritten);
-  } catch (e: any) {
-    console.error(`[ec2] rewriteJsonFiles: failed to process ${path}:`, e?.message ?? e);
-  }
-}
-
-/** Recursively find and rewrite JSON files in a directory. */
-function rewriteJsonFiles(dir: string, direction: "push" | "pull"): void {
-  if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      rewriteJsonFiles(full, direction);
-    } else if (entry.name.endsWith(".json")) {
-      rewriteSingleJsonFile(full, direction);
+  // List remote files first; we use `find` to enumerate then pull each one.
+  const { stdout } = await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: `find ${REMOTE_HOME}/.claude -type f -print 2>/dev/null || true`,
+    timeoutMs: 15_000,
+  });
+  const files = stdout
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const remoteRoot = `${REMOTE_HOME}/.claude/`;
+  for (const remote of files) {
+    if (!remote.startsWith(remoteRoot)) continue;
+    const rel = remote.slice(remoteRoot.length);
+    const local = join(claudeDir, rel);
+    await pullFile(instanceId, remote, local, ssm);
+    // Reverse path-rewrite for JSON files we just pulled.
+    if (local.endsWith(".json") && existsSync(local)) {
+      try {
+        const content = readFileSync(local, "utf-8");
+        const rewritten = rewritePaths(content, "pull");
+        if (rewritten !== content) writeFileSync(local, rewritten);
+      } catch {
+        // best-effort
+      }
     }
   }
 }
@@ -220,24 +276,17 @@ function rewriteJsonFiles(dir: string, direction: "push" | "pull"): void {
  * Refresh the Claude session access token on a remote host.
  * Called periodically to keep the remote agent authenticated.
  */
-export async function refreshRemoteToken(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<void> {
+export async function refreshRemoteToken(instanceId: string, ssm: SsmConnectOpts): Promise<void> {
   const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
   if (!token) return;
-  // Write token to the remote's environment for running tmux sessions
-  // The token is picked up by Claude when it refreshes its auth.
-  //
-  // The token is env-supplied and therefore not directly attacker-controlled,
-  // but a single-quote in the value (or future leakage from less-trusted
-  // sources) breaks out of the old `'${token}'` interpolation and runs on
-  // the remote shell. Shell-escape defensively so this is safe by
-  // construction regardless of the token's contents.
   const escapedToken = shellEscape(token);
-  await sshExec(
-    key,
+  await ssmExec({
     instanceId,
-    `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN ${escapedToken} 2>/dev/null; done`,
-    { ...ssm, timeout: 10_000 },
-  );
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN ${escapedToken} 2>/dev/null; done`,
+    timeoutMs: 10_000,
+  });
 }
 
 export const SYNC_STEPS: SyncStep[] = [
@@ -255,7 +304,6 @@ export const SYNC_STEPS: SyncStep[] = [
  * Execute sync steps by category. Returns which succeeded and which failed.
  */
 export async function syncToHost(
-  key: string,
   instanceId: string,
   opts: {
     direction: "push" | "pull";
@@ -278,9 +326,9 @@ export async function syncToHost(
     log(`Syncing ${step.name} (${i + 1}/${total})...`);
     try {
       if (opts.direction === "push") {
-        await step.push(key, instanceId, ssm);
+        await step.push(instanceId, ssm);
       } else {
-        await step.pull(key, instanceId, ssm);
+        await step.pull(instanceId, ssm);
       }
       synced.push(step.name);
       log(`${step.name} done (${i + 1}/${total})`);
@@ -299,7 +347,6 @@ export async function syncToHost(
  * These are typically the arc.json "sync" files (.env, terraform.tfvars, etc.)
  */
 export async function syncProjectFiles(
-  key: string,
   instanceId: string,
   files: string[],
   localDir: string,
@@ -309,16 +356,16 @@ export async function syncProjectFiles(
   // `remoteDir` is derived from session.workdir / arc.json. Both can be
   // attacker-controlled in hosted mode -- use argv-based exec so shell
   // metacharacters are quoted rather than interpreted.
-  await sshExecArgs(key, instanceId, ["mkdir", "-p", remoteDir], ssm);
+  await ssmExecArgs({ instanceId, region: ssm.region, awsProfile: ssm.awsProfile, argv: ["mkdir", "-p", remoteDir] });
   for (const file of files) {
     const localPath = join(localDir, file);
     if (!existsSync(localPath)) continue;
-
-    const parts = file.split("/");
-    if (parts.length > 1) {
-      const subdir = parts.slice(0, -1).join("/");
-      await sshExecArgs(key, instanceId, ["mkdir", "-p", `${remoteDir}/${subdir}`], ssm);
+    const stat = statSync(localPath);
+    const remoteDest = `${remoteDir.replace(/\/$/, "")}/${file}`;
+    if (stat.isDirectory()) {
+      await pushDir(instanceId, localPath, remoteDest, ssm);
+    } else {
+      await pushFile(instanceId, localPath, remoteDest, ssm);
     }
-    await rsyncPush(key, instanceId, localPath, `${remoteDir}/${file}`, ssm);
   }
 }

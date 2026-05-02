@@ -6,7 +6,6 @@
  * needed.
  */
 
-import { readFileSync } from "node:fs";
 import {
   EC2Client,
   RunInstancesCommand,
@@ -14,8 +13,6 @@ import {
   DescribeInstancesCommand,
   CreateSecurityGroupCommand,
   DeleteSecurityGroupCommand,
-  ImportKeyPairCommand,
-  DeleteKeyPairCommand,
   DescribeSubnetsCommand,
   DescribeImagesCommand,
   CreateTagsCommand,
@@ -86,7 +83,6 @@ export interface ProvisionResult {
   instance_id: string;
   stack_name: string;
   sg_id?: string;
-  key_name?: string;
 }
 
 export interface ProvisionStackOpts {
@@ -97,8 +93,6 @@ export interface ProvisionStackOpts {
   securityGroupId?: string;
   userData?: string;
   tags?: Record<string, string>;
-  keyName?: string;
-  sshKeyPath?: string;
   awsProfile?: string;
   /**
    * Name (or full ARN) of the IAM instance profile to attach. The profile's
@@ -116,7 +110,6 @@ export interface DestroyStackOpts {
   awsProfile?: string;
   /** Resource IDs to clean up (from ProvisionResult stored in compute config) */
   sg_id?: string;
-  key_name?: string;
   instance_id?: string;
 }
 
@@ -210,36 +203,7 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
     log(`Security group: ${sgId}`);
   }
 
-  // 3. SSH key pair
-  let keyName = opts.keyName;
-  let createdKey = false;
-
-  if (!keyName && opts.sshKeyPath) {
-    const pubKeyPath = `${opts.sshKeyPath}.pub`;
-    const pubKey = readFileSync(pubKeyPath, "utf-8").trim();
-    keyName = `ark-${hostName}`;
-
-    try {
-      await client.send(
-        new ImportKeyPairCommand({
-          KeyName: keyName,
-          PublicKeyMaterial: Buffer.from(pubKey),
-        }),
-      );
-      createdKey = true;
-    } catch (e: any) {
-      if (e.Code === "InvalidKeyPair.Duplicate") {
-        // Key already exists -- reuse it
-        log(`Key pair ${keyName} already exists, reusing`);
-      } else {
-        throw e;
-      }
-    }
-
-    log(`Key pair: ${keyName}`);
-  }
-
-  // 4. Launch instance.
+  // 3. Launch instance.
   //
   // We attach an IAM instance profile so the instance can register with SSM
   // (AmazonSSMManagedInstanceCore policy). The conductor's SSH transport is
@@ -259,7 +223,9 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
         InstanceType: instanceType as import("@aws-sdk/client-ec2")._InstanceType,
         MinCount: 1,
         MaxCount: 1,
-        KeyName: keyName,
+        // No KeyName: pure SSM transport doesn't need an SSH keypair.
+        // The SSM agent + IAM role (AmazonSSMManagedInstanceCore) is the
+        // entire authentication contract.
         // IamInstanceProfile takes either Name or Arn. We pass Name for
         // anything that doesn't look like an ARN.
         IamInstanceProfile: iamProfile.startsWith("arn:") ? { Arn: iamProfile } : { Name: iamProfile },
@@ -302,15 +268,15 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
 
   log(`Instance launched: ${instanceId}`);
 
-  // 5. Wait for running state
+  // 4. Wait for running state
   log("Waiting for instance to reach running state...");
   await waitUntilInstanceRunning(
     { client, maxWaitTime: 300, minDelay: 5, maxDelay: 10 },
     { InstanceIds: [instanceId] },
   );
 
-  // 6. Capture IP address for legacy back-compat (some callers still log it
-  // / use it for codegraph HTTP). Not required for SSH transport.
+  // 5. Capture IP address for legacy back-compat (some callers still log it
+  // / use it for codegraph HTTP). Not required for SSM transport.
   const descResult = await client.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
   const instance = descResult.Reservations?.[0]?.Instances?.[0];
   const ip = instance?.PrivateIpAddress ?? instance?.PublicIpAddress ?? null;
@@ -322,7 +288,6 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
     instance_id: instanceId,
     stack_name: `ark-compute-${hostName}`,
     sg_id: createdSg ? sgId : undefined,
-    key_name: createdKey ? keyName : undefined,
   };
 }
 
@@ -353,16 +318,6 @@ export async function destroyStack(hostName: string, opts?: DestroyStackOpts): P
       await client.send(new DeleteSecurityGroupCommand({ GroupId: sgId }));
     } catch (e: any) {
       console.error(`Failed to delete security group ${sgId}: ${e.message}`);
-    }
-  }
-
-  // Clean up key pair (if we created it)
-  const keyName = opts?.key_name;
-  if (keyName) {
-    try {
-      await client.send(new DeleteKeyPairCommand({ KeyName: keyName }));
-    } catch (e: any) {
-      console.error(`Failed to delete key pair ${keyName}: ${e.message}`);
     }
   }
 }

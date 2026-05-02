@@ -1,7 +1,7 @@
 /**
  * EC2Compute unit tests.
  *
- * The whole AWS + SSH surface is faked via `setHelpersForTesting` so no
+ * The whole AWS + SSM surface is faked via `setHelpersForTesting` so no
  * network / subprocess is touched. Each test records the sequence of helper
  * calls so we can assert both behaviour and lifecycle order.
  */
@@ -33,18 +33,20 @@ type Call = { fn: string; args: unknown[] };
 interface StubOpts {
   /** If set, provisionStack returns this IP. Default "1.2.3.4". */
   ip?: string | null;
-  /** If set, sshExec returns this stdout + exit 0 for the ready-marker probe. */
+  /** If false, the cloud-init readiness probe never sees "ready". */
   readyMarker?: boolean;
   /** If true, fetchHealth always returns true. */
   healthy?: boolean;
   /** Pre-allocated port the stub will hand out. */
   localPort?: number;
-  /** Override spawned tunnel PID. */
+  /** Override spawned port-forward PID. */
   tunnelPid?: number;
   /** startInstance response. */
   startIp?: { publicIp: string | null; privateIp: string | null };
   /** Force provisionStack to throw. */
   provisionError?: Error;
+  /** If false, ssmCheckInstance returns false. */
+  ssmOnline?: boolean;
 }
 
 function makeHelpers(opts: StubOpts = {}): { helpers: EC2ComputeHelpers; calls: Call[] } {
@@ -62,20 +64,17 @@ function makeHelpers(opts: StubOpts = {}): { helpers: EC2ComputeHelpers; calls: 
   const tunnelPid = opts.tunnelPid ?? 99999;
 
   const helpers: EC2ComputeHelpers = {
-    generateSshKey: async (hostName) => {
-      record("generateSshKey")(hostName);
-      return {
-        publicKeyPath: `/tmp/keys/ark-${hostName}.pub`,
-        privateKeyPath: `/tmp/keys/ark-${hostName}`,
-      };
-    },
-    sshExec: async (key, host, cmd, o) => {
-      record("sshExec")(key, host, cmd, o);
+    ssmExec: async (execOpts) => {
+      record("ssmExec")(execOpts);
       // Ready-marker probe -- return "ready" if readyMarker is truthy (default).
-      if (cmd.includes(".ark-ready")) {
+      if (execOpts.command.includes(".ark-ready")) {
         return { stdout: opts.readyMarker === false ? "" : "ready\n", stderr: "", exitCode: 0 };
       }
       return { stdout: "ok\n", stderr: "", exitCode: 0 };
+    },
+    ssmCheckInstance: async (checkOpts) => {
+      record("ssmCheckInstance")(checkOpts);
+      return opts.ssmOnline !== false;
     },
     buildUserData: async (o) => {
       record("buildUserData")(o);
@@ -89,7 +88,6 @@ function makeHelpers(opts: StubOpts = {}): { helpers: EC2ComputeHelpers; calls: 
         instance_id: "i-abc123",
         stack_name: `ark-compute-${hostName}`,
         sg_id: "sg-0001",
-        key_name: `ark-${hostName}`,
       };
     },
     destroyStack: async (hostName, destroyOpts) => {
@@ -106,12 +104,12 @@ function makeHelpers(opts: StubOpts = {}): { helpers: EC2ComputeHelpers; calls: 
       record("describeInstance")(descOpts);
       return { publicIp: ip, privateIp: "10.0.0.5" };
     },
-    openSshTunnel: (tunnelOpts) => {
-      record("openSshTunnel")(tunnelOpts);
-      return tunnelPid;
+    startPortForward: (tunnelOpts) => {
+      record("startPortForward")(tunnelOpts);
+      return { pid: tunnelPid };
     },
-    killSshTunnel: (pid) => {
-      record("killSshTunnel")(pid);
+    killPortForward: (pid) => {
+      record("killPortForward")(pid);
     },
     allocatePort: async () => {
       record("allocatePort")();
@@ -139,12 +137,10 @@ function makeProvisionedHandle(meta: Partial<EC2HandleMeta> = {}): ComputeHandle
     publicIp: "1.2.3.4",
     privateIp: "10.0.0.5",
     arkdLocalPort: 54321,
-    sshPid: 99999,
-    sshKeyPath: "/tmp/keys/ark-test",
+    portForwardPid: 99999,
     region: "us-east-1",
     stackName: "ark-compute-test",
     sgId: "sg-0001",
-    keyName: "ark-test",
     size: "m",
     arch: "x64",
     ...meta,
@@ -167,22 +163,23 @@ describe("EC2Compute", async () => {
   });
 
   describe("provision", async () => {
-    it("runs generateSshKey -> buildUserData -> provisionStack -> SSH poll -> cloud-init poll -> allocatePort -> openSshTunnel -> health poll", async () => {
+    it("runs buildUserData -> provisionStack -> ssmCheck poll -> cloud-init poll -> allocatePort -> startPortForward -> health poll", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const handle = await c.provision({ tags: { name: "test" }, size: "l", arch: "arm" });
 
-      const fnOrder = calls.map((call) => call.fn).filter((fn) => fn !== "sshExec" && fn !== "fetchHealth");
+      const fnOrder = calls
+        .map((call) => call.fn)
+        .filter((fn) => fn !== "ssmExec" && fn !== "fetchHealth" && fn !== "ssmCheckInstance");
       expect(fnOrder).toEqual([
-        "generateSshKey",
         "buildUserData",
         "provisionStack",
-        "poll", // SSH readiness
+        "poll", // SSM agent readiness
         "poll", // cloud-init ready marker
         "allocatePort",
-        "openSshTunnel",
+        "startPortForward",
         "poll", // arkd health
       ]);
 
@@ -192,14 +189,12 @@ describe("EC2Compute", async () => {
       expect(meta.instanceId).toBe("i-abc123");
       expect(meta.publicIp).toBe("1.2.3.4");
       expect(meta.arkdLocalPort).toBe(54321);
-      expect(meta.sshPid).toBe(99999);
+      expect(meta.portForwardPid).toBe(99999);
       expect(meta.region).toBe("us-east-1");
       expect(meta.sgId).toBe("sg-0001");
-      expect(meta.keyName).toBe("ark-test");
       expect(meta.size).toBe("l");
       expect(meta.arch).toBe("arm");
       expect(meta.stackName).toBe("ark-compute-test");
-      expect(meta.sshKeyPath).toBe("/tmp/keys/ark-test");
     });
 
     it("forwards cfg (region, awsProfile, idleMinutes, isolation) through to buildUserData + provisionStack", async () => {
@@ -231,10 +226,11 @@ describe("EC2Compute", async () => {
       expect(stackOpts.awsProfile).toBe("yt");
       expect(stackOpts.size).toBe("m");
       expect(stackOpts.arch).toBe("x64");
-      expect(stackOpts.sshKeyPath).toBe("/tmp/keys/ark-test");
+      // sshKeyPath is gone -- pure SSM, no key.
+      expect(stackOpts.sshKeyPath).toBeUndefined();
     });
 
-    it("opens the tunnel to ARKD_REMOTE_PORT on the returned instance_id", async () => {
+    it("opens the port-forward to ARKD_REMOTE_PORT on the returned instance_id", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
@@ -244,9 +240,8 @@ describe("EC2Compute", async () => {
         config: { region: "us-west-2", awsProfile: "yt" },
       });
 
-      const tunnelCall = calls.find((call) => call.fn === "openSshTunnel")!;
+      const tunnelCall = calls.find((call) => call.fn === "startPortForward")!;
       expect(tunnelCall.args[0]).toEqual({
-        keyPath: "/tmp/keys/ark-test",
         instanceId: "i-abc123",
         region: "us-west-2",
         awsProfile: "yt",
@@ -255,15 +250,15 @@ describe("EC2Compute", async () => {
       });
     });
 
-    it("throws and tears the tunnel down if arkd never responds", async () => {
+    it("throws and tears the port-forward down if arkd never responds", async () => {
       const { helpers, calls } = makeHelpers({ healthy: false });
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow(/arkd never became reachable/);
 
-      // The tunnel must have been killed so we don't leak the ssh process.
-      const killCalls = calls.filter((call) => call.fn === "killSshTunnel");
+      // The forward must have been killed so we don't leak the process.
+      const killCalls = calls.filter((call) => call.fn === "killPortForward");
       expect(killCalls.length).toBe(1);
       expect(killCalls[0].args[0]).toBe(99999);
     });
@@ -292,73 +287,73 @@ describe("EC2Compute", async () => {
   });
 
   describe("start", async () => {
-    it("calls StartInstances, re-opens the tunnel, and waits for arkd health", async () => {
+    it("calls StartInstances, re-opens the port-forward, and waits for arkd health", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      const handle = makeProvisionedHandle({ sshPid: 11111 });
+      const handle = makeProvisionedHandle({ portForwardPid: 11111 });
       await c.start(handle);
 
       const fnOrder = calls.map((call) => call.fn);
       expect(fnOrder).toContain("startInstance");
-      expect(fnOrder).toContain("openSshTunnel");
+      expect(fnOrder).toContain("startPortForward");
 
-      // Any pre-existing tunnel PID must have been torn down before the
-      // fresh `openSshTunnel` call. Find both and check order.
-      const killIdx = calls.findIndex((call) => call.fn === "killSshTunnel");
-      const openIdx = calls.findIndex((call) => call.fn === "openSshTunnel");
+      // Any pre-existing forward PID must have been torn down before the
+      // fresh `startPortForward` call. Find both and check order.
+      const killIdx = calls.findIndex((call) => call.fn === "killPortForward");
+      const openIdx = calls.findIndex((call) => call.fn === "startPortForward");
       expect(killIdx).toBeLessThan(openIdx);
       expect(calls[killIdx].args[0]).toBe(11111);
 
       // The handle's meta is mutated in place so callers see the new PID.
       const meta = (handle.meta as { ec2: EC2HandleMeta }).ec2;
-      expect(meta.sshPid).toBe(99999);
+      expect(meta.portForwardPid).toBe(99999);
     });
 
-    it("re-opens the SSM tunnel keyed off instance_id even when no IP is available", async () => {
+    it("re-opens the SSM port-forward keyed off instance_id even when no IP is available", async () => {
       // Pre-fix this threw `EC2Compute.start: instance i-abc has no IP after
       // start`. Under SSM, the canonical address is the instance_id; IPs are
-      // informational. The tunnel still opens cleanly.
+      // informational. The forward still opens cleanly.
       const { helpers, calls } = makeHelpers({ startIp: { publicIp: null, privateIp: null } });
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      await c.start(makeProvisionedHandle({ sshPid: null }));
+      await c.start(makeProvisionedHandle({ portForwardPid: null }));
 
-      const tunnelCall = calls.find((call) => call.fn === "openSshTunnel")!;
+      const tunnelCall = calls.find((call) => call.fn === "startPortForward")!;
       const tunnelArgs = tunnelCall.args[0] as { instanceId: string; region: string };
       expect(tunnelArgs.instanceId).toBe("i-abc123");
       expect(tunnelArgs.region).toBe("us-east-1");
     });
 
-    it("tears the new tunnel down if arkd never comes back", async () => {
+    it("tears the new port-forward down if arkd never comes back", async () => {
       const { helpers, calls } = makeHelpers({ healthy: false });
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      const handle = makeProvisionedHandle({ sshPid: null });
+      const handle = makeProvisionedHandle({ portForwardPid: null });
       (await expect(c.start(handle))).rejects.toThrow(/arkd never came back/);
 
-      // Exactly one kill -- the fresh tunnel we spawned. The pre-existing
+      // Exactly one kill -- the fresh forward we spawned. The pre-existing
       // PID was null so we didn't try to kill anything first.
-      const kills = calls.filter((call) => call.fn === "killSshTunnel");
+      const kills = calls.filter((call) => call.fn === "killPortForward");
       expect(kills.length).toBe(1);
       expect(kills[0].args[0]).toBe(99999);
     });
   });
 
   describe("stop", async () => {
-    it("kills the tunnel and then calls StopInstances", async () => {
+    it("kills the port-forward and then calls StopInstances", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      const handle = makeProvisionedHandle({ sshPid: 7777 });
+      const handle = makeProvisionedHandle({ portForwardPid: 7777 });
       await c.stop(handle);
 
       const fnOrder = calls.map((call) => call.fn);
-      const killIdx = fnOrder.indexOf("killSshTunnel");
+      const killIdx = fnOrder.indexOf("killPortForward");
       const stopIdx = fnOrder.indexOf("stopInstance");
       expect(killIdx).toBeGreaterThanOrEqual(0);
       expect(stopIdx).toBeGreaterThanOrEqual(0);
@@ -367,30 +362,30 @@ describe("EC2Compute", async () => {
 
       // PID is cleared on the handle so a later start() doesn't double-kill.
       const meta = (handle.meta as { ec2: EC2HandleMeta }).ec2;
-      expect(meta.sshPid).toBeNull();
+      expect(meta.portForwardPid).toBeNull();
     });
 
-    it("skips killSshTunnel when there is no live PID", async () => {
+    it("skips killPortForward when there is no live PID", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      await c.stop(makeProvisionedHandle({ sshPid: null }));
-      expect(calls.find((call) => call.fn === "killSshTunnel")).toBeUndefined();
+      await c.stop(makeProvisionedHandle({ portForwardPid: null }));
+      expect(calls.find((call) => call.fn === "killPortForward")).toBeUndefined();
       expect(calls.find((call) => call.fn === "stopInstance")).toBeDefined();
     });
   });
 
   describe("destroy", async () => {
-    it("kills the tunnel, then calls destroyStack with the stored ids", async () => {
+    it("kills the port-forward, then calls destroyStack with the stored ids", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      const handle = makeProvisionedHandle({ sshPid: 5555 });
+      const handle = makeProvisionedHandle({ portForwardPid: 5555 });
       await c.destroy(handle);
 
-      const killIdx = calls.findIndex((call) => call.fn === "killSshTunnel");
+      const killIdx = calls.findIndex((call) => call.fn === "killPortForward");
       const destroyIdx = calls.findIndex((call) => call.fn === "destroyStack");
       expect(killIdx).toBeLessThan(destroyIdx);
       expect(calls[killIdx].args[0]).toBe(5555);
@@ -401,7 +396,6 @@ describe("EC2Compute", async () => {
         region: "us-east-1",
         instance_id: "i-abc123",
         sg_id: "sg-0001",
-        key_name: "ark-test",
         stackName: "ark-compute-test",
       });
     });
@@ -419,73 +413,63 @@ describe("EC2Compute", async () => {
   describe("ensureReachable", async () => {
     // The two tests below exercise the idempotency claim that the
     // Compute.ensureReachable contract makes:
-    //   1. healthy reuse -- second call must NOT spawn a fresh tunnel.
+    //   1. healthy reuse -- second call must NOT spawn a fresh port-forward.
     //   2. stale-PID kill + respawn -- when /health probes false, the
-    //      old PID must be killed AND a fresh openSshTunnel happen.
-    // The makeHelpers fixture above doesn't capture this directly because
-    // its `fetchHealth` is a constant boolean. We override it locally with
-    // a closure so the second invocation sees a different result.
+    //      old PID must be killed AND a fresh startPortForward happen.
 
     it("second call with healthy reused tunnel does not spawn again", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      const handle = makeProvisionedHandle({ sshPid: 12345, arkdLocalPort: 60001 });
+      const handle = makeProvisionedHandle({ portForwardPid: 12345, arkdLocalPort: 60001 });
 
-      // First call -- the recorded sshPid is alive AND fetchHealth returns
+      // First call -- the recorded PID is alive AND fetchHealth returns
       // true (default), so the reuse branch should fire on Phase 1 and we
-      // expect zero `openSshTunnel` calls.
+      // expect zero `startPortForward` calls.
       await c.ensureReachable!(handle, { app, sessionId: "s-1" });
-      let openCalls = calls.filter((call) => call.fn === "openSshTunnel");
+      let openCalls = calls.filter((call) => call.fn === "startPortForward");
       expect(openCalls.length).toBe(0);
 
       // Second call -- still healthy. Same expectation.
       await c.ensureReachable!(handle, { app, sessionId: "s-1" });
-      openCalls = calls.filter((call) => call.fn === "openSshTunnel");
+      openCalls = calls.filter((call) => call.fn === "startPortForward");
       expect(openCalls.length).toBe(0);
 
       // The kill helper must NOT have fired -- nothing was stale.
-      const kills = calls.filter((call) => call.fn === "killSshTunnel");
+      const kills = calls.filter((call) => call.fn === "killPortForward");
       expect(kills.length).toBe(0);
     });
 
     it("second call with a dead tunnel kills the orphan and respawns", async () => {
-      // Custom helpers: the rehydrate-time `fetchHealth` (URL-targeted at
-      // the recorded port) returns false. After the kill+respawn the
-      // /health poll for the *new* port returns true so the test path
-      // converges. The /health URL identifies which probe each call is.
       const recordedPort = 60001;
       const recordedPid = 12345;
 
-      let openSshCount = 0;
+      let openCount = 0;
       let killCount = 0;
       const kills: number[] = [];
       const opens: Array<Record<string, unknown>> = [];
 
       const helpers: EC2ComputeHelpers = {
-        generateSshKey: async () => ({ publicKeyPath: "/k.pub", privateKeyPath: "/k" }),
-        sshExec: async () => ({ stdout: "ok", stderr: "", exitCode: 0 }),
+        ssmExec: async () => ({ stdout: "ok", stderr: "", exitCode: 0 }),
+        ssmCheckInstance: async () => true,
         buildUserData: async () => "",
         provisionStack: async () => ({ ip: null, instance_id: "i", stack_name: "s" }),
         destroyStack: async () => {},
         startInstance: async () => ({ publicIp: null, privateIp: null }),
         stopInstance: async () => {},
         describeInstance: async () => ({ publicIp: null, privateIp: null }),
-        openSshTunnel: (o) => {
-          openSshCount += 1;
+        startPortForward: (o) => {
+          openCount += 1;
           opens.push(o);
-          return 90000 + openSshCount;
+          return { pid: 90000 + openCount };
         },
-        killSshTunnel: (pid) => {
+        killPortForward: (pid) => {
           killCount += 1;
           kills.push(pid);
         },
-        allocatePort: async () => recordedPort + 1, // freshly allocated port
+        allocatePort: async () => recordedPort + 1,
         fetchHealth: async (url) => {
-          // The reuse-path probe targets the recorded port; mark it dead.
-          // The Phase-2 probe targets the freshly allocated port; mark it
-          // alive so the call sequence converges.
           if (url.includes(`localhost:${recordedPort}`)) return false;
           return true;
         },
@@ -498,19 +482,16 @@ describe("EC2Compute", async () => {
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      const handle = makeProvisionedHandle({ sshPid: recordedPid, arkdLocalPort: recordedPort });
+      const handle = makeProvisionedHandle({ portForwardPid: recordedPid, arkdLocalPort: recordedPort });
 
       await c.ensureReachable!(handle, { app, sessionId: "s-1" });
 
-      // The orphaned ssh process must have been killed before respawn.
       expect(killCount).toBe(1);
       expect(kills[0]).toBe(recordedPid);
-      // A fresh tunnel must have been spawned.
-      expect(openSshCount).toBe(1);
-      // The freshly-allocated port must be the one we record.
+      expect(openCount).toBe(1);
       const meta = (handle.meta as { ec2: EC2HandleMeta }).ec2;
       expect(meta.arkdLocalPort).toBe(recordedPort + 1);
-      expect(meta.sshPid).toBe(90001);
+      expect(meta.portForwardPid).toBe(90001);
     });
   });
 

@@ -1,77 +1,56 @@
 /**
- * SSH connection pool using OpenSSH ControlMaster multiplexing.
+ * SSM-backed exec pool for EC2 hosts.
  *
- * One persistent master connection per host. All SSH operations (exec, rsync,
- * tunnels) multiplex over it. A semaphore limits concurrent channels.
+ * Originally an SSH ControlMaster multiplexer; under pure SSM there's no
+ * persistent socket to keep alive -- SendCommand is independent per call.
+ * This module is preserved as a thin adapter so legacy callers keep
+ * working: it bounds in-flight calls with a semaphore but otherwise
+ * delegates to the SSM helpers.
  *
- * Transport: the master connection is SSM-tunneled SSH. The host arg is
- * an EC2 instance_id; SSM provides the underlying TCP transport via
- * AWS-StartSSHSession.
+ * Port-forward management lives on the EC2Compute helper surface (see
+ * core/ec2.ts:DEFAULT_HELPERS.startPortForward / killPortForward). The
+ * pool's `spawnTunnel` / `attachArgs` shapes were SSH-specific and have
+ * been removed -- callers that need a forward should call ssmStartPortForward
+ * directly.
  */
 
-import { execFile, spawn } from "child_process";
-import { promisify } from "util";
-import { existsSync, mkdirSync, rmSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
-import { SSH_OPTS, buildSsmProxyArgs, type SsmConnectOpts } from "./ssh.js";
-import { REMOTE_USER } from "./constants.js";
-import { safeAsync } from "../../../core/safe.js";
+import { ssmExec, type SsmConnectOpts } from "./ssm.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
 
-const execFileAsync = promisify(execFile);
-
-const CONTROL_DIR = join(homedir(), ".ark", "ssh-control");
-
-/** Timeout for SSH control socket health checks */
-const SSH_CHECK_TIMEOUT_MS = 5_000;
-
-/** Timeout for establishing the ControlMaster connection */
-const SSH_MASTER_CONNECT_TIMEOUT_MS = 20_000;
-
-/** Default timeout for SSH command execution */
-const SSH_EXEC_TIMEOUT_MS = 30_000;
-
-/** Default timeout for rsync file transfer operations */
-const RSYNC_TIMEOUT_MS = 300_000;
+/** Default timeout for SSM command execution */
+const SSM_EXEC_TIMEOUT_MS = 30_000;
 
 export interface SSHPoolOpts {
   computeName: string;
-  key: string;
   instanceId: string;
   ssm: SsmConnectOpts;
   maxConcurrent?: number; // default 10
-  controlPersist?: number; // default 300 seconds
 }
 
+/**
+ * SSM-backed exec pool. The class name is preserved for back-compat with
+ * legacy callers; under the hood it's now a SendCommand semaphore -- there
+ * is no SSH process to multiplex.
+ */
 export class SSHPool {
   readonly computeName: string;
-  readonly key: string;
   private instanceId: string;
   private ssm: SsmConnectOpts;
-  private socketPath: string;
   private maxConcurrent: number;
-  private controlPersist: number;
   private active = 0;
   private waitQueue: Array<() => void> = [];
-  private masterStarting = false;
   private closed = false;
 
   constructor(opts: SSHPoolOpts) {
     this.computeName = opts.computeName;
-    this.key = opts.key;
     this.instanceId = opts.instanceId;
     this.ssm = opts.ssm;
     this.maxConcurrent = opts.maxConcurrent ?? 10;
-    this.controlPersist = opts.controlPersist ?? 300;
-    this.socketPath = join(CONTROL_DIR, `${opts.computeName}.sock`);
-    mkdirSync(CONTROL_DIR, { recursive: true });
   }
 
-  /** Update target instance_id (after stop/start cycle). Destroys existing master. */
+  /** Update target instance_id (after stop/start cycle). */
   async updateTarget(newInstanceId: string, newSsm?: SsmConnectOpts): Promise<void> {
     if (newInstanceId === this.instanceId && (!newSsm || newSsm === this.ssm)) return;
-    await this.destroyMaster();
     this.instanceId = newInstanceId;
     if (newSsm) this.ssm = newSsm;
   }
@@ -80,219 +59,40 @@ export class SSHPool {
     return this.instanceId;
   }
 
+  /**
+   * "Alive" under SSM means the agent reports Online. We don't probe per
+   * call; callers that want a connectivity check should use
+   * `ssmCheckInstance` directly.
+   */
   async isAlive(): Promise<boolean> {
-    if (this.closed) return false;
-    try {
-      await execFileAsync(
-        "ssh",
-        ["-i", this.key, "-o", `ControlPath=${this.socketPath}`, "-O", "check", `${REMOTE_USER}@${this.instanceId}`],
-        { timeout: SSH_CHECK_TIMEOUT_MS },
-      );
-      return true;
-    } catch {
-      // Expected when master socket doesn't exist yet
-      return false;
-    }
+    return !this.closed;
   }
 
-  /** Ensure the ControlMaster socket is established. */
+  /** No-op under SSM (kept for back-compat with the legacy ControlMaster API). */
   async connect(): Promise<void> {
     if (this.closed) throw new Error("Pool is closed");
-    if (await this.isAlive()) return;
-    if (this.masterStarting) {
-      await new Promise<void>((r) => this.waitQueue.push(r));
-      return;
-    }
-
-    this.masterStarting = true;
-    try {
-      if (existsSync(this.socketPath)) {
-        try {
-          rmSync(this.socketPath);
-        } catch {
-          logDebug("pool", "Stale socket file may already be gone -- safe to ignore");
-        }
-      }
-
-      await execFileAsync(
-        "ssh",
-        [
-          "-i",
-          this.key,
-          ...SSH_OPTS,
-          ...buildSsmProxyArgs(this.ssm),
-          "-o",
-          `ControlMaster=yes`,
-          "-o",
-          `ControlPath=${this.socketPath}`,
-          "-o",
-          `ControlPersist=${this.controlPersist}`,
-          "-N",
-          "-f",
-          `${REMOTE_USER}@${this.instanceId}`,
-        ],
-        { timeout: SSH_MASTER_CONNECT_TIMEOUT_MS },
-      );
-    } finally {
-      this.masterStarting = false;
-      const q = this.waitQueue.splice(0);
-      q.forEach((r) => r());
-    }
   }
 
-  /** Execute a command over the multiplexed connection. */
+  /** Execute a command via SSM SendCommand. */
   async exec(cmd: string, opts?: { timeout?: number }): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    await this.connect();
+    if (this.closed) throw new Error("Pool is closed");
     await this.acquire();
     try {
-      const { stdout } = await execFileAsync(
-        "ssh",
-        [
-          "-i",
-          this.key,
-          "-o",
-          `ControlPath=${this.socketPath}`,
-          "-o",
-          "ControlMaster=no",
-          "-o",
-          "StrictHostKeyChecking=no",
-          "-o",
-          "LogLevel=ERROR",
-          `${REMOTE_USER}@${this.instanceId}`,
-          cmd,
-        ],
-        { encoding: "utf-8", timeout: opts?.timeout ?? SSH_EXEC_TIMEOUT_MS },
-      );
-      return { stdout, stderr: "", exitCode: 0 };
-    } catch (err: any) {
-      return {
-        stdout: err.stdout?.toString() ?? "",
-        stderr: err.stderr?.toString() ?? "",
-        exitCode: typeof err.status === "number" ? err.status : 1,
-      };
-    } finally {
-      this.release();
-    }
-  }
-
-  rsyncSshOpt(): string {
-    return `ssh -i ${this.key} -o ControlPath=${this.socketPath} -o ControlMaster=no -o StrictHostKeyChecking=no`;
-  }
-
-  async rsyncPush(local: string, remote: string, opts?: { timeout?: number }): Promise<void> {
-    await this.connect();
-    await this.acquire();
-    try {
-      await safeAsync(`[ec2] SSHPool.rsyncPush: (${local} -> ${this.instanceId}:${remote})`, async () => {
-        await execFileAsync(
-          "rsync",
-          [
-            "-avz",
-            "--update",
-            "--timeout=30",
-            "-e",
-            this.rsyncSshOpt(),
-            local,
-            `${REMOTE_USER}@${this.instanceId}:${remote}`,
-          ],
-          { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
-        );
+      return await ssmExec({
+        instanceId: this.instanceId,
+        region: this.ssm.region,
+        awsProfile: this.ssm.awsProfile,
+        command: cmd,
+        timeoutMs: opts?.timeout ?? SSM_EXEC_TIMEOUT_MS,
       });
     } finally {
       this.release();
     }
-  }
-
-  async rsyncPull(remote: string, local: string, opts?: { timeout?: number }): Promise<void> {
-    await this.connect();
-    await this.acquire();
-    try {
-      await safeAsync(`[ec2] SSHPool.rsyncPull: (${this.instanceId}:${remote} -> ${local})`, async () => {
-        await execFileAsync(
-          "rsync",
-          [
-            "-avz",
-            "--update",
-            "--timeout=30",
-            "-e",
-            this.rsyncSshOpt(),
-            `${REMOTE_USER}@${this.instanceId}:${remote}`,
-            local,
-          ],
-          { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
-        );
-      });
-    } finally {
-      this.release();
-    }
-  }
-
-  /** Spawn a persistent tunnel using the ControlMaster. */
-  spawnTunnel(flags: string[]): void {
-    const child = spawn(
-      "ssh",
-      [
-        "-i",
-        this.key,
-        "-o",
-        `ControlPath=${this.socketPath}`,
-        "-o",
-        "ControlMaster=no",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-N",
-        "-f",
-        ...flags,
-        `${REMOTE_USER}@${this.instanceId}`,
-      ],
-      { detached: true, stdio: "ignore" },
-    );
-    child.unref();
-  }
-
-  /** Build args for interactive attach. */
-  attachArgs(remoteCmd: string): string[] {
-    return [
-      "ssh",
-      "-i",
-      this.key,
-      "-o",
-      `ControlPath=${this.socketPath}`,
-      "-o",
-      "ControlMaster=no",
-      "-o",
-      "StrictHostKeyChecking=no",
-      "-o",
-      "ConnectTimeout=10",
-      "-t",
-      `${REMOTE_USER}@${this.instanceId}`,
-      remoteCmd,
-    ];
   }
 
   async close(): Promise<void> {
     this.closed = true;
-    await this.destroyMaster();
-  }
-
-  private async destroyMaster(): Promise<void> {
-    try {
-      await execFileAsync(
-        "ssh",
-        ["-o", `ControlPath=${this.socketPath}`, "-O", "exit", `${REMOTE_USER}@${this.instanceId}`],
-        {
-          timeout: SSH_CHECK_TIMEOUT_MS,
-        },
-      );
-    } catch {
-      logDebug("pool", "Master may already be dead -- expected during cleanup");
-    }
-    try {
-      // Clean up control socket file at this.socketPath
-      if (existsSync(this.socketPath)) rmSync(this.socketPath);
-    } catch {
-      logDebug("pool", "Socket file at this.socketPath may already be removed -- safe to ignore");
-    }
+    logDebug("pool", "ssm pool closed (no socket to tear down)");
   }
 
   private async acquire(): Promise<void> {
@@ -319,13 +119,13 @@ export function getPool(computeName: string): SSHPool | undefined {
   return pools.get(computeName);
 }
 
-export function getOrCreatePool(computeName: string, key: string, instanceId: string, ssm: SsmConnectOpts): SSHPool {
+export function getOrCreatePool(computeName: string, instanceId: string, ssm: SsmConnectOpts): SSHPool {
   let pool = pools.get(computeName);
   if (pool) {
     if (pool.getInstanceId() !== instanceId) pool.updateTarget(instanceId, ssm);
     return pool;
   }
-  pool = new SSHPool({ computeName, key, instanceId, ssm });
+  pool = new SSHPool({ computeName, instanceId, ssm });
   pools.set(computeName, pool);
   return pool;
 }

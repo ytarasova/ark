@@ -8,7 +8,7 @@ Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types
 
 | module | fan-in |
 | --- | --- |
-| `packages/core/observability/structured-log.ts` | 169 |
+| `packages/core/observability/structured-log.ts` | 170 |
 | `packages/core/app.ts` | 148 |
 | `packages/types/index.ts` | 106 |
 | `packages/web/src/lib/utils.ts` | 94 |
@@ -22,11 +22,11 @@ Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types
 | `packages/server/validate.ts` | 29 |
 | `packages/core/config.ts` | 27 |
 | `packages/core/constants.ts` | 24 |
-| `packages/core/safe.ts` | 21 |
 | `packages/core/services/dispatch/types.ts` | 21 |
 | `packages/core/tickets/types.ts` | 21 |
 | `packages/compute/core/types.ts` | 20 |
 | `packages/core/index.ts` | 20 |
+| `packages/core/safe.ts` | 20 |
 | `packages/core/triggers/types.ts` | 18 |
 
 ## Orphans (99)
@@ -918,7 +918,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/compute/providers/ec2/constants.ts`
   - `packages/compute/providers/ec2/placement-ctx.ts`
   - `packages/compute/providers/ec2/provision.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/compute/util.ts`
   - `packages/core/app.ts`
   - `packages/core/conductor/arkd-events-consumer.ts`
@@ -1222,9 +1222,10 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/compute/providers/ec2/clipboard.ts`
 
 - fan-in: 0
-- fan-out: 2
+- fan-out: 3
 - imports:
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/shell-escape.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/core/observability/structured-log.ts`
 
 ### `packages/compute/providers/ec2/cloud-init.ts`
@@ -1234,7 +1235,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/compute/providers/ec2/constants.ts`
 
-- fan-in: 8
+- fan-in: 5
 - fan-out: 0
 
 ### `packages/compute/providers/ec2/cost.ts`
@@ -1248,7 +1249,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - fan-out: 3
 - imports:
   - `packages/compute/providers/ec2/constants.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/compute/types.ts`
 
 ### `packages/compute/providers/ec2/placement-ctx.ts`
@@ -1258,27 +1259,24 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - imports:
   - `packages/compute/providers/ec2/constants.ts`
   - `packages/compute/providers/ec2/shell-escape.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/core/observability/structured-log.ts`
   - `packages/core/secrets/placement-types.ts`
 
 ### `packages/compute/providers/ec2/pool.ts`
 
 - fan-in: 2
-- fan-out: 4
+- fan-out: 2
 - imports:
-  - `packages/compute/providers/ec2/constants.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/core/observability/structured-log.ts`
-  - `packages/core/safe.ts`
 
 ### `packages/compute/providers/ec2/ports.ts`
 
 - fan-in: 1
-- fan-out: 4
+- fan-out: 3
 - imports:
-  - `packages/compute/providers/ec2/constants.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/compute/types.ts`
   - `packages/core/observability/structured-log.ts`
 
@@ -1300,22 +1298,21 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - fan-out: 3
 - imports:
   - `packages/compute/providers/ec2/constants.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/compute/util.ts`
 
 ### `packages/compute/providers/ec2/shell-escape.ts`
 
-- fan-in: 3
+- fan-in: 4
 - fan-out: 0
 
-### `packages/compute/providers/ec2/ssh.ts`
+### `packages/compute/providers/ec2/ssm.ts`
 
 - fan-in: 10
-- fan-out: 3
+- fan-out: 2
 - imports:
-  - `packages/compute/providers/ec2/constants.ts`
   - `packages/compute/providers/ec2/shell-escape.ts`
-  - `packages/compute/util.ts`
+  - `packages/core/observability/structured-log.ts`
 
 ### `packages/compute/providers/ec2/sync.ts`
 
@@ -1324,7 +1321,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - imports:
   - `packages/compute/providers/ec2/constants.ts`
   - `packages/compute/providers/ec2/shell-escape.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/core/safe.ts`
 
 ### `packages/compute/providers/firecracker-placement-ctx.ts`
@@ -1387,7 +1384,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/compute/providers/ec2/pool.ts`
   - `packages/compute/providers/ec2/ports.ts`
   - `packages/compute/providers/ec2/provision.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/compute/providers/ec2/sync.ts`
   - `packages/compute/types.ts`
   - `packages/compute/util.ts`
@@ -1408,7 +1405,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/compute/util.ts`
 
-- fan-in: 4
+- fan-in: 3
 - fan-out: 0
 
 ### `packages/core/acp.ts`
@@ -4112,7 +4109,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/observability/structured-log.ts`
 
-- fan-in: 169
+- fan-in: 170
 - fan-out: 0
 
 ### `packages/core/observability/telemetry.ts`
@@ -4510,7 +4507,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/safe.ts`
 
-- fan-in: 21
+- fan-in: 20
 - fan-out: 1
 - imports:
   - `packages/core/observability/structured-log.ts`
@@ -4978,12 +4975,13 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/services/dispatch/target-resolver.ts`
 
 - fan-in: 1
-- fan-out: 5
+- fan-out: 6
 - imports:
   - `packages/compute/core/compute-target.ts`
   - `packages/compute/core/types.ts`
   - `packages/core/app.ts`
   - `packages/core/observability/structured-log.ts`
+  - `packages/core/services/provisioning-steps.ts`
   - `packages/types/index.ts`
 
 ### `packages/core/services/dispatch/task-assembly.ts`
@@ -5057,7 +5055,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/services/provisioning-steps.ts`
 
-- fan-in: 4
+- fan-in: 5
 - fan-out: 2
 - imports:
   - `packages/core/app.ts`
@@ -6639,7 +6637,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - imports:
   - `packages/compute/adapters/provider-map.ts`
   - `packages/compute/index.ts`
-  - `packages/compute/providers/ec2/ssh.ts`
+  - `packages/compute/providers/ec2/ssm.ts`
   - `packages/core/app.ts`
   - `packages/core/infra/tmux.ts`
   - `packages/core/observability/structured-log.ts`

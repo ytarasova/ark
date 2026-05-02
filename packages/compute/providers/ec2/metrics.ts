@@ -1,10 +1,10 @@
 /**
- * SSH-based metrics collection for EC2 hosts.
+ * SSM-based metrics collection for EC2 hosts.
  * Ported from BigBox's dashboard/fetch.py + parse.py to TypeScript.
  */
 
 import type { DockerContainer, ComputeMetrics, ComputeProcess, ComputeSession, ComputeSnapshot } from "../../types.js";
-import { sshExec, sshExecAsync, type SsmConnectOpts } from "./ssh.js";
+import { ssmExec, type SsmConnectOpts } from "./ssm.js";
 import { REMOTE_PROJECTS_DIR } from "./constants.js";
 
 // ---------------------------------------------------------------------------
@@ -62,8 +62,8 @@ const DOCKER_PS_CMD = "docker ps --format '{{.Names}}\\t{{.Image}}' 2>/dev/null"
 // Exported SSH command strings
 // ---------------------------------------------------------------------------
 
-/** Single SSH command that outputs section-delimited fast metrics. */
-export const SSH_FAST_CMD: string = [
+/** Single shell command that outputs section-delimited fast metrics. */
+export const FAST_METRICS_CMD: string = [
   'echo "=== CPU ===" && { cpu=$(mpstat 1 1 2>/dev/null | tail -1 | awk \'NF>0{printf "%.1f", 100 - $NF}\'); [ -n "$cpu" ] && echo "$cpu" || top -bn1 | awk \'/^%?Cpu/{printf "%.1f\\n", 100 - $8}\'; }',
   'echo "=== MEMORY ===" && free | awk \'/Mem:/{printf "%.1f %.1f\\n", $3/1024, $2/1024}\'',
   "echo \"=== DISK ===\" && df / | tail -1 | awk '{print $5}' | tr -d '%'",
@@ -75,8 +75,8 @@ export const SSH_FAST_CMD: string = [
   `echo "=== NETWORK ===" && ${NETWORK_CMD}`,
 ].join("\n");
 
-/** SSH command for docker stats + docker ps. */
-export const SSH_DOCKER_CMD: string = [
+/** Shell command for docker stats + docker ps. */
+export const DOCKER_METRICS_CMD: string = [
   `echo "=== DOCKER ===" && ${DOCKER_CMD}`,
   `echo "=== DOCKER_PS ===" && ${DOCKER_PS_CMD}`,
 ].join("\n");
@@ -105,7 +105,7 @@ function emptySnapshot(): ComputeSnapshot {
   return { metrics: emptyMetrics(), sessions: [], processes: [], docker: [] };
 }
 
-/** Split raw SSH output into named sections. */
+/** Split raw command output into named sections. */
 function splitSections(stdout: string): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   let cur: string | null = null;
@@ -254,7 +254,7 @@ function parseDocker(s: Record<string, string[]>): DockerContainer[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse section-delimited SSH output into a typed ComputeSnapshot.
+ * Parse section-delimited command output into a typed ComputeSnapshot.
  * Returns a zero-valued snapshot for empty / invalid input (never throws).
  */
 export function parseSnapshot(stdout: string): ComputeSnapshot {
@@ -270,39 +270,31 @@ export function parseSnapshot(stdout: string): ComputeSnapshot {
 }
 
 /**
- * Fetch fast metrics from an EC2 host via SSH (over SSM tunnel).
- * Runs SSH_FAST_CMD and parses the output into a ComputeSnapshot.
+ * Fetch fast metrics from an EC2 host via SSM SendCommand.
+ * Runs FAST_METRICS_CMD and parses the output into a ComputeSnapshot.
  */
-export async function fetchMetrics(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExec(key, instanceId, SSH_FAST_CMD, { ...ssm, timeout: 15_000 });
+export async function fetchMetrics(instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
+  const { stdout } = await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: FAST_METRICS_CMD,
+    timeoutMs: 15_000,
+  });
   return parseSnapshot(stdout);
 }
 
 /**
- * Fetch fast metrics from an EC2 host via SSH (async / non-blocking).
+ * Fetch docker metrics from an EC2 host via SSM SendCommand.
+ * Runs DOCKER_METRICS_CMD and parses the output (only docker fields populated).
  */
-export async function fetchMetricsAsync(
-  key: string,
-  instanceId: string,
-  ssm: SsmConnectOpts,
-): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExecAsync(key, instanceId, SSH_FAST_CMD, { ...ssm, timeout: 15_000 });
-  return parseSnapshot(stdout);
-}
-
-/**
- * Fetch docker metrics from an EC2 host via SSH (over SSM tunnel).
- * Runs SSH_DOCKER_CMD and parses the output (only docker fields populated).
- */
-export async function fetchDocker(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExec(key, instanceId, SSH_DOCKER_CMD, { ...ssm, timeout: 30_000 });
-  return parseSnapshot(stdout);
-}
-
-/**
- * Fetch docker metrics from an EC2 host via SSH (async / non-blocking).
- */
-export async function fetchDockerAsync(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExecAsync(key, instanceId, SSH_DOCKER_CMD, { ...ssm, timeout: 30_000 });
+export async function fetchDocker(instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
+  const { stdout } = await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: DOCKER_METRICS_CMD,
+    timeoutMs: 30_000,
+  });
   return parseSnapshot(stdout);
 }

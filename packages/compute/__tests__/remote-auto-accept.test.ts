@@ -2,47 +2,38 @@
  * Tests for remote autoAcceptChannelPrompt in EC2 remote-setup.
  * Verifies that the remote version sends "1" + Enter (not just Enter),
  * handles double-prompt from resume fallback, and uses correct working markers.
+ *
+ * Uses spyOn rather than mock.module so the SSM module isn't poisoned for
+ * other test files in the same `bun test` invocation (notably ec2-ssm.test.ts).
  */
 
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterAll, spyOn } from "bun:test";
+import * as ssmModule from "../providers/ec2/ssm.js";
+import * as utilModule from "../util.js";
 
-// ── Mock SSH module before importing remote-setup ────────────────────────────
+// ── Spy setup ────────────────────────────────────────────────────────────────
 
-const sshCalls: { cmd: string }[] = [];
-let sshResponses: { stdout: string; stderr: string; exitCode: number }[] = [];
-let sshIndex = 0;
+const ssmCalls: { cmd: string }[] = [];
+let ssmResponses: { stdout: string; stderr: string; exitCode: number }[] = [];
+let ssmIndex = 0;
 
-const mockSshExec = mock(async (_key: string, _ip: string, cmd: string, _opts?: any) => {
-  sshCalls.push({ cmd });
-  const response = sshResponses[sshIndex] ?? { stdout: "", stderr: "", exitCode: 0 };
-  // Advance index for capture-pane calls only (not send-keys)
-  if (cmd.includes("capture-pane")) {
-    sshIndex = Math.min(sshIndex + 1, sshResponses.length - 1);
-  }
-  return response;
+const ssmExecSpy = spyOn(ssmModule, "ssmExec").mockImplementation(
+  async (opts: { instanceId: string; command: string; [k: string]: unknown }) => {
+    ssmCalls.push({ cmd: opts.command });
+    const response = ssmResponses[ssmIndex] ?? { stdout: "", stderr: "", exitCode: 0 };
+    if (opts.command.includes("capture-pane")) {
+      ssmIndex = Math.min(ssmIndex + 1, ssmResponses.length - 1);
+    }
+    return response;
+  },
+);
+
+const sleepSpy = spyOn(utilModule, "sleep").mockImplementation(async () => {});
+
+afterAll(() => {
+  ssmExecSpy.mockRestore();
+  sleepSpy.mockRestore();
 });
-
-mock.module("../providers/ec2/ssh.js", () => ({
-  sshExecAsync: mockSshExec,
-  sshExec: mockSshExec,
-  sshKeyPath: mock((name: string) => `/home/ubuntu/.ssh/ark-${name}`),
-  sshBaseArgs: mock(() => ["ssh"]),
-  SSH_OPTS: [],
-  waitForSsh: mock(async () => true),
-  waitForSshAsync: mock(async () => true),
-  generateSshKey: mock(async () => ({ publicKeyPath: "", privateKeyPath: "" })),
-  rsyncPush: mock(async () => {}),
-  rsyncPull: mock(async () => {}),
-  rsyncPushArgs: mock(() => []),
-  rsyncPullArgs: mock(() => []),
-}));
-
-// Mock the sleep utility to be fast
-mock.module("../util.js", () => ({
-  sleep: mock(async (_ms: number) => {}),
-  poll: mock(async () => true),
-  retry: mock(async () => null),
-}));
 
 const { autoAcceptChannelPrompt } = await import("../providers/ec2/remote-setup.js");
 
@@ -69,50 +60,49 @@ const STARTUP_OUTPUT = `
 `;
 
 beforeEach(() => {
-  sshCalls.length = 0;
-  sshResponses = [];
-  sshIndex = 0;
-  mockSshExec.mockClear();
+  ssmCalls.length = 0;
+  ssmResponses = [];
+  ssmIndex = 0;
+  ssmExecSpy.mockClear();
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("remote autoAcceptChannelPrompt", async () => {
   it("sends '1' then Enter when prompt is detected", async () => {
-    sshResponses = [ok(PROMPT_OUTPUT), ok(WORKING_OUTPUT)];
+    ssmResponses = [ok(PROMPT_OUTPUT), ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
+    const sendKeysCalls = ssmCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
     expect(sendKeysCalls[0].cmd).toContain("send-keys -t 'ark-test' 1");
     expect(sendKeysCalls[1].cmd).toContain("send-keys -t 'ark-test' Enter");
   });
 
   it("stops polling when Claude is working", async () => {
-    sshResponses = [ok(WORKING_OUTPUT)];
+    ssmResponses = [ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
+    const sendKeysCalls = ssmCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
   });
 
   it("handles double prompt from resume fallback", async () => {
-    sshResponses = [
+    ssmResponses = [
       ok(PROMPT_OUTPUT), // 1st prompt
       ok(STARTUP_OUTPUT), // resume failing
       ok(PROMPT_OUTPUT), // 2nd prompt
       ok(WORKING_OUTPUT), // finally working
     ];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", {
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", {
       maxAttempts: 10,
       delayMs: 1,
     });
 
-    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
-    // Should have sent keys for BOTH prompts: "1", Enter, "1", Enter
+    const sendKeysCalls = ssmCalls.filter((c) => c.cmd.includes("send-keys"));
     const enterCalls = sendKeysCalls.filter((c) => c.cmd.includes("Enter"));
     const oneCalls = sendKeysCalls.filter((c) => c.cmd.endsWith(" 1"));
     expect(enterCalls.length).toBeGreaterThanOrEqual(2);
@@ -124,11 +114,11 @@ describe("remote autoAcceptChannelPrompt", async () => {
       --dangerously-load-development-channels is for local channel development
       only. Do not use downloaded channels.
     `;
-    sshResponses = [ok(altPrompt), ok(WORKING_OUTPUT)];
+    ssmResponses = [ok(altPrompt), ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
+    const sendKeysCalls = ssmCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
   });
 
@@ -137,50 +127,43 @@ describe("remote autoAcceptChannelPrompt", async () => {
       Claude is running
       esc to interrupt
     `;
-    sshResponses = [ok(working)];
+    ssmResponses = [ok(working)];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
+    const sendKeysCalls = ssmCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
   });
 
   it("does NOT match 'Welcome' or 'Claude Code v' as working indicators", async () => {
-    // Previously the remote version used these as success indicators,
-    // which could match before the channel prompt appeared
     const earlyOutput = `Welcome to Ubuntu\nClaude Code v1.2.3`;
-    sshResponses = [
-      ok(earlyOutput), // should NOT stop polling here
-      ok(PROMPT_OUTPUT), // prompt appears
-      ok(WORKING_OUTPUT), // actually working
-    ];
+    ssmResponses = [ok(earlyOutput), ok(PROMPT_OUTPUT), ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", {
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", {
       maxAttempts: 10,
       delayMs: 1,
     });
 
-    // Should have continued past the "Welcome" output and accepted the prompt
-    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
+    const sendKeysCalls = ssmCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
   });
 
   it("captures 30 lines of tmux output", async () => {
-    sshResponses = [ok(WORKING_OUTPUT)];
+    ssmResponses = [ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 3, delayMs: 1 });
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 3, delayMs: 1 });
 
-    const captureCalls = sshCalls.filter((c) => c.cmd.includes("capture-pane"));
+    const captureCalls = ssmCalls.filter((c) => c.cmd.includes("capture-pane"));
     expect(captureCalls.length).toBeGreaterThan(0);
     expect(captureCalls[0].cmd).toContain("tail -30");
   });
 
   it("exhausts max attempts without error", async () => {
-    sshResponses = [ok(STARTUP_OUTPUT)];
+    ssmResponses = [ok(STARTUP_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 3, delayMs: 1 });
+    await autoAcceptChannelPrompt("i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 3, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
+    const sendKeysCalls = ssmCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
   });
 });

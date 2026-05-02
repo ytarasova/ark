@@ -60,7 +60,7 @@ Total RPC methods: **246**.  Zod-validated: **112**.
 | `code-intel/tenant/list` | `packages/server/handlers/code-intel.ts` | 82 | no | packages/protocol/clients/code-intel.ts |
 | `compute/capabilities` | `packages/server/handlers/resource-compute.ts` | 187 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `compute/clean` | `packages/server/handlers/resource-compute.ts` | 325 | no | packages/protocol/clients/compute.ts |
-| `compute/clean-zombies` | `packages/server/handlers/resource-compute.ts` | 393 | no | packages/protocol/clients/compute.ts |
+| `compute/clean-zombies` | `packages/server/handlers/resource-compute.ts` | 400 | no | packages/protocol/clients/compute.ts |
 | `compute/create` | `packages/server/handlers/resource-compute.ts` | 53 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `compute/destroy` | `packages/server/handlers/resource-compute.ts` | 306 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `compute/docker-action` | `packages/server/handlers/metrics-local.ts` | 61 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
@@ -74,10 +74,10 @@ Total RPC methods: **246**.  Zod-validated: **112**.
 | `compute/reboot` | `packages/server/handlers/resource-compute.ts` | 333 | no | packages/protocol/clients/compute.ts |
 | `compute/start-instance` | `packages/server/handlers/resource-compute.ts` | 294 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `compute/stop-instance` | `packages/server/handlers/resource-compute.ts` | 263 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `compute/template/create` | `packages/server/handlers/resource-compute.ts` | 439 | no | _(no caller found)_ |
-| `compute/template/delete` | `packages/server/handlers/resource-compute.ts` | 458 | no | _(no caller found)_ |
-| `compute/template/get` | `packages/server/handlers/resource-compute.ts` | 422 | no | packages/protocol/clients/compute.ts |
-| `compute/template/list` | `packages/server/handlers/resource-compute.ts` | 399 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `compute/template/create` | `packages/server/handlers/resource-compute.ts` | 446 | no | _(no caller found)_ |
+| `compute/template/delete` | `packages/server/handlers/resource-compute.ts` | 465 | no | _(no caller found)_ |
+| `compute/template/get` | `packages/server/handlers/resource-compute.ts` | 429 | no | packages/protocol/clients/compute.ts |
+| `compute/template/list` | `packages/server/handlers/resource-compute.ts` | 406 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `compute/update` | `packages/server/handlers/resource-compute.ts` | 168 | no | packages/protocol/clients/compute.ts |
 | `conductor/bridge` | `packages/server/handlers/conductor.ts` | 98 | no | packages/protocol/clients/observability.ts |
 | `conductor/learn` | `packages/server/handlers/conductor.ts` | 69 | no | packages/protocol/clients/observability.ts |

@@ -1,53 +1,41 @@
 /**
- * SSH tunnel management for forwarding ports from remote EC2 hosts.
+ * Port-forward + remote-port-probe helpers for EC2 hosts.
  *
- * Transport: SSH runs over SSM Session Manager. The host arg is an
- * EC2 instance_id; tunnels still use SSH `-L` / `-R` flags but are
- * carried by SSM rather than direct TCP.
+ * Port forwarding goes through `aws ssm start-session
+ * --document-name AWS-StartPortForwardingSession` (the only SSM-sanctioned
+ * way to pipe TCP through Session Manager). The probe uses `ss -tln` over
+ * SSM SendCommand.
  */
 
-import { execFile, spawn } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import type { PortDecl, PortStatus } from "../../types.js";
-import { SSH_OPTS, sshExec, buildSsmProxyArgs, type SsmConnectOpts } from "./ssh.js";
-import { REMOTE_USER } from "./constants.js";
+import { ssmExec, ssmStartPortForward, type SsmConnectOpts } from "./ssm.js";
 import { logInfo, logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
 /**
- * Build SSH args for a background tunnel process.
- * Produces: ssh -i key -N -f -L port:localhost:port ... ${REMOTE_USER}@instance_id
+ * Spawn a background SSM port-forward for each declared port.
+ * Non-blocking - returns immediately. Tracks PIDs internally so
+ * `teardownTunnels` can find them.
  */
-export function buildTunnelArgs(key: string, instanceId: string, ports: PortDecl[], ssm: SsmConnectOpts): string[] {
-  const args = ["ssh", "-i", key, ...SSH_OPTS, ...buildSsmProxyArgs(ssm), "-N", "-f"];
-  for (const p of ports) {
-    args.push("-L", `${p.port}:localhost:${p.port}`);
-  }
-  args.push(`${REMOTE_USER}@${instanceId}`);
-  return args;
-}
-
-/**
- * Spawn a background SSH process with -L for each port.
- * Non-blocking - returns immediately.
- */
-export function setupTunnels(key: string, instanceId: string, ports: PortDecl[], ssm: SsmConnectOpts): void {
+export function setupTunnels(instanceId: string, ports: PortDecl[], ssm: SsmConnectOpts): void {
   if (ports.length === 0) return;
-
-  const args = buildTunnelArgs(key, instanceId, ports, ssm);
-  const [bin, ...rest] = args;
-
-  const child = spawn(bin, rest, {
-    detached: true,
-    stdio: "ignore",
-  });
-  child.unref();
+  for (const p of ports) {
+    ssmStartPortForward({
+      instanceId,
+      region: ssm.region,
+      awsProfile: ssm.awsProfile,
+      localPort: p.port,
+      remotePort: p.port,
+    });
+  }
 }
 
 /**
- * Kill SSH processes that are forwarding the given ports.
- * Uses lsof to find PIDs listening on each port, then kills them.
+ * Kill processes listening on the given local ports. Used to tear down
+ * port-forwards during compute stop/destroy.
  */
 export async function teardownTunnels(ports: PortDecl[]): Promise<void> {
   for (const p of ports) {
@@ -74,24 +62,17 @@ export async function teardownTunnels(ports: PortDecl[]): Promise<void> {
 }
 
 /**
- * Returns the PID of an existing forward tunnel for `(instanceId, remotePort)`, or null.
+ * Returns the PID of an existing forward for `(instanceId, remotePort)`, or null.
  *
- * The pgrep pattern includes the `:localhost:<remotePort>` half of the `-L`
- * flag *and* `${REMOTE_USER}@<instanceId>` -- the remote port is the
- * stable key (the local port is dynamically allocated and may differ across
- * runs), but the instance_id pins the match to this specific compute target.
- *
- * No `-a` (macOS pgrep doesn't support it), `--` to terminate flag
- * parsing, and we trust the substring match.
+ * The pgrep pattern matches against the AWS CLI command-line shape produced
+ * by `ssmStartPortForward` -- specifically it looks for the
+ * `--target <instanceId>` and the `portNumber=<remotePort>` substrings. The
+ * local port is dynamically allocated and intentionally not part of the
+ * match key.
  */
 async function findForwardTunnelPid(instanceId: string, remotePort: number): Promise<number | null> {
   try {
-    // Match the right-hand half of `-L <local>:localhost:<remote>` plus the
-    // remote target. The local port varies, so we deliberately don't anchor
-    // on it -- the (`:localhost:<remotePort>`, `${REMOTE_USER}@<instanceId>`)
-    // pair is unique enough to never collide with the reverse tunnel
-    // (which uses `<port>:localhost:<port>` -- same number both sides).
-    const pattern = `:localhost:${remotePort} .*${REMOTE_USER}@${instanceId}`;
+    const pattern = `start-session.*${instanceId}.*portNumber=${remotePort}`;
     const { stdout } = await execFileAsync("pgrep", ["-f", "--", pattern], { encoding: "utf-8" });
     const pid = stdout
       .trim()
@@ -105,20 +86,24 @@ async function findForwardTunnelPid(instanceId: string, remotePort: number): Pro
 }
 
 /**
- * Read the local-side port a forward tunnel is bound to by parsing the
- * matched ssh command line. We use `ps -o command=` (cross-platform) for the
- * pid the pgrep above returned and pull `-L <local>:localhost:<remote>`.
- *
- * This is how `setupForwardTunnel` discovers the local port for an *existing*
- * tunnel it's reusing -- the compute config is the source of truth, but the
- * helper has to be safe to call when the config has been wiped (e.g. a
- * crashed conductor that left the SSH process running).
+ * Read the local-side port a forward is bound to by parsing the matched AWS
+ * CLI command line. Used by `setupForwardTunnel` to recover the local port
+ * for an *existing* forward.
  */
 async function readForwardTunnelLocalPort(pid: number, remotePort: number): Promise<number | null> {
   try {
     const { stdout } = await execFileAsync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf-8" });
-    const match = stdout.match(new RegExp(`-L\\s+(\\d+):localhost:${remotePort}`));
-    if (!match) return null;
+    // Match `localPortNumber=<port>` *paired with* the same `portNumber=<remotePort>`
+    // already on the line so we don't pick the wrong forward when multiple
+    // are running.
+    const match = stdout.match(new RegExp(`portNumber=${remotePort}[^\\s]*localPortNumber=(\\d+)`));
+    if (!match) {
+      // CLI may have placed localPortNumber first; try the reverse.
+      const alt = stdout.match(new RegExp(`localPortNumber=(\\d+)[^\\s]*portNumber=${remotePort}`));
+      if (!alt) return null;
+      const port = parseInt(alt[1], 10);
+      return Number.isFinite(port) ? port : null;
+    }
     const port = parseInt(match[1], 10);
     return Number.isFinite(port) ? port : null;
   } catch {
@@ -127,18 +112,11 @@ async function readForwardTunnelLocalPort(pid: number, remotePort: number): Prom
 }
 
 /**
- * Spawn a background SSH forward tunnel (-L) so the conductor can reach a
- * service on the remote host (e.g. arkd at remote `localhost:19300`).
- * Local `localhost:<localPort>` -> remote `localhost:<remotePort>`.
- *
- * `localPort` is allocated by the caller via `allocatePort()` and threaded
- * in -- this lets the function stay a pure shell-out without dragging the
- * core port-allocator into the compute package. If a forward tunnel for
- * `(instanceId, remotePort)` is already running, we reuse it and return its
- * existing local port (ignoring the `localPort` arg) for idempotency.
+ * Spawn a background SSM port-forward so the conductor can reach a service
+ * on the remote host. If a forward for `(instanceId, remotePort)` is already
+ * running, we reuse it and return its existing local port for idempotency.
  */
 export async function setupForwardTunnel(
-  key: string,
   instanceId: string,
   remotePort: number,
   localPort: number,
@@ -151,36 +129,19 @@ export async function setupForwardTunnel(
       return { pid: existing, localPort: existingLocal, reused: true };
     }
     // Stale match (couldn't read the ps line) -- fall through and respawn.
-    // The duplicate would fail fast on the local port-bind anyway.
   }
 
-  const args = [
-    "ssh",
-    "-i",
-    key,
-    ...SSH_OPTS,
-    ...buildSsmProxyArgs(ssm),
-    "-N",
-    "-f",
-    "-L",
-    `${localPort}:localhost:${remotePort}`,
-    `${REMOTE_USER}@${instanceId}`,
-  ];
-  const [bin, ...rest] = args;
-  const child = spawn(bin, rest, { detached: true, stdio: "ignore" });
-  child.unref();
-
-  // ssh -f forks; the spawned child is the short-lived parent. Resolve the
-  // long-lived PID via pgrep with retries (race against fork).
-  for (let attempt = 0; attempt < 5; attempt++) {
-    await new Promise((r) => setTimeout(r, 100));
-    const pid = await findForwardTunnelPid(instanceId, remotePort);
-    if (pid) return { pid, localPort, reused: false };
-  }
-  return { pid: null, localPort, reused: false };
+  const { pid } = ssmStartPortForward({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    localPort,
+    remotePort,
+  });
+  return { pid: pid > 0 ? pid : null, localPort, reused: false };
 }
 
-/** Kill the forward tunnel for `(instanceId, remotePort)`, if any. Best-effort. */
+/** Kill the forward for `(instanceId, remotePort)`, if any. Best-effort. */
 export async function teardownForwardTunnel(instanceId: string, remotePort: number): Promise<boolean> {
   const pid = await findForwardTunnelPid(instanceId, remotePort);
   if (!pid) return false;
@@ -194,21 +155,25 @@ export async function teardownForwardTunnel(instanceId: string, remotePort: numb
 }
 
 /**
- * SSH into the remote host, run `ss -tln`, and check which declared ports
- * are actually listening. Returns a PortStatus[] with listening: true/false.
+ * Run `ss -tln` over SSM and check which declared ports are actually
+ * listening. Returns a PortStatus[] with listening: true/false.
  */
 export async function probeRemotePorts(
-  key: string,
   instanceId: string,
   ports: PortDecl[],
   ssm: SsmConnectOpts,
 ): Promise<PortStatus[]> {
   if (ports.length === 0) return [];
 
-  const { stdout: ssOutput } = await sshExec(key, instanceId, "ss -tln", { ...ssm, timeout: 15_000 });
+  const { stdout: ssOutput } = await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: "ss -tln",
+    timeoutMs: 15_000,
+  });
 
   if (!ssOutput) {
-    // If SSH fails, mark all ports as not listening
     return ports.map((p) => ({ ...p, listening: false }));
   }
 

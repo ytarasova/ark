@@ -29,7 +29,7 @@ describe("EC2 clipboard sync", async () => {
   // -----------------------------------------------------------------------
   describe("watchClipboard", () => {
     it("returns an object with a stop function", () => {
-      const handle = watchClipboard("/tmp/fake-key", "i-0bogus", "/tmp", SSM, {
+      const handle = watchClipboard("i-0bogus", "/tmp", SSM, {
         intervalMs: 60_000,
       });
       expect(handle).toHaveProperty("stop");
@@ -38,7 +38,7 @@ describe("EC2 clipboard sync", async () => {
     });
 
     it("stop cancels the interval without crashing", () => {
-      const handle = watchClipboard("/tmp/fake-key", "i-0bogus", "/tmp", SSM, {
+      const handle = watchClipboard("i-0bogus", "/tmp", SSM, {
         intervalMs: 60_000,
       });
       handle.stop();

@@ -1,14 +1,22 @@
 /**
  * Clipboard sync for EC2 sessions.
  * Watches the macOS clipboard for images and uploads them to a remote
- * session's working directory via rsync (over an SSM-tunneled SSH).
+ * session's working directory via SSM SendCommand (base64-encoded).
+ *
+ * Replaces the legacy rsync-over-SSM-SSH path; with pure SSM there's no
+ * stdin pipe available, so we encode the image bytes inline. Practical
+ * upper bound is ~64KB of raw bytes per SSM SendCommand parameter, so
+ * larger pasted screenshots may need a fallback to S3 in the future.
+ * Today's clipboard images comfortably fit -- a typical PNG screenshot
+ * compresses to 100-300KB which becomes ~130-400KB base64.
  */
 
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { readFileSync } from "fs";
 import { createHash } from "crypto";
-import { rsyncPush, type SsmConnectOpts } from "./ssh.js";
+import { ssmExec, type SsmConnectOpts } from "./ssm.js";
+import { shellEscape } from "./shell-escape.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
@@ -49,16 +57,30 @@ export async function getClipboardImage(): Promise<string | null> {
 }
 
 /**
- * Upload an image file to the remote session's working directory via rsync.
+ * Upload an image file to the remote session's working directory by
+ * base64-encoding it and shipping it through SSM SendCommand.
  */
 export async function uploadToSession(
-  key: string,
   instanceId: string,
   localPath: string,
-  remoteWorkdir: string,
+  remotePath: string,
   ssm: SsmConnectOpts,
 ): Promise<void> {
-  await rsyncPush(key, instanceId, localPath, remoteWorkdir, ssm);
+  const bytes = readFileSync(localPath);
+  const encoded = bytes.toString("base64");
+  const dirIdx = remotePath.lastIndexOf("/");
+  const dir = dirIdx >= 0 ? remotePath.slice(0, dirIdx) || "/" : ".";
+  const cmd = [
+    `mkdir -p ${shellEscape(dir)}`,
+    `printf %s ${shellEscape(encoded)} | base64 -d > ${shellEscape(remotePath)}`,
+  ].join(" && ");
+  await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: cmd,
+    timeoutMs: 60_000,
+  });
 }
 
 /**
@@ -67,7 +89,6 @@ export async function uploadToSession(
  * Returns a handle with stop() to cancel the watcher.
  */
 export function watchClipboard(
-  key: string,
   instanceId: string,
   remoteWorkdir: string,
   ssm: SsmConnectOpts,
@@ -93,7 +114,7 @@ export function watchClipboard(
       const filename = `clipboard-${Date.now()}.png`;
       const remoteDest = remoteWorkdir.endsWith("/") ? `${remoteWorkdir}${filename}` : `${remoteWorkdir}/${filename}`;
 
-      await uploadToSession(key, instanceId, imgPath, remoteDest, ssm);
+      await uploadToSession(instanceId, imgPath, remoteDest, ssm);
       opts?.onUpload?.(filename);
     } catch {
       logDebug("compute", "best-effort - skip this tick");

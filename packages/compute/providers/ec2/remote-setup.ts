@@ -4,12 +4,12 @@
  * Resolves git repos, clones them on the remote host, pre-trusts directories
  * in Claude's config, and handles the development-channels acceptance prompt.
  *
- * SSH transport is via SSM Session Manager; the host arg is an instance_id.
+ * Transport: pure AWS SSM SendCommand. The host arg is an instance_id.
  */
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { sshExecAsync, type SsmConnectOpts } from "./ssh.js";
+import { ssmExec, type SsmConnectOpts } from "./ssm.js";
 import { REMOTE_HOME } from "./constants.js";
 
 const execFileAsync = promisify(execFile);
@@ -19,13 +19,11 @@ const execFileAsync = promisify(execFile);
  */
 export async function getGitRemoteUrl(localPath: string): Promise<string | null> {
   try {
-    // stdio "pipe" so git's stderr doesn't leak to our process stderr for soft failures
     const { stdout } = await execFileAsync("git", ["-C", localPath, "remote", "get-url", "origin"], {
       encoding: "utf-8",
     });
     return stdout.trim() || null;
   } catch {
-    // Expected for non-git dirs, missing origin, etc. -- caller handles null
     return null;
   }
 }
@@ -37,7 +35,6 @@ export async function getGitRemoteUrl(localPath: string): Promise<string | null>
 export async function resolveRepoUrl(repo: string): Promise<string | null> {
   if (repo.startsWith("git@") || repo.startsWith("https://")) return repo;
   if (repo.includes("/") && !repo.startsWith("/")) return `git@github.com:${repo}.git`;
-  // Local path - extract remote
   return getGitRemoteUrl(repo);
 }
 
@@ -54,7 +51,6 @@ export function getRepoName(repoUrlOrPath: string): string {
  * Returns the remote working directory path.
  */
 export async function cloneRepoOnRemote(
-  key: string,
   instanceId: string,
   ssm: SsmConnectOpts,
   repoUrl: string,
@@ -62,23 +58,28 @@ export async function cloneRepoOnRemote(
   opts?: { branch?: string; sessionId?: string; onLog?: (msg: string) => void },
 ): Promise<string> {
   const log = opts?.onLog ?? (() => {});
-  const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(4, 12); // MMDD-HHMM (e.g. 03221430)
+  const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(4, 12);
   const branchSuffix = opts?.branch ? `-${opts.branch.split("/").pop()}` : "";
   const dirName = `${repoName}${branchSuffix}-${ts}`;
   const remotePath = `${REMOTE_HOME}/Projects/${dirName}`;
 
-  // Ensure Projects directory exists
-  await sshExecAsync(key, instanceId, "mkdir -p ~/Projects", { ...ssm, timeout: 5000 });
+  await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: "mkdir -p ~/Projects",
+    timeoutMs: 5000,
+  });
 
-  // Clone
   const branchFlag = opts?.branch ? `-b ${opts.branch}` : "";
   log(`Cloning ${repoUrl} into ${dirName}...`);
-  const { exitCode, stderr } = await sshExecAsync(
-    key,
+  const { exitCode, stderr } = await ssmExec({
     instanceId,
-    `cd ~/Projects && git clone ${branchFlag} ${repoUrl} ${dirName}`,
-    { ...ssm, timeout: 120_000 },
-  );
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: `cd ~/Projects && git clone ${branchFlag} ${repoUrl} ${dirName}`,
+    timeoutMs: 120_000,
+  });
 
   if (exitCode !== 0) {
     throw new Error(`Git clone failed: ${stderr.slice(0, 200)}${stderr.length > 200 ? "..." : ""}`);
@@ -91,13 +92,7 @@ export async function cloneRepoOnRemote(
 /**
  * Pre-trust a directory in Claude's config on the remote host.
  */
-export async function trustRemoteDirectory(
-  key: string,
-  instanceId: string,
-  ssm: SsmConnectOpts,
-  remotePath: string,
-): Promise<void> {
-  // Use python3 since it's always available on Ubuntu
+export async function trustRemoteDirectory(instanceId: string, ssm: SsmConnectOpts, remotePath: string): Promise<void> {
   const script = `python3 -c "
 import json, os
 f = os.path.expanduser('~/.claude.json')
@@ -106,7 +101,13 @@ j.setdefault('projects', {})
 j['projects']['${remotePath}'] = {'hasTrustDialogAccepted': True}
 json.dump(j, open(f, 'w'), indent=2)
 " 2>/dev/null || echo '{"projects":{"${remotePath}":{"hasTrustDialogAccepted":true}}}' > ~/.claude.json`;
-  await sshExecAsync(key, instanceId, script, { ...ssm, timeout: 10_000 });
+  await ssmExec({
+    instanceId,
+    region: ssm.region,
+    awsProfile: ssm.awsProfile,
+    command: script,
+    timeoutMs: 10_000,
+  });
 }
 
 /** Markers that indicate the channel development prompt is visible. */
@@ -117,7 +118,6 @@ const CLAUDE_WORKING_MARKERS = ["ctrl+o to expand", "esc to interrupt"];
 
 /** Single iteration of the channel prompt poll loop. */
 async function pollChannelPrompt(
-  key: string,
   instanceId: string,
   ssm: SsmConnectOpts,
   tmuxName: string,
@@ -125,18 +125,31 @@ async function pollChannelPrompt(
   max: number,
 ): Promise<"done" | "retry"> {
   try {
-    const { stdout } = await sshExecAsync(
-      key,
+    const { stdout } = await ssmExec({
       instanceId,
-      `tmux capture-pane -t '${tmuxName}' -p 2>/dev/null | tail -30`,
-      { ...ssm, timeout: 10_000 },
-    );
+      region: ssm.region,
+      awsProfile: ssm.awsProfile,
+      command: `tmux capture-pane -t '${tmuxName}' -p 2>/dev/null | tail -30`,
+      timeoutMs: 10_000,
+    });
 
     if (CHANNEL_PROMPT_MARKERS.some((m) => stdout.includes(m))) {
-      await sshExecAsync(key, instanceId, `tmux send-keys -t '${tmuxName}' 1`, { ...ssm, timeout: 5_000 });
+      await ssmExec({
+        instanceId,
+        region: ssm.region,
+        awsProfile: ssm.awsProfile,
+        command: `tmux send-keys -t '${tmuxName}' 1`,
+        timeoutMs: 5_000,
+      });
       const { sleep } = await import("../../util.js");
       await sleep(300);
-      await sshExecAsync(key, instanceId, `tmux send-keys -t '${tmuxName}' Enter`, { ...ssm, timeout: 5_000 });
+      await ssmExec({
+        instanceId,
+        region: ssm.region,
+        awsProfile: ssm.awsProfile,
+        command: `tmux send-keys -t '${tmuxName}' Enter`,
+        timeoutMs: 5_000,
+      });
       return "retry";
     }
 
@@ -144,7 +157,7 @@ async function pollChannelPrompt(
     return "retry";
   } catch (e: any) {
     console.error(
-      `[ec2] autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${attempt + 1}/${max}):`,
+      `[ec2] autoAcceptChannelPrompt: ssm to ${tmuxName} failed (attempt ${attempt + 1}/${max}):`,
       e?.message ?? e,
     );
     return "retry";
@@ -159,7 +172,6 @@ async function pollChannelPrompt(
  * We keep polling after acceptance until Claude is actually working.
  */
 export async function autoAcceptChannelPrompt(
-  key: string,
   instanceId: string,
   ssm: SsmConnectOpts,
   tmuxName: string,
@@ -171,7 +183,7 @@ export async function autoAcceptChannelPrompt(
 
   for (let i = 0; i < max; i++) {
     await sleep(delay);
-    const result = await pollChannelPrompt(key, instanceId, ssm, tmuxName, i, max);
+    const result = await pollChannelPrompt(instanceId, ssm, tmuxName, i, max);
     if (result === "done") return;
   }
 }

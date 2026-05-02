@@ -87,8 +87,7 @@ function ec2Handle(overrides: Partial<EC2HandleMeta> = {}): ComputeHandle {
     publicIp: null,
     privateIp: null,
     arkdLocalPort: 54321,
-    sshPid: 1111,
-    sshKeyPath: "/tmp/ark-test-key",
+    portForwardPid: 1111,
     region: "us-east-1",
     awsProfile: "ark-test",
     stackName: "ark-compute-ec2-test",
@@ -206,7 +205,6 @@ describe("EC2Compute.flushPlacement", () => {
     // Right fields plumbed off meta.ec2 into the ctx factory.
     expect(factoryArgs).toHaveLength(1);
     expect(factoryArgs[0]).toEqual({
-      sshKeyPath: "/tmp/ark-test-key",
       instanceId: "i-abc123",
       region: "us-east-1",
       awsProfile: "ark-test",

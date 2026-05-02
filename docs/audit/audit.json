@@ -512,7 +512,7 @@
     {
       "method": "compute/clean-zombies",
       "file": "packages/server/handlers/resource-compute.ts",
-      "line": 393,
+      "line": 400,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/compute.ts"
@@ -655,21 +655,21 @@
     {
       "method": "compute/template/create",
       "file": "packages/server/handlers/resource-compute.ts",
-      "line": 439,
+      "line": 446,
       "hasZodSchema": false,
       "callerFiles": []
     },
     {
       "method": "compute/template/delete",
       "file": "packages/server/handlers/resource-compute.ts",
-      "line": 458,
+      "line": 465,
       "hasZodSchema": false,
       "callerFiles": []
     },
     {
       "method": "compute/template/get",
       "file": "packages/server/handlers/resource-compute.ts",
-      "line": 422,
+      "line": 429,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/compute.ts"
@@ -678,7 +678,7 @@
     {
       "method": "compute/template/list",
       "file": "packages/server/handlers/resource-compute.ts",
-      "line": 399,
+      "line": 406,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/compute.ts",
@@ -3484,7 +3484,7 @@
         "packages/compute/providers/ec2/constants.ts",
         "packages/compute/providers/ec2/placement-ctx.ts",
         "packages/compute/providers/ec2/provision.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/util.ts",
         "packages/core/app.ts",
         "packages/core/conductor/arkd-events-consumer.ts",
@@ -3910,7 +3910,8 @@
     {
       "path": "packages/compute/providers/ec2/clipboard.ts",
       "imports": [
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/shell-escape.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": []
@@ -3930,10 +3931,7 @@
         "packages/compute/core/ec2.ts",
         "packages/compute/providers/ec2/metrics.ts",
         "packages/compute/providers/ec2/placement-ctx.ts",
-        "packages/compute/providers/ec2/pool.ts",
-        "packages/compute/providers/ec2/ports.ts",
         "packages/compute/providers/ec2/remote-setup.ts",
-        "packages/compute/providers/ec2/ssh.ts",
         "packages/compute/providers/ec2/sync.ts"
       ]
     },
@@ -3948,7 +3946,7 @@
       "path": "packages/compute/providers/ec2/metrics.ts",
       "imports": [
         "packages/compute/providers/ec2/constants.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/types.ts"
       ],
       "importedBy": []
@@ -3958,7 +3956,7 @@
       "imports": [
         "packages/compute/providers/ec2/constants.ts",
         "packages/compute/providers/ec2/shell-escape.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/secrets/placement-types.ts"
       ],
@@ -3970,10 +3968,8 @@
     {
       "path": "packages/compute/providers/ec2/pool.ts",
       "imports": [
-        "packages/compute/providers/ec2/constants.ts",
-        "packages/compute/providers/ec2/ssh.ts",
-        "packages/core/observability/structured-log.ts",
-        "packages/core/safe.ts"
+        "packages/compute/providers/ec2/ssm.ts",
+        "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
         "packages/compute/providers/ec2/queue.ts",
@@ -3983,8 +3979,7 @@
     {
       "path": "packages/compute/providers/ec2/ports.ts",
       "imports": [
-        "packages/compute/providers/ec2/constants.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/types.ts",
         "packages/core/observability/structured-log.ts"
       ],
@@ -4012,7 +4007,7 @@
       "path": "packages/compute/providers/ec2/remote-setup.ts",
       "imports": [
         "packages/compute/providers/ec2/constants.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/util.ts"
       ],
       "importedBy": []
@@ -4021,17 +4016,17 @@
       "path": "packages/compute/providers/ec2/shell-escape.ts",
       "imports": [],
       "importedBy": [
+        "packages/compute/providers/ec2/clipboard.ts",
         "packages/compute/providers/ec2/placement-ctx.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/providers/ec2/sync.ts"
       ]
     },
     {
-      "path": "packages/compute/providers/ec2/ssh.ts",
+      "path": "packages/compute/providers/ec2/ssm.ts",
       "imports": [
-        "packages/compute/providers/ec2/constants.ts",
         "packages/compute/providers/ec2/shell-escape.ts",
-        "packages/compute/util.ts"
+        "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
         "packages/compute/core/ec2.ts",
@@ -4051,7 +4046,7 @@
       "imports": [
         "packages/compute/providers/ec2/constants.ts",
         "packages/compute/providers/ec2/shell-escape.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/core/safe.ts"
       ],
       "importedBy": [
@@ -4129,7 +4124,7 @@
         "packages/compute/providers/ec2/pool.ts",
         "packages/compute/providers/ec2/ports.ts",
         "packages/compute/providers/ec2/provision.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/providers/ec2/sync.ts",
         "packages/compute/types.ts",
         "packages/compute/util.ts",
@@ -4177,7 +4172,6 @@
       "importedBy": [
         "packages/compute/core/ec2.ts",
         "packages/compute/providers/ec2/remote-setup.ts",
-        "packages/compute/providers/ec2/ssh.ts",
         "packages/compute/providers/remote-arkd.ts"
       ]
     },
@@ -8066,6 +8060,7 @@
         "packages/compute/providers/ec2/placement-ctx.ts",
         "packages/compute/providers/ec2/pool.ts",
         "packages/compute/providers/ec2/ports.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/providers/k8s.ts",
         "packages/compute/providers/remote-arkd.ts",
         "packages/core/agent/skill-extractor.ts",
@@ -8814,7 +8809,6 @@
       ],
       "importedBy": [
         "packages/compute/isolation/docker-compose.ts",
-        "packages/compute/providers/ec2/pool.ts",
         "packages/compute/providers/ec2/sync.ts",
         "packages/compute/providers/local-arkd.ts",
         "packages/compute/providers/remote-arkd.ts",
@@ -9451,6 +9445,7 @@
         "packages/compute/core/types.ts",
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts",
+        "packages/core/services/provisioning-steps.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -9576,7 +9571,8 @@
         "packages/compute/core/ec2.ts",
         "packages/compute/core/firecracker/compute.ts",
         "packages/compute/core/k8s.ts",
-        "packages/core/services/dispatch/target-lifecycle.ts"
+        "packages/core/services/dispatch/target-lifecycle.ts",
+        "packages/core/services/dispatch/target-resolver.ts"
       ]
     },
     {
@@ -11743,7 +11739,7 @@
       "imports": [
         "packages/compute/adapters/provider-map.ts",
         "packages/compute/index.ts",
-        "packages/compute/providers/ec2/ssh.ts",
+        "packages/compute/providers/ec2/ssm.ts",
         "packages/core/app.ts",
         "packages/core/infra/tmux.ts",
         "packages/core/observability/structured-log.ts",

@@ -41,6 +41,17 @@ export class LocalCompute implements Compute {
     };
   }
 
+  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+    // The host is always "provisioned" -- there's no underlying instance to
+    // create. Synthesize a handle directly from the row so the dispatcher
+    // skips the redundant provision() call.
+    return {
+      kind: this.kind,
+      name: row.name,
+      meta: { ...row.config },
+    };
+  }
+
   async start(_h: ComputeHandle): Promise<void> {
     throw new NotSupportedError(this.kind, "start");
   }

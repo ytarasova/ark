@@ -1,32 +1,34 @@
 /**
  * EC2Compute -- Compute impl that lives on an AWS EC2 instance.
  *
- * Transport: SSH runs over an SSM Session Manager tunnel; the conductor
- * does not need direct network reachability to the instance, no public
- * IP is required, and the security group has no inbound rules. Callers
- * never see AWS-level networking details -- arkd is reached through a
- * local SSH-forwarded port.
+ * Transport: pure AWS SSM. The conductor reaches arkd through a port
+ * forwarded by `aws ssm start-session --document AWS-StartPortForwardingSession`,
+ * and runs remote shell commands via `ssm.SendCommand`. There is no SSH
+ * layer at all. The instance needs no public IP, no security-group ingress,
+ * and no SSH keypair -- the SSM agent + IAM role
+ * (`AmazonSSMManagedInstanceCore`) is the entire transport contract.
  *
  * Lifecycle overview:
  *
- *   provision: ensure SSH key -> provisionStack (RunInstances + IAM SSM
- *              role + SG + key) -> wait for SSH-via-SSM reachability ->
- *              wait for cloud-init "ready" marker -> open a forward SSH
- *              tunnel (over SSM) from a local ephemeral port to arkd's
- *              internal :19300 -> wait for arkd /health through the
- *              tunnel -> return a handle whose `meta.ec2` captures
- *              everything needed to resume, tear down, and talk to arkd.
+ *   provision: provisionStack (RunInstances + IAM SSM role + SG without
+ *              ingress) -> wait for SSM agent online -> wait for cloud-init
+ *              "ready" marker via ssmExec -> open a port-forward from a
+ *              local ephemeral port to arkd's internal :19300 -> wait for
+ *              arkd /health through the forward -> return a handle whose
+ *              `meta.ec2` captures everything needed to resume, tear down,
+ *              and talk to arkd.
  *
  *   getArkdUrl: always returns http://localhost:<arkdLocalPort>. The
- *               conductor talks to arkd via the SSM-tunneled SSH forward;
- *               the instance ID is the canonical address, no IP needed.
+ *               conductor talks to arkd via the SSM port-forward; the
+ *               instance ID is the canonical address, no IP needed.
  *
  *   start / stop: map to EC2 StartInstances / StopInstances. `start`
  *                 waits until the instance is running, then re-establishes
- *                 the tunnel (the local port stays stable across restarts).
+ *                 the port-forward (the local port stays stable across
+ *                 restarts).
  *
- *   destroy: TerminateInstances (via `destroyStack`), close the tunnel,
- *            drop the security group / key pair the stack created.
+ *   destroy: TerminateInstances (via `destroyStack`), kill the port
+ *            forward, drop the security group the stack created.
  *
  * Snapshot / restore: deferred. Both throw NotSupportedError with
  * `capabilities.snapshot = true` still reported so dispatch can hint
@@ -36,22 +38,19 @@
  * DockerIsolation, DevcontainerIsolation, DockerComposeIsolation). The
  * isolation's container / devcontainer / compose logic is completely
  * unchanged -- the Isolation just calls `compute.getArkdUrl(h)` and talks
- * to arkd through the
- * tunnel exactly like LocalCompute. That works because arkd inside the EC2
- * instance owns every container it launches via its own docker / devcontainer
- * / compose machinery, and those all listen back on the instance's loopback
- * -- the tunnel's :19300 -> :19300 forwarding picks them up transparently.
+ * to arkd through the port-forward exactly like LocalCompute. That works
+ * because arkd inside the EC2 instance owns every container it launches via
+ * its own docker / devcontainer / compose machinery, and those all listen
+ * back on the instance's loopback -- the forward's :19300 -> :19300 picks
+ * them up transparently.
  *
- * All AWS and SSH side-effects go through the injectable `EC2ComputeHelpers`
+ * All AWS / SSM side-effects go through the injectable `EC2ComputeHelpers`
  * surface. Production wiring passes the real functions from `../providers/ec2/*`;
  * tests swap in stubs to avoid hitting AWS. We intentionally import the
  * helpers lazily so the AWS SDK is not pulled into cold-start paths that
  * never provision an EC2 compute.
  */
 
-import { spawn } from "child_process";
-
-import { REMOTE_HOME, REMOTE_USER } from "../providers/ec2/constants.js";
 import type { AppContext } from "../../core/app.js";
 import type { Session } from "../../types/session.js";
 import type {
@@ -66,6 +65,7 @@ import type {
   Snapshot,
 } from "./types.js";
 import { NotSupportedError } from "./types.js";
+import { REMOTE_HOME } from "../providers/ec2/constants.js";
 import { cloneWorkspaceViaArkd } from "./workspace-clone.js";
 import { logDebug, logInfo } from "../../core/observability/structured-log.js";
 import { provisionStep } from "../../core/services/provisioning-steps.js";
@@ -102,12 +102,14 @@ export interface EC2HandleMeta {
   publicIp: string | null;
   /** Private IPv4 on the VPC (informational; not required for transport). */
   privateIp: string | null;
-  /** Local ephemeral host port the SSH tunnel listens on. */
+  /** Local ephemeral host port the SSM port-forward listens on. */
   arkdLocalPort: number;
-  /** PID of the backgrounded `ssh -N -L` tunnel process. */
-  sshPid: number | null;
-  /** Absolute path of the SSH private key (ed25519) used for provisioning. */
-  sshKeyPath: string;
+  /**
+   * PID of the backgrounded `aws ssm start-session
+   * --document AWS-StartPortForwardingSession` process. Renamed from the
+   * legacy `sshPid` -- we no longer spawn ssh, just the AWS CLI.
+   */
+  portForwardPid: number | null;
   /** AWS region the stack lives in. Required for SSM session establishment. */
   region: string;
   /** Optional AWS profile for credentials. */
@@ -116,8 +118,6 @@ export interface EC2HandleMeta {
   stackName: string;
   /** Security group id if we created a fresh one; undefined if we reused. */
   sgId?: string;
-  /** Key pair name if we created a fresh one; undefined if we reused. */
-  keyName?: string;
   /** Instance size label (e.g. "m"). */
   size: string;
   /** Architecture label ("x64" / "arm"). */
@@ -127,27 +127,28 @@ export interface EC2HandleMeta {
 // ── Injectable helper surface (DI for tests) ────────────────────────────────
 
 /**
- * The set of EC2 / SSH side-effects EC2Compute depends on. Tests swap all of
- * these via `setHelpersForTesting` so no real AWS / SSH call ever fires.
+ * The set of EC2 / SSM side-effects EC2Compute depends on. Tests swap all of
+ * these via `setHelpersForTesting` so no real AWS call ever fires.
  *
  * Kept deliberately minimal: each helper mirrors exactly one external
  * operation, which makes assertions trivial and keeps the production wiring
  * a straight passthrough.
  */
 export interface EC2ComputeHelpers {
-  /** Ensure an ed25519 SSH key exists for the given host name. */
-  generateSshKey: (hostName: string) => Promise<{ publicKeyPath: string; privateKeyPath: string }>;
   /**
-   * One-shot SSH (over SSM) command for readiness probes.
-   * Returns exitCode 0 on success; never throws. The host arg is an
-   * EC2 instance_id; SSM provides the underlying transport.
+   * One-shot remote command via SSM SendCommand. Returns exitCode 0 on
+   * success; never throws. The host arg is an EC2 instance_id; SSM provides
+   * the underlying transport.
    */
-  sshExec: (
-    key: string,
-    instanceId: string,
-    cmd: string,
-    opts?: { timeout?: number; region?: string; awsProfile?: string },
-  ) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+  ssmExec: (opts: {
+    instanceId: string;
+    command: string;
+    timeoutMs?: number;
+    region?: string;
+    awsProfile?: string;
+  }) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+  /** SSM connectivity check via DescribeInstanceInformation. */
+  ssmCheckInstance: (opts: { instanceId: string; region?: string; awsProfile?: string }) => Promise<boolean>;
   /** Build the cloud-init user-data bundle. */
   buildUserData: (opts: {
     idleMinutes?: number;
@@ -163,9 +164,8 @@ export interface EC2ComputeHelpers {
     instance_id: string;
     stack_name: string;
     sg_id?: string;
-    key_name?: string;
   }>;
-  /** TerminateInstances + clean up SG + key pair. */
+  /** TerminateInstances + clean up SG. */
   destroyStack: (hostName: string, opts?: Record<string, unknown>) => Promise<void>;
   /** StartInstances, returns once the instance is running with a public IP. */
   startInstance: (opts: {
@@ -182,20 +182,22 @@ export interface EC2ComputeHelpers {
     awsProfile?: string;
   }) => Promise<{ publicIp: string | null; privateIp: string | null }>;
   /**
-   * Spawn a background `ssh -N -L <localPort>:localhost:19300` process
-   * (tunneled through SSM Session Manager) and return its PID. The
-   * returned PID is stored on `handle.meta.ec2.sshPid`.
+   * Spawn a background `aws ssm start-session
+   * --document AWS-StartPortForwardingSession` process and return its PID.
+   * The returned PID is stored on `handle.meta.ec2.portForwardPid`.
+   *
+   * Async because the production wiring lazy-imports the SSM helper module;
+   * the body itself is a synchronous `child_process.spawn`.
    */
-  openSshTunnel: (opts: {
-    keyPath: string;
+  startPortForward: (opts: {
     instanceId: string;
     region: string;
     awsProfile?: string;
     localPort: number;
     remotePort: number;
-  }) => number;
-  /** Kill a PID (SIGTERM). Swallows ESRCH -- tunnel may already be gone. */
-  killSshTunnel: (pid: number) => void;
+  }) => Promise<{ pid: number }> | { pid: number };
+  /** Kill a port-forward PID (SIGTERM, then SIGKILL after 1s). Swallows ESRCH. */
+  killPortForward: (pid: number) => Promise<void> | void;
   /**
    * Allocate a free ephemeral host port. Wired to
    * `core/config/port-allocator.ts#allocatePort` in production.
@@ -212,70 +214,12 @@ export interface EC2ComputeHelpers {
 /** Internal arkd listens on this port inside the EC2 instance. */
 export const ARKD_REMOTE_PORT = 19300;
 
-/** Constants used by the default tunnel spawn. */
-const SSH_TUNNEL_OPTS = [
-  "-o",
-  "StrictHostKeyChecking=no",
-  "-o",
-  "ConnectTimeout=10",
-  "-o",
-  "ServerAliveInterval=10",
-  "-o",
-  "ServerAliveCountMax=3",
-  "-o",
-  "ExitOnForwardFailure=yes",
-];
-
 async function defaultFetchHealth(url: string, timeoutMs: number): Promise<boolean> {
   try {
     const resp = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     return resp.ok;
   } catch {
     return false;
-  }
-}
-
-function defaultOpenSshTunnel(opts: {
-  keyPath: string;
-  instanceId: string;
-  region: string;
-  awsProfile?: string;
-  localPort: number;
-  remotePort: number;
-}): number {
-  // `-N` = no remote command; `-L local:host:remote` forwards.
-  // We deliberately do NOT pass `-f` here: Node can't reliably capture the PID
-  // of a self-daemonised ssh. Instead we spawn detached + unref so the process
-  // survives this process's event loop while still exposing a PID we can kill.
-  // Transport is SSH-over-SSM via the AWS-StartSSHSession document.
-  const profilePart = opts.awsProfile ? ` --profile ${opts.awsProfile}` : "";
-  const proxy =
-    `aws ssm start-session --target %h ` +
-    `--document-name AWS-StartSSHSession ` +
-    `--parameters portNumber=%p ` +
-    `--region ${opts.region}${profilePart}`;
-  const args = [
-    "-i",
-    opts.keyPath,
-    "-N",
-    ...SSH_TUNNEL_OPTS,
-    "-o",
-    `ProxyCommand=${proxy}`,
-    "-L",
-    `${opts.localPort}:localhost:${opts.remotePort}`,
-    `${REMOTE_USER}@${opts.instanceId}`,
-  ];
-  const child = spawn("ssh", args, { detached: true, stdio: "ignore" });
-  child.unref();
-  return child.pid ?? -1;
-}
-
-function defaultKillSshTunnel(pid: number): void {
-  if (pid <= 0) return;
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch {
-    logDebug("compute", "already gone -- best-effort.");
   }
 }
 
@@ -337,14 +281,14 @@ async function defaultDescribeInstance(opts: {
 }
 
 const DEFAULT_HELPERS: EC2ComputeHelpers = {
-  generateSshKey: (async (hostName) => {
-    const { generateSshKey } = await import("../providers/ec2/ssh.js");
-    return generateSshKey(hostName);
-  }) as EC2ComputeHelpers["generateSshKey"],
-  sshExec: (async (key, instanceId, cmd, opts) => {
-    const { sshExec } = await import("../providers/ec2/ssh.js");
-    return sshExec(key, instanceId, cmd, opts);
-  }) as EC2ComputeHelpers["sshExec"],
+  ssmExec: (async (opts) => {
+    const { ssmExec } = await import("../providers/ec2/ssm.js");
+    return ssmExec(opts);
+  }) as EC2ComputeHelpers["ssmExec"],
+  ssmCheckInstance: (async (opts) => {
+    const { ssmCheckInstance } = await import("../providers/ec2/ssm.js");
+    return ssmCheckInstance(opts);
+  }) as EC2ComputeHelpers["ssmCheckInstance"],
   buildUserData: (async (opts) => {
     const { buildUserData } = await import("../providers/ec2/cloud-init.js");
     return buildUserData(opts);
@@ -360,8 +304,14 @@ const DEFAULT_HELPERS: EC2ComputeHelpers = {
   startInstance: defaultStartInstance,
   stopInstance: defaultStopInstance,
   describeInstance: defaultDescribeInstance,
-  openSshTunnel: defaultOpenSshTunnel,
-  killSshTunnel: defaultKillSshTunnel,
+  startPortForward: (async (opts) => {
+    const { ssmStartPortForward } = await import("../providers/ec2/ssm.js");
+    return ssmStartPortForward(opts);
+  }) as EC2ComputeHelpers["startPortForward"],
+  killPortForward: (async (pid) => {
+    const { ssmKillPortForward } = await import("../providers/ec2/ssm.js");
+    ssmKillPortForward(pid);
+  }) as EC2ComputeHelpers["killPortForward"],
   allocatePort: (async () => {
     const { allocatePort } = await import("../../core/config/port-allocator.js");
     return allocatePort();
@@ -389,7 +339,7 @@ export class EC2Compute implements Compute {
   constructor(private readonly app: AppContext) {}
 
   /**
-   * Test-only: swap in stubs for every EC2 / SSH side-effect. Partial
+   * Test-only: swap in stubs for every EC2 / SSM side-effect. Partial
    * overrides merge over DEFAULT_HELPERS, so a test only has to stub what
    * it cares about.
    */
@@ -416,9 +366,6 @@ export class EC2Compute implements Compute {
     const arch = opts.arch ?? "x64";
     const region = cfg.region ?? "us-east-1";
 
-    log(`[ec2] Ensuring SSH key for ${name}...`);
-    const { privateKeyPath } = await this.helpers.generateSshKey(name);
-
     log("[ec2] Building cloud-init bundle...");
     const userData =
       cfg.userData ??
@@ -438,57 +385,48 @@ export class EC2Compute implements Compute {
       awsProfile: cfg.awsProfile,
       userData,
       tags: opts.tags,
-      sshKeyPath: privateKeyPath,
       onOutput: (msg: string) => log(`[ec2] ${msg}`),
     });
 
     // SSM transport: target is instance_id, no IP required.
     const instanceId = result.instance_id;
-    log(`[ec2] Instance ${instanceId} running. Waiting for SSH (via SSM)...`);
-    const sshReady = await this.helpers.poll(
-      async () => {
-        const res = await this.helpers.sshExec(privateKeyPath, instanceId, "echo ok", {
-          timeout: 15_000,
-          region,
-          awsProfile: cfg.awsProfile,
-        });
-        return res.exitCode === 0;
-      },
+    log(`[ec2] Instance ${instanceId} running. Waiting for SSM agent online...`);
+    const ssmReady = await this.helpers.poll(
+      async () => this.helpers.ssmCheckInstance({ instanceId, region, awsProfile: cfg.awsProfile }),
       { maxAttempts: 30, delayMs: 5000 },
     );
-    if (!sshReady) {
-      throw new Error(`EC2Compute.provision: SSH (via SSM) never became reachable for ${instanceId}`);
+    if (!ssmReady) {
+      throw new Error(`EC2Compute.provision: SSM agent never came online for ${instanceId}`);
     }
 
     log("[ec2] Waiting for cloud-init ready marker...");
     await this.helpers.poll(
       async () => {
-        const res = await this.helpers.sshExec(
-          privateKeyPath,
+        const res = await this.helpers.ssmExec({
           instanceId,
-          "test -f /home/ubuntu/.ark-ready && echo ready",
-          { timeout: 10_000, region, awsProfile: cfg.awsProfile },
-        );
+          command: "test -f /home/ubuntu/.ark-ready && echo ready",
+          timeoutMs: 10_000,
+          region,
+          awsProfile: cfg.awsProfile,
+        });
         return res.stdout.includes("ready");
       },
       { maxAttempts: 60, delayMs: 10_000 },
     );
 
-    // Build a partial meta -- transport fields (arkdLocalPort, sshPid) are
-    // filled in by setupTransport, called next. Done this way so the same
+    // Build a partial meta -- transport fields (arkdLocalPort, portForwardPid)
+    // are filled in by setupTransport, called next. Done this way so the same
     // setupTransport body covers fresh-provision and rehydrate.
     const meta: EC2HandleMeta = {
       instanceId,
       publicIp: result.ip,
       privateIp: null,
       arkdLocalPort: 0,
-      sshPid: null,
-      sshKeyPath: privateKeyPath,
+      portForwardPid: null,
       region,
       awsProfile: cfg.awsProfile,
       stackName: result.stack_name,
       sgId: result.sg_id,
-      keyName: result.key_name,
       size,
       arch,
     };
@@ -502,12 +440,52 @@ export class EC2Compute implements Compute {
     return handle;
   }
 
+  // ── attachExistingHandle ─────────────────────────────────────────────────
+  //
+  // Synthesize an EC2 handle from a `compute` row that already represents a
+  // provisioned instance. Returns null when the row hasn't been provisioned
+  // (no instance_id in config) so the dispatcher falls through to a fresh
+  // `provision()`. This is the fast path for `ec2-ssm`-style "live" rows --
+  // status=running, instance_id known -- where re-running provisionStack
+  // would attempt to build a duplicate CloudFormation stack and hang on
+  // AWS SDK calls.
+  //
+  // Pure: maps row.config -> EC2HandleMeta. No AWS calls. ensureReachable
+  // does the actual transport setup post-attach.
+
+  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+    const cfg = row.config as Record<string, unknown>;
+    const instanceId = cfg.instance_id as string | undefined;
+    if (!instanceId) return null; // never provisioned -- fall through to provision()
+
+    const meta: EC2HandleMeta = {
+      instanceId,
+      publicIp: (cfg.ip as string | undefined) ?? null,
+      privateIp: null,
+      // arkdLocalPort is 0 here; ensureReachable's setupTransport allocates a
+      // fresh port (or reuses the live forward's port from cfg.arkd_local_forward_port).
+      arkdLocalPort: typeof cfg.arkd_local_forward_port === "number" ? (cfg.arkd_local_forward_port as number) : 0,
+      portForwardPid: null,
+      region: (cfg.region as string | undefined) ?? "us-east-1",
+      awsProfile: cfg.aws_profile as string | undefined,
+      stackName: (cfg.stack_name as string | undefined) ?? `ark-compute-${row.name}`,
+      sgId: cfg.sg_id as string | undefined,
+      size: (cfg.size as string | undefined) ?? "m",
+      arch: (cfg.arch as string | undefined) ?? "x64",
+    };
+    return {
+      kind: this.kind,
+      name: row.name,
+      meta: { ec2: meta },
+    };
+  }
+
   // ── ensureReachable ──────────────────────────────────────────────────────
   //
   // Bring the conductor's connection to arkd into a "ready" state on every
   // dispatch. Fresh provision feeds in the meta we just minted; rehydrate
   // (multi-stage flow, persisted handle from a previous run) feeds in the
-  // existing meta. setupTransport reuses the live ssh -L process when the
+  // existing meta. setupTransport reuses the live port-forward when the
   // recorded PID is still alive AND arkd answers /health through it, so
   // this method is idempotent.
   //
@@ -521,16 +499,16 @@ export class EC2Compute implements Compute {
   // ── setupTransport (private; shared by provision + ensureReachable) ──────
   //
   // Three phases:
-  //   1. forward-tunnel  -- check for a live tunnel; reuse if healthy,
-  //                         otherwise allocate a port and openSshTunnel.
-  //   2. arkd-probe      -- /health on the (possibly fresh) local tunnel.
+  //   1. forward-tunnel  -- check for a live forward; reuse if healthy,
+  //                         otherwise allocate a port and startPortForward.
+  //   2. arkd-probe      -- /health on the (possibly fresh) local forward.
   //   3. events-consumer -- subscribe to arkd's NDJSON event stream so
   //                         hook events from the agent flow back to the
   //                         session timeline. startArkdEventsConsumer is
   //                         idempotent.
   //
-  // Mutates `handle.meta.ec2.arkdLocalPort` + `sshPid` so subsequent
-  // `getArkdUrl(h)` calls resolve to the live tunnel.
+  // Mutates `handle.meta.ec2.arkdLocalPort` + `portForwardPid` so subsequent
+  // `getArkdUrl(h)` calls resolve to the live forward.
   //
   // ── Ordering invariant ───────────────────────────────────────────────────
   //
@@ -549,7 +527,7 @@ export class EC2Compute implements Compute {
   // (CLI `ark compute provision`, raw provision tests) genuinely have no
   // session, and Option B keeps `provision` honest about that. The cost is
   // that any future code path that calls `provision` without a follow-up
-  // `ensureReachable` gets a working tunnel but no event stream -- callers
+  // `ensureReachable` gets a working forward but no event stream -- callers
   // outside the dispatcher must call `ensureReachable` themselves if they
   // want hook events. `dispatch.runTargetLifecycle` enforces this for
   // dispatch (see its callers in services/dispatch).
@@ -568,57 +546,54 @@ export class EC2Compute implements Compute {
     const useStep = !!opts.app && !!opts.sessionId;
     const stepCtx = { compute: h.name, instanceId: meta.instanceId };
 
-    // Phase 0 (rehydrate-only): connectivity-check. Fail fast if the SSM
-    // transport itself isn't alive before we waste time on tunnel setup.
+    // Phase 0 (rehydrate-only): connectivity-check via DescribeInstanceInformation.
+    // Fail fast if SSM itself isn't alive before we waste time on forward setup.
     // Skipped on the fresh-provision path because `provision` already polled
-    // sshExec to confirm the instance is up before it called us, and adding
-    // a second connectivity hit there would change the existing test's
-    // observable poll order.
+    // ssmCheckInstance to confirm the instance is up before it called us.
     if (useStep) {
       await provisionStep(
         opts.app!,
         opts.sessionId!,
         "connectivity-check",
         async () => {
-          const res = await this.helpers.sshExec(meta.sshKeyPath, meta.instanceId, "echo ok", {
-            timeout: 15_000,
+          const online = await this.helpers.ssmCheckInstance({
+            instanceId: meta.instanceId,
             region: meta.region,
             awsProfile: meta.awsProfile,
           });
-          if (res.exitCode !== 0) throw new Error(`ssh returned non-zero exit ${res.exitCode}`);
+          if (!online) throw new Error(`SSM agent not online for ${meta.instanceId}`);
         },
         { retries: 1, retryBackoffMs: 1_000, context: stepCtx },
       );
     }
 
     // Phase 1: forward-tunnel. Reuse the existing one when healthy.
-    const tunnelFn = async (): Promise<{ localPort: number; sshPid: number; reused: boolean }> => {
-      // Idempotent reuse: if we already recorded a tunnel and arkd answers
+    const tunnelFn = async (): Promise<{ localPort: number; portForwardPid: number; reused: boolean }> => {
+      // Idempotent reuse: if we already recorded a forward and arkd answers
       // through it, keep using it. This is the rehydrate-after-multi-stage
-      // path -- a stale meta from 5 minutes ago whose ssh process is still
-      // alive should not provoke a tunnel respawn.
-      if (meta.sshPid !== null && meta.sshPid > 0 && meta.arkdLocalPort > 0) {
+      // path -- a stale meta from 5 minutes ago whose forward process is still
+      // alive should not provoke a respawn.
+      if (meta.portForwardPid !== null && meta.portForwardPid > 0 && meta.arkdLocalPort > 0) {
         const probeUrl = `http://localhost:${meta.arkdLocalPort}`;
         const live = await this.helpers.fetchHealth(`${probeUrl}/health`, 2000);
         if (live) {
-          return { localPort: meta.arkdLocalPort, sshPid: meta.sshPid, reused: true };
+          return { localPort: meta.arkdLocalPort, portForwardPid: meta.portForwardPid, reused: true };
         }
-        // Old tunnel is dead -- tear down the recorded PID before respawning
-        // so we don't leak the orphaned ssh process.
-        this.helpers.killSshTunnel(meta.sshPid);
+        // Old forward is dead -- tear down the recorded PID before respawning
+        // so we don't leak the orphaned process.
+        await this.helpers.killPortForward(meta.portForwardPid);
       }
 
-      log("[ec2] Opening SSH tunnel (via SSM) to arkd...");
+      log("[ec2] Opening SSM port-forward to arkd...");
       const localPort = await this.helpers.allocatePort();
-      const sshPid = this.helpers.openSshTunnel({
-        keyPath: meta.sshKeyPath,
+      const { pid } = await this.helpers.startPortForward({
         instanceId: meta.instanceId,
         region: meta.region,
         awsProfile: meta.awsProfile,
         localPort,
         remotePort: ARKD_REMOTE_PORT,
       });
-      return { localPort, sshPid, reused: false };
+      return { localPort, portForwardPid: pid, reused: false };
     };
 
     const tunnel = useStep
@@ -628,9 +603,9 @@ export class EC2Compute implements Compute {
     // Persist the port + pid before the health probe so a probe failure
     // teardown can find the right pid to kill.
     meta.arkdLocalPort = tunnel.localPort;
-    meta.sshPid = tunnel.sshPid;
+    meta.portForwardPid = tunnel.portForwardPid;
 
-    // Phase 2: arkd /health probe through the (possibly fresh) tunnel.
+    // Phase 2: arkd /health probe through the (possibly fresh) forward.
     const arkdUrl = `http://localhost:${tunnel.localPort}`;
     const probeFn = async (): Promise<void> => {
       log(`[ec2] Waiting for arkd at ${arkdUrl}...`);
@@ -639,9 +614,9 @@ export class EC2Compute implements Compute {
         delayMs: 3000,
       });
       if (!ready) {
-        // Tear the tunnel down so we don't leak an ssh process on failure.
-        this.helpers.killSshTunnel(tunnel.sshPid);
-        meta.sshPid = null;
+        // Tear the forward down so we don't leak the AWS CLI process on failure.
+        await this.helpers.killPortForward(tunnel.portForwardPid);
+        meta.portForwardPid = null;
         throw new Error(`EC2Compute.setupTransport: arkd never became reachable at ${arkdUrl}`);
       }
     };
@@ -683,14 +658,13 @@ export class EC2Compute implements Compute {
       awsProfile: meta.awsProfile,
     });
 
-    // Kill any previous tunnel (defensive -- stop() should have handled it,
+    // Kill any previous forward (defensive -- stop() should have handled it,
     // but a crash/reboot may have left a stale PID on the meta).
-    if (meta.sshPid !== null && meta.sshPid > 0) {
-      this.helpers.killSshTunnel(meta.sshPid);
+    if (meta.portForwardPid !== null && meta.portForwardPid > 0) {
+      await this.helpers.killPortForward(meta.portForwardPid);
     }
 
-    const sshPid = this.helpers.openSshTunnel({
-      keyPath: meta.sshKeyPath,
+    const { pid: portForwardPid } = await this.helpers.startPortForward({
       instanceId: meta.instanceId,
       region: meta.region,
       awsProfile: meta.awsProfile,
@@ -698,33 +672,33 @@ export class EC2Compute implements Compute {
       remotePort: ARKD_REMOTE_PORT,
     });
 
-    // Wait for arkd to come back through the tunnel before returning.
+    // Wait for arkd to come back through the forward before returning.
     const arkdUrl = `http://localhost:${meta.arkdLocalPort}`;
     const ready = await this.helpers.poll(() => this.helpers.fetchHealth(`${arkdUrl}/health`, 5000), {
       maxAttempts: 30,
       delayMs: 2000,
     });
     if (!ready) {
-      this.helpers.killSshTunnel(sshPid);
+      await this.helpers.killPortForward(portForwardPid);
       throw new Error(`EC2Compute.start: arkd never came back at ${arkdUrl}`);
     }
 
     // Mutate the caller's handle in place so subsequent calls see the
-    // refreshed IP / tunnel PID. The DB-backed handle store used by
+    // refreshed IP / forward PID. The DB-backed handle store used by
     // dispatch persists this via a separate path.
     meta.publicIp = publicIp;
     if (privateIp) meta.privateIp = privateIp;
-    meta.sshPid = sshPid;
+    meta.portForwardPid = portForwardPid;
   }
 
   async stop(h: ComputeHandle): Promise<void> {
     const meta = readMeta(h);
 
-    // Tear the tunnel down first -- stopping the instance drops SSH anyway,
-    // but killing the tunnel explicitly releases the local port.
-    if (meta.sshPid !== null && meta.sshPid > 0) {
-      this.helpers.killSshTunnel(meta.sshPid);
-      meta.sshPid = null;
+    // Tear the forward down first -- stopping the instance drops SSM anyway,
+    // but killing the forward explicitly releases the local port.
+    if (meta.portForwardPid !== null && meta.portForwardPid > 0) {
+      await this.helpers.killPortForward(meta.portForwardPid);
+      meta.portForwardPid = null;
     }
 
     await this.helpers.stopInstance({
@@ -739,11 +713,11 @@ export class EC2Compute implements Compute {
   async destroy(h: ComputeHandle): Promise<void> {
     const meta = readMeta(h);
 
-    // Close the tunnel first so the local port isn't held through the
+    // Close the forward first so the local port isn't held through the
     // (potentially slow) terminate call.
-    if (meta.sshPid !== null && meta.sshPid > 0) {
-      this.helpers.killSshTunnel(meta.sshPid);
-      meta.sshPid = null;
+    if (meta.portForwardPid !== null && meta.portForwardPid > 0) {
+      await this.helpers.killPortForward(meta.portForwardPid);
+      meta.portForwardPid = null;
     }
 
     await this.helpers.destroyStack(h.name, {
@@ -751,7 +725,6 @@ export class EC2Compute implements Compute {
       awsProfile: meta.awsProfile,
       instance_id: meta.instanceId,
       sg_id: meta.sgId,
-      key_name: meta.keyName,
       stackName: meta.stackName,
     });
   }
@@ -796,7 +769,7 @@ export class EC2Compute implements Compute {
   //
   // Per-session workspace setup on the remote host: mkdir the parent and
   // git clone the source into the leaf. Routes through arkd via the live
-  // SSH-over-SSM tunnel that `ensureReachable` set up; no SSH out-of-band
+  // SSM port-forward that `ensureReachable` set up; no out-of-band
   // ops at this layer.
   //
   // Returns silently when either `source` or `remoteWorkdir` is null --
@@ -835,8 +808,8 @@ export class EC2Compute implements Compute {
   // ── flushPlacement ──────────────────────────────────────────────────────
   //
   // Replay the dispatcher's queued typed-secret ops onto a real
-  // `EC2PlacementCtx` over the live SSH-over-SSM transport. Lifted byte-for-
-  // byte from the legacy `RemoteArkdBase.flushDeferredPlacement` body so the
+  // `EC2PlacementCtx` over the SSM transport. Lifted byte-for-byte from
+  // the legacy `RemoteArkdBase.flushDeferredPlacement` body so the
   // dispatch behaviour for live EC2 sessions stays identical.
   //
   // Behaviour:
@@ -852,36 +825,30 @@ export class EC2Compute implements Compute {
   //
   // Reads from `handle.meta.ec2`:
   //   - `instanceId` -- canonical SSM target
-  //   - `sshKeyPath` -- private key generated by `provision()` (same path
-  //     `sshKeyPath(handle.name)` returns; the legacy code went through the
-  //     helper, the new code reads the field that was populated by it).
-  //   - `region`, `awsProfile` -- forwarded into the SSM proxy command.
+  //   - `region`, `awsProfile` -- forwarded into the SSM client.
   //
   // Ordering invariant: `ensureReachable` must have run on `h` first so the
-  // SSH tunnel + arkd are live. The placement ctx talks SSH-over-SSM
-  // directly to the instance and does not flow through arkd; the tunnel is
-  // not strictly needed for this method, but we still order behind
-  // ensureReachable to match the rest of the dispatch lifecycle.
+  // forward + arkd are live. The placement ctx talks SSM directly to the
+  // instance and does not flow through arkd; the forward is not strictly
+  // needed for this method, but we still order behind ensureReachable to
+  // match the rest of the dispatch lifecycle.
 
   /**
    * Test-only: swap the helper that constructs an EC2PlacementCtx from
    * meta. Mirrors `setCloneHelperForTesting` -- the test injects a
    * recording stub so we can assert which fields are read off
    * `handle.meta.ec2` and which deps are passed to the ctx without
-   * exercising the real ssh/tar pipeline.
+   * exercising the real ssm/tar pipeline.
    */
   setPlacementCtxFactoryForTesting(
-    fn: (deps: { sshKeyPath: string; instanceId: string; region: string; awsProfile?: string }) => PlacementCtx,
+    fn: (deps: { instanceId: string; region: string; awsProfile?: string }) => PlacementCtx,
   ): void {
     this.placementCtxFactory = fn;
   }
 
-  private placementCtxFactory: (deps: {
-    sshKeyPath: string;
-    instanceId: string;
-    region: string;
-    awsProfile?: string;
-  }) => PlacementCtx = (deps) => new EC2PlacementCtx(deps);
+  private placementCtxFactory: (deps: { instanceId: string; region: string; awsProfile?: string }) => PlacementCtx = (
+    deps,
+  ) => new EC2PlacementCtx(deps);
 
   async flushPlacement(h: ComputeHandle, opts: FlushPlacementOpts): Promise<void> {
     const deferred = opts.placement;
@@ -897,7 +864,6 @@ export class EC2Compute implements Compute {
       );
     }
     const realCtx = this.placementCtxFactory({
-      sshKeyPath: meta.sshKeyPath,
       instanceId: meta.instanceId,
       region: meta.region,
       awsProfile: meta.awsProfile,

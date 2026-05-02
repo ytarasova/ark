@@ -32,8 +32,7 @@ import { DeferredPlacementCtx } from "../deferred-placement-ctx.js";
 
 describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
   let app: AppContext;
-  const sshExecCalls: string[] = [];
-  const tarCalls: Array<{ tarArgs: string[]; remoteCmd: string }> = [];
+  const ssmExecCalls: string[] = [];
   const stubKeyscanBytes = Buffer.from("bitbucket.org ssh-rsa AAAA-fixture\n");
 
   beforeAll(async () => {
@@ -58,8 +57,7 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
   });
 
   beforeEach(async () => {
-    sshExecCalls.length = 0;
-    tarCalls.length = 0;
+    ssmExecCalls.length = 0;
     // Wipe + re-seed the BB_KEY secret to ensure isolation between cases.
     const refs = await app.secrets.list("default");
     for (const r of refs) await app.secrets.delete("default", r.name);
@@ -80,85 +78,79 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
 
     await placeAllSecrets(app, session, deferred);
 
-    expect(sshExecCalls).toHaveLength(0); // dispatcher never touched the wire
-    expect(tarCalls).toHaveLength(0);
+    expect(ssmExecCalls).toHaveLength(0); // dispatcher never touched the wire
     expect(deferred.hasDeferred()).toBe(true); // file ops are queued
 
     // Phase B: post-provision the provider builds a real EC2PlacementCtx
     // (now the instance_id is known) and replays the queue. This is what
     // RemoteArkdBase.flushDeferredPlacement does inside provider.launch.
     const realCtx = _makeEC2PlacementCtx({
-      sshKeyPath: "/fake/key",
       instanceId: "i-acceptance",
       region: "us-east-1",
-      sshExec: async (_k, _id, cmd) => {
-        sshExecCalls.push(cmd);
+      ssmExec: async (_id, cmd) => {
+        ssmExecCalls.push(cmd);
         return "";
-      },
-      pipeTarToSsh: async (tarArgs, remoteCmd) => {
-        tarCalls.push({ tarArgs, remoteCmd });
       },
     });
     await deferred.flush(realCtx);
 
-    // 1. The key file was tar-piped to /home/ubuntu/.ssh/.
-    expect(tarCalls).toHaveLength(1);
-    expect(tarCalls[0].remoteCmd).toContain("/home/ubuntu/.ssh");
+    // 1. The key file landed in /home/ubuntu/.ssh via the SSM base64-decode
+    //    path. The same SendCommand carries mkdir + base64 + chmod.
+    expect(
+      ssmExecCalls.some(
+        (c) => c.includes("/home/ubuntu/.ssh") && c.includes("base64 -d") && c.includes("/home/ubuntu/.ssh/id_bb_key"),
+      ),
+    ).toBe(true);
 
     // 2. chmod 600 was issued for the key.
-    expect(sshExecCalls.some((c) => c.includes("chmod 600") && c.includes("id_bb_key"))).toBe(true);
+    expect(ssmExecCalls.some((c) => c.includes("chmod 600") && c.includes("id_bb_key"))).toBe(true);
 
     // 3. sed marker replacement happened at least twice -- once for config,
     //    once for known_hosts.
-    const sedCmds = sshExecCalls.filter((c) => c.includes("sed") && c.includes("ark:secret:BB_KEY"));
+    const sedCmds = ssmExecCalls.filter((c) => c.includes("sed") && c.includes("ark:secret:BB_KEY"));
     expect(sedCmds.length).toBeGreaterThanOrEqual(2);
 
     // 4. /.ssh/config command landed.
-    expect(sshExecCalls.some((c) => c.includes("/home/ubuntu/.ssh/config") && c.includes("ark:secret:BB_KEY"))).toBe(
+    expect(ssmExecCalls.some((c) => c.includes("/home/ubuntu/.ssh/config") && c.includes("ark:secret:BB_KEY"))).toBe(
       true,
     );
 
     // 5. /.ssh/known_hosts command landed.
     expect(
-      sshExecCalls.some((c) => c.includes("/home/ubuntu/.ssh/known_hosts") && c.includes("ark:secret:BB_KEY")),
+      ssmExecCalls.some((c) => c.includes("/home/ubuntu/.ssh/known_hosts") && c.includes("ark:secret:BB_KEY")),
     ).toBe(true);
 
     // 6. The base64 of the keyscan fixture appears in the known_hosts append cmd.
     const keyscanB64 = stubKeyscanBytes.toString("base64");
-    expect(sshExecCalls.some((c) => c.includes(keyscanB64))).toBe(true);
+    expect(ssmExecCalls.some((c) => c.includes(keyscanB64))).toBe(true);
 
     // 7. The base64-encoded ssh config block decodes to a chunk containing
     //    "Host bitbucket.org". We can't grep for that string directly because
     //    appendFile wraps the bytes in `printf %s '<b64>' | base64 -d`.
-    const containsConfigBlock = sshExecCalls.some((c) => {
+    const containsConfigBlock = ssmExecCalls.some((c) => {
       const matches = [...c.matchAll(/'([A-Za-z0-9+/=]+)' \| base64 -d/g)];
       return matches.some((m) => Buffer.from(m[1], "base64").toString().includes("Host bitbucket.org"));
     });
     expect(containsConfigBlock).toBe(true);
   });
 
-  test("session with no typed secrets is a no-op (no ssh exec calls)", async () => {
+  test("session with no typed secrets is a no-op (no ssm exec calls)", async () => {
     // Wipe the seeded secret so the dispatcher has nothing to place.
     await app.secrets.delete("default", "BB_KEY");
     const deferred = new DeferredPlacementCtx();
     await placeAllSecrets(app, { id: "s-empty", tenant_id: "default" } as any, deferred);
     expect(deferred.hasDeferred()).toBe(false);
 
-    // Even when we synthesize a flush against a real ctx, no SSH calls fire.
+    // Even when we synthesize a flush against a real ctx, no SSM calls fire.
     const realCtx = _makeEC2PlacementCtx({
-      sshKeyPath: "/fake/key",
       instanceId: "i-acceptance-empty",
       region: "us-east-1",
-      sshExec: async (_k, _id, cmd) => {
-        sshExecCalls.push(cmd);
+      ssmExec: async (_id, cmd) => {
+        ssmExecCalls.push(cmd);
         return "";
-      },
-      pipeTarToSsh: async (tarArgs, remoteCmd) => {
-        tarCalls.push({ tarArgs, remoteCmd });
       },
     });
     await deferred.flush(realCtx);
-    expect(sshExecCalls).toHaveLength(0);
-    expect(tarCalls).toHaveLength(0);
+    expect(ssmExecCalls).toHaveLength(0);
   });
 });

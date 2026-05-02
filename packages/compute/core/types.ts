@@ -149,6 +149,22 @@ export interface FlushPlacementOpts {
   onLog?: (msg: string) => void;
 }
 
+/**
+ * Compute-row shape used by `Compute.attachExistingHandle` to synthesize a
+ * handle for an already-provisioned compute. Mirrors the relevant subset of
+ * the `compute` table that the synthesizer needs -- name + status (to gate
+ * "is this row alive?") and config (carries provider-specific meta like
+ * `instance_id`, `region`, etc.).
+ *
+ * Kept narrow on purpose so kinds can drift independently without dragging
+ * the full repo type. The full row lives in `packages/types/compute.ts`.
+ */
+export interface AttachExistingComputeRow {
+  name: string;
+  status: string;
+  config: Record<string, unknown>;
+}
+
 // ── Errors ─────────────────────────────────────────────────────────────────
 
 /**
@@ -194,6 +210,22 @@ export interface Compute {
   start(h: ComputeHandle): Promise<void>;
   stop(h: ComputeHandle): Promise<void>;
   destroy(h: ComputeHandle): Promise<void>;
+
+  /**
+   * Synthesize a `ComputeHandle` from a `compute` row that already
+   * represents a provisioned instance. Returns null when the row hasn't
+   * been provisioned yet -- in which case `provision()` must run first.
+   *
+   * The dispatcher calls this in `resolveTargetAndHandle` before falling
+   * through to a fresh `provision()`. Persistent computes (LocalCompute,
+   * EC2Compute against a running instance) build the handle straight from
+   * `row.config` -- no AWS / k8s round-trip, no re-provisioning. Template
+   * computes (per-session pod / microVM) leave it omitted (the dispatcher
+   * defaults to `provision()` for those).
+   *
+   * Pure: must not perform I/O. Just maps `row.config` -> handle meta.
+   */
+  attachExistingHandle?(row: AttachExistingComputeRow): ComputeHandle | null;
 
   /** Where arkd listens. URL reachable from the ark host conductor. */
   getArkdUrl(h: ComputeHandle): string;

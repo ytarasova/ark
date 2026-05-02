@@ -61,7 +61,7 @@ describe("RemoteWorktreeProvider", () => {
     // `provision()` writes `arkd_url: http://<private-ip>:19300` for legacy
     // back-compat. After commit 7a888f74 (no public IPs) that URL is not
     // reachable from the conductor. `prepareRemoteEnvironment` sets up an
-    // SSH `-L` forward tunnel and stores the local port; the forward port
+    // SSM port-forward and stores the local port; the forward port
     // must win over the stale `arkd_url` so dispatch actually reaches arkd.
     const compute = makeCompute({
       config: {
@@ -126,14 +126,17 @@ describe("RemoteWorktreeProvider", () => {
     expect((cfg.env as Record<string, string>).ARK_SESSION_ID).toBe("s-1");
   });
 
-  it("getAttachCommand includes ssh with SSM ProxyCommand", () => {
+  it("getAttachCommand uses pure aws ssm start-session (no ssh)", () => {
     const cmd = provider.getAttachCommand(makeCompute(), {
       session_id: "ark-s-test",
     } as Session);
-    expect(cmd[0]).toBe("ssh");
-    expect(cmd).toContain("ubuntu@i-test123");
-    // ProxyCommand wraps SSH in an SSM Session Manager tunnel.
-    expect(cmd.some((a) => a.startsWith("ProxyCommand=aws ssm start-session"))).toBe(true);
+    expect(cmd[0]).toBe("aws");
+    expect(cmd).toContain("ssm");
+    expect(cmd).toContain("start-session");
+    expect(cmd).toContain("--target");
+    expect(cmd).toContain("i-test123");
+    // The interactive command parameter carries the tmux attach.
+    expect(cmd.some((a) => a.includes("tmux attach -t ark-s-test"))).toBe(true);
   });
 
   it("buildPlacementCtx returns a DeferredPlacementCtx even without an instance_id", async () => {

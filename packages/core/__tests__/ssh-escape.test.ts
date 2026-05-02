@@ -1,29 +1,28 @@
 /**
- * Deny-path tests for P1-5: SSH command injection.
+ * Deny-path tests for shell-injection through SSM SendCommand.
  *
- * The fix is two-pronged:
- *   1. A new `sshExecArgs(key, ip, argv[], opts?)` helper that shell-escapes
- *      every element before concatenation. Preferred for all argv-style calls.
- *   2. Remaining template-string `sshExec(...)` sites pass every user-derived
- *      interpolant through `shellEscape()` before concatenation.
+ * Under the SSM-only transport, AWS-RunShellScript runs `bash -c "<cmd>"`
+ * on the remote, which means unescaped user input is the same risk it was
+ * with raw ssh. The fix mirrors the SSH-era pattern:
+ *
+ *   1. A `ssmExecArgs(...)` helper that shell-escapes every element before
+ *      concatenation. Preferred for all argv-style calls.
+ *   2. Remaining template-string `ssmExec(...)` sites pass every
+ *      user-derived interpolant through `shellEscape()` before concatenation.
  *
  * These tests verify:
  *   - `shellEscape` quotes injection payloads into a single POSIX token.
- *   - `sshExecArgs` validates and escapes its argv. We intercept the underlying
- *     ssh invocation by pointing at a non-routable host with a very short
- *     timeout and inspecting the built-up remote command via a spy.
- *   - Concrete call sites (sync.ts, docker-compose runtime) no longer contain
- *     the vulnerable template-string patterns. The compose-up exec used to
- *     live in `core/services/agent-launcher.ts:applyContainerSetup`; after
- *     the ComputeTarget dispatch flip it moved onto `DockerComposeRuntime`,
- *     which delegates to argv-form `composeUpWithFiles` (no shell -c).
+ *   - `ssmExecArgs` validates and escapes its argv (the actual escaping is
+ *     covered by `ec2-ssm.test.ts`; this file focuses on the validation
+ *     branches and on call-site regression guards in sync.ts and
+ *     docker-compose.ts).
  */
 
 import { describe, test, expect } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { shellEscape } from "../../compute/providers/ec2/shell-escape.js";
-import { sshExecArgs } from "../../compute/providers/ec2/ssh.js";
+import { ssmExecArgs } from "../../compute/providers/ec2/ssm.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 
@@ -35,12 +34,9 @@ describe("shellEscape -- primitive sanity", () => {
   test("classic injection payload is fully quoted into one token", () => {
     const payload = "s-abc; rm -rf /";
     const escaped = shellEscape(payload);
-    // Must be a single single-quoted token with no bare `;` or unquoted space
     expect(escaped.startsWith("'")).toBe(true);
     expect(escaped.endsWith("'")).toBe(true);
     expect(escaped).toBe("'s-abc; rm -rf /'");
-    // The only way a `;` could terminate the command is if it were outside
-    // the quotes. It isn't.
     const innards = escaped.slice(1, -1);
     expect(innards).toBe(payload);
   });
@@ -60,59 +56,32 @@ describe("shellEscape -- primitive sanity", () => {
   test("newline payload stays quoted", () => {
     const payload = "a\n; cat /etc/passwd";
     const escaped = shellEscape(payload);
-    // Must remain one single-quoted token, not split into two commands.
     expect(escaped.startsWith("'")).toBe(true);
     expect(escaped.endsWith("'")).toBe(true);
   });
 });
 
-describe("sshExecArgs -- argv-based remote exec validates + escapes inputs", async () => {
+describe("ssmExecArgs -- argv-based remote exec validates inputs", async () => {
   test("rejects empty argv", async () => {
-    (await expect(sshExecArgs("key", "ip", []))).rejects.toThrow(/non-empty/);
+    await expect(ssmExecArgs({ instanceId: "i", region: "us-east-1", argv: [] })).rejects.toThrow(/non-empty/);
   });
 
   test("rejects non-string argv elements", async () => {
-    // @ts-expect-error -- deliberately bad input
-    (await expect(sshExecArgs("key", "ip", ["mkdir", 123]))).rejects.toThrow(/must be strings/);
-  });
-
-  test("malicious session id in argv is shell-escaped end-to-end", async () => {
-    // Integration-style: invoke sshExecArgs with a non-routable address
-    // and a payload that would shell-expand on any real host. We never
-    // complete the connection (it times out), but we verify two things:
-    //   (a) the function does NOT throw synchronously on a `; rm -rf /`
-    //       payload (it must accept + escape, not reject).
-    //   (b) the resolved result comes from the timeout path, not from a
-    //       syntax error -- proving ssh was handed a syntactically intact
-    //       single-quoted command, not a half-formed injection.
-    const maliciousSessionId = "s-abc; rm -rf /";
-    const result = await sshExecArgs(
-      "/nonexistent/key",
-      "127.0.0.1",
-      ["mkdir", "-p", `/tmp/ark-${maliciousSessionId}`],
-      { timeout: 250 },
-    );
-    // ssh will fail (no key, wrong host) but the shape of the failure
-    // must be "exec produced stderr / nonzero", NOT an unhandled exception.
-    expect(typeof result.exitCode).toBe("number");
-    expect(result.exitCode).not.toBe(0);
-    // The injection payload must not have been interpreted -- the function
-    // returned a single structured result rather than (e.g.) firing a
-    // subprocess that interpreted `rm -rf /`. We can't directly observe
-    // the remote shell here, but the unit-level assertion that
-    // shellEscape wraps this specific payload into
-    // `'s-abc; rm -rf /'` covers that property.
+    await expect(
+      // @ts-expect-error -- deliberately bad input
+      ssmExecArgs({ instanceId: "i", region: "us-east-1", argv: ["mkdir", 123] }),
+    ).rejects.toThrow(/must be strings/);
   });
 });
 
 describe("call-site regression guards -- user-derived vars never land unescaped", () => {
-  test("sync.ts syncProjectFiles uses sshExecArgs, not template-string mkdir", () => {
+  test("sync.ts syncProjectFiles uses ssmExecArgs, not template-string mkdir", () => {
     const src = readFileSync(join(ROOT, "packages/compute/providers/ec2/sync.ts"), "utf-8");
     // Old vulnerable patterns MUST be gone.
     expect(src).not.toMatch(/sshExec\([^)]*,\s*`mkdir -p \$\{remoteDir\}`/);
     expect(src).not.toMatch(/sshExec\([^)]*,\s*`mkdir -p \$\{remoteDir\}\/\$\{subdir\}`/);
     // Safe replacement MUST be present.
-    expect(src).toMatch(/sshExecArgs\([^)]*,\s*\[\s*"mkdir"\s*,\s*"-p"\s*,\s*remoteDir/);
+    expect(src).toMatch(/ssmExecArgs\([^)]*argv:\s*\[\s*"mkdir"\s*,\s*"-p"\s*,\s*remoteDir/);
   });
 
   test("sync.ts refreshRemoteToken shell-escapes the token", () => {
@@ -125,20 +94,12 @@ describe("call-site regression guards -- user-derived vars never land unescaped"
 
   test("docker-compose isolation uses argv-form exec (no shell -c interpolation)", () => {
     const src = readFileSync(join(ROOT, "packages/compute/isolation/docker-compose.ts"), "utf-8");
-    // The isolation must never shell-interpolate workdir / files into a
-    // `sh -c \`...\${var}...\`` template -- the old agent-launcher.ts
-    // pattern. Compose work is done via argv-form helpers that exec
-    // `docker` directly with separated args.
     expect(src).not.toMatch(/sh\s+-c\s+`[^`]*\$\{/);
-    // Safe replacement: argv-form composeUpWithFiles delegate.
     expect(src).toMatch(/composeUpWithFiles/);
   });
 
   test("docker compose argv helpers exec docker with separated args (no shell)", () => {
     const src = readFileSync(join(ROOT, "packages/compute/providers/docker/compose.ts"), "utf-8");
-    // The legacy template-string `cd ${workdir} && docker compose up`
-    // pattern must NOT be present. compose lifecycle goes through
-    // execFile("docker", [...]) with cwd: workdir.
     expect(src).not.toMatch(/sh\s+-c\s+`[^`]*\$\{/);
     expect(src).not.toMatch(/cd \$\{[a-zA-Z_]+\} && docker compose/);
     expect(src).toMatch(/execFileAsync\("docker",/);

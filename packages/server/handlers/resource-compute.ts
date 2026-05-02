@@ -357,17 +357,24 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const cfg = compute.config as Record<string, unknown>;
-    const ip = cfg?.ip as string | undefined;
-    if (!ip) return { reachable: false, message: "No IP configured" };
+    const instanceId = cfg?.instance_id as string | undefined;
+    if (!instanceId) return { reachable: false, message: "No instance_id configured" };
     try {
-      const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-      const { exitCode, stdout } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok && uptime", {
-        timeout: 10_000,
-      });
-      if (exitCode === 0) {
+      const { ssmExec, ssmCheckInstance } = await import("../../compute/providers/ec2/ssm.js");
+      const region = (cfg?.region as string | undefined) ?? "us-east-1";
+      const awsProfile = cfg?.aws_profile as string | undefined;
+      const online = await ssmCheckInstance({ instanceId, region, awsProfile });
+      if (online) {
+        const { stdout } = await ssmExec({
+          instanceId,
+          region,
+          awsProfile,
+          command: "echo ok && uptime",
+          timeoutMs: 10_000,
+        });
         return { reachable: true, message: stdout.trim() };
       }
-      // Check provider status if SSH fails.
+      // Check provider status if SSM is offline.
       const { getProvider } = await import("../../compute/index.js");
       const provider = getProvider(providerOf(compute));
       if (provider?.checkStatus) {
@@ -384,9 +391,9 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         }
         return { reachable: false, message: `Unreachable -- provider status: ${real ?? "unknown"}` };
       }
-      return { reachable: false, message: "Unreachable -- SSH connection failed" };
+      return { reachable: false, message: "Unreachable -- SSM agent offline" };
     } catch {
-      return { reachable: false, message: "Unreachable -- SSH connection failed" };
+      return { reachable: false, message: "Unreachable -- SSM connection failed" };
     }
   });
 
