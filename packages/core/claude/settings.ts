@@ -38,14 +38,31 @@ function hookCommand(sessionId: string, arkdUrl: string, tenantId?: string): str
 
 /**
  * PostCompact hook: re-inject the original task prompt after context compaction.
- * Reads the task from ~/.ark/tracks/<sessionId>/task.txt and echoes it as
- * a user-visible message so the agent retains its mission after compaction.
+ *
+ * Reads the task from `${ARK_SESSION_DIR}/task.txt` and echoes it as a
+ * user-visible message so the agent retains its mission after compaction.
+ *
+ * Why `$ARK_SESSION_DIR` and not `$HOME/.ark/tracks/<id>/task.txt`: this
+ * command string is embedded in `.claude/settings.local.json` which lands
+ * on the host where claude actually runs. For remote dispatch (EC2 / k8s)
+ * that host is *not* the conductor, so a conductor-side path like
+ * `$HOME/.ark/...` (where `$HOME=/Users/<name>`) would not exist on Ubuntu
+ * and the `[ -f $taskFile ]` guard would silently no-op forever. The
+ * executor exports `ARK_SESSION_DIR` into the launch env on both local and
+ * remote dispatch (see `executors/claude-code.ts`), pointing at a path the
+ * launcher itself wrote `task.txt` into. That makes the hook host-agnostic.
+ *
+ * Note we deliberately do NOT expand `$ARK_SESSION_DIR` at hook-build time
+ * -- the value depends on the agent's host, and we want the shell that
+ * Claude Code spawns to resolve it. Hence the literal `$` in the heredoc.
  */
-function postCompactTaskHook(sessionId: string): Record<string, unknown> {
-  const arkDir = process.env.ARK_TEST_DIR || `${process.env.HOME}/.ark`;
-  const taskFile = `${arkDir}/tracks/${sessionId}/task.txt`;
+export function postCompactTaskHook(_sessionId: string): Record<string, unknown> {
   // Read task file and output a reminder. head -c to avoid ARG_MAX issues.
-  const cmd = `if [ -f '${taskFile}' ]; then echo "TASK REMINDER (re-injected after context compaction):"; head -c 4000 '${taskFile}'; fi ${ARK_HOOK_MARKER}`;
+  const cmd =
+    `if [ -f "$ARK_SESSION_DIR/task.txt" ]; then ` +
+    `echo "TASK REMINDER (re-injected after context compaction):"; ` +
+    `head -c 4000 "$ARK_SESSION_DIR/task.txt"; ` +
+    `fi ${ARK_HOOK_MARKER}`;
   return { type: "command", command: cmd, async: true };
 }
 

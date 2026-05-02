@@ -217,11 +217,19 @@ export const claudeCodeExecutor: Executor = {
     // JSON we just built as heredocs in the launcher script. The launcher writes
     // them in the remote workdir on first run -- no conductor-side files cross
     // the wire, no rsync.
+    //
+    // We also embed `task.txt` under `${ARK_SESSION_DIR}/task.txt` so the
+    // PostCompact hook (see settings.ts:postCompactTaskHook) can re-inject the
+    // original task on the agent's host after compaction. The conductor-side
+    // write below (`writeFileSync(sessionDir/task.txt)`) is irrelevant on
+    // remote -- that path is `/Users/<name>/.ark/...` and doesn't exist on
+    // Ubuntu. Without this file, every PostCompact hook silently no-ops.
     const embedFiles =
       isRemote && mcpJsonContent && settingsJsonContent
         ? [
             { relPath: mcpRelPath, content: mcpJsonContent },
             { relPath: settingsRelPath, content: settingsJsonContent },
+            { relPath: `${sessionDirEnv}/task.txt`, content: opts.task },
           ]
         : undefined;
     const { content: launchContent, claudeSessionId } = claude.buildLauncher({
