@@ -2495,6 +2495,7 @@
       "path": "packages/arkd/routes/channel.ts",
       "imports": [
         "packages/arkd/internal.ts",
+        "packages/arkd/routes/events.ts",
         "packages/arkd/types.ts",
         "packages/core/constants.ts"
       ],
@@ -2509,6 +2510,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
+        "packages/arkd/routes/channel.ts",
         "packages/arkd/server.ts"
       ]
     },
@@ -5774,8 +5776,12 @@
       "path": "packages/core/conductor/arkd-events-consumer.ts",
       "imports": [
         "packages/core/app.ts",
+        "packages/core/conductor/channel-types.ts",
+        "packages/core/conductor/deliver-to-channel.ts",
         "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/observability/structured-log.ts"
+        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/observability/structured-log.ts",
+        "packages/types/index.ts"
       ],
       "importedBy": [
         "packages/compute/core/ec2.ts",
@@ -5786,6 +5792,7 @@
       "path": "packages/core/conductor/channel-types.ts",
       "imports": [],
       "importedBy": [
+        "packages/core/conductor/arkd-events-consumer.ts",
         "packages/core/conductor/channel.ts",
         "packages/core/conductor/conductor.ts",
         "packages/core/conductor/hook-status-handler.ts",
@@ -5843,6 +5850,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
+        "packages/core/conductor/arkd-events-consumer.ts",
         "packages/core/conductor/conductor.ts"
       ]
     },
@@ -5921,6 +5929,7 @@
         "packages/core/services/worktree/index.ts"
       ],
       "importedBy": [
+        "packages/core/conductor/arkd-events-consumer.ts",
         "packages/core/conductor/conductor.ts",
         "packages/core/conductor/hook-status-handler.ts"
       ]
@@ -12192,6 +12201,7 @@
         "packages/core/auth/middleware.ts",
         "packages/core/compute-resolver.ts",
         "packages/core/compute/pool.ts",
+        "packages/core/conductor/arkd-events-consumer.ts",
         "packages/core/conductor/conductor.ts",
         "packages/core/conductor/deliver-to-channel.ts",
         "packages/core/connectors/resolve.ts",

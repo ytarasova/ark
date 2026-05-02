@@ -18,6 +18,14 @@
  *     existing `/hooks/status` handler shape so nothing downstream
  *     changes.
  *
+ * The same queue + stream is also used to carry agent->conductor channel
+ * traffic that previously POSTed directly to `${conductorUrl}/api/channel/...`
+ * and `${conductorUrl}/api/relay`. With pure SSM (no reverse tunnel),
+ * those direct POSTs land on the EC2 instance's own loopback and are
+ * silently dropped. Routing them through the events stream is the only
+ * conductor-reachable path post-SSH-removal. See `routes/channel.ts`
+ * for the producers.
+ *
  * Module-scoped state: there is exactly one event ring per arkd
  * process. arkd is single-tenant single-compute by deployment shape,
  * so a global queue is the right granularity. The ring is bounded
@@ -29,9 +37,9 @@
 import { json, type RouteCtx } from "../internal.js";
 import { logDebug, logInfo, logWarn } from "../../core/observability/structured-log.js";
 
-/** One enqueued hook event. */
-interface QueuedEvent {
-  /** Wire kind. `hook` is the only one today; future: `channel`, `progress`. */
+/** A hook event posted by the agent's launcher hooks. */
+interface QueuedHookEvent {
+  /** Wire kind. */
   kind: "hook";
   /** Optional session id from `?session=<id>` -- echoed to the conductor. */
   session: string | null;
@@ -43,6 +51,39 @@ interface QueuedEvent {
   /** Wall-clock at enqueue. */
   ts: string;
 }
+
+/** An agent->conductor channel report (was: POST `${conductor}/api/channel/<sid>`). */
+interface QueuedChannelReportEvent {
+  kind: "channel-report";
+  /** Session id the report is for (carried separately so the consumer
+   *  doesn't need to parse it back out of the body). */
+  session: string;
+  /** Tenant id from `X-Ark-Tenant-Id`, or null if unset. Preserved so the
+   *  consumer can scope the AppContext exactly the way the direct HTTP
+   *  path used to via `appForRequest`. */
+  tenantId: string | null;
+  /** Parsed report payload (OutboundMessage shape). */
+  body: unknown;
+  ts: string;
+}
+
+/** An agent-to-agent relay request (was: POST `${conductor}/api/relay`). */
+interface QueuedChannelRelayEvent {
+  kind: "channel-relay";
+  tenantId: string | null;
+  /** Parsed { from, target, message } payload. */
+  body: unknown;
+  ts: string;
+}
+
+/** Synthetic frame emitted when the queue overflowed since the last drain. */
+interface QueuedDroppedEvent {
+  kind: "dropped";
+  count: number;
+  ts: string;
+}
+
+type QueuedEvent = QueuedHookEvent | QueuedChannelReportEvent | QueuedChannelRelayEvent;
 
 /**
  * Bound on the in-memory queue. ~10k events is well past any single
@@ -77,6 +118,34 @@ function enqueue(ev: QueuedEvent): void {
   for (const fn of w) fn();
 }
 
+/**
+ * Enqueue a channel report for the conductor to pick up via `/events/stream`.
+ * Used by `routes/channel.ts` instead of POSTing directly to the conductor,
+ * which is unreachable from the compute under pure SSM (no reverse tunnel).
+ */
+export function enqueueChannelReport(sessionId: string, report: unknown, tenantId: string | null): void {
+  enqueue({
+    kind: "channel-report",
+    session: sessionId,
+    tenantId,
+    body: report,
+    ts: new Date().toISOString(),
+  });
+}
+
+/**
+ * Enqueue an agent-to-agent relay for the conductor. Same rationale as
+ * `enqueueChannelReport`.
+ */
+export function enqueueChannelRelay(payload: unknown, tenantId: string | null): void {
+  enqueue({
+    kind: "channel-relay",
+    tenantId,
+    body: payload,
+    ts: new Date().toISOString(),
+  });
+}
+
 /** Test-only: reset module state between tests. */
 export function _resetEventBus(): void {
   state.ring.length = 0;
@@ -102,7 +171,7 @@ function waitForEvent(signal: AbortSignal): Promise<void> {
 }
 
 /** Encode one event as an NDJSON line (newline-terminated JSON). */
-function ndjsonLine(payload: unknown): Uint8Array {
+function ndjsonLine(payload: QueuedEvent | QueuedDroppedEvent): Uint8Array {
   const text = JSON.stringify(payload) + "\n";
   return new TextEncoder().encode(text);
 }

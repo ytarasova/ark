@@ -7,6 +7,16 @@
  * the existing `handleHookStatus` pipeline so nothing downstream
  * changes shape.
  *
+ * Channel reports + agent-to-agent relays travel the same path. Pre-SSM
+ * arkd would POST these directly to `${conductor}/api/channel/<sid>` and
+ * `${conductor}/api/relay`, which only worked because the SSH `-R` tunnel
+ * mapped the compute's `localhost:19100` back to the dev-box conductor.
+ * Under pure SSM there is no reverse path, so arkd now enqueues those
+ * payloads as `channel-report` / `channel-relay` frames on the same ring
+ * and we drain them here, dispatching through `handleReport` and the
+ * channel-relay path respectively. See `arkd/routes/channel.ts` and
+ * `arkd/routes/events.ts`.
+ *
  * One reader per remote compute. Started when the compute becomes
  * reachable (right after the forward tunnel is up), stopped when the
  * compute is stopped. The map below is module-scoped because a
@@ -18,8 +28,12 @@
  * a flaky network can't kill the conductor.
  */
 
+import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 import { handleHookStatus } from "./hook-status-handler.js";
+import { handleReport } from "./report-pipeline.js";
+import type { OutboundMessage } from "./channel-types.js";
+import { deliverToChannel } from "./deliver-to-channel.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
 
 interface ConsumerEntry {
@@ -41,13 +55,28 @@ interface NdjsonHookFrame {
   ts: string;
 }
 
+interface NdjsonChannelReportFrame {
+  kind: "channel-report";
+  session: string;
+  tenantId: string | null;
+  body: unknown;
+  ts: string;
+}
+
+interface NdjsonChannelRelayFrame {
+  kind: "channel-relay";
+  tenantId: string | null;
+  body: unknown;
+  ts: string;
+}
+
 interface NdjsonDroppedFrame {
   kind: "dropped";
   count: number;
   ts: string;
 }
 
-type NdjsonFrame = NdjsonHookFrame | NdjsonDroppedFrame;
+type NdjsonFrame = NdjsonHookFrame | NdjsonChannelReportFrame | NdjsonChannelRelayFrame | NdjsonDroppedFrame;
 
 /**
  * Start the consumer for a compute. Idempotent: a second call for the
@@ -183,10 +212,25 @@ async function readEventsStreamOnce(
 }
 
 /**
+ * Tenant-scope an AppContext by id, mirroring what `appForRequest` does
+ * for the live HTTP path. `null` / empty strings fall through to the
+ * unscoped app (the local-mode default), which matches the pre-fix
+ * behaviour when the agent didn't send `X-Ark-Tenant-Id`.
+ */
+function scopeApp(app: AppContext, tenantId: string | null): AppContext {
+  if (!tenantId) return app;
+  try {
+    return app.forTenant(tenantId);
+  } catch {
+    return app;
+  }
+}
+
+/**
  * Parse one NDJSON line and route it to the right downstream handler.
- * Currently only `kind: "hook"` and `kind: "dropped"` are emitted;
- * unknown kinds are logged and ignored so arkd can introduce new
- * frame types without breaking the conductor.
+ * Currently `hook`, `channel-report`, `channel-relay`, and `dropped`
+ * are emitted; unknown kinds are logged and ignored so arkd can
+ * introduce new frame types without breaking the conductor.
  */
 async function dispatchFrame(app: AppContext, line: string): Promise<void> {
   let frame: NdjsonFrame;
@@ -227,6 +271,51 @@ async function dispatchFrame(app: AppContext, line: string): Promise<void> {
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message ?? String(err);
       logWarn("conductor", `arkd-events: hook dispatch threw: ${msg}`);
+    }
+    return;
+  }
+  if (frame.kind === "channel-report") {
+    // Mirror the legacy `/api/channel/:sessionId` HTTP route on conductor.ts:
+    // resolve the tenant-scoped app, then run `handleReport`. Tenant scoping
+    // is critical -- without it a hosted-mode conductor would write the
+    // session update against the wrong tenant's repo and the UI would never
+    // see the completion.
+    const scoped = scopeApp(app, frame.tenantId);
+    const report = frame.body as OutboundMessage;
+    try {
+      await handleReport(scoped, frame.session, report);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message ?? String(err);
+      logWarn("conductor", `arkd-events: channel-report dispatch threw for session=${frame.session}: ${msg}`);
+    }
+    return;
+  }
+  if (frame.kind === "channel-relay") {
+    // Mirror the legacy `/api/relay` HTTP route. The relay payload looks up
+    // the target session, computes the channel port, and pushes a `steer`
+    // payload via `deliverToChannel` (which already prefers arkd over direct
+    // HTTP and re-scopes by the target session's own tenant).
+    const scoped = scopeApp(app, frame.tenantId);
+    const relay = frame.body as { from: string; target: string; message: string };
+    if (!relay || typeof relay.target !== "string") {
+      logWarn("conductor", `arkd-events: channel-relay missing target; ignoring`);
+      return;
+    }
+    try {
+      const targetSession = await scoped.sessions.get(relay.target);
+      if (targetSession) {
+        const channelPort = scoped.sessions.channelPort(relay.target);
+        const payload = {
+          type: "steer",
+          message: relay.message,
+          from: relay.from,
+          sessionId: relay.target,
+        };
+        await deliverToChannel(scoped, targetSession as Session, channelPort, payload);
+      }
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message ?? String(err);
+      logWarn("conductor", `arkd-events: channel-relay dispatch threw target=${relay.target}: ${msg}`);
     }
     return;
   }

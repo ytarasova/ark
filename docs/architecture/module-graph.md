@@ -10,7 +10,7 @@ Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types
 | --- | --- |
 | `packages/core/observability/structured-log.ts` | 171 |
 | `packages/core/app.ts` | 148 |
-| `packages/types/index.ts` | 106 |
+| `packages/types/index.ts` | 107 |
 | `packages/web/src/lib/utils.ts` | 94 |
 | `packages/core/database/index.ts` | 73 |
 | `packages/web/src/hooks/useApi.ts` | 43 |
@@ -174,15 +174,16 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/arkd/routes/channel.ts`
 
 - fan-in: 1
-- fan-out: 3
+- fan-out: 4
 - imports:
   - `packages/arkd/internal.ts`
+  - `packages/arkd/routes/events.ts`
   - `packages/arkd/types.ts`
   - `packages/core/constants.ts`
 
 ### `packages/arkd/routes/events.ts`
 
-- fan-in: 1
+- fan-in: 2
 - fan-out: 2
 - imports:
   - `packages/arkd/internal.ts`
@@ -2506,15 +2507,19 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/conductor/arkd-events-consumer.ts`
 
 - fan-in: 2
-- fan-out: 3
+- fan-out: 7
 - imports:
   - `packages/core/app.ts`
+  - `packages/core/conductor/channel-types.ts`
+  - `packages/core/conductor/deliver-to-channel.ts`
   - `packages/core/conductor/hook-status-handler.ts`
+  - `packages/core/conductor/report-pipeline.ts`
   - `packages/core/observability/structured-log.ts`
+  - `packages/types/index.ts`
 
 ### `packages/core/conductor/channel-types.ts`
 
-- fan-in: 6
+- fan-in: 7
 - fan-out: 0
 
 ### `packages/core/conductor/channel.ts`
@@ -2549,7 +2554,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/conductor/deliver-to-channel.ts`
 
-- fan-in: 1
+- fan-in: 2
 - fan-out: 7
 - imports:
   - `packages/arkd/client.ts`
@@ -2613,7 +2618,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/conductor/report-pipeline.ts`
 
-- fan-in: 2
+- fan-in: 3
 - fan-out: 10
 - imports:
   - `packages/core/app.ts`
@@ -6933,7 +6938,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/types/index.ts`
 
-- fan-in: 106
+- fan-in: 107
 - fan-out: 0
 
 ### `packages/types/message.ts`

@@ -522,57 +522,52 @@ describe("Server lifecycle", async () => {
   });
 });
 
-// ── Channel report forwarding ──────────────────────────────────────────────
+// ── Channel report forwarding (post-SSM events-ring path) ─────────────────
+//
+// Pre-SSM these tests asserted that arkd POSTed reports directly to
+// `${conductor}/api/channel/...`. Under pure SSM that POST silently fails
+// (the EC2 instance's loopback doesn't host the conductor), so we now
+// enqueue onto the events ring and the conductor pulls them via
+// `/events/stream`. The assertions below check the new contract:
+// `{ ok: true, forwarded: true }` regardless of conductor reachability,
+// because reachability is the conductor consumer's problem, not arkd's.
 
 describe("Channel report forwarding", async () => {
-  it("defaults conductorUrl to localhost:19100", () => {
-    // The main test server was started without conductorUrl.
-    // With the fix, it defaults to http://localhost:19100.
-    // We can verify by posting a channel report -- it should attempt to forward
-    // (and fail since the conductor isn't running on that port for this test).
-    // The key assertion is that it returns ok:false with an error, not ok:true/forwarded:false.
-  });
-
-  it("returns ok:false when conductor is unreachable", async () => {
-    // Start arkd with a bogus conductor URL
-    const ephemeral = startArkd(19380, { conductorUrl: "http://localhost:19999", quiet: true });
+  it("returns ok:true even when no conductor is reachable", async () => {
+    // No reverse path is needed any more -- arkd just queues. The conductor
+    // URL setting is irrelevant for the report path now.
+    const ephemeralPort = await allocatePort();
+    const ephemeral = startArkd(ephemeralPort, { conductorUrl: "http://localhost:19999", quiet: true });
     try {
-      const resp = await fetch("http://localhost:19380/channel/test-session", {
+      const resp = await fetch(`http://localhost:${ephemeralPort}/channel/test-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test" }),
       });
       const data = (await resp.json()) as any;
-      expect(data.ok).toBe(false);
-      expect(data.forwarded).toBe(false);
-      expect(data.error).toBeDefined();
+      expect(data.ok).toBe(true);
+      expect(data.forwarded).toBe(true);
     } finally {
       ephemeral.stop();
     }
   });
 
-  it("forwards report to conductor and returns forwarded:true", async () => {
-    // Start a mock conductor that accepts channel reports
-    const received: any[] = [];
+  it("does NOT POST to ${conductor}/api/channel/... (SSM regression guard)", async () => {
+    const conductorPort = await allocatePort();
+    const arkdPort = await allocatePort();
+    // Mock conductor records every inbound request. The new path must not hit it.
+    const mockHits: string[] = [];
     const mockConductor = Bun.serve({
-      port: 19381,
+      port: conductorPort,
       async fetch(req) {
-        if (req.method === "POST" && new URL(req.url).pathname.startsWith("/api/channel/")) {
-          const body = await req.json();
-          received.push(body);
-          return Response.json({ status: "ok" });
-        }
-        return new Response("not found", { status: 404 });
+        mockHits.push(new URL(req.url).pathname);
+        return Response.json({ status: "ok" });
       },
     });
 
-    // Give the mock server a moment to bind
-    await Bun.sleep(50);
-
-    const ephemeral = startArkd(19382, { conductorUrl: "http://localhost:19381", quiet: true });
-    await Bun.sleep(50);
+    const ephemeral = startArkd(arkdPort, { conductorUrl: `http://localhost:${conductorPort}`, quiet: true });
     try {
-      const resp = await fetch("http://localhost:19382/channel/s-test123", {
+      const resp = await fetch(`http://localhost:${arkdPort}/channel/s-test123`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test report" }),
@@ -581,10 +576,9 @@ describe("Channel report forwarding", async () => {
       expect(data.ok).toBe(true);
       expect(data.forwarded).toBe(true);
 
-      // Verify the mock conductor received the report
-      await pollUntil(() => received.length > 0, { timeout: 2000 });
-      expect(received[0].type).toBe("completed");
-      expect(received[0].summary).toBe("test report");
+      // Give any (now-removed) outbound POST a tick to fire.
+      await Bun.sleep(100);
+      expect(mockHits.filter((p) => p.startsWith("/api/channel/")).length).toBe(0);
     } finally {
       ephemeral.stop();
       mockConductor.stop();

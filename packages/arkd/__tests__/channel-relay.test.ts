@@ -2,19 +2,24 @@
  * Tests for arkd channel relay - arkd as conductor transport layer.
  *
  * Tests the 3 relay endpoints:
- *   POST /channel/:sessionId  - agent report forwarding to conductor
- *   POST /channel/relay       - agent-to-agent relay via conductor
+ *   POST /channel/:sessionId  - agent report enqueued for conductor stream
+ *   POST /channel/relay       - agent-to-agent relay enqueued for conductor stream
  *   POST /channel/deliver     - conductor-to-agent delivery to local channel port
  *
  * Also tests the /config endpoint for runtime conductorUrl management.
  *
- * Uses a real arkd + a mock conductor + a mock channel server to verify
- * the full forwarding chain.
+ * Post-SSM-migration shape: report + relay no longer POST to the conductor
+ * directly (the EC2 reverse tunnel is gone); instead they enqueue onto the
+ * arkd events ring and the conductor pulls them via `/events/stream`. We
+ * verify both that the channel routes still return success to the agent
+ * AND that the conductor never receives a direct POST to `/api/channel/...`
+ * or `/api/relay` from arkd.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { startArkd } from "../server.js";
 import { ArkdClient } from "../client.js";
+import { _resetEventBus } from "../routes/events.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let ARKD_PORT: number;
@@ -34,14 +39,17 @@ beforeAll(async () => {
   ARKD_PORT = await allocatePort();
   CONDUCTOR_PORT = await allocatePort();
   CHANNEL_PORT = await allocatePort();
-  // Start arkd with conductor URL pointing to our mock
+  // Start arkd with conductor URL pointing to our mock. The conductor URL
+  // is no longer used for report/relay (those go through the events ring),
+  // but it still configures `/config` and is kept for back-compat probes.
   arkdServer = startArkd(ARKD_PORT, {
     quiet: true,
     conductorUrl: `http://localhost:${CONDUCTOR_PORT}`,
   });
   client = new ArkdClient(`http://localhost:${ARKD_PORT}`);
 
-  // Mock conductor - captures requests
+  // Mock conductor - captures requests. Used to assert that arkd does NOT
+  // POST report/relay to the conductor any more.
   mockConductor = Bun.serve({
     port: CONDUCTOR_PORT,
     hostname: "127.0.0.1",
@@ -72,6 +80,13 @@ afterAll(() => {
   mockChannel.stop();
 });
 
+beforeEach(() => {
+  // Reset the events ring so each test sees a clean queue.
+  _resetEventBus();
+  conductorRequests = [];
+  channelRequests = [];
+});
+
 // ── Config endpoint ────────────────────────────────────────────────────────
 
 describe("/config", async () => {
@@ -91,26 +106,26 @@ describe("/config", async () => {
   });
 });
 
-// ── Channel report forwarding ──────────────────────────────────────────────
+// ── Channel report enqueue (no direct POST to conductor) ───────────────────
 
-describe("/channel/:sessionId (report forwarding)", async () => {
-  it("forwards report to conductor", async () => {
-    conductorRequests = [];
+describe("/channel/:sessionId (report enqueue)", async () => {
+  it("returns ok+forwarded and does NOT POST to conductor", async () => {
     const report = { type: "progress", message: "Working on it", stage: "work" };
 
     const result = await client.channelReport("s-test-123", report);
     expect(result.ok).toBe(true);
     expect(result.forwarded).toBe(true);
 
-    // Verify conductor received it
-    expect(conductorRequests.length).toBe(1);
-    expect(conductorRequests[0].path).toBe("/api/channel/s-test-123");
-    expect(conductorRequests[0].body.type).toBe("progress");
-    expect(conductorRequests[0].body.message).toBe("Working on it");
+    // Critical regression assertion: arkd must not call out to the
+    // conductor's `/api/channel/...` directly any more. That POST silently
+    // fails on EC2 under pure SSM and was the root cause of stuck sessions.
+    // Give the (non-existent) request a tick to fire if it were going to.
+    await Bun.sleep(50);
+    const directHits = conductorRequests.filter((r) => r.path.startsWith("/api/channel/"));
+    expect(directHits.length).toBe(0);
   });
 
-  it("forwards completed report with all fields", async () => {
-    conductorRequests = [];
+  it("returns ok+forwarded for a completed report with all fields", async () => {
     const report = {
       type: "completed",
       summary: "Done with feature",
@@ -120,38 +135,97 @@ describe("/channel/:sessionId (report forwarding)", async () => {
       stage: "implement",
     };
 
-    await client.channelReport("s-test-456", report);
-    expect(conductorRequests[0].body.type).toBe("completed");
-    expect(conductorRequests[0].body.pr_url).toBe("https://github.com/owner/repo/pull/42");
-    expect(conductorRequests[0].body.filesChanged).toEqual(["src/foo.ts", "src/bar.ts"]);
+    const result = await client.channelReport("s-test-456", report);
+    expect(result.ok).toBe(true);
+    expect(result.forwarded).toBe(true);
   });
 
-  it("returns forwarded:false when no conductorUrl", async () => {
+  it("returns ok+forwarded even when no conductorUrl configured", async () => {
+    // The events-ring path doesn't depend on the conductor URL at all --
+    // arkd just queues and the conductor's long-poll consumer is
+    // responsible for pulling. So clearing the URL must not break report.
     await client.setConfig({ conductorUrl: "" });
     const result = await client.channelReport("s-test-789", { type: "progress", message: "test" });
-    expect(result.forwarded).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.forwarded).toBe(true);
 
-    // Restore
     await client.setConfig({ conductorUrl: `http://localhost:${CONDUCTOR_PORT}` });
   });
 
-  it("returns forwarded:false when conductor unreachable", async () => {
-    await client.setConfig({ conductorUrl: "http://localhost:1" });
-    const result = await client.channelReport("s-test-000", { type: "error", error: "boom" });
-    expect(result.ok).toBe(false);
-    expect(result.forwarded).toBe(false);
+  it("enqueues a channel-report frame visible on /events/stream", async () => {
+    await client.channelReport("s-stream-1", { type: "completed", summary: "done" });
 
-    // Restore
-    await client.setConfig({ conductorUrl: `http://localhost:${CONDUCTOR_PORT}` });
+    const abort = new AbortController();
+    const stream = await fetch(`http://localhost:${ARKD_PORT}/events/stream`, { signal: abort.signal });
+    expect(stream.status).toBe(200);
+
+    const reader = stream.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let frame: any = null;
+    while (frame === null) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const nl = buf.indexOf("\n");
+      if (nl >= 0) {
+        const line = buf.slice(0, nl).trim();
+        if (line) frame = JSON.parse(line);
+      }
+    }
+    abort.abort();
+    try {
+      await reader.cancel();
+    } catch {
+      /* already cancelled */
+    }
+
+    expect(frame).not.toBeNull();
+    expect(frame.kind).toBe("channel-report");
+    expect(frame.session).toBe("s-stream-1");
+    expect(frame.body.type).toBe("completed");
+    expect(frame.body.summary).toBe("done");
+  });
+
+  it("preserves tenantId from X-Ark-Tenant-Id header on the queued frame", async () => {
+    await fetch(`http://localhost:${ARKD_PORT}/channel/s-tenant-1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Ark-Tenant-Id": "tenant-acme" },
+      body: JSON.stringify({ type: "progress", message: "with tenant" }),
+    });
+
+    const abort = new AbortController();
+    const stream = await fetch(`http://localhost:${ARKD_PORT}/events/stream`, { signal: abort.signal });
+    const reader = stream.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let frame: any = null;
+    while (frame === null) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const nl = buf.indexOf("\n");
+      if (nl >= 0) {
+        const line = buf.slice(0, nl).trim();
+        if (line) frame = JSON.parse(line);
+      }
+    }
+    abort.abort();
+    try {
+      await reader.cancel();
+    } catch {
+      /* already cancelled */
+    }
+
+    expect(frame.kind).toBe("channel-report");
+    expect(frame.tenantId).toBe("tenant-acme");
   });
 });
 
 // ── Channel relay ──────────────────────────────────────────────────────────
 
 describe("/channel/relay", async () => {
-  it("forwards relay to conductor /api/relay", async () => {
-    conductorRequests = [];
-
+  it("returns ok+forwarded and does NOT POST to conductor", async () => {
     const result = await client.channelRelay({
       from: "s-agent-a",
       target: "s-agent-b",
@@ -160,20 +234,52 @@ describe("/channel/relay", async () => {
     expect(result.ok).toBe(true);
     expect(result.forwarded).toBe(true);
 
-    expect(conductorRequests.length).toBe(1);
-    expect(conductorRequests[0].path).toBe("/api/relay");
-    expect(conductorRequests[0].body.from).toBe("s-agent-a");
-    expect(conductorRequests[0].body.target).toBe("s-agent-b");
-    expect(conductorRequests[0].body.message).toBe("Hey, I finished the plan");
+    await Bun.sleep(50);
+    const directHits = conductorRequests.filter((r) => r.path === "/api/relay");
+    expect(directHits.length).toBe(0);
+  });
+
+  it("enqueues a channel-relay frame visible on /events/stream", async () => {
+    await client.channelRelay({
+      from: "s-a",
+      target: "s-b",
+      message: "ping",
+    });
+
+    const abort = new AbortController();
+    const stream = await fetch(`http://localhost:${ARKD_PORT}/events/stream`, { signal: abort.signal });
+    const reader = stream.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let frame: any = null;
+    while (frame === null) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const nl = buf.indexOf("\n");
+      if (nl >= 0) {
+        const line = buf.slice(0, nl).trim();
+        if (line) frame = JSON.parse(line);
+      }
+    }
+    abort.abort();
+    try {
+      await reader.cancel();
+    } catch {
+      /* already cancelled */
+    }
+
+    expect(frame.kind).toBe("channel-relay");
+    expect(frame.body.from).toBe("s-a");
+    expect(frame.body.target).toBe("s-b");
+    expect(frame.body.message).toBe("ping");
   });
 });
 
-// ── Channel deliver ────────────────────────────────────────────────────────
+// ── Channel deliver (conductor -> agent: unchanged) ────────────────────────
 
 describe("/channel/deliver", async () => {
   it("delivers task to local channel port", async () => {
-    channelRequests = [];
-
     const result = await client.channelDeliver({
       channelPort: CHANNEL_PORT,
       payload: { type: "task", task: "Implement auth module", sessionId: "s-test", stage: "work" },
@@ -187,8 +293,6 @@ describe("/channel/deliver", async () => {
   });
 
   it("delivers steer message to channel", async () => {
-    channelRequests = [];
-
     await client.channelDeliver({
       channelPort: CHANNEL_PORT,
       payload: { type: "steer", message: "Focus on the auth part", from: "user", sessionId: "s-test" },
@@ -211,9 +315,7 @@ describe("/channel/deliver", async () => {
 // ── Full round-trip ────────────────────────────────────────────────────────
 
 describe("full relay chain", async () => {
-  it("report → arkd → conductor (end-to-end)", async () => {
-    conductorRequests = [];
-
+  it("report -> arkd -> events ring (no direct conductor hit)", async () => {
     // Simulate what channel.ts does: POST report to arkd
     const resp = await fetch(`http://localhost:${ARKD_PORT}/channel/s-roundtrip`, {
       method: "POST",
@@ -231,15 +333,12 @@ describe("full relay chain", async () => {
     expect(result.ok).toBe(true);
     expect(result.forwarded).toBe(true);
 
-    // Conductor received the full report
-    const req = conductorRequests[0];
-    expect(req.path).toBe("/api/channel/s-roundtrip");
-    expect(req.body.summary).toBe("All done");
+    // No direct conductor POST -- the events ring is the only path.
+    await Bun.sleep(50);
+    expect(conductorRequests.filter((r) => r.path.startsWith("/api/channel/")).length).toBe(0);
   });
 
-  it("deliver → arkd → channel (end-to-end)", async () => {
-    channelRequests = [];
-
+  it("deliver -> arkd -> channel (end-to-end, unchanged)", async () => {
     // Simulate what conductor does: POST deliver to arkd
     const resp = await fetch(`http://localhost:${ARKD_PORT}/channel/deliver`, {
       method: "POST",
