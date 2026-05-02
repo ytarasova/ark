@@ -288,7 +288,7 @@ export function buildAppMode(config: ArkConfig, app?: AppContext): AppMode {
   // rule classified `sqlite://...` URLs as hosted even though the DB
   // adapter then opened SQLite anyway -- dialect + mode now agree.
   const isHosted = database.dialect === "postgres";
-  return isHosted ? buildHostedAppMode(database) : buildLocalAppMode(app, database);
+  return isHosted ? buildHostedAppMode(database, config) : buildLocalAppMode(app, database);
 }
 
 export { buildLocalAppMode, buildHostedAppMode };
