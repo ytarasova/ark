@@ -934,7 +934,7 @@ export class AppContext {
  * Override every known executor name with the noop stub in the app's per-
  * instance plugin registry. `resolveExecutor` in dispatch consults the
  * per-app registry before the global one, so this prevents any test-mode
- * dispatch from reaching the real claude-code / agent-sdk / goose
+ * dispatch from reaching the real claude-code / claude-agent / goose
  * executors (which would spawn tmux panes + real agent binaries).
  */
 function installNoopExecutors(app: AppContext): void {
@@ -946,8 +946,8 @@ function installNoopExecutors(app: AppContext): void {
 
 /**
  * Test profile: pre-seed the secret store with dummy values for every
- * env-var secret declared by a builtin runtime YAML (claude.yaml's
- * CLAUDE_CODE_OAUTH_TOKEN, agent-sdk's ANTHROPIC_API_KEY, etc).
+ * env-var secret declared by a builtin runtime YAML (claude-code.yaml's
+ * CLAUDE_CODE_OAUTH_TOKEN, claude-agent's ANTHROPIC_API_KEY, etc).
  *
  * Without this, any test that runs through `dispatchService.dispatch`
  * fails at `buildLaunchEnv` with "Missing secrets for tenant 'default'"

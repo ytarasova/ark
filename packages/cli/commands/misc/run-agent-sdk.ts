@@ -1,17 +1,21 @@
 import type { Command } from "commander";
 
 /**
- * `ark run-agent-sdk` -- launch the agent-sdk child process.
+ * `ark run-agent-sdk` -- launch the claude-agent runtime child process.
  *
- * Invoked by the agent-sdk executor in compiled-binary mode; dev mode spawns
+ * Invoked by the claude-agent executor in compiled-binary mode; dev mode spawns
  * `launch.ts` directly. All context is read from `ARK_*` env vars.
+ *
+ * Subcommand name kept as `run-agent-sdk` (not `run-claude-agent`) for
+ * backward-compat with previously compiled binaries -- the launch spec in
+ * install-paths.ts still emits this verb.
  */
 export function registerRunAgentSdkCommand(program: Command): void {
   program
     .command("run-agent-sdk")
-    .description("Run the agent-sdk launch script (internal -- used by agent-sdk executor)")
+    .description("Run the claude-agent launch script (internal -- used by claude-agent executor)")
     .action(async () => {
-      const { runAgentSdkLaunch } = await import("../../../core/runtimes/agent-sdk/launch.js");
+      const { runAgentSdkLaunch } = await import("../../../core/runtimes/claude-agent/launch.js");
 
       function need(name: string): string {
         const v = process.env[name];

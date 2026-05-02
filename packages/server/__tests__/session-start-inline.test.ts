@@ -76,7 +76,7 @@ describe("session/start: inline flow payloads", () => {
           name: "main",
           gate: "auto",
           agent: {
-            runtime: "agent-sdk",
+            runtime: "claude-agent",
             model: "sonnet",
             system_prompt: "You are inline.",
           },
@@ -97,7 +97,7 @@ describe("session/start: inline flow payloads", () => {
     expect(stage?.agent).toBeDefined();
     expect(typeof stage?.agent).toBe("object");
     const agent = stage?.agent as Record<string, unknown>;
-    expect(agent.runtime).toBe("agent-sdk");
+    expect(agent.runtime).toBe("claude-agent");
     expect(agent.model).toBe("sonnet");
   });
 

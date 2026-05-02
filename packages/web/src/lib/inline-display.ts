@@ -119,7 +119,7 @@ export function resolveInlineDisplay(session: any, models: InlineModelLike[] | u
  *
  * Resolution order:
  *   1. `session.agent` if set and not the placeholder.
- *   2. Runtime of the active inline-flow stage (e.g. `"agent-sdk"`).
+ *   2. Runtime of the active inline-flow stage (e.g. `"claude-agent"`).
  *   3. `null` -- callers fall back to a generic word like "agent".
  */
 export function friendlyAgentName(session: any): string | null {

@@ -76,7 +76,7 @@ describe("Goose runtime resolution", () => {
   });
 
   it("all five builtin runtimes are loadable", () => {
-    const names = ["claude", "claude-max", "codex", "gemini", "goose"];
+    const names = ["claude-code", "claude-max", "codex", "gemini", "goose"];
     for (const name of names) {
       const runtime = app.runtimes.get(name);
       expect(runtime).not.toBeNull();

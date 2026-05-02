@@ -11,7 +11,7 @@ import { runAction } from "./_shared.js";
  * removed: it conflated two unrelated concerns -- agent-runtime credentials
  * and ark-API access -- and bypassed the secret store. Agent runtimes now
  * declare what they need via `secrets: [...]` in their YAML (see
- * runtimes/claude.yaml, runtimes/agent-sdk.yaml); operators store the
+ * runtimes/claude-code.yaml, runtimes/claude-agent.yaml); operators store the
  * value with `ark secret set <NAME> <VALUE>` and dispatch resolves it via
  * `app.secrets.resolveMany(tenantId, names)`. Subscription-blob auth
  * (claude-max) stays on `ark tenant auth set --subscription-blob`.

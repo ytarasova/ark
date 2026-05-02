@@ -28,7 +28,7 @@ import { TranscriptParserRegistry } from "../runtimes/transcript-parser.js";
 import { ClaudeTranscriptParser } from "../runtimes/claude/parser.js";
 import { CodexTranscriptParser } from "../runtimes/codex/parser.js";
 import { GeminiTranscriptParser } from "../runtimes/gemini/parser.js";
-import { AgentSdkParser } from "../runtimes/agent-sdk/parser.js";
+import { AgentSdkParser } from "../runtimes/claude-agent/parser.js";
 import { createPluginRegistry } from "../plugins/registry.js";
 import { FsSnapshotStore } from "../../compute/core/snapshot-store-fs.js";
 import type { SessionRepository } from "../repositories/session.js";

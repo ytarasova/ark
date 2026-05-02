@@ -180,7 +180,7 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
   // session.agent may be set to "inline" for inline-flow dispatches, which
   // bleeds into the typing indicator, agent message author labels, and
   // anywhere else this string is shown. friendlyAgentName falls back to the
-  // active inline-flow stage's runtime (e.g. "agent-sdk"), then to a
+  // active inline-flow stage's runtime (e.g. "claude-agent"), then to a
   // generic "agent".
   const sessionAgent = friendlyAgentName(session) ?? "agent";
 

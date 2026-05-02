@@ -400,9 +400,9 @@ describe("M6 -- seedBuiltinResources is strict in hosted mode", () => {
   });
 });
 
-// ── M7 ─ agent-sdk executor refusal ─────────────────────────────────────────
+// ── M7 ─ claude-agent executor refusal ─────────────────────────────────────
 
-describe("M7 -- agent-sdk executor refuses launch in hosted mode", () => {
+describe("M7 -- claude-agent executor refuses launch in hosted mode", () => {
   it("returns ok: false with a clear message in hosted mode", async () => {
     const ctx = await forHostedTestAsync();
     // We don't need a fully booted hosted stack -- the executor only needs
@@ -417,8 +417,8 @@ describe("M7 -- agent-sdk executor refuses launch in hosted mode", () => {
     const hostedMode = buildHostedAppMode({ dialect: "postgres", url: "postgres://x" }, local.config as any);
     (local as any)._container.register({ mode: asValue(hostedMode) });
 
-    const { agentSdkExecutor } = await import("../executors/agent-sdk.js");
-    const result = await agentSdkExecutor.launch({
+    const { claudeAgentExecutor } = await import("../executors/claude-agent.js");
+    const result = await claudeAgentExecutor.launch({
       app: local,
       sessionId: session.id,
       task: "test",
@@ -426,7 +426,7 @@ describe("M7 -- agent-sdk executor refuses launch in hosted mode", () => {
       agent: { name: "test", model: "claude-3" } as any,
     });
     expect(result.ok).toBe(false);
-    expect(result.message).toMatch(/agent-sdk executor is local-mode only/);
+    expect(result.message).toMatch(/claude-agent executor is local-mode only/);
 
     await local.shutdown();
   });

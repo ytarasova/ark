@@ -200,7 +200,8 @@ export function registerViewCommands(session: Command) {
       }
 
       const launchExecutor = (sessionData?.config as Record<string, unknown> | undefined)?.launch_executor;
-      if (launchExecutor === "agent-sdk") {
+      // Older sessions persisted the legacy `agent-sdk` executor name -- accept both.
+      if (launchExecutor === "claude-agent" || launchExecutor === "agent-sdk") {
         if (
           sessionData?.status === "completed" ||
           sessionData?.status === "failed" ||

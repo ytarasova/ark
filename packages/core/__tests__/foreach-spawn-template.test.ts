@@ -45,7 +45,7 @@ describe("for_each + mode:spawn + inline flow templating", () => {
           name: "plan",
           gate: "auto",
           agent: {
-            runtime: "agent-sdk",
+            runtime: "claude-agent",
             model: "test",
             system_prompt: "Plan the work for {{stream.stream_id}}.",
           },

@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { buildAgentSdkRuntimeEnv } from "../executors/agent-sdk.js";
+import { buildAgentSdkRuntimeEnv } from "../executors/claude-agent.js";
 
 describe("buildAgentSdkRuntimeEnv", () => {
   it("forwards default_haiku_model as ANTHROPIC_DEFAULT_HAIKU_MODEL", () => {

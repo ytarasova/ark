@@ -82,10 +82,10 @@ beforeAll(async () => {
   // a savable store -- use the default FileRuntimeStore the test profile gives
   // us by writing YAML into arkDir/runtimes.
   const rtDir = join(app.arkDir, "runtimes");
-  writeYaml(rtDir, "agent-sdk.yaml", {
-    name: "agent-sdk",
-    description: "test agent-sdk runtime",
-    type: "agent-sdk",
+  writeYaml(rtDir, "claude-agent.yaml", {
+    name: "claude-agent",
+    description: "test claude-agent runtime",
+    type: "claude-agent",
     permission_mode: "bypassPermissions",
   });
 
@@ -94,7 +94,7 @@ beforeAll(async () => {
   writeYaml(agentsDir, "worker.yaml", {
     name: "worker",
     description: "test worker",
-    runtime: "agent-sdk",
+    runtime: "claude-agent",
     model: "sonnet",
     max_turns: 200,
     system_prompt: "Be helpful.",
@@ -117,7 +117,7 @@ describe("resolveStage: named chain", () => {
     const stage: StageDefinition = { name: "main", gate: "auto", agent: "worker" };
     const resolved = resolveStage(app, fakeSession, stage);
     expect(resolved.agent.name).toBe("worker");
-    expect(resolved.runtime.name).toBe("agent-sdk");
+    expect(resolved.runtime.name).toBe("claude-agent");
     expect(resolved.model.id).toBe("claude-sonnet-4-6");
     expect(resolved.resolvedSlug).toBe("claude-sonnet-4-6");
   });
@@ -129,14 +129,14 @@ describe("resolveStage: inline agent with named runtime + named model", () => {
       name: "custom",
       gate: "auto",
       agent: {
-        runtime: "agent-sdk",
+        runtime: "claude-agent",
         model: "opus",
         system_prompt: "You are an inline agent.",
       },
     };
     const resolved = resolveStage(app, fakeSession, stage);
     expect(resolved.agent.system_prompt).toBe("You are an inline agent.");
-    expect(resolved.runtime.name).toBe("agent-sdk");
+    expect(resolved.runtime.name).toBe("claude-agent");
     expect(resolved.model.id).toBe("claude-opus-4-7");
   });
 });
@@ -147,7 +147,7 @@ describe("resolveStage: inline model with provider_slugs", () => {
       name: "bespoke-model",
       gate: "auto",
       agent: {
-        runtime: "agent-sdk",
+        runtime: "claude-agent",
         model: {
           id: "my-custom",
           display: "Custom",
@@ -169,7 +169,7 @@ describe("resolveStage: inline runtime", () => {
       name: "bespoke-runtime",
       gate: "auto",
       agent: {
-        runtime: { name: "my-rt", type: "agent-sdk" },
+        runtime: { name: "my-rt", type: "claude-agent" },
         model: "sonnet",
         system_prompt: "inline runtime",
       },
@@ -186,7 +186,7 @@ describe("resolveStage: fully mixed tree", () => {
       name: "full-inline",
       gate: "auto",
       agent: {
-        runtime: { name: "inline-rt", type: "agent-sdk" },
+        runtime: { name: "inline-rt", type: "claude-agent" },
         model: {
           id: "inline-model",
           display: "Inline Model",
@@ -237,7 +237,7 @@ describe("resolveStage: error paths", () => {
       name: "x",
       gate: "auto",
       agent: {
-        runtime: "agent-sdk",
+        runtime: "claude-agent",
         model: "no-such-model",
         system_prompt: "hi",
       },
@@ -255,7 +255,7 @@ describe("resolveStage: error paths", () => {
       name: "x",
       gate: "auto",
       agent: {
-        runtime: "agent-sdk",
+        runtime: "claude-agent",
         system_prompt: "hi",
       },
     };

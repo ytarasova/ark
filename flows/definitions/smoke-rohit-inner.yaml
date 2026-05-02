@@ -23,7 +23,7 @@ stages:
       - name: do_work
         gate: auto
         agent:
-          runtime: agent-sdk
+          runtime: claude-agent
           model: pi-agentic/global.anthropic.claude-sonnet-4-6
           system_prompt: |
             You are an autonomous agent in a local git worktree.

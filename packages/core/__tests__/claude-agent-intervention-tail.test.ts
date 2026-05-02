@@ -9,7 +9,7 @@ import { test, expect } from "bun:test";
 import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startInterventionTail } from "../runtimes/agent-sdk/intervention-tail.js";
+import { startInterventionTail } from "../runtimes/claude-agent/intervention-tail.js";
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), "intervention-tail-"));

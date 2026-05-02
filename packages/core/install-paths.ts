@@ -92,8 +92,8 @@ export function resolveInstallPrefixWith(env: ResolveEnv): string | null {
   // and `process.execPath` reflects whatever the user invoked. Without
   // realpath the marker check looks one dir up from the symlink and lands
   // outside the install (e.g. `~/.local/flows/definitions`, which doesn't
-  // exist) -- so the binary thinks it's in dev mode and the agent-sdk
-  // launcher tries to spawn `ark <repo>/packages/core/runtimes/agent-sdk/launch.ts`,
+  // exist) -- so the binary thinks it's in dev mode and the claude-agent
+  // launcher tries to spawn `ark <repo>/packages/core/runtimes/claude-agent/launch.ts`,
   // which exits 1 immediately.
   let real = env.execPath;
   try {
@@ -231,7 +231,7 @@ export function channelLaunchSpec(): { command: string; args: string[] } {
 }
 
 /**
- * Return the command + args to spawn when launching the agent-sdk runtime
+ * Return the command + args to spawn when launching the claude-agent runtime
  * as a child process. Mirrors the channelLaunchSpec pattern.
  *
  * Compiled binary:
@@ -240,22 +240,23 @@ export function channelLaunchSpec(): { command: string; args: string[] } {
  *
  * Dev mode:
  *   command = execPath              (the bun runtime)
- *   args    = [<repo>/packages/core/runtimes/agent-sdk/launch.ts]
+ *   args    = [<repo>/packages/core/runtimes/claude-agent/launch.ts]
  *
  * The launch script reads all context from ARK_* env vars -- callers do not
- * need to pass additional positional arguments.
+ * need to pass additional positional arguments. The `run-agent-sdk` CLI verb
+ * is preserved for backward compatibility with previously compiled binaries.
  */
 export function agentSdkLaunchSpecWith(env: ResolveEnv): { command: string; args: string[] } {
   if (isCompiledBinaryWith(env)) {
     return { command: env.execPath, args: ["run-agent-sdk"] };
   }
-  // Dev mode: bun <repo>/packages/core/runtimes/agent-sdk/launch.ts
+  // Dev mode: bun <repo>/packages/core/runtimes/claude-agent/launch.ts
   const launchScript = join(
     sourceRepoRootFrom(env.sourceUrl),
     "packages",
     "core",
     "runtimes",
-    "agent-sdk",
+    "claude-agent",
     "launch.ts",
   );
   return { command: env.execPath, args: [launchScript] };

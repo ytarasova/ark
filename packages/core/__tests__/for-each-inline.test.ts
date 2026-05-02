@@ -98,7 +98,7 @@ function makeInlineStage(overrides: Partial<StageDefinition> = {}): StageDefinit
         name: "write_tests",
         gate: "auto",
         agent: {
-          runtime: "agent-sdk",
+          runtime: "claude-agent",
           system_prompt: "Write tests for {{file.path}}",
         },
         task: "Write tests for {{file.path}} per: {{file.criteria}}",
@@ -107,7 +107,7 @@ function makeInlineStage(overrides: Partial<StageDefinition> = {}): StageDefinit
         name: "implement",
         gate: "auto",
         agent: {
-          runtime: "agent-sdk",
+          runtime: "claude-agent",
           system_prompt: "Implement the changes",
         },
         task: "Implement {{file.prompt}}",

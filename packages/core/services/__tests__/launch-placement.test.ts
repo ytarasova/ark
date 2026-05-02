@@ -156,7 +156,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       secrets: app.secrets,
       config: app.config,
     });
-    const result = await buildLaunchEnv(deps, secrets, fetched, null, "claude-code", () => {});
+    const result = await buildLaunchEnv(deps, secrets, fetched, null, "test-only-runtime", () => {});
 
     expect(result.error).toBeUndefined();
     expect(result.env.STUB_TOKEN).toBe("stub-value");
@@ -193,7 +193,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       secrets: app.secrets,
       config: app.config,
     });
-    const result = await buildLaunchEnv(deps, secrets, fetched, null, "claude-code", () => {});
+    const result = await buildLaunchEnv(deps, secrets, fetched, null, "test-only-runtime", () => {});
 
     expect(result.error).toBeUndefined();
     // Legacy stage/runtime resolve also did not match (no stage, no runtime
@@ -233,7 +233,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       secrets: app.secrets,
       config: app.config,
     });
-    const result = await buildLaunchEnv(deps, secrets, fetched, stageDef, "claude-code", () => {});
+    const result = await buildLaunchEnv(deps, secrets, fetched, stageDef, "test-only-runtime", () => {});
 
     expect(result.error).toBeUndefined();
     // WANTED resolved + placed; EXTRA filtered out by narrow.
@@ -271,7 +271,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       secrets: app.secrets,
       config: app.config,
     });
-    const result = await buildLaunchEnv(deps, secrets, fetched, null, "claude-code", () => {});
+    const result = await buildLaunchEnv(deps, secrets, fetched, null, "test-only-runtime", () => {});
     expect(result.placement).toBe(ctx);
   });
 
@@ -323,7 +323,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
         secrets: app.secrets,
         config: app.config,
       });
-      const result = await buildLaunchEnv(deps, secrets, fetched, null, "claude-code", () => {});
+      const result = await buildLaunchEnv(deps, secrets, fetched, null, "test-only-runtime", () => {});
 
       expect(result.error).toBeUndefined();
       // Env was captured synchronously and merged into the launch env.
@@ -388,7 +388,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       secrets: app.secrets,
       config: app.config,
     });
-    const result = await buildLaunchEnv(deps, secrets, fetched, null, "claude-code", () => {});
+    const result = await buildLaunchEnv(deps, secrets, fetched, null, "test-only-runtime", () => {});
 
     expect(result.error).toBeDefined();
     expect(result.error).toMatch(/placement/i);

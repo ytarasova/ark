@@ -80,7 +80,7 @@ function makeInlineStage(overrides: Partial<StageDefinition> = {}): StageDefinit
         name: "do_work",
         gate: "auto",
         agent: {
-          runtime: "agent-sdk",
+          runtime: "claude-agent",
           system_prompt: "Work",
         },
         task: "Work on {{repo.path}}",

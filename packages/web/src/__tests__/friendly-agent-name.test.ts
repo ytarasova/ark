@@ -6,7 +6,7 @@
  * "inline is typing" on inline-flow dispatches, because the agent's
  * `name` field in the YAML defaulted to "inline" and that propagated all
  * the way to `session.agent`. We now strip the placeholder at the display
- * layer and fall back to the inline-flow stage's runtime ("agent-sdk"),
+ * layer and fall back to the inline-flow stage's runtime ("claude-agent"),
  * with a final default of null so callers can substitute "agent".
  */
 
@@ -24,11 +24,11 @@ describe("friendlyAgentName", () => {
       stage: "implement",
       config: {
         inline_flow: {
-          stages: [{ name: "implement", agent: { runtime: "agent-sdk", model: "sonnet" } }],
+          stages: [{ name: "implement", agent: { runtime: "claude-agent", model: "sonnet" } }],
         },
       },
     };
-    expect(friendlyAgentName(session)).toBe("agent-sdk");
+    expect(friendlyAgentName(session)).toBe("claude-agent");
   });
 
   test("uses the matching stage's runtime, not just the first stage", () => {
@@ -38,7 +38,7 @@ describe("friendlyAgentName", () => {
       config: {
         inline_flow: {
           stages: [
-            { name: "implement", agent: { runtime: "agent-sdk" } },
+            { name: "implement", agent: { runtime: "claude-agent" } },
             { name: "review", agent: { runtime: "claude-code" } },
           ],
         },
@@ -71,10 +71,10 @@ describe("friendlyAgentName", () => {
       stage: "unknown-stage",
       config: {
         inline_flow: {
-          stages: [{ name: "implement", agent: { runtime: "agent-sdk" } }],
+          stages: [{ name: "implement", agent: { runtime: "claude-agent" } }],
         },
       },
     };
-    expect(friendlyAgentName(session)).toBe("agent-sdk");
+    expect(friendlyAgentName(session)).toBe("claude-agent");
   });
 });
