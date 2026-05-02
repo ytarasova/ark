@@ -77,17 +77,20 @@ describe("POST /mcp", () => {
     });
     expect(listResp.status).toBe(200);
     const text = await listResp.text();
-    // Streamable HTTP frames the response as SSE; pull out the data line(s)
-    // and find the one carrying the JSON-RPC envelope for id:2.
-    const dataLines = text.match(/data:\s*(\{.*?\})\s*$/gm) ?? [];
-    let payload: { result?: { tools?: unknown[] } } | null = null;
-    for (const line of dataLines) {
-      const m = line.match(/data:\s*(\{.*\})/);
-      if (!m) continue;
-      const env = JSON.parse(m[1]);
-      if (env.id === 2) {
-        payload = env;
-        break;
+    let payload: { id?: number; result?: { tools?: unknown[] } } | null = null;
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const json = trimmed.slice("data:".length).trim();
+      if (!json.startsWith("{")) continue;
+      try {
+        const env = JSON.parse(json) as { id?: number; result?: { tools?: unknown[] } };
+        if (env.id === 2) {
+          payload = env;
+          break;
+        }
+      } catch {
+        // not a JSON-RPC envelope on this line; skip
       }
     }
     expect(payload).toBeTruthy();

@@ -11,6 +11,7 @@ import {
 import { ArkdClient } from "../arkd/client.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
 import { providerOf } from "../compute/adapters/provider-map.js";
+import { handleMcpRequest } from "./mcp/index.js";
 
 export interface ServerConnection {
   id: string;
@@ -304,7 +305,6 @@ export class ArkServer {
             return new Response(`Unauthorized: ${err?.message ?? "auth failed"}`, { status: 401 });
           }
           const tenantApp = ctx.tenantId ? mcpApp.forTenant(ctx.tenantId) : mcpApp;
-          const { handleMcpRequest } = await import("./mcp/index.js");
           return handleMcpRequest(req, tenantApp, ctx);
         }
 
