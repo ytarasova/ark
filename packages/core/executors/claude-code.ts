@@ -420,6 +420,14 @@ export const claudeCodeExecutor: Executor = {
       const cloneSource = (session.config as { remoteRepo?: string } | null)?.remoteRepo ?? session.repo ?? null;
 
       log("Launching on remote...");
+      // `remoteWorkdir` is null on the no-resolveWorkdir fallback (so
+      // `prepare-workspace` correctly skips), but arkd's `/agent/launch`
+      // and the isolation `prepare` step need a valid path for tmux's
+      // `-c <workdir>` and any pre-launch shell setup. Use REMOTE_HOME
+      // (the same value baked into the launcher's `cd`) as the agent-
+      // side fallback; keep null for the workspace-clone path so
+      // prepare-workspace stays a no-op when there's nothing to clone.
+      const agentWorkdir = remoteWorkdir ?? "/home/ubuntu";
       const agentHandle = await runTargetLifecycle(
         app,
         session.id,
@@ -427,12 +435,12 @@ export const claudeCodeExecutor: Executor = {
         handle,
         {
           tmuxName,
-          workdir: remoteWorkdir,
+          workdir: agentWorkdir,
           launcherContent: launchContent,
           ports,
         },
         {
-          prepareCtx: { workdir: remoteWorkdir, onLog: log },
+          prepareCtx: { workdir: agentWorkdir, onLog: log },
           workspace: { source: cloneSource, remoteWorkdir },
           placement: opts.placement,
           computeStatus: compute.status,

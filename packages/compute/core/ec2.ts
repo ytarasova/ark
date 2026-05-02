@@ -186,8 +186,11 @@ export interface EC2ComputeHelpers {
    * --document AWS-StartPortForwardingSession` process and return its PID.
    * The returned PID is stored on `handle.meta.ec2.portForwardPid`.
    *
-   * Async because the production wiring lazy-imports the SSM helper module;
-   * the body itself is a synchronous `child_process.spawn`.
+   * Async because the implementation polls the local port until the
+   * session-manager-plugin has bound a listener (the AWS CLI returns
+   * before the plugin hands off the listening socket; without this wait,
+   * `arkd-probe` racing the port-forward sees ECONNREFUSED for the full
+   * arkd-probe budget and dispatch fails). 5-12s on cold paths.
    */
   startPortForward: (opts: {
     instanceId: string;

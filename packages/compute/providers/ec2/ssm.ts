@@ -35,6 +35,7 @@
  */
 
 import { spawn } from "child_process";
+import * as fs from "fs";
 import type { SSMClient } from "@aws-sdk/client-ssm";
 import { shellEscape } from "./shell-escape.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
@@ -275,13 +276,24 @@ export async function ssmExecArgs(opts: {
  * so the child outlives the event loop, but the caller is still responsible
  * for calling `ssmKillPortForward` when it's done.
  */
-export function ssmStartPortForward(opts: {
+export async function ssmStartPortForward(opts: {
   instanceId: string;
   region?: string;
   awsProfile?: string;
   localPort: number;
   remotePort: number;
-}): { pid: number } {
+  /**
+   * Maximum time to wait for the local port to start accepting TCP
+   * connections after the AWS CLI is spawned. SSM start-session does an
+   * authenticated handshake before re-execing into `session-manager-plugin`,
+   * which then opens the local listener -- on cold paths this takes 5-12s.
+   * We poll until the connect succeeds or this deadline expires; without
+   * this wait the caller (e.g., `arkd-probe`) gets ECONNREFUSED on every
+   * attempt because the listener isn't bound yet, even though `aws ssm`
+   * is technically running.
+   */
+  readyTimeoutMs?: number;
+}): Promise<{ pid: number }> {
   const region = opts.region ?? DEFAULT_REGION;
   const args = [
     "ssm",
@@ -297,9 +309,61 @@ export function ssmStartPortForward(opts: {
   ];
   if (opts.awsProfile) args.push("--profile", opts.awsProfile);
 
-  const child = spawn("aws", args, { detached: true, stdio: "ignore" });
+  // `stdio: "ignore"` closes stdin/stdout/stderr -- but
+  // `session-manager-plugin` (re-exec'd by `aws ssm start-session`) needs
+  // open fds for its WebSocket framing layer; closing them silently breaks
+  // the tunnel and the local listener never binds. Pipe stdout/stderr to
+  // /dev/null instead so the plugin gets real fds to write to.
+  const devnull = fs.openSync("/dev/null", "w");
+  const child = spawn("aws", args, {
+    detached: true,
+    stdio: ["ignore", devnull, devnull],
+  });
+  // Close our copy of the /dev/null fd; the child kept its own dup.
+  fs.closeSync(devnull);
   child.unref();
-  return { pid: child.pid ?? -1 };
+  const pid = child.pid ?? -1;
+
+  // Poll the local port until something accepts a TCP connection, or
+  // bail with a clear error when the deadline expires. The plugin
+  // doesn't print anything to stdout/stderr we can grep on (we
+  // explicitly `stdio: "ignore"`), so a TCP probe is the most reliable
+  // readiness signal.
+  const deadline = Date.now() + (opts.readyTimeoutMs ?? 30_000);
+  const net = await import("net");
+  while (Date.now() < deadline) {
+    const ok = await new Promise<boolean>((resolve) => {
+      const sock = net.connect({ host: "127.0.0.1", port: opts.localPort });
+      sock.once("connect", () => {
+        sock.destroy();
+        resolve(true);
+      });
+      sock.once("error", () => {
+        sock.destroy();
+        resolve(false);
+      });
+      sock.setTimeout(500, () => {
+        sock.destroy();
+        resolve(false);
+      });
+    });
+    if (ok) return { pid };
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  // Tear down the orphaned child before throwing so we don't leak it.
+  if (pid > 0) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // already gone -- expected when the CLI exited on auth failure
+    }
+  }
+  throw new Error(
+    `ssmStartPortForward: local port ${opts.localPort} did not start listening within ${
+      opts.readyTimeoutMs ?? 30_000
+    }ms (instanceId=${opts.instanceId} -> :${opts.remotePort})`,
+  );
 }
 
 /**

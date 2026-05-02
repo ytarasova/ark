@@ -16,21 +16,24 @@ import { logInfo, logDebug } from "../../../core/observability/structured-log.js
 const execFileAsync = promisify(execFile);
 
 /**
- * Spawn a background SSM port-forward for each declared port.
- * Non-blocking - returns immediately. Tracks PIDs internally so
- * `teardownTunnels` can find them.
+ * Spawn a background SSM port-forward for each declared port. Each
+ * forward waits until the local listener is bound (or a fresh-tunnel
+ * deadline expires) before returning. Tunnels are launched in parallel
+ * so total wall time tracks the slowest single tunnel, not the sum.
  */
-export function setupTunnels(instanceId: string, ports: PortDecl[], ssm: SsmConnectOpts): void {
+export async function setupTunnels(instanceId: string, ports: PortDecl[], ssm: SsmConnectOpts): Promise<void> {
   if (ports.length === 0) return;
-  for (const p of ports) {
-    ssmStartPortForward({
-      instanceId,
-      region: ssm.region,
-      awsProfile: ssm.awsProfile,
-      localPort: p.port,
-      remotePort: p.port,
-    });
-  }
+  await Promise.all(
+    ports.map((p) =>
+      ssmStartPortForward({
+        instanceId,
+        region: ssm.region,
+        awsProfile: ssm.awsProfile,
+        localPort: p.port,
+        remotePort: p.port,
+      }),
+    ),
+  );
 }
 
 /**
@@ -131,7 +134,7 @@ export async function setupForwardTunnel(
     // Stale match (couldn't read the ps line) -- fall through and respawn.
   }
 
-  const { pid } = ssmStartPortForward({
+  const { pid } = await ssmStartPortForward({
     instanceId,
     region: ssm.region,
     awsProfile: ssm.awsProfile,

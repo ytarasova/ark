@@ -98,6 +98,29 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   // launcher -- the poller just won't find the sentinel and the session
   // stays "running", which matches the pre-bug-3 behaviour.
   const sentinelDir = `"\${ARK_SESSION_DIR:-/tmp/ark-session-unknown}"`;
+
+  // Auto-ack first-run interactive prompts that Claude Code shows even when
+  // the corresponding `~/.claude.json` field is set to true. Specifically
+  // 2.1.126 added a "I am using this for local development / Exit" dialog
+  // that fires unconditionally on a fresh per-host install -- the
+  // `bypassPermissionsModeAccepted: true` we write in `preAcceptBlock` is
+  // necessary but not sufficient. The dialog accepts on Enter (option 1 is
+  // pre-selected). We schedule two Enter-presses on the surrounding tmux
+  // session: one at +6s (covers the bypass dialog), one at +12s (covers a
+  // second-stage prompt some installs see). Both are harmless if the
+  // prompt is already gone -- the keystrokes land on the running claude
+  // input which ignores stray Enters at the bash prompt or in input mode.
+  // Skipped when not running inside tmux (e.g. local --print invocations).
+  const autoAckBlock = `# Pre-empt Claude Code 2.1.x first-run interactive prompts.
+if command -v tmux >/dev/null 2>&1 && [ -n "\${TMUX:-}" ]; then
+  _ARK_TMUX_SESSION="$(tmux display-message -p '#{session_name}' 2>/dev/null || true)"
+  if [ -n "\$_ARK_TMUX_SESSION" ]; then
+    (sleep 6 && tmux send-keys -t "\$_ARK_TMUX_SESSION" Enter 2>/dev/null
+     sleep 6 && tmux send-keys -t "\$_ARK_TMUX_SESSION" Enter 2>/dev/null) &
+  fi
+  unset _ARK_TMUX_SESSION
+fi
+`;
   const primary = opts.prevClaudeSessionId
     ? `${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} \\
   ${extraFlags}${promptArg}`
@@ -199,7 +222,7 @@ fi`;
   // populated by the time the jq merge runs.
   const content = `#!/bin/bash
 ${pathSetup}cd ${shellQuote(opts.workdir)}
-${embedBlock}${envBlock}${preAcceptBlock}${body}
+${embedBlock}${envBlock}${preAcceptBlock}${autoAckBlock}${body}
 exec bash
 `;
 
