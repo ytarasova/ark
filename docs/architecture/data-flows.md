@@ -7,7 +7,6 @@ One-hop traces for the top-N operations. Each row is module-level -- depth stops
 ## `session/start`
 
 - **route**: `packages/server/handlers/session.ts`
-- **service**: `packages/core/services/session-orchestration.ts`
 - **repository**: `packages/core/repositories/session.ts`
 - **table**: `sessions`
 
@@ -27,7 +26,7 @@ One-hop traces for the top-N operations. Each row is module-level -- depth stops
 
 ## `compute/create`
 
-- **route**: `packages/server/handlers/resource.ts`
+- **route**: `packages/server/handlers/resource-compute.ts`
 - **service**: `packages/core/services/compute.ts`
 - **repository**: `packages/core/repositories/compute.ts`
 - **table**: `compute`

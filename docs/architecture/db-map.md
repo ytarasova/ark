@@ -2,7 +2,7 @@
 
 > generated: 1970-01-01T00:00:00.000Z  -  regenerate with `make audit`.
 
-Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
+Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **25**.
 
 ## `api_keys`
 
@@ -70,25 +70,26 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `config` (text, DEFAULT)
   - `created_at` (text, NOT NULL)
   - `is_template` (integer, NOT NULL DEFAULT)
+  - `isolation_kind` (text, NOT NULL DEFAULT)
   - `name` (text)
   - `provider` (text, NOT NULL DEFAULT)
-  - `runtime_kind` (text, NOT NULL DEFAULT)
   - `status` (text, NOT NULL DEFAULT)
   - `tenant_id` (text, NOT NULL DEFAULT)
   - `updated_at` (text, NOT NULL)
-- writers (3):
-  - `packages/core/repositories/compute.ts`
+- writers (2):
   - `packages/core/repositories/schema-postgres.ts`
   - `packages/core/repositories/schema.ts`
-- readers (1):
-  - `packages/core/repositories/compute.ts`
-- migration history (6):
+- readers (0):
+- migration history (9):
   - `packages/core/migrations/001_initial.ts`
   - `packages/core/migrations/002_compute_unify.ts`
   - `packages/core/migrations/002_compute_unify_postgres.ts`
   - `packages/core/migrations/002_compute_unify_sqlite.ts`
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
   - `packages/core/migrations/003_tenants_teams_sqlite.ts`
+  - `packages/core/migrations/012_isolation_kind_rename.ts`
+  - `packages/core/migrations/012_isolation_kind_rename_postgres.ts`
+  - `packages/core/migrations/012_isolation_kind_rename_sqlite.ts`
 
 ## `compute_pools`
 
@@ -141,12 +142,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `tenant_id` (text, NOT NULL DEFAULT)
   - `track_id` (text, NOT NULL)
   - `type` (text, NOT NULL)
-- writers (2):
-  - `packages/core/repositories/event.ts`
-  - `packages/core/repositories/session.ts`
-- readers (2):
-  - `packages/core/repositories/event.ts`
-  - `packages/core/repositories/session.ts`
+- writers (0):
+- readers (0):
 - migration history (3):
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
   - `packages/core/migrations/003_tenants_teams_sqlite.ts`
@@ -160,10 +157,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `created_at` (text, NOT NULL)
   - `name` (text, NOT NULL)
   - `tenant_id` (text, NOT NULL DEFAULT)
-- writers (1):
-  - `packages/core/repositories/session.ts`
-- readers (1):
-  - `packages/core/repositories/session.ts`
+- writers (0):
+- readers (0):
 - migration history (0):
 
 ## `instance_heartbeat`
@@ -224,10 +219,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `role` (text, NOT NULL DEFAULT)
   - `team_id` (text, NOT NULL)
   - `user_id` (text, NOT NULL)
-- writers (1):
-  - `packages/core/repositories/memberships.ts`
-- readers (1):
-  - `packages/core/repositories/memberships.ts`
+- writers (0):
+- readers (0):
 - migration history (10):
   - `packages/core/migrations/003_tenants_teams.ts`
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
@@ -253,10 +246,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `session_id` (text, NOT NULL)
   - `tenant_id` (text, NOT NULL DEFAULT)
   - `type` (text, NOT NULL DEFAULT)
-- writers (1):
-  - `packages/core/repositories/message.ts`
-- readers (1):
-  - `packages/core/repositories/message.ts`
+- writers (0):
+- readers (0):
 - migration history (3):
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
   - `packages/core/migrations/003_tenants_teams_sqlite.ts`
@@ -313,19 +304,15 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `tenant_id` (text, NOT NULL DEFAULT)
   - `type` (text, NOT NULL)
   - `value` (text, NOT NULL)
-- writers (2):
-  - `packages/core/repositories/artifact.ts`
-  - `packages/core/repositories/session.ts`
-- readers (2):
-  - `packages/core/repositories/artifact.ts`
-  - `packages/core/repositories/session.ts`
+- writers (0):
+- readers (0):
 - migration history (0):
 
 ## `sessions`
 
 - TS binding: `sessions`
 - defined in: `packages/core/drizzle/schema/sqlite.ts`
-- columns (33):
+- columns (34):
   - `agent` (text)
   - `attached_by` (text)
   - `branch` (text)
@@ -339,6 +326,7 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `fork_group` (text)
   - `group_name` (text)
   - `id` (text)
+  - `orchestrator` (text, NOT NULL DEFAULT)
   - `parent_id` (text)
   - `pr_id` (text)
   - `pr_url` (text)
@@ -359,17 +347,38 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `user_id` (text)
   - `workdir` (text)
   - `workspace_id` (text)
-- writers (1):
-  - `packages/core/repositories/session.ts`
+- writers (0):
 - readers (2):
   - `packages/core/auth/tenant-policy.ts`
   - `packages/core/repositories/session.ts`
-- migration history (5):
+- migration history (8):
   - `packages/core/migrations/003_tenants_teams.ts`
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
   - `packages/core/migrations/003_tenants_teams_sqlite.ts`
   - `packages/core/migrations/004_soft_delete.ts`
   - `packages/core/migrations/007_tenant_claude_auth.ts`
+  - `packages/core/migrations/011_session_orchestrator.ts`
+  - `packages/core/migrations/011_session_orchestrator_postgres.ts`
+  - `packages/core/migrations/011_session_orchestrator_sqlite.ts`
+
+## `stage_operations`
+
+- TS binding: `stageOperations`
+- defined in: `packages/core/drizzle/schema/sqlite.ts`
+- columns (7):
+  - `created_at` (text, NOT NULL)
+  - `id` (integer)
+  - `idempotency_key` (text, NOT NULL)
+  - `op_kind` (text, NOT NULL)
+  - `result_json` (text, NOT NULL)
+  - `session_id` (text, NOT NULL)
+  - `stage` (text, NOT NULL DEFAULT)
+- writers (0):
+- readers (0):
+- migration history (3):
+  - `packages/core/migrations/010_stage_operations.ts`
+  - `packages/core/migrations/010_stage_operations_postgres.ts`
+  - `packages/core/migrations/010_stage_operations_sqlite.ts`
 
 ## `teams`
 
@@ -385,10 +394,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `slug` (text, NOT NULL)
   - `tenant_id` (text, NOT NULL)
   - `updated_at` (text, NOT NULL)
-- writers (1):
-  - `packages/core/repositories/teams.ts`
-- readers (1):
-  - `packages/core/repositories/teams.ts`
+- writers (0):
+- readers (0):
 - migration history (10):
   - `packages/core/migrations/003_tenants_teams.ts`
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
@@ -411,10 +418,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `secret_ref` (text, NOT NULL)
   - `tenant_id` (text)
   - `updated_at` (text, NOT NULL)
-- writers (1):
-  - `packages/core/repositories/tenant_claude_auth.ts`
-- readers (1):
-  - `packages/core/repositories/tenant_claude_auth.ts`
+- writers (0):
+- readers (0):
 - migration history (3):
   - `packages/core/migrations/007_tenant_claude_auth.ts`
   - `packages/core/migrations/007_tenant_claude_auth_postgres.ts`
@@ -461,10 +466,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `slug` (text, NOT NULL)
   - `status` (text, NOT NULL DEFAULT)
   - `updated_at` (text, NOT NULL)
-- writers (1):
-  - `packages/core/repositories/tenants.ts`
-- readers (1):
-  - `packages/core/repositories/tenants.ts`
+- writers (0):
+- readers (0):
 - migration history (12):
   - `packages/core/migrations/003_tenants_teams.ts`
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
@@ -490,10 +493,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `id` (integer)
   - `session_id` (text, NOT NULL)
   - `tenant_id` (text, NOT NULL DEFAULT)
-- writers (1):
-  - `packages/core/repositories/todo.ts`
-- readers (1):
-  - `packages/core/repositories/todo.ts`
+- writers (0):
+- readers (0):
 - migration history (2):
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
   - `packages/core/migrations/003_tenants_teams_sqlite.ts`
@@ -535,10 +536,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **24**.
   - `id` (text)
   - `name` (text)
   - `updated_at` (text, NOT NULL)
-- writers (1):
-  - `packages/core/repositories/users.ts`
-- readers (1):
-  - `packages/core/repositories/users.ts`
+- writers (0):
+- readers (0):
 - migration history (10):
   - `packages/core/migrations/003_tenants_teams.ts`
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
