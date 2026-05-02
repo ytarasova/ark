@@ -11,6 +11,7 @@ import {
 import { ArkdClient } from "../arkd/client.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
 import { providerOf } from "../compute/adapters/provider-map.js";
+import { handleMcpRequest } from "./mcp/index.js";
 
 export interface ServerConnection {
   id: string;
@@ -44,10 +45,16 @@ export class ArkServer {
   private connections = new Map<string, ServerConnection>();
   private connCounter = 0;
   private auth: ServerAuthConfig | null = null;
+  private app: import("../core/app.js").AppContext | null = null;
 
   constructor() {
     this.router.requireInitialization();
     this.router.broadcast = this.notify.bind(this);
+  }
+
+  /** Capture the AppContext so non-JSON-RPC routes (like /mcp) can use it. */
+  attachApp(appCtx: import("../core/app.js").AppContext): void {
+    this.app = appCtx;
   }
 
   /**
@@ -285,6 +292,30 @@ export class ArkServer {
           };
           if (server.upgrade(req, { data })) return;
           return new Response("WebSocket upgrade failed", { status: 500 });
+        }
+
+        // /mcp -- MCP HTTP endpoint (Streamable HTTP transport).
+        if (url.pathname === "/mcp") {
+          const mcpApp = self.app ?? app;
+          if (!mcpApp) return new Response("MCP route requires AppContext", { status: 503 });
+          let ctx: TenantContext;
+          try {
+            ctx = await self.resolveContextFromCredentials({ authorizationHeader, queryToken });
+          } catch (err: any) {
+            return new Response(`Unauthorized: ${err?.message ?? "auth failed"}`, { status: 401 });
+          }
+          // materializeContext returns anonymousContext() for missing/invalid tokens
+          // rather than throwing, so the try/catch above doesn't catch unauth in
+          // requireToken mode. The terminal route gets away with this because every
+          // request carries a session id with its own tenant ownership gate; /mcp
+          // has no such per-resource gate -- agent_create and secrets_list would
+          // silently scope to "anonymous" and write to a phantom tenant. Explicit
+          // 401 here keeps tools from ever seeing an unauth context.
+          if (self.auth?.requireToken && ctx.tenantId === "anonymous") {
+            return new Response("Unauthorized: missing or invalid bearer token", { status: 401 });
+          }
+          const tenantApp = ctx.tenantId ? mcpApp.forTenant(ctx.tenantId) : mcpApp;
+          return handleMcpRequest(req, tenantApp, ctx);
         }
 
         const data: RpcData = { kind: "rpc", authorizationHeader, queryToken };

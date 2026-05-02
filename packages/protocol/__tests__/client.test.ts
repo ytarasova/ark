@@ -18,6 +18,7 @@ afterAll(async () => {
 function createPair(): { client: ArkClient; server: ArkServer } {
   const server = new ArkServer();
   registerAllHandlers(server.router, app);
+  server.attachApp(app);
 
   let clientHandler: (msg: JsonRpcMessage) => void = () => {};
   let serverHandler: (msg: JsonRpcMessage) => void = () => {};

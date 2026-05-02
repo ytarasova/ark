@@ -162,6 +162,7 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       registerAllHandlers(server.router, app);
       server.attachLifecycle(app);
       server.attachAuth(app);
+      server.attachApp(app);
 
       const ws = server.startWebSocket(port, { app });
 

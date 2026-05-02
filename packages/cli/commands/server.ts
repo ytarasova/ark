@@ -60,6 +60,7 @@ export function registerServerCommands(program: Command) {
       registerAllHandlers(server.router, serverApp);
       server.attachLifecycle(serverApp);
       server.attachAuth(serverApp);
+      server.attachApp(serverApp);
 
       if (opts.stdio) {
         server.startStdio();

@@ -122,9 +122,9 @@ return JSON results. Schemas defined inline below; auto-generated from
 
 | Tool | Params | Returns |
 |------|--------|---------|
-| `session_list` | `{status?, flow?, compute?, limit?}` | `Session[]` |
+| `session_list` | `{status?, flow?, limit?}` | `Session[]` |
 | `session_show` | `{sessionId}` | `Session` |
-| `session_events` | `{sessionId, since?, limit?}` | `Event[]` |
+| `session_events` | `{sessionId, type?, limit?}` | `Event[]` |
 | `flow_list` | `{}` | `Flow[]` |
 | `flow_show` | `{name}` | `Flow` |
 | `agent_list` | `{}` | `Agent[]` |

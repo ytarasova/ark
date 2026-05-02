@@ -46,6 +46,7 @@ beforeAll(async () => {
   // Skip requireInitialization so our tests don't have to run the handshake.
   (server.router as any).requireInit = false;
   registerAllHandlers(server.router, app);
+  server.attachApp(app);
   port = await allocatePort();
   baseWs = `ws://localhost:${port}`;
   ws = server.startWebSocket(port, { app });
