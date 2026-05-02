@@ -99,13 +99,26 @@ export async function maybeHandleActionStage(
  * Clone a remote repo referenced in session.config.remoteRepo into the
  * worktrees dir. Noop when no remoteRepo or when session.workdir is already
  * set. Mutates the in-memory session object so callers don't need to re-fetch.
+ *
+ * Hosted-mode contract: the conductor process is shared across tenants and
+ * its `<arkDir>/worktrees/` lives on the pod's ephemeral disk -- a clone
+ * here is wasted work that disappears on pod restart. The compute target's
+ * `Compute.prepareWorkspace` is responsible for the remote-side clone in
+ * hosted deployments. Skipping the conductor-side clone keeps the session
+ * row's `workdir` null until the worker materialises the workspace; the
+ * downstream resolver already tolerates that case.
  */
 export async function cloneRemoteRepoIfNeeded(
-  deps: Pick<DispatchDeps, "sessions" | "events" | "config">,
+  deps: Pick<DispatchDeps, "sessions" | "events" | "config" | "getApp">,
   session: Session,
   log: (msg: string) => void,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!session.config?.remoteRepo || session.workdir) return { ok: true };
+  // Hosted dispatch defers cloning to the compute target.
+  if (deps.getApp().mode.kind === "hosted") {
+    log("Skipping conductor-side remote-repo clone in hosted mode (deferred to compute target)");
+    return { ok: true };
+  }
   const sessionId = session.id;
   const remoteUrl = session.config.remoteRepo as string;
   log(`Cloning remote repo: ${remoteUrl}`);

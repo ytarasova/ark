@@ -289,11 +289,18 @@ export async function getClaudeSession(
 /**
  * Refresh the cache by scanning ~/.claude/projects/.
  * Async with periodic yields so the UI stays responsive.
+ *
+ * Hosted-mode contract: the conductor pod's `~/.claude/projects/` is the
+ * pod's own home (irrelevant + cross-tenant if mutated). The
+ * `ftsRebuildCapability` is null in hosted mode so this function is
+ * normally never reached, but a defensive guard here prevents a future
+ * caller from accidentally re-introducing the dependency.
  */
 export async function refreshClaudeSessionsCache(
   app: AppContext,
   opts?: { baseDir?: string; onProgress?: (processed: number, total: number) => void },
 ): Promise<number> {
+  if (app.mode.kind === "hosted") return 0;
   const baseDir = opts?.baseDir ?? join(homedir(), ".claude", "projects");
   if (!existsSync(baseDir)) return 0;
 
