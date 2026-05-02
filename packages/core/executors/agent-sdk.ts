@@ -92,6 +92,23 @@ export const agentSdkExecutor: Executor = {
       return { ok: false, handle: "", message: `Session ${opts.sessionId} not found` };
     }
 
+    // The agent-sdk executor runs in-process as a child of the conductor and
+    // writes task.txt + stdio.log + transcript.jsonl to `<config.dirs.tracks>/<sid>/`.
+    // In hosted mode that path lives on the conductor pod's ephemeral disk and
+    // is shared across tenants -- not isolated, not durable. The supported
+    // hosted-mode runtime is the Claude Code executor on a real compute target,
+    // not in-process agent-sdk. Refuse the launch with a clear error.
+    if (app.mode.kind === "hosted") {
+      return {
+        ok: false,
+        handle: "",
+        message:
+          "agent-sdk executor is local-mode only -- it runs in-process on the conductor and " +
+          "writes per-session state to the conductor pod's ephemeral disk. Use the claude-code " +
+          "runtime on an external compute target for hosted deployments.",
+      };
+    }
+
     // Ensure session directory exists early so the log tee can write to stdio.log
     // before pipeToFile is wired up. We recreate it after worktree setup too, but
     // we need it now to wire the log() tee correctly.
