@@ -347,10 +347,7 @@ export class ArkdClientTransportError extends Error {
   readonly method: string;
   readonly path: string;
   readonly attempts: number;
-  constructor(
-    message: string,
-    opts: { url: string; method: string; path: string; attempts: number; cause?: unknown },
-  ) {
+  constructor(message: string, opts: { url: string; method: string; path: string; attempts: number; cause?: unknown }) {
     super(message, { cause: opts.cause });
     this.name = "ArkdClientTransportError";
     this.url = opts.url;

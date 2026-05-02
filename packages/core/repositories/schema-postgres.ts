@@ -75,7 +75,7 @@ export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name)`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url)`);
 
-  // Compute table. Includes compute_kind + runtime_kind columns and the
+  // Compute table. Includes compute_kind + isolation_kind columns and the
   // is_template flag that unifies compute targets and templates into a
   // single row type.
   await db.exec(`
@@ -83,7 +83,7 @@ export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
       name TEXT PRIMARY KEY,
       provider TEXT NOT NULL DEFAULT 'local',
       compute_kind TEXT NOT NULL DEFAULT 'local',
-      runtime_kind TEXT NOT NULL DEFAULT 'direct',
+      isolation_kind TEXT NOT NULL DEFAULT 'direct',
       status TEXT NOT NULL DEFAULT 'stopped',
       config TEXT DEFAULT '{}',
       is_template BOOLEAN NOT NULL DEFAULT FALSE,
@@ -96,7 +96,7 @@ export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
 
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_kind ON compute(compute_kind)`);
-  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_runtime_kind ON compute(runtime_kind)`);
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_isolation_kind ON compute(isolation_kind)`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status)`);
 
   // Compute templates table
@@ -470,7 +470,7 @@ export async function seedLocalComputePostgres(db: DatabaseAdapter): Promise<voi
   await db
     .prepare(
       `
-    INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, created_at, updated_at)
+    INSERT INTO compute (name, provider, compute_kind, isolation_kind, status, config, created_at, updated_at)
     VALUES ($1, 'local', 'local', 'direct', 'running', '{}', $2, $3)
     ON CONFLICT (name) DO NOTHING
   `,

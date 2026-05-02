@@ -8,9 +8,9 @@ export type ComputeProviderName = "local" | "docker" | "ec2" | "remote-arkd";
 export type ComputeKindName = "local" | "firecracker" | "ec2" | "k8s" | "k8s-kata";
 
 /**
- * How the agent process is launched inside the compute. Mirrors `RuntimeKind`.
+ * How the agent process is sandboxed inside the compute. Mirrors `IsolationKind`.
  */
-export type RuntimeKindName = "direct" | "docker" | "compose" | "devcontainer" | "firecracker-in-container";
+export type IsolationKindName = "direct" | "docker" | "compose" | "devcontainer" | "firecracker-in-container";
 
 /**
  * Lifecycle classification for a compute kind.
@@ -41,8 +41,8 @@ export const COMPUTE_KIND_LIFECYCLE: Record<ComputeKindName, ComputeLifecycle> =
   "k8s-kata": "template",
 };
 
-/** Lifecycle for each runtime kind. Used when the compute kind is `local`. */
-export const RUNTIME_KIND_LIFECYCLE: Record<RuntimeKindName, ComputeLifecycle> = {
+/** Lifecycle for each isolation kind. Used when the compute kind is `local`. */
+export const ISOLATION_KIND_LIFECYCLE: Record<IsolationKindName, ComputeLifecycle> = {
   direct: "persistent", // runs on the host
   docker: "template", // container per session
   compose: "template", // compose project per session
@@ -51,7 +51,7 @@ export const RUNTIME_KIND_LIFECYCLE: Record<RuntimeKindName, ComputeLifecycle> =
 };
 
 /**
- * Resolve the effective lifecycle for a (compute, runtime) pair.
+ * Resolve the effective lifecycle for a (compute, isolation) pair.
  *
  * Rule: a target is `persistent` only when both axes are persistent.
  * - local + direct -> persistent (the host)
@@ -62,9 +62,9 @@ export const RUNTIME_KIND_LIFECYCLE: Record<RuntimeKindName, ComputeLifecycle> =
  * Used by repositories + scheduler to decide whether the compute row should
  * stick around after the last referencing session ends.
  */
-export function effectiveLifecycle(compute: ComputeKindName, runtime: RuntimeKindName): ComputeLifecycle {
+export function effectiveLifecycle(compute: ComputeKindName, isolation: IsolationKindName): ComputeLifecycle {
   if (COMPUTE_KIND_LIFECYCLE[compute] === "template") return "template";
-  return RUNTIME_KIND_LIFECYCLE[runtime];
+  return ISOLATION_KIND_LIFECYCLE[isolation];
 }
 
 export interface LocalComputeConfig {
@@ -102,8 +102,8 @@ export interface Compute {
   name: string;
   /** Where the compute lives (dispatch axis). */
   compute_kind: ComputeKindName;
-  /** How the agent process is launched (dispatch axis). */
-  runtime_kind: RuntimeKindName;
+  /** How the agent process is sandboxed (dispatch axis). */
+  isolation_kind: IsolationKindName;
   status: ComputeStatus;
   config: ComputeConfig;
   /**
@@ -126,8 +126,8 @@ export interface CreateComputeOpts {
   name: string;
   /** Compute axis (e.g. "local", "ec2"). */
   compute?: ComputeKindName;
-  /** Runtime axis (e.g. "direct", "docker"). */
-  runtime?: RuntimeKindName;
+  /** Isolation axis (e.g. "direct", "docker"). */
+  isolation?: IsolationKindName;
   config?: Partial<ComputeConfig>;
   /** Apply a named template's defaults before user config overrides. */
   template?: string;

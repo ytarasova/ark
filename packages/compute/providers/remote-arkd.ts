@@ -586,7 +586,7 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
 
   async launch(_compute: Compute, _session: Session, _opts: LaunchOpts): Promise<string> {
     // Deprecated: live dispatch routes through `ComputeTarget(EC2Compute,
-    // DirectRuntime)` via `runTargetLifecycle`. Legacy callers that still
+    // DirectIsolation)` via `runTargetLifecycle`. Legacy callers that still
     // hold a RemoteWorktreeProvider can map to the new target through
     // `packages/compute/adapters/legacy.ts:computeProviderToTarget`.
     throw new Error(
@@ -598,7 +598,7 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
 
 // ── Remote Docker Provider ──────────────────────────────────────────────────
 //
-// Will be superseded by `EC2Compute + DockerRuntime`. Today's sessions still
+// Will be superseded by `EC2Compute + DockerIsolation`. Today's sessions still
 // dispatch through these classes for killAgent / cleanupSession / metrics --
 // the new Compute interface doesn't cover those verbs yet, so the classes
 // below stay registered at boot and remain the live path.

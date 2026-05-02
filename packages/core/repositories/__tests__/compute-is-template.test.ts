@@ -30,7 +30,7 @@ describe("ComputeRepository unified is_template model", () => {
       name: "plain-ec2",
       provider: "ec2",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
     });
     expect(c.is_template).toBe(false);
@@ -42,7 +42,7 @@ describe("ComputeRepository unified is_template model", () => {
       name: "tmpl-k8s",
       provider: "k8s",
       compute_kind: "k8s",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       is_template: true,
     });
@@ -57,7 +57,7 @@ describe("ComputeRepository unified is_template model", () => {
       name: "tmpl",
       provider: "k8s",
       compute_kind: "k8s",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       is_template: true,
     });
@@ -65,7 +65,7 @@ describe("ComputeRepository unified is_template model", () => {
       name: "tmpl-session1",
       provider: "k8s",
       compute_kind: "k8s",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       cloned_from: "tmpl",
     });
@@ -81,14 +81,14 @@ describe("ComputeRepository unified is_template model", () => {
       name: "concrete-a",
       provider: "ec2",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
     });
     await repo.insert({
       name: "tmpl-a",
       provider: "docker",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
       is_template: true,
     });
@@ -96,7 +96,7 @@ describe("ComputeRepository unified is_template model", () => {
       name: "tmpl-b",
       provider: "k8s",
       compute_kind: "k8s",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       is_template: true,
     });
@@ -112,14 +112,14 @@ describe("ComputeRepository unified is_template model", () => {
       name: "concrete-a",
       provider: "ec2",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
     });
     await repo.insert({
       name: "tmpl-a",
       provider: "docker",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
       is_template: true,
     });
@@ -137,14 +137,14 @@ describe("ComputeRepository unified is_template model", () => {
       name: "concrete-a",
       provider: "ec2",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
     });
     await repo.insert({
       name: "tmpl-a",
       provider: "docker",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
       is_template: true,
     });

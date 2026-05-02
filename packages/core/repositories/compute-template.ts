@@ -20,7 +20,7 @@
  */
 
 import type { DatabaseAdapter } from "../database/index.js";
-import type { ComputeProviderName, ComputeConfig, ComputeKindName, RuntimeKindName } from "../../types/index.js";
+import type { ComputeProviderName, ComputeConfig, ComputeKindName, IsolationKindName } from "../../types/index.js";
 import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
 import { ComputeRepository } from "./compute.js";
 
@@ -39,14 +39,14 @@ export interface ComputeTemplateView {
 function computeToTemplate(c: {
   name: string;
   compute_kind: ComputeKindName;
-  runtime_kind: RuntimeKindName;
+  isolation_kind: IsolationKindName;
   config: ComputeConfig;
   description?: string | null;
 }): ComputeTemplateView {
   return {
     name: c.name,
     description: (c as { description?: string | null }).description ?? undefined,
-    provider: (pairToProvider({ compute: c.compute_kind, runtime: c.runtime_kind }) ??
+    provider: (pairToProvider({ compute: c.compute_kind, isolation: c.isolation_kind }) ??
       c.compute_kind) as ComputeProviderName,
     config: c.config as Partial<ComputeConfig>,
   };
@@ -111,7 +111,7 @@ export class ComputeTemplateRepository {
     await this.inner.insert({
       name: template.name,
       compute_kind: pair.compute as ComputeKindName,
-      runtime_kind: pair.runtime as RuntimeKindName,
+      isolation_kind: pair.isolation as IsolationKindName,
       status: "stopped",
       config: cfg,
       is_template: true,

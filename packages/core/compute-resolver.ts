@@ -1,5 +1,5 @@
 /**
- * Compute / Runtime resolution helpers.
+ * Compute / Isolation resolution helpers.
  *
  * Extracted from app.ts so AppContext stays focused on lifecycle. Both
  * helpers are pure functions over an AppContext + session.
@@ -16,7 +16,7 @@
 import type { AppContext } from "./app.js";
 import type { Session, Compute, ComputeProviderName } from "../types/index.js";
 import type { ComputeProvider } from "../compute/types.js";
-import type { ComputeKind, RuntimeKind } from "../compute/core/types.js";
+import type { ComputeKind, IsolationKind } from "../compute/core/types.js";
 
 export async function resolveProvider(
   app: AppContext,
@@ -37,12 +37,12 @@ export async function resolveProvider(
   const scoped = session.tenant_id && session.tenant_id !== app.tenantId ? app.forTenant(session.tenant_id) : app;
   const compute = await scoped.computes.get(computeName);
   if (!compute) return { provider: null, compute: null };
-  // Derive the legacy provider key from the two-axis (compute_kind, runtime_kind)
+  // Derive the legacy provider key from the two-axis (compute_kind, isolation_kind)
   // since the `provider` field has been removed from the Compute type.
   // ProviderRegistry is still keyed by legacy provider names.
   const { pairToProvider } = await import("../compute/adapters/provider-map.js");
   const providerKey =
-    pairToProvider({ compute: compute.compute_kind, runtime: compute.runtime_kind }) ??
+    pairToProvider({ compute: compute.compute_kind, isolation: compute.isolation_kind }) ??
     (compute.compute_kind as string);
   const provider = app.getProvider(providerKey as ComputeProviderName as string);
   return { provider: provider ?? null, compute };
@@ -56,10 +56,10 @@ export async function resolveComputeTarget(
   if (!compute) return { target: null, compute: null };
 
   const computeKind = compute.compute_kind as ComputeKind;
-  const runtimeKind = compute.runtime_kind as RuntimeKind;
+  const isolationKind = compute.isolation_kind as IsolationKind;
 
   const c = app.getCompute(computeKind);
-  const r = app.getRuntime(runtimeKind);
+  const r = app.getIsolation(isolationKind);
   if (!c || !r) return { target: null, compute };
 
   const { ComputeTarget } = await import("../compute/core/compute-target.js");

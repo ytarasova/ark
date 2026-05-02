@@ -96,7 +96,7 @@ export const compute = sqliteTable(
     name: text("name").primaryKey(),
     provider: text("provider").notNull().default("local"),
     computeKind: text("compute_kind").notNull().default("local"),
-    runtimeKind: text("runtime_kind").notNull().default("direct"),
+    isolationKind: text("isolation_kind").notNull().default("direct"),
     status: text("status").notNull().default("stopped"),
     config: text("config").default("{}"),
     isTemplate: integer("is_template").notNull().default(0),
@@ -108,7 +108,7 @@ export const compute = sqliteTable(
   (t) => ({
     idxProvider: index("idx_compute_provider").on(t.provider),
     idxKind: index("idx_compute_kind").on(t.computeKind),
-    idxRuntimeKind: index("idx_compute_runtime_kind").on(t.runtimeKind),
+    idxIsolationKind: index("idx_compute_isolation_kind").on(t.isolationKind),
     idxStatus: index("idx_compute_status").on(t.status),
     idxTenant: index("idx_compute_tenant").on(t.tenantId),
   }),

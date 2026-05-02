@@ -24,7 +24,7 @@ describe("ComputeRepository", async () => {
     const c = await repo.insert({
       name: "test-docker",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     expect(c.name).toBe("test-docker");
@@ -40,7 +40,7 @@ describe("ComputeRepository", async () => {
     const c = await repo.insert({
       name: "local2",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
     });
     expect(c.name).toBe("local2");
@@ -50,7 +50,7 @@ describe("ComputeRepository", async () => {
     const c = await repo.insert({
       name: "ec2-1",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       config: { region: "us-east-1" },
     });
@@ -61,7 +61,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "tmpl-1",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       is_template: true,
     });
@@ -71,7 +71,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "clone-1",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       cloned_from: "tmpl-1",
     });
@@ -97,7 +97,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "ec2-tmpl",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
       is_template: true,
     });
@@ -111,7 +111,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "ec2-concrete",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
     });
     const found = await repo.findByProvider("ec2", { excludeTemplates: true });
@@ -136,7 +136,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "with-cfg",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
       config: { ip: "10.0.0.1" },
     });
@@ -150,7 +150,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "docker1",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     const all = await repo.list();
@@ -161,19 +161,19 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "d1",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     await repo.insert({
       name: "d2",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     await repo.insert({
       name: "e1",
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "stopped",
     });
     const dockers = await repo.list({ provider: "docker" });
@@ -186,7 +186,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "stop1",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     const running = await repo.list({ status: "running" });
@@ -199,7 +199,7 @@ describe("ComputeRepository", async () => {
       await repo.insert({
         name: n,
         compute_kind: "local",
-        runtime_kind: "docker",
+        isolation_kind: "docker",
         status: "stopped",
       });
     }
@@ -213,7 +213,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "upd",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     const updated = await repo.update("upd", { status: "running" as ComputeStatus });
@@ -224,7 +224,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "upd2",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     const updated = await repo.update("upd2", { unknownField: "x" } as Record<string, unknown>);
@@ -235,7 +235,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "upd3",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     const original = (await repo.get("upd3"))!;
@@ -249,7 +249,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "cfg-upd",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     const updated = await repo.update("cfg-upd", { config: { region: "eu-west-1" } as ComputeConfig });
@@ -266,7 +266,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "del-me",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     expect(await repo.delete("del-me")).toBe(true);
@@ -291,7 +291,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "merge",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
       config: { ip: "1.2.3.4", region: "us-east-1" },
     });
@@ -308,7 +308,7 @@ describe("ComputeRepository", async () => {
     await repo.insert({
       name: "ts-test",
       compute_kind: "local",
-      runtime_kind: "docker",
+      isolation_kind: "docker",
       status: "stopped",
     });
     const before = (await repo.get("ts-test"))!;

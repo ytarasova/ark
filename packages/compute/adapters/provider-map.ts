@@ -1,5 +1,5 @@
 /**
- * Legacy provider-name -> (Compute, Runtime) pair mapping.
+ * Legacy provider-name -> (Compute, Isolation) pair mapping.
  *
  * Dispatch resolves a session through ComputeTarget keyed by the new two-axis
  * columns. Existing DB rows and CLI callers still use legacy provider names;
@@ -7,69 +7,67 @@
  * into the new two-axis representation.
  *
  * Rules:
- *   - "local"              -> local + direct      (host running ark itself, worktree)
- *   - "docker"             -> local + docker      (arkd-sidecar container on localhost)
+ *   - "local"              -> local + direct       (host running ark itself, worktree)
+ *   - "docker"             -> local + docker       (arkd-sidecar container on localhost)
  *   - "devcontainer"       -> local + devcontainer (devcontainer.json on localhost)
  *   - "firecracker"        -> local + firecracker-in-container (local Firecracker microVM)
- *   - "ec2"                -> ec2 + direct        (remote worktree over arkd)
- *   - "ec2-docker"         -> ec2 + docker        (arkd-sidecar container on EC2)
- *   - "ec2-devcontainer"   -> ec2 + devcontainer  (devcontainer.json on EC2)
+ *   - "ec2"                -> ec2 + direct         (remote worktree over arkd)
+ *   - "ec2-docker"         -> ec2 + docker         (arkd-sidecar container on EC2)
+ *   - "ec2-devcontainer"   -> ec2 + devcontainer   (devcontainer.json on EC2)
  *   - "ec2-firecracker"    -> ec2 + firecracker-in-container
- *   - "remote-arkd"        -> ec2 + direct        (legacy alias)
+ *   - "remote-arkd"        -> ec2 + direct         (legacy alias)
  *   - "remote-docker"      -> ec2 + docker
  *   - "remote-devcontainer"-> ec2 + devcontainer
  *   - "remote-firecracker" -> ec2 + firecracker-in-container
  *   - "k8s"                -> k8s + direct
  *   - "k8s-kata"           -> k8s-kata + direct
-
-
  *
  * Unknown names fall through to `local + direct` with a warning so callers
  * with bad data do not crash dispatch.
  */
 
-import type { ComputeKind, RuntimeKind } from "../core/types.js";
+import type { ComputeKind, IsolationKind } from "../core/types.js";
 
-export interface ComputeRuntimePair {
+export interface ComputeIsolationPair {
   compute: ComputeKind;
-  runtime: RuntimeKind;
+  isolation: IsolationKind;
 }
 
-const PROVIDER_MAP: Record<string, ComputeRuntimePair> = {
+const PROVIDER_MAP: Record<string, ComputeIsolationPair> = {
   // Local host
-  local: { compute: "local", runtime: "direct" },
-  docker: { compute: "local", runtime: "docker" },
-  devcontainer: { compute: "local", runtime: "devcontainer" },
-  firecracker: { compute: "local", runtime: "firecracker-in-container" },
+  local: { compute: "local", isolation: "direct" },
+  docker: { compute: "local", isolation: "docker" },
+  devcontainer: { compute: "local", isolation: "devcontainer" },
+  firecracker: { compute: "local", isolation: "firecracker-in-container" },
 
   // EC2 (remote) family
-  ec2: { compute: "ec2", runtime: "direct" },
-  "ec2-docker": { compute: "ec2", runtime: "docker" },
-  "ec2-devcontainer": { compute: "ec2", runtime: "devcontainer" },
-  "ec2-firecracker": { compute: "ec2", runtime: "firecracker-in-container" },
+  ec2: { compute: "ec2", isolation: "direct" },
+  "ec2-docker": { compute: "ec2", isolation: "docker" },
+  "ec2-devcontainer": { compute: "ec2", isolation: "devcontainer" },
+  "ec2-firecracker": { compute: "ec2", isolation: "firecracker-in-container" },
 
   // Legacy "remote-*" naming (pre-EC2 rename). Maps identically.
-  "remote-arkd": { compute: "ec2", runtime: "direct" },
-  "remote-worktree": { compute: "ec2", runtime: "direct" },
-  "remote-docker": { compute: "ec2", runtime: "docker" },
-  "remote-devcontainer": { compute: "ec2", runtime: "devcontainer" },
-  "remote-firecracker": { compute: "ec2", runtime: "firecracker-in-container" },
+  "remote-arkd": { compute: "ec2", isolation: "direct" },
+  "remote-worktree": { compute: "ec2", isolation: "direct" },
+  "remote-docker": { compute: "ec2", isolation: "docker" },
+  "remote-devcontainer": { compute: "ec2", isolation: "devcontainer" },
+  "remote-firecracker": { compute: "ec2", isolation: "firecracker-in-container" },
 
   // Kubernetes
-  k8s: { compute: "k8s", runtime: "direct" },
-  "k8s-kata": { compute: "k8s-kata", runtime: "direct" },
+  k8s: { compute: "k8s", isolation: "direct" },
+  "k8s-kata": { compute: "k8s-kata", isolation: "direct" },
 };
 
 /**
- * Map a legacy provider name to a {compute, runtime} pair.
+ * Map a legacy provider name to a {compute, isolation} pair.
  *
  * Returns a safe default (`local + direct`) for unknown names; callers that
  * care about unknown input should check `isKnownProvider()` first.
  */
-export function providerToPair(name: string): ComputeRuntimePair {
+export function providerToPair(name: string): ComputeIsolationPair {
   const hit = PROVIDER_MAP[name];
   if (hit) return hit;
-  return { compute: "local", runtime: "direct" };
+  return { compute: "local", isolation: "direct" };
 }
 
 export function isKnownProvider(name: string): boolean {
@@ -82,9 +80,9 @@ export function knownProviders(): string[] {
 }
 
 /** Reverse-map a pair back to a provider name (first match). Useful for UI. */
-export function pairToProvider(pair: ComputeRuntimePair): string | null {
+export function pairToProvider(pair: ComputeIsolationPair): string | null {
   for (const [name, entry] of Object.entries(PROVIDER_MAP)) {
-    if (entry.compute === pair.compute && entry.runtime === pair.runtime) return name;
+    if (entry.compute === pair.compute && entry.isolation === pair.isolation) return name;
   }
   return null;
 }
@@ -96,6 +94,6 @@ export function pairToProvider(pair: ComputeRuntimePair): string | null {
  * provider-registry lookups). Prefer this over reaching into a nonexistent
  * `.provider` field on `Compute`.
  */
-export function providerOf(c: { compute_kind: ComputeKind; runtime_kind: RuntimeKind }): string {
-  return pairToProvider({ compute: c.compute_kind, runtime: c.runtime_kind }) ?? c.compute_kind;
+export function providerOf(c: { compute_kind: ComputeKind; isolation_kind: IsolationKind }): string {
+  return pairToProvider({ compute: c.compute_kind, isolation: c.isolation_kind }) ?? c.compute_kind;
 }

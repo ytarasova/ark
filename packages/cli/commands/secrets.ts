@@ -193,9 +193,7 @@ export function registerSecretsCommands(program: Command): void {
         console.log(`  ${"NAME".padEnd(28)} ${"TYPE".padEnd(18)} ${"UPDATED".padEnd(24)} DESCRIPTION`);
         for (const r of refs) {
           const desc = r.description ?? "";
-          console.log(
-            `  ${r.name.padEnd(28)} ${r.type.padEnd(18)} ${(r.updated_at ?? "").padEnd(24)} ${desc}`,
-          );
+          console.log(`  ${r.name.padEnd(28)} ${r.type.padEnd(18)} ${(r.updated_at ?? "").padEnd(24)} ${desc}`);
         }
       });
     });
@@ -205,17 +203,8 @@ export function registerSecretsCommands(program: Command): void {
     .description("Create or replace a secret. Reads value from stdin if piped, otherwise prompts.")
     .argument("<name>", "Secret name (ASCII [A-Z0-9_]+)")
     .option("-d, --description <text>", "Human-readable description")
-    .option(
-      "--type <type>",
-      "Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)",
-      "env-var",
-    )
-    .option(
-      "--metadata <kv>",
-      "Repeatable key=value metadata pair",
-      metadataCollector,
-      {} as Record<string, string>,
-    )
+    .option("--type <type>", "Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)", "env-var")
+    .option("--metadata <kv>", "Repeatable key=value metadata pair", metadataCollector, {} as Record<string, string>)
     .action(async (name: string, opts) => {
       await runAction("secrets set", async () => {
         assertAllowedType(opts.type);
@@ -301,17 +290,8 @@ export function registerSecretsCommands(program: Command): void {
     .description("Upload a directory as a named blob. Reads every file in <dir> (non-recursive).")
     .argument("<name>", "Blob name (lowercase kebab-case, <=63 chars)")
     .argument("<dir>", "Directory to upload")
-    .option(
-      "--type <type>",
-      "Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)",
-      "generic-blob",
-    )
-    .option(
-      "--metadata <kv>",
-      "Repeatable key=value metadata pair",
-      metadataCollector,
-      {} as Record<string, string>,
-    )
+    .option("--type <type>", "Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)", "generic-blob")
+    .option("--metadata <kv>", "Repeatable key=value metadata pair", metadataCollector, {} as Record<string, string>)
     .action(async (name: string, dir: string, opts) => {
       await runAction("secrets blob upload", async () => {
         const count = await performBlobUpload(name, dir, {

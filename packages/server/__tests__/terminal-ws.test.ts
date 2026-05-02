@@ -184,7 +184,7 @@ describe("/terminal/:sessionId WS route", () => {
       name: "stub-remote-1",
       provider: "stub-terminal-remote" as any,
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as any);

@@ -1,8 +1,8 @@
 /**
- * ComputeTarget -- the composed (Compute, Runtime) pair used at dispatch.
+ * ComputeTarget -- the composed (Compute, Isolation) pair used at dispatch.
  *
  * Exposes a straight delegation over the two interfaces. The dispatch layer
- * constructs a ComputeTarget from the `{compute_kind, runtime_kind}` DB
+ * constructs a ComputeTarget from the `{compute_kind, isolation_kind}` DB
  * columns instead of looking up a single `ComputeProvider`.
  *
  * When the underlying Compute declares `capabilities.pool === true` AND an
@@ -16,10 +16,10 @@
  * `compute.destroy()` as before.
  *
  * Methods follow the lifecycle order: `provision` (compute) -> `prepare`
- * (runtime) -> `launchAgent` (runtime) -> `shutdown` (runtime) -> `destroy`
- * (compute). The compose shape intentionally does not expose intermediate
- * start/stop yet -- those semantics may get refined later once more remote
- * computes land.
+ * (isolation) -> `launchAgent` (isolation) -> `shutdown` (isolation) ->
+ * `destroy` (compute). The compose shape intentionally does not expose
+ * intermediate start/stop yet -- those semantics may get refined later
+ * once more remote computes land.
  */
 
 import type { AppContext } from "../../core/app.js";
@@ -27,10 +27,10 @@ import type {
   AgentHandle,
   Compute,
   ComputeHandle,
+  Isolation,
   LaunchOpts,
   PrepareCtx,
   ProvisionOpts,
-  Runtime,
   Snapshot,
 } from "./types.js";
 import type { ComputePool } from "./pool/types.js";
@@ -46,7 +46,7 @@ export const POOL_SOURCE_META_KEY = "__pool_source";
 export class ComputeTarget {
   constructor(
     readonly compute: Compute,
-    readonly runtime: Runtime,
+    readonly isolation: Isolation,
     /**
      * Optional AppContext used to consult the compute-pool registry. When
      * absent (legacy direct construction in tests / adapters without an app
@@ -111,18 +111,18 @@ export class ComputeTarget {
     return this.compute.restore(s);
   }
 
-  // ── Runtime delegation ────────────────────────────────────────────────
+  // ── Isolation delegation ──────────────────────────────────────────────
 
   prepare(h: ComputeHandle, ctx: PrepareCtx): Promise<void> {
-    return this.runtime.prepare(this.compute, h, ctx);
+    return this.isolation.prepare(this.compute, h, ctx);
   }
 
   launchAgent(h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle> {
-    return this.runtime.launchAgent(this.compute, h, opts);
+    return this.isolation.launchAgent(this.compute, h, opts);
   }
 
   shutdown(h: ComputeHandle): Promise<void> {
-    return this.runtime.shutdown(this.compute, h);
+    return this.isolation.shutdown(this.compute, h);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────

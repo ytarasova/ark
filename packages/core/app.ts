@@ -25,7 +25,12 @@ import { buildContainer } from "./di/index.js";
 import { loadConfig, loadAppConfig, type ArkConfig } from "./config.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
-import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
+import type {
+  Compute as NewCompute,
+  Isolation as NewIsolation,
+  ComputeKind,
+  IsolationKind,
+} from "../compute/core/types.js";
 import type { ComputePool } from "../compute/core/pool/types.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
@@ -788,20 +793,20 @@ export class AppContext {
   registerCompute(c: NewCompute): void {
     this._registries.registerCompute(c);
   }
-  registerRuntime(r: NewRuntime): void {
-    this._registries.registerRuntime(r);
+  registerIsolation(r: NewIsolation): void {
+    this._registries.registerIsolation(r);
   }
   getCompute(kind: ComputeKind): NewCompute | null {
     return this._registries.getCompute(kind);
   }
-  getRuntime(kind: RuntimeKind): NewRuntime | null {
-    return this._registries.getRuntime(kind);
+  getIsolation(kind: IsolationKind): NewIsolation | null {
+    return this._registries.getIsolation(kind);
   }
   listComputes(): ComputeKind[] {
     return this._registries.listComputes();
   }
-  listRuntimes(): RuntimeKind[] {
-    return this._registries.listRuntimes();
+  listIsolations(): IsolationKind[] {
+    return this._registries.listIsolations();
   }
 
   registerComputePool(pool: ComputePool): void {

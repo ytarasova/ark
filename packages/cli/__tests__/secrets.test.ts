@@ -55,9 +55,9 @@ describe("ark secrets set --type and --metadata", () => {
   });
 
   test("rejects an unknown --type value", async () => {
-    await expect(
-      performSecretSet("FOO", "v", { type: "not-a-type" as any, metadata: {} }),
-    ).rejects.toThrow(/Invalid --type/);
+    await expect(performSecretSet("FOO", "v", { type: "not-a-type" as any, metadata: {} })).rejects.toThrow(
+      /Invalid --type/,
+    );
   });
 
   test("defaults type to env-var when caller does not specify", async () => {
@@ -93,9 +93,9 @@ describe("ark secrets blob upload --type and --metadata", () => {
   });
 
   test("rejects an unknown --type value", async () => {
-    await expect(
-      performBlobUpload("nope", tmp, { type: "bogus" as any, metadata: {} }),
-    ).rejects.toThrow(/Invalid --type/);
+    await expect(performBlobUpload("nope", tmp, { type: "bogus" as any, metadata: {} })).rejects.toThrow(
+      /Invalid --type/,
+    );
   });
 });
 

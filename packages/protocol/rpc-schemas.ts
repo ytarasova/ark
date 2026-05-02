@@ -102,7 +102,7 @@ const computeSchema = z
     // Two-axis kinds. Optional on the wire so responses from a server that
     // hasn't shipped the schema change yet still parse.
     compute_kind: z.string().optional(),
-    runtime_kind: z.string().optional(),
+    isolation_kind: z.string().optional(),
     status: computeStatusSchema,
     config: z.record(z.string(), z.unknown()),
     // Unified-model fields -- `is_template` distinguishes template rows
@@ -477,10 +477,10 @@ export type ComputeListResponse = z.infer<typeof computeListResponse>;
 
 export const computeCreateRequest = z.object({
   name: z.string().min(1),
-  // `provider` is legacy; new callers pass `compute` + `runtime`.
+  // `provider` is legacy; new callers pass `compute` + `isolation`.
   provider: computeProviderSchema.optional(),
   compute: z.string().optional(),
-  runtime: z.string().optional(),
+  isolation: z.string().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   template: z.string().optional(),
   // Unified-model fields: templates vs concrete rows in the same table.
@@ -1937,9 +1937,9 @@ const computeTemplateSchema = z
     name: z.string(),
     description: z.string().nullable().optional(),
     provider: z.string(),
-    /** New two-axis (compute, runtime) pair derived from `provider`. */
+    /** New two-axis (compute, isolation) pair derived from `provider`. */
     compute: z.string().optional(),
-    runtime: z.string().optional(),
+    isolation: z.string().optional(),
     config: z.unknown().optional(),
   })
   .loose();

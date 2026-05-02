@@ -146,12 +146,7 @@ function resolveRemoteWorkdir(provider: ComputeProvider, compute: Compute, sessi
  * propagate). For symmetry between paths we re-throw on a non-zero exit
  * code from the remote dispatcher.
  */
-export async function runGit(
-  app: AppContext,
-  session: Session,
-  args: string[],
-  opts?: GitOpts,
-): Promise<GitResult> {
+export async function runGit(app: AppContext, session: Session, args: string[], opts?: GitOpts): Promise<GitResult> {
   const timeout = opts?.timeout ?? 30_000;
   const routing = await resolveRemoteRouting(app, session);
   if (routing.remote) {

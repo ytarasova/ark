@@ -177,7 +177,7 @@ describe("K8sProvider.launch owner-ref integration", () => {
       name: "k8s-owner-ref",
       provider: "k8s" as const,
       compute_kind: "k8s" as const,
-      runtime_kind: "direct" as const,
+      isolation_kind: "direct" as const,
       config: {
         provider: "k8s" as const,
         context: "test-ctx",
@@ -242,7 +242,7 @@ describe("K8sProvider.launch owner-ref integration", () => {
       name: "k8s-no-creds",
       provider: "k8s" as const,
       compute_kind: "k8s" as const,
-      runtime_kind: "direct" as const,
+      isolation_kind: "direct" as const,
       config: { provider: "k8s" as const, context: "test-ctx", namespace: "ark-test", image: "alpine:3.19" },
       status: "running" as const,
       is_template: false,

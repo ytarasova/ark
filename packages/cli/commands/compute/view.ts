@@ -19,19 +19,19 @@ export function registerViewCommands(computeCmd: Command) {
       const include = opts.templatesOnly ? "template" : opts.concreteOnly ? "concrete" : "all";
       const computes = (await ark.computeList({ include })) as Array<Record<string, any>>;
       if (!computes.length) {
-        console.log(chalk.dim("No compute. Create one: ark compute create <name> --compute local --runtime direct"));
+        console.log(chalk.dim("No compute. Create one: ark compute create <name> --compute local --isolation direct"));
         return;
       }
       console.log(
-        `  ${"NAME".padEnd(20)} ${"KIND".padEnd(9)} ${"COMPUTE".padEnd(12)} ${"RUNTIME".padEnd(12)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`,
+        `  ${"NAME".padEnd(20)} ${"KIND".padEnd(9)} ${"COMPUTE".padEnd(12)} ${"ISOLATION".padEnd(12)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`,
       );
       for (const h of computes) {
         const ip = (h.config as { ip?: string })?.ip ?? "-";
         const ck = String(h.compute_kind ?? "-").padEnd(12);
-        const rk = String(h.runtime_kind ?? "-").padEnd(12);
+        const ik = String(h.isolation_kind ?? "-").padEnd(12);
         const kind = (h.is_template ? "template" : "compute").padEnd(9);
         console.log(
-          `  ${String(h.name).padEnd(20)} ${kind} ${ck} ${rk} ${String(h.provider).padEnd(10)} ${String(h.status).padEnd(14)} ${ip}`,
+          `  ${String(h.name).padEnd(20)} ${kind} ${ck} ${ik} ${String(h.provider).padEnd(10)} ${String(h.status).padEnd(14)} ${ip}`,
         );
       }
     });

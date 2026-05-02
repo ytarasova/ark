@@ -1,18 +1,23 @@
 /**
  * In-memory registries for legacy `ComputeProvider`s plus the new
- * `Compute` / `Runtime` kinds and warm `ComputePool`s.
+ * `Compute` / `Isolation` kinds and warm `ComputePool`s.
  *
  * Lives on AppContext because providers are registered imperatively at
  * boot. Keeping the maps + mutators here keeps app.ts focused on lifecycle.
  */
 import type { ComputeProvider } from "../compute/types.js";
-import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
+import type {
+  Compute as NewCompute,
+  Isolation as NewIsolation,
+  ComputeKind,
+  IsolationKind,
+} from "../compute/core/types.js";
 import type { ComputePool } from "../compute/core/pool/types.js";
 
 export class ComputeRegistries {
   private providers = new Map<string, ComputeProvider>();
   private computes = new Map<ComputeKind, NewCompute>();
-  private runtimes = new Map<RuntimeKind, NewRuntime>();
+  private isolations = new Map<IsolationKind, NewIsolation>();
   private pools = new Map<ComputeKind, ComputePool>();
 
   registerProvider(p: ComputeProvider): void {
@@ -28,20 +33,20 @@ export class ComputeRegistries {
   registerCompute(c: NewCompute): void {
     this.computes.set(c.kind, c);
   }
-  registerRuntime(r: NewRuntime): void {
-    this.runtimes.set(r.kind, r);
+  registerIsolation(r: NewIsolation): void {
+    this.isolations.set(r.kind, r);
   }
   getCompute(k: ComputeKind): NewCompute | null {
     return this.computes.get(k) ?? null;
   }
-  getRuntime(k: RuntimeKind): NewRuntime | null {
-    return this.runtimes.get(k) ?? null;
+  getIsolation(k: IsolationKind): NewIsolation | null {
+    return this.isolations.get(k) ?? null;
   }
   listComputes(): ComputeKind[] {
     return [...this.computes.keys()];
   }
-  listRuntimes(): RuntimeKind[] {
-    return [...this.runtimes.keys()];
+  listIsolations(): IsolationKind[] {
+    return [...this.isolations.keys()];
   }
 
   registerPool(pool: ComputePool): void {

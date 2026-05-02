@@ -26,9 +26,9 @@ import { EC2Compute } from "../core/ec2.js";
 import { FirecrackerCompute } from "../core/firecracker/compute.js";
 import { K8sCompute } from "../core/k8s.js";
 import { KataCompute } from "../core/k8s-kata.js";
-import { DirectRuntime } from "../runtimes/direct.js";
-import { DockerRuntime } from "../runtimes/docker.js";
-import { DevcontainerRuntime } from "../runtimes/devcontainer.js";
+import { DirectIsolation } from "../isolation/direct.js";
+import { DockerIsolation } from "../isolation/docker.js";
+import { DevcontainerIsolation } from "../isolation/devcontainer.js";
 import { AppContext } from "../../core/app.js";
 import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 
@@ -46,12 +46,12 @@ afterAll(async () => {
 });
 
 describe("computeProviderToTarget", async () => {
-  it("maps LocalWorktreeProvider onto LocalCompute + DirectRuntime", () => {
+  it("maps LocalWorktreeProvider onto LocalCompute + DirectIsolation", () => {
     const legacy = new LocalWorktreeProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(LocalCompute);
-    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
+    expect(target!.isolation).toBeInstanceOf(DirectIsolation);
   });
 
   it("returned ComputeTarget is wired to the running AppContext", () => {
@@ -62,31 +62,31 @@ describe("computeProviderToTarget", async () => {
     expect(target.getArkdUrl(handle)).toBe(`http://localhost:${app.config.ports.arkd}`);
   });
 
-  it("maps LocalDockerProvider onto LocalCompute + DockerRuntime", () => {
+  it("maps LocalDockerProvider onto LocalCompute + DockerIsolation", () => {
     const legacy = new LocalDockerProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(LocalCompute);
-    expect(target!.runtime).toBeInstanceOf(DockerRuntime);
+    expect(target!.isolation).toBeInstanceOf(DockerIsolation);
   });
 
-  it("maps LocalFirecrackerProvider onto FirecrackerCompute + DirectRuntime", () => {
+  it("maps LocalFirecrackerProvider onto FirecrackerCompute + DirectIsolation", () => {
     const legacy = new LocalFirecrackerProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(FirecrackerCompute);
-    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
+    expect(target!.isolation).toBeInstanceOf(DirectIsolation);
   });
 
-  it("maps K8sProvider onto K8sCompute + DirectRuntime", () => {
+  it("maps K8sProvider onto K8sCompute + DirectIsolation", () => {
     const legacy = new K8sProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(K8sCompute);
-    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
+    expect(target!.isolation).toBeInstanceOf(DirectIsolation);
   });
 
-  it("maps KataProvider onto KataCompute + DirectRuntime (Kata checked before K8s)", () => {
+  it("maps KataProvider onto KataCompute + DirectIsolation (Kata checked before K8s)", () => {
     const legacy = new KataProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
@@ -95,7 +95,7 @@ describe("computeProviderToTarget", async () => {
     // not the base K8sCompute.
     expect(target!.compute).toBeInstanceOf(KataCompute);
     expect(target!.compute.kind).toBe("k8s-kata");
-    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
+    expect(target!.isolation).toBeInstanceOf(DirectIsolation);
   });
 
   it("returns null for providers that have not been migrated yet", () => {
@@ -114,28 +114,28 @@ describe("computeProviderToTarget", async () => {
 
   // ── Remote (EC2-backed) providers ────────────────────────────────────────
 
-  it("maps RemoteWorktreeProvider onto EC2Compute + DirectRuntime", () => {
+  it("maps RemoteWorktreeProvider onto EC2Compute + DirectIsolation", () => {
     const legacy = new RemoteWorktreeProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(EC2Compute);
-    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
+    expect(target!.isolation).toBeInstanceOf(DirectIsolation);
   });
 
-  it("maps RemoteDockerProvider onto EC2Compute + DockerRuntime", () => {
+  it("maps RemoteDockerProvider onto EC2Compute + DockerIsolation", () => {
     const legacy = new RemoteDockerProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(EC2Compute);
-    expect(target!.runtime).toBeInstanceOf(DockerRuntime);
+    expect(target!.isolation).toBeInstanceOf(DockerIsolation);
   });
 
-  it("maps RemoteDevcontainerProvider onto EC2Compute + DevcontainerRuntime", () => {
+  it("maps RemoteDevcontainerProvider onto EC2Compute + DevcontainerIsolation", () => {
     const legacy = new RemoteDevcontainerProvider(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(EC2Compute);
-    expect(target!.runtime).toBeInstanceOf(DevcontainerRuntime);
+    expect(target!.isolation).toBeInstanceOf(DevcontainerIsolation);
   });
 
   it("returns null for RemoteFirecrackerProvider (microVM-on-EC2 not yet wired)", () => {

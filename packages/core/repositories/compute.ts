@@ -7,7 +7,7 @@ import type {
   ComputeStatus,
   ComputeProviderName,
   ComputeKindName,
-  RuntimeKindName,
+  IsolationKindName,
   ComputeConfig,
 } from "../../types/index.js";
 import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
@@ -28,7 +28,7 @@ import { now } from "../util/time.js";
 export interface InsertComputeRow {
   name: string;
   compute_kind: ComputeKindName;
-  runtime_kind: RuntimeKindName;
+  isolation_kind: IsolationKindName;
   status: ComputeStatus;
   config?: Partial<ComputeConfig>;
   is_template?: boolean;
@@ -41,7 +41,7 @@ type DrizzleSelectCompute = {
   name: string;
   provider: string;
   computeKind: string | null;
-  runtimeKind: string | null;
+  isolationKind: string | null;
   status: string;
   config: string | null;
   isTemplate: number | boolean | null;
@@ -65,11 +65,11 @@ function safeParseConfig(raw: unknown): ComputeConfig {
 function rowToCompute(row: DrizzleSelectCompute): Compute {
   const fallback = providerToPair(row.provider);
   const compute_kind = (row.computeKind as ComputeKindName | undefined | null) ?? fallback.compute;
-  const runtime_kind = (row.runtimeKind as RuntimeKindName | undefined | null) ?? fallback.runtime;
+  const isolation_kind = (row.isolationKind as IsolationKindName | undefined | null) ?? fallback.isolation;
   return {
     name: row.name,
     compute_kind: compute_kind as ComputeKindName,
-    runtime_kind: runtime_kind as RuntimeKindName,
+    isolation_kind: isolation_kind as IsolationKindName,
     status: row.status as ComputeStatus,
     config: safeParseConfig(row.config),
     is_template: !!row.isTemplate,
@@ -111,7 +111,7 @@ export class ComputeRepository {
 
   /**
    * Dumb write: persist the row as given, with no rule enforcement.
-   * Caller is responsible for resolving provider/compute/runtime kinds and
+   * Caller is responsible for resolving provider/compute/isolation kinds and
    * computing initial status via the provider registry.
    */
   async insert(row: InsertComputeRow): Promise<Compute> {
@@ -119,13 +119,14 @@ export class ComputeRepository {
     const d = this.d();
     // Legacy `provider` column is still materialized for back-compat indexes
     // + downstream readers that haven't been swept yet. Derived from the
-    // canonical (compute_kind, runtime_kind) pair.
-    const providerColumn = pairToProvider({ compute: row.compute_kind, runtime: row.runtime_kind }) ?? row.compute_kind;
+    // canonical (compute_kind, isolation_kind) pair.
+    const providerColumn =
+      pairToProvider({ compute: row.compute_kind, isolation: row.isolation_kind }) ?? row.compute_kind;
     await (d.db as any).insert(d.schema.compute).values({
       name: row.name,
       provider: providerColumn,
       computeKind: row.compute_kind,
-      runtimeKind: row.runtime_kind,
+      isolationKind: row.isolation_kind,
       status: row.status,
       config: JSON.stringify(row.config ?? {}),
       isTemplate: !!row.is_template as any,
@@ -228,12 +229,12 @@ export class ComputeRepository {
     if (fields.compute_kind !== undefined) {
       set.computeKind = fields.compute_kind;
       // Keep the legacy column in sync when the canonical axes change.
-      if (fields.runtime_kind !== undefined) {
+      if (fields.isolation_kind !== undefined) {
         set.provider =
-          pairToProvider({ compute: fields.compute_kind, runtime: fields.runtime_kind }) ?? fields.compute_kind;
+          pairToProvider({ compute: fields.compute_kind, isolation: fields.isolation_kind }) ?? fields.compute_kind;
       }
     }
-    if (fields.runtime_kind !== undefined) set.runtimeKind = fields.runtime_kind;
+    if (fields.isolation_kind !== undefined) set.isolationKind = fields.isolation_kind;
     if (fields.status !== undefined) set.status = fields.status;
     if (fields.config !== undefined) {
       set.config =

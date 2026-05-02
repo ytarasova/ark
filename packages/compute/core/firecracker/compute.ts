@@ -16,9 +16,9 @@
  *     kernelPath, rootfsPath, arkdUrl,
  *   }
  *
- * Runtime composition:
- *   - `FirecrackerCompute × DirectRuntime` = agent runs natively in the VM.
- *   - `FirecrackerCompute × DockerRuntime` = VM hosts docker with arkd
+ * Isolation composition:
+ *   - `FirecrackerCompute × DirectIsolation` = agent runs natively in the VM.
+ *   - `FirecrackerCompute × DockerIsolation` = VM hosts docker with arkd
  *     sidecar (not yet wired; no different from the compute's perspective).
  *
  * Snapshot / restore delegate to the VM manager's native pause+snapshot and
@@ -43,7 +43,7 @@ import type {
   ProvisionOpts,
   Snapshot,
 } from "../types.js";
-// ^ core/types.ts -- the new Compute/Runtime abstractions. Do NOT import from
+// ^ core/types.ts -- the new Compute/Isolation abstractions. Do NOT import from
 // `packages/compute/types.ts`, which is the legacy ComputeProvider surface.
 import { NotSupportedError } from "../types.js";
 import { cloneWorkspaceViaArkd } from "../workspace-clone.js";

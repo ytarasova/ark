@@ -1,7 +1,7 @@
 /**
  * runTargetLifecycle tests. Covers:
  *   - compute-start, ensure-reachable, flush-secrets, prepare-workspace,
- *     runtime-prepare, launch-agent all fire in order
+ *     isolation-prepare, launch-agent all fire in order
  *   - each step is gracefully skipped when its precondition isn't met
  *     (no method on Compute, no relevant opt, empty queue, running status)
  *   - provisioning_step events emitted with status: ok and the right
@@ -87,7 +87,7 @@ function fakeTarget(calls: Calls, opts: FakeOpts = {}): ComputeTarget {
     compute,
     async prepare(_h: ComputeHandle, _ctx: PrepareCtx): Promise<void> {
       calls.prepare += 1;
-      calls.order.push("runtime-prepare");
+      calls.order.push("isolation-prepare");
       if (opts.prepareThrows) throw new Error("prepare boom");
     },
     async launchAgent(_h: ComputeHandle, _o: LaunchOpts): Promise<AgentHandle> {
@@ -125,7 +125,7 @@ describe("runTargetLifecycle", () => {
     expect(result.sessionName).toBe("ark-test");
   });
 
-  test("emits provisioning_step events for runtime-prepare and launch-agent", async () => {
+  test("emits provisioning_step events for isolation-prepare and launch-agent", async () => {
     const s = await app.sessions.create({ summary: "events" });
     const calls = newCalls();
     await runTargetLifecycle(app, s.id, fakeTarget(calls), HANDLE, LAUNCH_OPTS);
@@ -136,7 +136,7 @@ describe("runTargetLifecycle", () => {
       .map((e: { data: { step?: string; status?: string } }) => e.data)
       .filter((d) => d.status === "ok")
       .map((d) => d.step);
-    expect(okSteps).toContain("runtime-prepare");
+    expect(okSteps).toContain("isolation-prepare");
     expect(okSteps).toContain("launch-agent");
   });
 
@@ -144,7 +144,7 @@ describe("runTargetLifecycle", () => {
     const s = await app.sessions.create({ summary: "prepare-fail" });
     const calls = newCalls();
     const target = fakeTarget(calls, { prepareThrows: true });
-    await expect(runTargetLifecycle(app, s.id, target, HANDLE, LAUNCH_OPTS)).rejects.toThrow(/runtime-prepare.*boom/);
+    await expect(runTargetLifecycle(app, s.id, target, HANDLE, LAUNCH_OPTS)).rejects.toThrow(/isolation-prepare.*boom/);
     // launch never ran because prepare failed.
     expect(calls.launch).toBe(0);
   });
@@ -307,7 +307,7 @@ describe("runTargetLifecycle", () => {
       "ensure-reachable",
       "flush-secrets",
       "prepare-workspace",
-      "runtime-prepare",
+      "isolation-prepare",
       "launch-agent",
     ]);
 
@@ -324,7 +324,7 @@ describe("runTargetLifecycle", () => {
       "ensure-reachable",
       "flush-secrets",
       "prepare-workspace",
-      "runtime-prepare",
+      "isolation-prepare",
       "launch-agent",
     ]);
   });

@@ -146,14 +146,14 @@ export function ComputeView({
       const config: any = { ...(form.templateConfig ?? {}) };
       if (form.size) config.size = form.size;
       if (form.region) config.region = form.region;
-      // Send compute + runtime axes. Provider is omitted -- the server
+      // Send compute + isolation axes. Provider is omitted -- the server
       // derives it via pairToProvider for back-compat reads. is_template
       // rides on the same RPC -- templates and concrete targets use the
       // same create surface.
       await api.createCompute({
         name: form.name,
         compute: form.compute,
-        runtime: form.runtime,
+        isolation: form.isolation,
         config,
         ...(form.is_template ? { is_template: true } : {}),
       } as any);
@@ -242,11 +242,11 @@ export function ComputeView({
                   </Badge>
                 </div>
                 <Badge variant="secondary" className="text-[10px] shrink-0 ml-2">
-                  {/* Prefer compute_kind + runtime_kind; fall back to the
+                  {/* Prefer compute_kind + isolation_kind; fall back to the
                       legacy type string for older rows. `provider` field was
                       removed from the Compute type in the round-3 deprecation sweep. */}
-                  {(c as any).compute_kind && (c as any).runtime_kind
-                    ? `${(c as any).compute_kind}/${(c as any).runtime_kind}`
+                  {(c as any).compute_kind && (c as any).isolation_kind
+                    ? `${(c as any).compute_kind}/${(c as any).isolation_kind}`
                     : c.type || "local"}
                 </Badge>
               </ListRow>

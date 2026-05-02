@@ -28,7 +28,7 @@ describe("resolveComputeForStage + template cloning", () => {
     await app.computeService.create({
       name: "k8s-tmpl",
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: "ctx", namespace: "ns", image: "img" },
       is_template: true,
     });
@@ -45,7 +45,7 @@ describe("resolveComputeForStage + template cloning", () => {
     expect(clone!.is_template).toBe(false);
     expect(clone!.cloned_from).toBe("k8s-tmpl");
     expect(clone!.compute_kind).toBe("k8s");
-    expect(clone!.runtime_kind).toBe("direct");
+    expect(clone!.isolation_kind).toBe("direct");
 
     // Template row stays intact.
     const tmpl = await app.computes.get("k8s-tmpl");
@@ -72,7 +72,7 @@ describe("resolveComputeForStage + template cloning", () => {
     await app.computeService.create({
       name: "legacy-tmpl",
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: "c", namespace: "ns", image: "img" },
       is_template: true,
     });
@@ -96,7 +96,7 @@ describe("resolveComputeForStage + template cloning", () => {
     await app.computeService.create({
       name: "k8s-tmpl2",
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: "c", namespace: "ns", image: "img" },
       is_template: true,
     });

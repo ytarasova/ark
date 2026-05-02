@@ -8,12 +8,12 @@ import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { cn } from "../../lib/utils.js";
 import { RichSelect } from "../ui/RichSelect.js";
-import { effectiveLifecycle, type ComputeKindName, type RuntimeKindName } from "../../../../types/compute.js";
+import { effectiveLifecycle, type ComputeKindName, type IsolationKindName } from "../../../../types/compute.js";
 
-// Surface both compute + runtime axes. Static defaults render while the
+// Surface both compute + isolation axes. Static defaults render while the
 // server reply is in flight; the queries below overwrite with the live list.
 const DEFAULT_COMPUTE_KINDS = ["local", "firecracker", "ec2", "k8s", "k8s-kata"] as const;
-const DEFAULT_RUNTIME_KINDS = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"] as const;
+const DEFAULT_ISOLATION_KINDS = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"] as const;
 
 // Zod schema -- single source of truth for form validation. The submit
 // payload type is `NewComputeFormValues`, derived from the schema so caller
@@ -21,7 +21,7 @@ const DEFAULT_RUNTIME_KINDS = ["direct", "docker", "compose", "devcontainer", "f
 export const NewComputeFormSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   compute: z.string().min(1),
-  runtime: z.string().min(1),
+  isolation: z.string().min(1),
   size: z.string().optional().default(""),
   region: z.string().optional().default(""),
   aws_profile: z.string().optional().default(""),
@@ -63,24 +63,24 @@ export function NewComputeForm({
   });
   const computeKinds = computeKindsQuery.data ?? [...DEFAULT_COMPUTE_KINDS];
 
-  const runtimeKindsQuery = useQuery({
-    queryKey: ["runtime", "kinds"],
+  const isolationKindsQuery = useQuery({
+    queryKey: ["isolation", "kinds"],
     queryFn: () =>
       (api as any)
         .listRuntimeKinds?.()
         .then((d: any) =>
-          Array.isArray(d?.kinds) && d.kinds.length ? (d.kinds as string[]) : [...DEFAULT_RUNTIME_KINDS],
+          Array.isArray(d?.kinds) && d.kinds.length ? (d.kinds as string[]) : [...DEFAULT_ISOLATION_KINDS],
         )
-        .catch(() => [...DEFAULT_RUNTIME_KINDS]),
+        .catch(() => [...DEFAULT_ISOLATION_KINDS]),
   });
-  const runtimeKinds = runtimeKindsQuery.data ?? [...DEFAULT_RUNTIME_KINDS];
+  const isolationKinds = isolationKindsQuery.data ?? [...DEFAULT_ISOLATION_KINDS];
 
   const { register, handleSubmit, watch, setValue, formState } = useForm<NewComputeFormValues>({
     resolver: zodResolver(NewComputeFormSchema),
     defaultValues: {
       name: "",
       compute: "local",
-      runtime: "direct",
+      isolation: "direct",
       size: "",
       region: "",
       aws_profile: "",
@@ -91,19 +91,20 @@ export function NewComputeForm({
   });
 
   const compute = watch("compute");
-  const runtime = watch("runtime");
+  const isolation = watch("isolation");
   const size = watch("size");
   const selectedTemplate = watch("selectedTemplate");
 
   // Template-lifecycle pairs can only exist as templates -- they have no
   // persistent infrastructure, so a "concrete" row would be nonsense.
   // Source of truth: packages/types/compute.ts.
-  const isTemplateLifecycle = effectiveLifecycle(compute as ComputeKindName, runtime as RuntimeKindName) === "template";
+  const isTemplateLifecycle =
+    effectiveLifecycle(compute as ComputeKindName, isolation as IsolationKindName) === "template";
 
   // Keep templateConfig in a ref-style state via watch / setValue -- we
   // stash the chosen template's config object and hand it over on submit.
-  // The template dropdown drives (compute, runtime) + config together.
-  // The server attaches `compute` + `runtime` to every template row (derived
+  // The template dropdown drives (compute, isolation) + config together.
+  // The server attaches `compute` + `isolation` to every template row (derived
   // from the legacy `provider` via the canonical `providerToPair` table in
   // packages/compute/adapters/provider-map.ts), so the web bundle no longer
   // needs its own copy of that mapping.
@@ -114,8 +115,8 @@ export function NewComputeForm({
     if (typeof tmpl.compute === "string" && tmpl.compute.length > 0) {
       setValue("compute", tmpl.compute, { shouldDirty: true });
     }
-    if (typeof tmpl.runtime === "string" && tmpl.runtime.length > 0) {
-      setValue("runtime", tmpl.runtime, { shouldDirty: true });
+    if (typeof tmpl.isolation === "string" && tmpl.isolation.length > 0) {
+      setValue("isolation", tmpl.isolation, { shouldDirty: true });
     }
   }, [selectedTemplate, templates, setValue]);
 
@@ -191,7 +192,7 @@ export function NewComputeForm({
               Base template
             </label>
             <p className="mb-1.5 text-[11px] text-muted-foreground">
-              Optional. Pre-fill compute, runtime, and config from an existing template.
+              Optional. Pre-fill compute, isolation, and config from an existing template.
             </p>
             <RichSelect
               value={selectedTemplate ?? ""}
@@ -236,12 +237,12 @@ export function NewComputeForm({
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
-            Runtime
+            Isolation
           </label>
           <RichSelect
-            value={runtime}
-            onChange={(v) => setValue("runtime", v, { shouldDirty: true })}
-            options={runtimeKinds.map((k) => ({ value: k, label: k }))}
+            value={isolation}
+            onChange={(v) => setValue("isolation", v, { shouldDirty: true })}
+            options={isolationKinds.map((k) => ({ value: k, label: k }))}
           />
         </div>
         {compute === "ec2" && (

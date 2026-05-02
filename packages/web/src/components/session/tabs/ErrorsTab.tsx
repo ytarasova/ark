@@ -31,7 +31,13 @@ function findDispatchFailedDetail(errorEvents: any[]): string | null {
       lines.push("\nerror chain:");
       for (const link of ev.data.errorChain) {
         lines.push(`  ${link.name ?? "Error"}: ${link.message ?? ""}`);
-        if (link.stack) lines.push(link.stack.split("\n").map((s: string) => "    " + s).join("\n"));
+        if (link.stack)
+          lines.push(
+            link.stack
+              .split("\n")
+              .map((s: string) => "    " + s)
+              .join("\n"),
+          );
       }
     }
     return lines.join("\n");

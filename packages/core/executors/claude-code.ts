@@ -252,7 +252,7 @@ export const claudeCodeExecutor: Executor = {
     // Routes through ComputeTarget. `runTargetLifecycle`
     // walks the per-dispatch lifecycle inside structured `provisioning_step`
     // events: compute-start (if stopped) -> ensure-reachable -> flush-secrets
-    // -> prepare-workspace -> runtime-prepare -> launch-agent. Each step is
+    // -> prepare-workspace -> isolation-prepare -> launch-agent. Each step is
     // optional on the compute (LocalCompute is a no-op for ensureReachable /
     // prepareWorkspace / flushPlacement); the helper skips any method the
     // impl omits.

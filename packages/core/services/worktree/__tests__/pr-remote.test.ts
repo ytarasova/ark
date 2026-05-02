@@ -24,12 +24,7 @@ import type { Server } from "bun";
 import { AppContext } from "../../../app.js";
 import { setApp, clearApp } from "../../../__tests__/test-helpers.js";
 import { allocatePort } from "../../../config/port-allocator.js";
-import {
-  createWorktreePR,
-  mergeWorktreePR,
-  detectGitHost,
-  parseCreatePrUrl,
-} from "../pr.js";
+import { createWorktreePR, mergeWorktreePR, detectGitHost, parseCreatePrUrl } from "../pr.js";
 import type { Compute, Session } from "../../../../types/index.js";
 import type { ComputeProvider } from "../../../../compute/types.js";
 
@@ -51,10 +46,9 @@ function startStubArkd(opts: {
     async fetch(req) {
       const url = new URL(req.url);
       if (url.pathname === "/health") {
-        return new Response(
-          JSON.stringify({ status: "ok", version: "stub", hostname: "stub", platform: "stub" }),
-          { headers: { "content-type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ status: "ok", version: "stub", hostname: "stub", platform: "stub" }), {
+          headers: { "content-type": "application/json" },
+        });
       }
       if (url.pathname === "/exec" && req.method === "POST") {
         const body = (await req.json()) as ExecCall;
@@ -229,7 +223,7 @@ describe("createWorktreePR (remote compute)", () => {
       name: "stub-remote",
       provider: "ec2" as any,
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: { instance_id: "i-stub" },
     } as any);

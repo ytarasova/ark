@@ -1,8 +1,8 @@
 /**
- * Exhaustive test for the legacy provider-name -> (Compute, Runtime) mapping.
+ * Exhaustive test for the legacy provider-name -> (Compute, Isolation) mapping.
  *
  * Every name that today's code registers or persists must map to a real
- * (ComputeKind, RuntimeKind) pair, and the reverse mapping must round-trip.
+ * (ComputeKind, IsolationKind) pair, and the reverse mapping must round-trip.
  */
 import { describe, it, expect } from "bun:test";
 import {
@@ -10,35 +10,35 @@ import {
   pairToProvider,
   isKnownProvider,
   knownProviders,
-  type ComputeRuntimePair,
+  type ComputeIsolationPair,
 } from "../adapters/provider-map.js";
 describe("providerToPair", () => {
   // Every provider name that ships today (see app.ts step 4, plus legacy
   // aliases kept for back-compat reads from older DB rows).
-  const CASES: Array<[string, ComputeRuntimePair]> = [
-    ["local", { compute: "local", runtime: "direct" }],
-    ["docker", { compute: "local", runtime: "docker" }],
-    ["devcontainer", { compute: "local", runtime: "devcontainer" }],
-    ["firecracker", { compute: "local", runtime: "firecracker-in-container" }],
-    ["ec2", { compute: "ec2", runtime: "direct" }],
-    ["ec2-docker", { compute: "ec2", runtime: "docker" }],
-    ["ec2-devcontainer", { compute: "ec2", runtime: "devcontainer" }],
-    ["ec2-firecracker", { compute: "ec2", runtime: "firecracker-in-container" }],
-    ["remote-arkd", { compute: "ec2", runtime: "direct" }],
-    ["remote-worktree", { compute: "ec2", runtime: "direct" }],
-    ["remote-docker", { compute: "ec2", runtime: "docker" }],
-    ["remote-devcontainer", { compute: "ec2", runtime: "devcontainer" }],
-    ["remote-firecracker", { compute: "ec2", runtime: "firecracker-in-container" }],
-    ["k8s", { compute: "k8s", runtime: "direct" }],
-    ["k8s-kata", { compute: "k8s-kata", runtime: "direct" }],
+  const CASES: Array<[string, ComputeIsolationPair]> = [
+    ["local", { compute: "local", isolation: "direct" }],
+    ["docker", { compute: "local", isolation: "docker" }],
+    ["devcontainer", { compute: "local", isolation: "devcontainer" }],
+    ["firecracker", { compute: "local", isolation: "firecracker-in-container" }],
+    ["ec2", { compute: "ec2", isolation: "direct" }],
+    ["ec2-docker", { compute: "ec2", isolation: "docker" }],
+    ["ec2-devcontainer", { compute: "ec2", isolation: "devcontainer" }],
+    ["ec2-firecracker", { compute: "ec2", isolation: "firecracker-in-container" }],
+    ["remote-arkd", { compute: "ec2", isolation: "direct" }],
+    ["remote-worktree", { compute: "ec2", isolation: "direct" }],
+    ["remote-docker", { compute: "ec2", isolation: "docker" }],
+    ["remote-devcontainer", { compute: "ec2", isolation: "devcontainer" }],
+    ["remote-firecracker", { compute: "ec2", isolation: "firecracker-in-container" }],
+    ["k8s", { compute: "k8s", isolation: "direct" }],
+    ["k8s-kata", { compute: "k8s-kata", isolation: "direct" }],
   ];
   for (const [name, expected] of CASES) {
-    it(`maps '${name}' to ${expected.compute} + ${expected.runtime}`, () => {
+    it(`maps '${name}' to ${expected.compute} + ${expected.isolation}`, () => {
       expect(providerToPair(name)).toEqual(expected);
     });
   }
   it("falls back to local + direct for unknown names", () => {
-    expect(providerToPair("fake-provider-xyz")).toEqual({ compute: "local", runtime: "direct" });
+    expect(providerToPair("fake-provider-xyz")).toEqual({ compute: "local", isolation: "direct" });
   });
 });
 describe("isKnownProvider", () => {
@@ -85,6 +85,6 @@ describe("pairToProvider", () => {
     }
   });
   it("returns null for impossible pairs", () => {
-    expect(pairToProvider({ compute: "k8s", runtime: "devcontainer" } as any)).toBeNull();
+    expect(pairToProvider({ compute: "k8s", isolation: "devcontainer" } as any)).toBeNull();
   });
 });

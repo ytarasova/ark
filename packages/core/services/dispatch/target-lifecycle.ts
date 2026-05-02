@@ -21,7 +21,7 @@
  *   4. `prepare-workspace`  -- mkdir + git clone via arkd HTTP. 2
  *      retries, 1_000ms backoff (matches the legacy `git-clone` step
  *      that lived inside `RemoteWorktreeProvider.launch`).
- *   5. `runtime-prepare`    -- bring up compose / build devcontainer /
+ *   5. `isolation-prepare`    -- bring up compose / build devcontainer /
  *      boot microVM. Idempotent; 1 retry / 1_000ms backoff.
  *   6. `launch-agent`       -- arkd-side process spawn. NOT retried
  *      (tmux session names don't dedupe; a retry would leak the prior
@@ -157,8 +157,8 @@ export async function runTargetLifecycle(
     );
   }
 
-  // 5. runtime-prepare -- existing behaviour, kept.
-  await provisionStep(app, sessionId, "runtime-prepare", () => target.prepare(handle, ctx), {
+  // 5. isolation-prepare -- existing behaviour, kept.
+  await provisionStep(app, sessionId, "isolation-prepare", () => target.prepare(handle, ctx), {
     retries: 1,
     retryBackoffMs: 1_000,
     context: stepCtx,

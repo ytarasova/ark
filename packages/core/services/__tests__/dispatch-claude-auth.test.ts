@@ -77,7 +77,7 @@ async function setupK8sCompute(name = "k8s-target"): Promise<void> {
     name,
     provider: "k8s",
     compute: "k8s",
-    runtime: "direct",
+    isolation: "direct",
     config: { context: "test-ctx", namespace: "ark-test", image: "ark/agent:test" },
     is_template: false,
   });
@@ -210,7 +210,7 @@ describe("materializeClaudeAuthForDispatch", () => {
       name: "docker-target",
       provider: "docker",
       compute: "local",
-      runtime: "docker",
+      isolation: "docker",
       config: {},
     });
     const session = await createSession("docker-target");
@@ -285,7 +285,7 @@ describe("materializeClaudeAuthForDispatch", () => {
       name: "eks-target",
       provider: "k8s-eks" as any,
       compute_kind: "k8s",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: { namespace: "ark-eks" },
     } as any);
@@ -359,7 +359,7 @@ describe("materializeClaudeAuthForDispatch", () => {
       name: "no-mount-target",
       provider: "custom-no-mount" as any,
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as any);

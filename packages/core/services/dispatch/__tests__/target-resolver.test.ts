@@ -19,14 +19,14 @@ afterAll(async () => {
 });
 
 describe("resolveTargetAndHandle", () => {
-  test("returns null target when compute_kind / runtime_kind don't resolve", async () => {
+  test("returns null target when compute_kind / isolation_kind don't resolve", async () => {
     // Insert a row with a phantom compute_kind so resolveComputeTarget
     // returns {target: null}. This exercises the early-return branch.
     await app.computes.insert({
       name: "phantom-kind",
       provider: "phantom",
       compute_kind: "phantom-compute" as never,
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as never);
@@ -44,7 +44,7 @@ describe("resolveTargetAndHandle", () => {
       name: "local-rehydrate",
       provider: "local",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as never);
@@ -67,7 +67,7 @@ describe("resolveTargetAndHandle", () => {
       name: "local-fresh",
       provider: "local",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as never);

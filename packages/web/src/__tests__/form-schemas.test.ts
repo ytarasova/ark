@@ -15,7 +15,7 @@ describe("NewComputeFormSchema", () => {
     const result = NewComputeFormSchema.safeParse({
       name: "my-compute",
       compute: "local",
-      runtime: "direct",
+      isolation: "direct",
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -27,7 +27,7 @@ describe("NewComputeFormSchema", () => {
   });
 
   test("rejects missing name", () => {
-    const result = NewComputeFormSchema.safeParse({ name: "", compute: "local", runtime: "direct" });
+    const result = NewComputeFormSchema.safeParse({ name: "", compute: "local", isolation: "direct" });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toMatch(/required/i);
@@ -35,7 +35,7 @@ describe("NewComputeFormSchema", () => {
   });
 
   test("rejects blank compute kind", () => {
-    const result = NewComputeFormSchema.safeParse({ name: "x", compute: "", runtime: "direct" });
+    const result = NewComputeFormSchema.safeParse({ name: "x", compute: "", isolation: "direct" });
     expect(result.success).toBe(false);
   });
 });

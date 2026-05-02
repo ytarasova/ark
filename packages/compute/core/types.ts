@@ -1,14 +1,16 @@
 /**
- * Compute / Runtime split -- primary abstractions.
+ * Compute / Isolation split -- primary abstractions.
  *
- * See `.workflow/plan/compute-runtime-vision.md` (section "Core interfaces") for
- * the intended shape. Today's `ComputeProvider` interface in `../types.ts`
- * conflates two axes (where the VM/container lives, and how the agent runs);
- * the interfaces in this file pull them apart:
+ * Two-axis dispatch model (see `docs/architecture.md`):
  *
  *   - `Compute`        -- where the VM / container / host lives
- *   - `Runtime`        -- how the agent process is launched inside that host
- *   - `ComputeTarget`  -- the composed (compute, runtime) pair used at dispatch
+ *   - `Isolation`      -- how the agent process is sandboxed inside that host
+ *   - `ComputeTarget`  -- the composed (compute, isolation) pair used at dispatch
+ *
+ * "Isolation" was previously called "Runtime", but that collided with the
+ * separate "agent runtime" concept (claude-code / codex / gemini / goose) one
+ * layer up. Renamed for clarity: the layer-2 agent-runtime stays "runtime",
+ * this layer-4b sandbox is "isolation".
  *
  * The legacy `ComputeProvider` interface stays live and unchanged -- the
  * adapter in `../adapters/legacy.ts` bridges the old world into the new until
@@ -17,11 +19,11 @@
 
 // ── Kinds ──────────────────────────────────────────────────────────────────
 
-/** Where the compute lives. Mirrors the vision doc's target set. */
+/** Where the compute lives. */
 export type ComputeKind = "local" | "firecracker" | "ec2" | "k8s" | "k8s-kata";
 
-/** How the agent process is launched inside the compute. */
-export type RuntimeKind = "direct" | "docker" | "compose" | "devcontainer" | "firecracker-in-container";
+/** How the agent process is sandboxed inside the compute. */
+export type IsolationKind = "direct" | "docker" | "compose" | "devcontainer" | "firecracker-in-container";
 
 /** Provision latency bucket, used for pool sizing decisions. */
 export type ProvisionLatency = "instant" | "seconds" | "minutes";
@@ -56,9 +58,9 @@ export interface ComputeHandle {
 }
 
 /**
- * Handle returned by `Runtime.launchAgent`. For the direct / docker / ...
- * runtimes this is just the tmux session name arkd launched, kept
- * structured so future runtimes can attach extra state (compose project,
+ * Handle returned by `Isolation.launchAgent`. For the direct / docker / ...
+ * isolations this is just the tmux session name arkd launched, kept
+ * structured so future isolations can attach extra state (compose project,
  * devcontainer id) without a breaking change.
  */
 export interface AgentHandle {
@@ -156,7 +158,7 @@ export interface FlushPlacementOpts {
  */
 export class NotSupportedError extends Error {
   constructor(
-    public readonly computeKind: ComputeKind | RuntimeKind,
+    public readonly computeKind: ComputeKind | IsolationKind,
     public readonly op: string,
   ) {
     super(`${computeKind} does not support ${op}`);
@@ -282,13 +284,13 @@ export interface Compute {
 }
 
 /**
- * Primary runtime abstraction. How the agent process is launched inside the
- * compute. Stateless with respect to the compute -- runtimes take a `Compute`
- * + `ComputeHandle` pair in every method so one runtime instance can be
- * reused across many computes.
+ * Primary isolation abstraction. How the agent process is sandboxed inside
+ * the compute. Stateless with respect to the compute -- isolations take a
+ * `Compute` + `ComputeHandle` pair in every method so one isolation instance
+ * can be reused across many computes.
  */
-export interface Runtime {
-  readonly kind: RuntimeKind;
+export interface Isolation {
+  readonly kind: IsolationKind;
   readonly name: string;
 
   /** One-time setup inside a provisioned compute (install deps, bring up compose, etc.). */
@@ -297,6 +299,6 @@ export interface Runtime {
   /** Launch the agent process via arkd (inside compute). */
   launchAgent(compute: Compute, h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle>;
 
-  /** Runtime-level teardown (compose down, devcontainer stop, etc.). */
+  /** Isolation-level teardown (compose down, devcontainer stop, etc.). */
   shutdown(compute: Compute, h: ComputeHandle): Promise<void>;
 }

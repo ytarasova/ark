@@ -123,9 +123,9 @@ describe("call-site regression guards -- user-derived vars never land unescaped"
     expect(src).toMatch(/shellEscape\(token\)/);
   });
 
-  test("docker-compose runtime uses argv-form exec (no shell -c interpolation)", () => {
-    const src = readFileSync(join(ROOT, "packages/compute/runtimes/docker-compose.ts"), "utf-8");
-    // The runtime must never shell-interpolate workdir / files into a
+  test("docker-compose isolation uses argv-form exec (no shell -c interpolation)", () => {
+    const src = readFileSync(join(ROOT, "packages/compute/isolation/docker-compose.ts"), "utf-8");
+    // The isolation must never shell-interpolate workdir / files into a
     // `sh -c \`...\${var}...\`` template -- the old agent-launcher.ts
     // pattern. Compose work is done via argv-form helpers that exec
     // `docker` directly with separated args.

@@ -21,7 +21,7 @@ const PLACER_SUMMARY: Record<string, string> = {
   "env-var": "every provider exports as $name on the launcher",
   "ssh-private-key": "(Phase 2) EC2 places at ~/.ssh/id_<name>",
   "generic-blob": "(Phase 3) k8s mounts at metadata.target_path; others write files",
-  "kubeconfig": "(Phase 3) only the k8s provisioner consumes this",
+  kubeconfig: "(Phase 3) only the k8s provisioner consumes this",
 };
 
 export function registerDescribeCommand(secretsCmd: Command): void {

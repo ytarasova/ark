@@ -117,8 +117,8 @@ export function registerTemplateCommands(computeCmd: Command) {
         } as any);
 
         const ck = (compute as any).compute_kind ?? "-";
-        const rk = (compute as any).runtime_kind ?? "-";
-        console.log(chalk.green(`Created TEMPLATE '${name}' (${ck}/${rk})`));
+        const ik = (compute as any).isolation_kind ?? "-";
+        console.log(chalk.green(`Created TEMPLATE '${name}' (${ck}/${ik})`));
         console.log(`  Provider: ${opts.provider}`);
         for (const [k, v] of Object.entries(config)) {
           console.log(`  ${k}: ${v}`);

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import {
   COMPUTE_KIND_LIFECYCLE,
-  RUNTIME_KIND_LIFECYCLE,
+  ISOLATION_KIND_LIFECYCLE,
   effectiveLifecycle,
   type ComputeKindName,
-  type RuntimeKindName,
+  type IsolationKindName,
 } from "../compute.js";
 
 describe("compute lifecycle classification", () => {
@@ -19,12 +19,12 @@ describe("compute lifecycle classification", () => {
     expect(COMPUTE_KIND_LIFECYCLE.firecracker).toBe("template");
   });
 
-  it("direct is the only persistent runtime kind", () => {
-    expect(RUNTIME_KIND_LIFECYCLE.direct).toBe("persistent");
-    expect(RUNTIME_KIND_LIFECYCLE.docker).toBe("template");
-    expect(RUNTIME_KIND_LIFECYCLE.compose).toBe("template");
-    expect(RUNTIME_KIND_LIFECYCLE.devcontainer).toBe("template");
-    expect(RUNTIME_KIND_LIFECYCLE["firecracker-in-container"]).toBe("template");
+  it("direct is the only persistent isolation kind", () => {
+    expect(ISOLATION_KIND_LIFECYCLE.direct).toBe("persistent");
+    expect(ISOLATION_KIND_LIFECYCLE.docker).toBe("template");
+    expect(ISOLATION_KIND_LIFECYCLE.compose).toBe("template");
+    expect(ISOLATION_KIND_LIFECYCLE.devcontainer).toBe("template");
+    expect(ISOLATION_KIND_LIFECYCLE["firecracker-in-container"]).toBe("template");
   });
 
   it("effectiveLifecycle: persistent only when both axes are persistent", () => {
@@ -38,7 +38,7 @@ describe("compute lifecycle classification", () => {
     expect(effectiveLifecycle("k8s-kata", "direct")).toBe("template");
   });
 
-  it("effectiveLifecycle: template runtime makes a persistent kind ephemeral", () => {
+  it("effectiveLifecycle: template isolation makes a persistent kind ephemeral", () => {
     expect(effectiveLifecycle("local", "docker")).toBe("template");
     expect(effectiveLifecycle("local", "compose")).toBe("template");
     expect(effectiveLifecycle("local", "devcontainer")).toBe("template");
@@ -52,10 +52,10 @@ describe("compute lifecycle classification", () => {
     }
   });
 
-  it("every RuntimeKindName has a lifecycle entry", () => {
-    const kinds: RuntimeKindName[] = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"];
+  it("every IsolationKindName has a lifecycle entry", () => {
+    const kinds: IsolationKindName[] = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"];
     for (const k of kinds) {
-      expect(RUNTIME_KIND_LIFECYCLE[k]).toBeDefined();
+      expect(ISOLATION_KIND_LIFECYCLE[k]).toBeDefined();
     }
   });
 });

@@ -120,7 +120,7 @@ function makeDeps(): Parameters<typeof buildLaunchEnv>[0] {
 describe("buildLaunchEnv with placeAllSecrets wiring", () => {
   it("runs placement and merges ctx.getEnv() when the provider implements buildPlacementCtx", async () => {
     // Override the registered "local" provider with a stub that exposes
-    // buildPlacementCtx. providerOf({compute_kind:"local", runtime_kind:"direct"})
+    // buildPlacementCtx. providerOf({compute_kind:"local", isolation_kind:"direct"})
     // returns "local", so the lookup inside buildLaunchEnv lands on us.
     const ctx = new MockPlacementCtx();
     const provider = makeStubProvider({
@@ -132,7 +132,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       name: "stub-target",
       provider: "local",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as any);
@@ -173,7 +173,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       name: "noctx-target",
       provider: "local",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as any);
@@ -214,7 +214,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       name: "narrow-target",
       provider: "local",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as any);
@@ -253,7 +253,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       name: "echo-target",
       provider: "local",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as any);
@@ -289,11 +289,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
         // installTestSecrets in the test profile) ride through the
         // same stub.
         place.setEnv(secret.name, secret.value!);
-        await place.writeFile(
-          `/home/ubuntu/.${secret.name}.token`,
-          0o600,
-          new TextEncoder().encode(secret.value!),
-        );
+        await place.writeFile(`/home/ubuntu/.${secret.name}.token`, 0o600, new TextEncoder().encode(secret.value!));
       },
     };
     __test_registerPlacer("env-var", stubPlacer);
@@ -307,7 +303,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
         name: "deferred-target",
         provider: "local",
         compute_kind: "local",
-        runtime_kind: "direct",
+        isolation_kind: "direct",
         status: "running",
         config: {},
       } as any);
@@ -373,7 +369,7 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       name: "fail-target",
       provider: "local",
       compute_kind: "local",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: {},
     } as any);

@@ -1,7 +1,7 @@
 /**
  * compute/create RPC accepts both the legacy `{provider}` form and the new
- * `{compute, runtime}` form. Both paths must persist both the legacy
- * `provider` column and the new `compute_kind` / `runtime_kind` columns so
+ * `{compute, isolation}` form. Both paths must persist both the legacy
+ * `provider` column and the new `compute_kind` / `isolation_kind` columns so
  * back-compat reads keep working.
  */
 
@@ -38,7 +38,7 @@ async function call(method: string, params: Record<string, unknown>): Promise<an
 }
 
 describe("compute/create (two-axis form)", async () => {
-  it("accepts legacy {provider} and backfills compute_kind + runtime_kind", async () => {
+  it("accepts legacy {provider} and backfills compute_kind + isolation_kind", async () => {
     const { compute } = await call("compute/create", {
       name: "legacy-docker",
       provider: "docker",
@@ -47,31 +47,31 @@ describe("compute/create (two-axis form)", async () => {
     expect(compute.name).toBe("legacy-docker");
     expect(compute.provider).toBe("docker");
     expect(compute.compute_kind).toBe("local");
-    expect(compute.runtime_kind).toBe("docker");
+    expect(compute.isolation_kind).toBe("docker");
   });
 
-  it("accepts new {compute, runtime} and persists both axes + legacy provider", async () => {
+  it("accepts new {compute, isolation} and persists both axes + legacy provider", async () => {
     const { compute } = await call("compute/create", {
       name: "new-form-docker",
       compute: "local",
-      runtime: "docker",
+      isolation: "docker",
       config: {},
     });
     expect(compute.compute_kind).toBe("local");
-    expect(compute.runtime_kind).toBe("docker");
+    expect(compute.isolation_kind).toBe("docker");
     // Server reverse-maps to a legacy provider name for back-compat.
     expect(compute.provider).toBe("docker");
   });
 
-  it("accepts new {compute, runtime} for ec2 + devcontainer", async () => {
+  it("accepts new {compute, isolation} for ec2 + devcontainer", async () => {
     const { compute } = await call("compute/create", {
       name: "new-form-ec2-dc",
       compute: "ec2",
-      runtime: "devcontainer",
+      isolation: "devcontainer",
       config: { region: "us-east-1" },
     });
     expect(compute.compute_kind).toBe("ec2");
-    expect(compute.runtime_kind).toBe("devcontainer");
+    expect(compute.isolation_kind).toBe("devcontainer");
     expect(compute.provider).toBe("ec2-devcontainer");
   });
 
@@ -79,13 +79,13 @@ describe("compute/create (two-axis form)", async () => {
     await call("compute/create", {
       name: "read-test",
       compute: "ec2",
-      runtime: "docker",
+      isolation: "docker",
       config: {},
     });
     const { compute } = await call("compute/read", { name: "read-test" });
     expect(compute.provider).toBeTruthy();
     expect(compute.compute_kind).toBe("ec2");
-    expect(compute.runtime_kind).toBe("docker");
+    expect(compute.isolation_kind).toBe("docker");
   });
 
   it("compute/kinds returns the registered compute list", async () => {
@@ -94,7 +94,7 @@ describe("compute/create (two-axis form)", async () => {
     expect(res.kinds).toContain("local");
   });
 
-  it("runtime/kinds returns the registered runtime list", async () => {
+  it("runtime/kinds returns the registered isolation list", async () => {
     const res = await call("runtime/kinds", {});
     expect(Array.isArray(res.kinds)).toBe(true);
     expect(res.kinds).toContain("direct");

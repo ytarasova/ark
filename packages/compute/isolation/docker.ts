@@ -1,20 +1,20 @@
 /**
- * DockerRuntime -- runtime that launches agents inside a per-session
+ * DockerIsolation -- isolation that launches agents inside a per-session
  * arkd-sidecar Docker container.
  *
  * Architecture (mirrors the current `LocalDockerProvider`, but split along
- * the `Compute` x `Runtime` axes):
+ * the `Compute` x `Isolation` axes):
  *   - The `Compute` owns the host (for `LocalCompute`: the host is always up).
- *   - The `Runtime` owns the per-session container: create, bootstrap, start
+ *   - The `Isolation` owns the per-session container: create, bootstrap, start
  *     arkd inside, health-check, then delegate agent launches to arkd via
  *     `ArkdClient`. On `shutdown` the container is stopped and removed.
  *
- * Port mapping: every runtime prepares a fresh loopback-bound host port that
- * maps to arkd's internal port inside the container. The URL is stored on
- * `handle.meta.docker.arkdUrl` and overrides the compute's default
+ * Port mapping: every isolation prepares a fresh loopback-bound host port
+ * that maps to arkd's internal port inside the container. The URL is stored
+ * on `handle.meta.docker.arkdUrl` and overrides the compute's default
  * `getArkdUrl` for all `launchAgent` calls.
  *
- * This file only implements the new `Runtime` interface. The legacy
+ * This file only implements the new `Isolation` interface. The legacy
  * `LocalDockerProvider` (same sidecar model, older abstraction) stays live
  * and untouched until dispatch flips over through the ComputeTarget adapter.
  */
@@ -26,12 +26,12 @@ import type {
   AgentHandle,
   Compute,
   ComputeHandle,
+  IsolationKind,
+  Isolation,
   LaunchOpts,
   PrepareCtx,
-  Runtime,
-  RuntimeKind,
 } from "../core/types.js";
-import type { DockerRuntimeConfig } from "./docker-config.js";
+import type { DockerIsolationConfig } from "./docker-config.js";
 import {
   pullImage,
   createContainer,
@@ -51,7 +51,7 @@ import { logDebug } from "../../core/observability/structured-log.js";
  * docker/helpers functions; tests swap in stubs that record calls and
  * trigger deterministic failures without touching `execFile` or `fetch`.
  */
-export interface DockerRuntimeHelpers {
+export interface DockerIsolationHelpers {
   pullImage: typeof pullImage;
   createContainer: typeof createContainer;
   startContainer: typeof startContainer;
@@ -64,7 +64,7 @@ export interface DockerRuntimeHelpers {
   allocatePort: () => Promise<number>;
 }
 
-const DEFAULT_HELPERS: DockerRuntimeHelpers = {
+const DEFAULT_HELPERS: DockerIsolationHelpers = {
   pullImage,
   createContainer,
   startContainer,
@@ -93,17 +93,17 @@ export interface DockerHandleMeta {
   tempPaths: string[];
 }
 
-export class DockerRuntime implements Runtime {
-  readonly kind: RuntimeKind = "docker";
+export class DockerIsolation implements Isolation {
+  readonly kind: IsolationKind = "docker";
   readonly name = "docker";
 
-  private helpers: DockerRuntimeHelpers = DEFAULT_HELPERS;
+  private helpers: DockerIsolationHelpers = DEFAULT_HELPERS;
   private clientFactory: ((url: string) => ArkdClient) | null = null;
 
   constructor(private readonly app: AppContext) {}
 
   /** Test-only: swap in stubbed docker helpers + a stub `ArkdClient`. */
-  setHelpersForTesting(helpers: Partial<DockerRuntimeHelpers>): void {
+  setHelpersForTesting(helpers: Partial<DockerIsolationHelpers>): void {
     this.helpers = { ...DEFAULT_HELPERS, ...helpers };
   }
 
@@ -112,7 +112,7 @@ export class DockerRuntime implements Runtime {
     this.clientFactory = factory;
   }
 
-  // ── Runtime lifecycle ─────────────────────────────────────────────────
+  // ── Isolation lifecycle ────────────────────────────────────────────────
 
   async prepare(compute: Compute, h: ComputeHandle, ctx: PrepareCtx): Promise<void> {
     const cfg = this._readConfig(h, ctx);
@@ -123,7 +123,7 @@ export class DockerRuntime implements Runtime {
     const arkSource = this.helpers.resolveArkSourceRoot();
     if (!arkSource) {
       throw new Error(
-        "DockerRuntime: cannot locate ark source tree on host. The arkd-sidecar " +
+        "DockerIsolation: cannot locate ark source tree on host. The arkd-sidecar " +
           "container needs the repo root mounted at /opt/ark. Run from a source " +
           "checkout or set ARK_SOURCE_ROOT.",
       );
@@ -216,7 +216,7 @@ export class DockerRuntime implements Runtime {
       logDebug("compute", "already gone");
     }
 
-    // Clean up any host-side temp files the runtime staged. Empty today;
+    // Clean up any host-side temp files the isolation staged. Empty today;
     // kept so future helpers (tarball copy, devcontainer build cache) have
     // a hook without a schema break.
     if (meta.tempPaths.length > 0) {
@@ -241,10 +241,10 @@ export class DockerRuntime implements Runtime {
     return `ark-rt-${suffix}`;
   }
 
-  private _readConfig(h: ComputeHandle, ctx: PrepareCtx): DockerRuntimeConfig {
+  private _readConfig(h: ComputeHandle, ctx: PrepareCtx): DockerIsolationConfig {
     // Precedence: explicit PrepareCtx.config (per-session) > compute handle meta.
-    const fromCtx = (ctx.config ?? {}) as DockerRuntimeConfig;
-    const fromHandle = (h.meta ?? {}) as DockerRuntimeConfig;
+    const fromCtx = (ctx.config ?? {}) as DockerIsolationConfig;
+    const fromHandle = (h.meta ?? {}) as DockerIsolationConfig;
     return {
       image: fromCtx.image ?? fromHandle.image,
       volumes: fromCtx.volumes ?? fromHandle.volumes,
@@ -256,7 +256,7 @@ export class DockerRuntime implements Runtime {
   private _readMeta(h: ComputeHandle): DockerHandleMeta {
     const meta = (h.meta as Record<string, unknown>).docker as DockerHandleMeta | undefined;
     if (!meta) {
-      throw new Error("DockerRuntime: handle.meta.docker missing -- prepare() was not called or failed");
+      throw new Error("DockerIsolation: handle.meta.docker missing -- prepare() was not called or failed");
     }
     return meta;
   }

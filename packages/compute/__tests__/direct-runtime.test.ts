@@ -1,5 +1,5 @@
 /**
- * DirectRuntime unit tests.
+ * DirectIsolation unit tests.
  *
  * Uses the test-only `setClientFactory` hook to swap in a stub `ArkdClient`
  * so we don't hit the network. The stub records the `launchAgent` payload
@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
-import { DirectRuntime } from "../runtimes/direct.js";
+import { DirectIsolation } from "../isolation/direct.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, LaunchOpts } from "../core/types.js";
 import type { ArkdClient } from "../../arkd/client.js";
@@ -65,15 +65,15 @@ function opts(): LaunchOpts {
   };
 }
 
-describe("DirectRuntime", async () => {
+describe("DirectIsolation", async () => {
   it("has kind=direct and matching name", () => {
-    const r = new DirectRuntime(app);
+    const r = new DirectIsolation(app);
     expect(r.kind).toBe("direct");
     expect(r.name).toBe("direct");
   });
 
   it("prepare is a no-op", async () => {
-    const r = new DirectRuntime(app);
+    const r = new DirectIsolation(app);
     // Must not throw, must not call arkd.
     let called = false;
     r.setClientFactory(() => {
@@ -86,7 +86,7 @@ describe("DirectRuntime", async () => {
 
   it("launchAgent forwards sessionName, script, workdir to arkd", async () => {
     const calls: LaunchCall[] = [];
-    const r = new DirectRuntime(app);
+    const r = new DirectIsolation(app);
     r.setClientFactory(() => stubClient(calls));
 
     const handle = await r.launchAgent(makeCompute(), makeHandle(), opts());
@@ -102,7 +102,7 @@ describe("DirectRuntime", async () => {
 
   it("launchAgent resolves the arkd URL via Compute.getArkdUrl", async () => {
     const urls: string[] = [];
-    const r = new DirectRuntime(app);
+    const r = new DirectIsolation(app);
     r.setClientFactory((url) => {
       urls.push(url);
       return stubClient([]);
@@ -115,13 +115,13 @@ describe("DirectRuntime", async () => {
   });
 
   it("launchAgent propagates arkd errors", async () => {
-    const r = new DirectRuntime(app);
+    const r = new DirectIsolation(app);
     r.setClientFactory(() => stubClient(null, new Error("arkd down")));
     (await expect(r.launchAgent(makeCompute(), makeHandle(), opts()))).rejects.toThrow("arkd down");
   });
 
   it("shutdown is a no-op", async () => {
-    const r = new DirectRuntime(app);
+    const r = new DirectIsolation(app);
     let called = false;
     r.setClientFactory(() => {
       called = true;

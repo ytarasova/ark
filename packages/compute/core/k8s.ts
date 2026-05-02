@@ -1,6 +1,6 @@
 /**
  * K8sCompute -- migration of the legacy `K8sProvider` onto the new
- * (Compute, Runtime) split.
+ * (Compute, Isolation) split.
  *
  * Model: one Kubernetes Pod per provisioned compute. The pod runs arkd as
  * its main container; the host conductor reaches arkd through a

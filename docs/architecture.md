@@ -774,6 +774,68 @@ This redirects the agent's LLM calls through the Ark router without changing the
 
 11 providers total (+ 3 ec2 sub-variants = 14 compute targets). Brief summary here; full details in `docs/providers.md`. All providers implement the `ComputeProvider` interface, and all (except `local`) talk to a remote arkd via HTTP.
 
+### 9.0 Dispatch layering (Compute × Isolation)
+
+Dispatch is a five-layer composition. The two middle axes — **Compute** (where) and **Isolation** (how the agent process is sandboxed) — are independent and combine into a `ComputeTarget` at dispatch time.
+
+```
+1. Agent              YAML spec: prompt, tools, model, runtime: <name>
+                      e.g. agents/implementer.yaml
+
+2. Agent Runtime      How the agent transcript is driven and parsed.
+                      claude-code | agent-sdk | codex | gemini | goose
+                      Each runtime has wildly different launch semantics
+                      (CLI args, env vars, hook formats, session-resume).
+                      Code: packages/core/executors/<type>.ts
+                      YAML: runtimes/<name>.yaml (referenced by agent.runtime)
+
+3. ComputeTarget      Composition: { compute, isolation }. Thin dispatch
+                      seam, not a real abstraction. Built from the
+                      (compute_kind, isolation_kind) pair on the compute row.
+                      Code: packages/compute/core/compute-target.ts
+
+4a. Compute           Where the workspace lives. Provision / start / stop /
+                      destroy / getArkdUrl / ensureReachable / resolveWorkdir /
+                      prepareWorkspace / flushPlacement.
+                      Kinds: local | ec2 | k8s | k8s-kata | firecracker
+                      Code: packages/compute/core/{local,ec2,k8s,k8s-kata,firecracker/compute}.ts
+
+4b. Isolation         How the agent process is sandboxed inside that compute.
+                      prepare / launchAgent / shutdown.
+                      Kinds: direct | docker | compose | devcontainer |
+                             firecracker-in-container
+                      Code: packages/compute/isolation/{direct,docker,docker-compose,devcontainer}.ts
+
+5. arkd               HTTP daemon (:19300) on every compute target.
+                      The conductor talks to arkd over HTTP to drive every
+                      step on the compute side. Not really a layer -- it's
+                      the destination/transport.
+                      Code: packages/arkd/
+```
+
+**Why "agent runtime" (layer 2) ≠ "isolation" (layer 4b).** Layer 2 names belong to the agent transcript driver — `claude-code`, `codex`, etc. — and are referenced from agent YAML as `runtime: <name>`. Layer 4b names the sandbox the agent process runs *inside*: a docker container, a devcontainer, the host directly. Both used to be called "runtime"; the layer-4b concept was renamed `Isolation` so the two no longer collide.
+
+**Two-axis dispatch.** The `compute` table stores both:
+- legacy `provider` column (`local`, `docker`, `ec2-docker`, ...) — kept for back-compat indexes and unmigrated callers
+- canonical `compute_kind` + `isolation_kind` columns — the source of truth post-2026-05
+
+`packages/compute/adapters/provider-map.ts` is the single mapping between the legacy name and the (compute, isolation) pair. New writes go through both.
+
+### 9.0.1 Per-dispatch lifecycle (`runTargetLifecycle`)
+
+Six structured `provisioning_step` events fire in order; each step is optional and skipped when the impl omits the method. Code: `packages/core/services/dispatch/target-lifecycle.ts`.
+
+| # | Step | Owner | What |
+|---|---|---|---|
+| 1 | `compute-start` | Compute | If status=stopped, Compute.start. 1 retry / 2s backoff |
+| 2 | `ensure-reachable` | Compute | SSH/kubectl tunnel + arkd /health. Idempotent, no retry |
+| 3 | `flush-secrets` | Compute | Replay deferred typed-secret placement. 1 retry / 1s |
+| 4 | `prepare-workspace` | Compute | mkdir + git clone via arkd. 2 retries / 1s |
+| 5 | `isolation-prepare` | Isolation | Bring up compose / build devcontainer / boot microVM. 1 retry |
+| 6 | `launch-agent` | Isolation | arkd-side process spawn. No retry (tmux dedupe) |
+
+Failures throw `ProvisionStepError(step, cause)` so the dispatch failure message names the failing phase. Each event carries `{ compute, computeKind }` plus step-specific context.
+
 ### 9.1 Local worktree only
 
 | Provider | Notes |

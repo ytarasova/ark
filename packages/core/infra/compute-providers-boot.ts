@@ -1,6 +1,6 @@
 /**
  * ComputeProvidersBoot -- registers legacy `ComputeProvider`s + new
- * `Compute` / `Runtime` kinds on the AppContext during startup.
+ * `Compute` / `Isolation` kinds on the AppContext during startup.
  *
  * Extracted from `AppContext._registerComputeProviders`. Split into a
  * service so it can run as part of the Lifecycle start phase and isn't
@@ -42,7 +42,7 @@ export class ComputeProvidersBoot {
         logDebug("general", "@kubernetes/client-node not installed");
       }
 
-      // Compute / Runtime registrations for Kubernetes
+      // Compute / Isolation registrations for Kubernetes
       try {
         await import("@kubernetes/client-node");
         const { K8sCompute } = await import("../../compute/core/k8s.js");
@@ -53,19 +53,19 @@ export class ComputeProvidersBoot {
         logDebug("general", "@kubernetes/client-node not installed");
       }
 
-      // Compute + Runtime registry (additive, local providers always on)
+      // Compute + Isolation registry (additive, local providers always on)
       const { LocalCompute } = await import("../../compute/core/local.js");
       const { EC2Compute } = await import("../../compute/core/ec2.js");
-      const { DirectRuntime } = await import("../../compute/runtimes/direct.js");
-      const { DockerRuntime } = await import("../../compute/runtimes/docker.js");
-      const { DevcontainerRuntime } = await import("../../compute/runtimes/devcontainer.js");
-      const { DockerComposeRuntime } = await import("../../compute/runtimes/docker-compose.js");
+      const { DirectIsolation } = await import("../../compute/isolation/direct.js");
+      const { DockerIsolation } = await import("../../compute/isolation/docker.js");
+      const { DevcontainerIsolation } = await import("../../compute/isolation/devcontainer.js");
+      const { DockerComposeIsolation } = await import("../../compute/isolation/docker-compose.js");
       this.app.registerCompute(new LocalCompute(this.app));
       this.app.registerCompute(new EC2Compute(this.app));
-      this.app.registerRuntime(new DirectRuntime(this.app));
-      this.app.registerRuntime(new DockerRuntime(this.app));
-      this.app.registerRuntime(new DevcontainerRuntime(this.app));
-      this.app.registerRuntime(new DockerComposeRuntime(this.app));
+      this.app.registerIsolation(new DirectIsolation(this.app));
+      this.app.registerIsolation(new DockerIsolation(this.app));
+      this.app.registerIsolation(new DevcontainerIsolation(this.app));
+      this.app.registerIsolation(new DockerComposeIsolation(this.app));
 
       // FirecrackerCompute (gated on /dev/kvm availability)
       const { registerFirecrackerIfAvailable } = await import("../../compute/core/firecracker/compute.js");

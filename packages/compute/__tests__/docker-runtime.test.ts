@@ -1,5 +1,5 @@
 /**
- * DockerRuntime unit tests.
+ * DockerIsolation unit tests.
  *
  * The runtime wraps a small docker-helpers surface + an `ArkdClient` factory;
  * both are swapped out in the tests via `setHelpersForTesting` and
@@ -9,14 +9,14 @@
 
 import { describe, it, expect } from "bun:test";
 
-import { DockerRuntime } from "../runtimes/docker.js";
+import { DockerIsolation } from "../isolation/docker.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, LaunchOpts, PrepareCtx } from "../core/types.js";
 import type { ArkdClient } from "../../arkd/client.js";
-import type { DockerRuntimeHelpers, DockerHandleMeta } from "../runtimes/docker.js";
+import type { DockerIsolationHelpers, DockerHandleMeta } from "../isolation/docker.js";
 import type { AppContext } from "../../core/app.js";
 
-// Minimal fake AppContext -- the DockerRuntime only reads config.dirs.ark +
+// Minimal fake AppContext -- the DockerIsolation only reads config.dirs.ark +
 // config.ports.conductor during prepare(). We don't need a real boot.
 const fakeApp = {
   config: {
@@ -29,8 +29,8 @@ const fakeApp = {
 
 type Call = { fn: string; args: unknown[] };
 
-function makeHelpers(overrides: Partial<DockerRuntimeHelpers> = {}): {
-  helpers: DockerRuntimeHelpers;
+function makeHelpers(overrides: Partial<DockerIsolationHelpers> = {}): {
+  helpers: DockerIsolationHelpers;
   calls: Call[];
 } {
   const calls: Call[] = [];
@@ -39,17 +39,17 @@ function makeHelpers(overrides: Partial<DockerRuntimeHelpers> = {}): {
     async (...args: unknown[]) => {
       calls.push({ fn: name, args });
     };
-  const helpers: DockerRuntimeHelpers = {
-    pullImage: record("pullImage") as DockerRuntimeHelpers["pullImage"],
-    createContainer: record("createContainer") as DockerRuntimeHelpers["createContainer"],
-    startContainer: record("startContainer") as DockerRuntimeHelpers["startContainer"],
-    stopContainer: record("stopContainer") as DockerRuntimeHelpers["stopContainer"],
-    removeContainer: record("removeContainer") as DockerRuntimeHelpers["removeContainer"],
-    bootstrapContainer: record("bootstrapContainer") as DockerRuntimeHelpers["bootstrapContainer"],
-    startArkdInContainer: record("startArkdInContainer") as DockerRuntimeHelpers["startArkdInContainer"],
-    waitForArkdHealth: record("waitForArkdHealth") as DockerRuntimeHelpers["waitForArkdHealth"],
-    resolveArkSourceRoot: (() => "/fake/ark/source") as DockerRuntimeHelpers["resolveArkSourceRoot"],
-    allocatePort: (async () => 45678) as DockerRuntimeHelpers["allocatePort"],
+  const helpers: DockerIsolationHelpers = {
+    pullImage: record("pullImage") as DockerIsolationHelpers["pullImage"],
+    createContainer: record("createContainer") as DockerIsolationHelpers["createContainer"],
+    startContainer: record("startContainer") as DockerIsolationHelpers["startContainer"],
+    stopContainer: record("stopContainer") as DockerIsolationHelpers["stopContainer"],
+    removeContainer: record("removeContainer") as DockerIsolationHelpers["removeContainer"],
+    bootstrapContainer: record("bootstrapContainer") as DockerIsolationHelpers["bootstrapContainer"],
+    startArkdInContainer: record("startArkdInContainer") as DockerIsolationHelpers["startArkdInContainer"],
+    waitForArkdHealth: record("waitForArkdHealth") as DockerIsolationHelpers["waitForArkdHealth"],
+    resolveArkSourceRoot: (() => "/fake/ark/source") as DockerIsolationHelpers["resolveArkSourceRoot"],
+    allocatePort: (async () => 45678) as DockerIsolationHelpers["allocatePort"],
     ...overrides,
   };
   return { helpers, calls };
@@ -90,9 +90,9 @@ function launchOpts(): LaunchOpts {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("DockerRuntime", async () => {
+describe("DockerIsolation", async () => {
   it("has kind=docker and matching name", () => {
-    const r = new DockerRuntime(fakeApp);
+    const r = new DockerIsolation(fakeApp);
     expect(r.kind).toBe("docker");
     expect(r.name).toBe("docker");
   });
@@ -100,7 +100,7 @@ describe("DockerRuntime", async () => {
   describe("prepare", async () => {
     it("runs pull -> create -> start -> bootstrap -> startArkd -> waitForHealth in order", async () => {
       const { helpers, calls } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -119,7 +119,7 @@ describe("DockerRuntime", async () => {
 
     it("stores containerName / arkdHostPort / arkdUrl / image / arkSource / tempPaths on handle.meta.docker", async () => {
       const { helpers } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle("my-compute");
@@ -137,7 +137,7 @@ describe("DockerRuntime", async () => {
 
     it("honours ctx.config.image override", async () => {
       const { helpers, calls } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -153,7 +153,7 @@ describe("DockerRuntime", async () => {
 
     it("forwards extraVolumes + bootstrap opts + arkSource to createContainer / bootstrapContainer", async () => {
       const { helpers, calls } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -186,7 +186,7 @@ describe("DockerRuntime", async () => {
 
     it("throws if resolveArkSourceRoot returns null", async () => {
       const { helpers } = makeHelpers({ resolveArkSourceRoot: () => null });
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       (await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx()))).rejects.toThrow(/ark source tree/);
@@ -197,9 +197,9 @@ describe("DockerRuntime", async () => {
       const { helpers, calls } = makeHelpers({
         bootstrapContainer: (async () => {
           throw bootstrapErr;
-        }) as DockerRuntimeHelpers["bootstrapContainer"],
+        }) as DockerIsolationHelpers["bootstrapContainer"],
       });
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -217,9 +217,9 @@ describe("DockerRuntime", async () => {
       const { helpers, calls } = makeHelpers({
         createContainer: (async () => {
           throw createErr;
-        }) as DockerRuntimeHelpers["createContainer"],
+        }) as DockerIsolationHelpers["createContainer"],
       });
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       (await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx()))).rejects.toThrow("docker create failed");
@@ -232,9 +232,9 @@ describe("DockerRuntime", async () => {
       const { helpers, calls } = makeHelpers({
         waitForArkdHealth: (async () => {
           throw healthErr;
-        }) as DockerRuntimeHelpers["waitForArkdHealth"],
+        }) as DockerIsolationHelpers["waitForArkdHealth"],
       });
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       (await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx()))).rejects.toThrow("arkd never came up");
@@ -245,7 +245,7 @@ describe("DockerRuntime", async () => {
   describe("launchAgent", async () => {
     it("delegates to ArkdClient.launchAgent with tmuxName / script / workdir", async () => {
       const { helpers } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -263,7 +263,7 @@ describe("DockerRuntime", async () => {
 
     it("resolves the arkd URL from handle.meta.docker.arkdUrl", async () => {
       const { helpers } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -280,7 +280,7 @@ describe("DockerRuntime", async () => {
     });
 
     it("throws if called before prepare", async () => {
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setClientFactory(() => stubClient([]));
       (await expect(r.launchAgent(makeCompute(), makeHandle(), launchOpts()))).rejects.toThrow(
         /handle\.meta\.docker missing/,
@@ -289,7 +289,7 @@ describe("DockerRuntime", async () => {
 
     it("propagates arkd errors", async () => {
       const { helpers } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -302,7 +302,7 @@ describe("DockerRuntime", async () => {
   describe("shutdown", async () => {
     it("stops + removes the container", async () => {
       const { helpers, calls } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -320,7 +320,7 @@ describe("DockerRuntime", async () => {
 
     it("is a no-op if prepare never ran (meta missing)", async () => {
       const { helpers, calls } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       await r.shutdown(makeCompute(), makeHandle());
@@ -331,9 +331,9 @@ describe("DockerRuntime", async () => {
       const { helpers, calls } = makeHelpers({
         stopContainer: (async () => {
           throw new Error("already stopped");
-        }) as DockerRuntimeHelpers["stopContainer"],
+        }) as DockerIsolationHelpers["stopContainer"],
       });
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
@@ -347,7 +347,7 @@ describe("DockerRuntime", async () => {
 
     it("cleans up tempPaths on shutdown", async () => {
       const { helpers } = makeHelpers();
-      const r = new DockerRuntime(fakeApp);
+      const r = new DockerIsolation(fakeApp);
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();

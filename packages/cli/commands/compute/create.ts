@@ -122,11 +122,11 @@ export function registerCreateCommand(computeCmd: Command) {
     .argument("<name>", "Compute name")
     // Two-axis flags:
     .option("--compute <kind>", "Compute kind (local, firecracker, ec2, k8s, k8s-kata)")
-    .option("--runtime <kind>", "Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container)")
+    .option("--isolation <kind>", "Isolation kind (direct, docker, compose, devcontainer, firecracker-in-container)")
     // Legacy single-axis flag, kept for one release:
     .option(
       "--provider <type>",
-      "[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime.",
+      "[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --isolation.",
     )
     // Unified-model: template vs concrete target is now just a flag.
     .option("--template", "Create a reusable template (blueprint) instead of a concrete compute target")
@@ -138,32 +138,32 @@ export function registerCreateCommand(computeCmd: Command) {
   registerProviderFlags(createCmd);
 
   createCmd.option("--from-template <name>", "Use a compute template as defaults").action(async (name, opts) => {
-    // Resolve either --compute + --runtime (new) or --provider (legacy).
+    // Resolve either --compute + --isolation (new) or --provider (legacy).
     // We mutate `opts.provider` to a concrete value before handing off to
     // the per-provider flag spec so the spec sees the real provider key.
     const { providerToPair, pairToProvider } = await import("../../../compute/adapters/provider-map.js");
 
     const newCompute: string | undefined = opts.compute;
-    const newRuntime: string | undefined = opts.runtime;
+    const newIsolation: string | undefined = opts.isolation;
 
     if (opts.provider) {
       const pair = providerToPair(opts.provider);
       console.log(
         chalk.yellow(
-          `--provider is deprecated; pass --compute + --runtime instead. ` +
-            `Auto-mapping '${opts.provider}' -> --compute ${pair.compute} --runtime ${pair.runtime}.`,
+          `--provider is deprecated; pass --compute + --isolation instead. ` +
+            `Auto-mapping '${opts.provider}' -> --compute ${pair.compute} --isolation ${pair.isolation}.`,
         ),
       );
     }
 
     // Default when nothing is specified: local + direct (local auto-created).
-    if (!opts.provider && !newCompute && !newRuntime) {
+    if (!opts.provider && !newCompute && !newIsolation) {
       opts.provider = "local";
     }
 
     // Derive legacy provider name for the downstream spec lookup + display.
-    if (!opts.provider && newCompute && newRuntime) {
-      opts.provider = pairToProvider({ compute: newCompute as any, runtime: newRuntime as any }) ?? newCompute;
+    if (!opts.provider && newCompute && newIsolation) {
+      opts.provider = pairToProvider({ compute: newCompute as any, isolation: newIsolation as any }) ?? newCompute;
     }
 
     // Templates don't need the "local is auto-created" guard -- a local
@@ -216,7 +216,7 @@ export function registerCreateCommand(computeCmd: Command) {
         name,
         provider: opts.provider,
         ...(newCompute ? { compute: newCompute } : {}),
-        ...(newRuntime ? { runtime: newRuntime } : {}),
+        ...(newIsolation ? { isolation: newIsolation } : {}),
         config,
         ...(opts.template ? { is_template: true } : {}),
       } as any);
@@ -224,13 +224,13 @@ export function registerCreateCommand(computeCmd: Command) {
       // The kind-label is the most important thing a user sees -- make it
       // unambiguous whether they just made a template or a concrete target.
       const ck = (compute as any).compute_kind ?? "-";
-      const rk = (compute as any).runtime_kind ?? "-";
+      const ik = (compute as any).isolation_kind ?? "-";
       const kindLabel = opts.template ? "TEMPLATE" : "COMPUTE";
-      console.log(chalk.green(`Created ${kindLabel} '${compute.name}' (${ck}/${rk})`));
+      console.log(chalk.green(`Created ${kindLabel} '${compute.name}' (${ck}/${ik})`));
       console.log(`  Provider: ${providerOf(compute)}`);
-      if ((compute as any).compute_kind || (compute as any).runtime_kind) {
-        console.log(`  Compute:  ${ck}`);
-        console.log(`  Runtime:  ${rk}`);
+      if ((compute as any).compute_kind || (compute as any).isolation_kind) {
+        console.log(`  Compute:    ${ck}`);
+        console.log(`  Isolation:  ${ik}`);
       }
       console.log(`  Status:   ${compute.status}`);
 

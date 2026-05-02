@@ -1,7 +1,7 @@
 /**
  * Resolve `(target, handle)` for a session ready to dispatch.
  *
- * The dispatcher needs both a `ComputeTarget` (Compute × Runtime
+ * The dispatcher needs both a `ComputeTarget` (Compute × Isolation
  * composition) AND a `ComputeHandle` (per-instance state: EC2 instance
  * id, k8s pod name, container id, ...). The legacy `ComputeProvider`
  * threaded the `Compute` row directly; the new path threads a handle

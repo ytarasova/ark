@@ -62,7 +62,7 @@ describe("k8s e2e flow (live cluster)", () => {
     await app.computeService.create({
       name: templateName,
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: CLUSTER, namespace: NAMESPACE, image: IMAGE },
       is_template: true,
     });
@@ -100,7 +100,7 @@ describe("k8s e2e flow (live cluster)", () => {
       name: cloneName,
       provider: tmpl.provider,
       compute: tmpl.compute_kind,
-      runtime: tmpl.runtime_kind,
+      isolation: tmpl.isolation_kind,
       config: JSON.parse(JSON.stringify(tmpl.config ?? {})),
       is_template: false,
       cloned_from: tmpl.name,
@@ -242,7 +242,7 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
     await app.computeService.create({
       name: templateName,
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: CLUSTER, namespace: NAMESPACE, image: E2E_IMAGE_WITH_CLAUDE },
       is_template: true,
     });
@@ -328,7 +328,7 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
       name: cloneName,
       provider: tmpl.provider,
       compute: tmpl.compute_kind,
-      runtime: tmpl.runtime_kind,
+      isolation: tmpl.isolation_kind,
       // Inject the creds Secret reference into the clone's config so
       // `launch()` mounts it on the session pod. We mutate a deep copy --
       // never the template's live config object.

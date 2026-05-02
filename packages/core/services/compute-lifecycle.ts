@@ -35,7 +35,7 @@ export async function garbageCollectComputeIfTemplate(
   // lifecycle -- every session gets its own clone and no other session
   // should ever reference it by name.
   const isClone = !!compute.cloned_from;
-  const lifecycle = effectiveLifecycle(compute.compute_kind, compute.runtime_kind);
+  const lifecycle = effectiveLifecycle(compute.compute_kind, compute.isolation_kind);
   if (!isClone && lifecycle !== "template") return false;
 
   // A template row (`is_template: true`) is a config blueprint, never a
@@ -89,7 +89,9 @@ export async function garbageCollectComputeIfTemplate(
     } else {
       await app.computeService.delete(computeName);
     }
-    const reason = isClone ? `cloned from '${compute.cloned_from}'` : `${compute.compute_kind}/${compute.runtime_kind}`;
+    const reason = isClone
+      ? `cloned from '${compute.cloned_from}'`
+      : `${compute.compute_kind}/${compute.isolation_kind}`;
     logInfo("compute-pool", `gc'd compute '${computeName}' (${reason}) -- no live sessions reference it`);
     return true;
   } catch (e: any) {

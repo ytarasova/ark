@@ -94,10 +94,10 @@ describe("session/attach-command", () => {
   it("delegates to provider.getAttachCommand when the session has a compute", async () => {
     // Register a fake provider that returns an SSH-prefixed command so we can
     // assert the handler delegates to it rather than the plain local path.
-    // The provider name must match what `providerOf({compute_kind, runtime_kind})`
+    // The provider name must match what `providerOf({compute_kind, isolation_kind})`
     // will return for the inserted compute row -- the registry is keyed by
     // the legacy provider name, derived from the two-axis kinds. For
-    // {compute_kind:"ec2", runtime_kind:"direct"} that's "ec2".
+    // {compute_kind:"ec2", isolation_kind:"direct"} that's "ec2".
     class FakeRemoteProvider {
       readonly name = "ec2";
       readonly singleton = false;
@@ -150,7 +150,7 @@ describe("session/attach-command", () => {
       name: "fake-remote-1",
       provider: "fake-remote" as any,
       compute_kind: "ec2",
-      runtime_kind: "direct",
+      isolation_kind: "direct",
       status: "running",
       config: { ip: "1.2.3.4" },
     } as any);

@@ -1,5 +1,5 @@
 /**
- * DirectRuntime -- launches the agent directly via arkd, no further
+ * DirectIsolation -- launches the agent directly via arkd, no further
  * container / devcontainer / compose wrapper. This is the semantic equivalent
  * of today's `LocalWorktreeProvider.launch` path.
  *
@@ -13,14 +13,14 @@ import type {
   AgentHandle,
   Compute,
   ComputeHandle,
+  IsolationKind,
+  Isolation,
   LaunchOpts,
   PrepareCtx,
-  Runtime,
-  RuntimeKind,
 } from "../core/types.js";
 
-export class DirectRuntime implements Runtime {
-  readonly kind: RuntimeKind = "direct";
+export class DirectIsolation implements Isolation {
+  readonly kind: IsolationKind = "direct";
   readonly name = "direct";
 
   /** Override hook for tests; when null we build a fresh `ArkdClient`. */
@@ -34,7 +34,7 @@ export class DirectRuntime implements Runtime {
   }
 
   async prepare(_compute: Compute, _h: ComputeHandle, _ctx: PrepareCtx): Promise<void> {
-    // No-op: direct runtime needs no per-compute preparation.
+    // No-op: direct isolation needs no per-compute preparation.
   }
 
   async launchAgent(compute: Compute, h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle> {

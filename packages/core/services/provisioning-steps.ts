@@ -244,12 +244,7 @@ export async function provisionStep<T>(
       if (transient && hasBudget) {
         const backoff = backoffFor(attempt, baseBackoff);
         const message = messageOf(error);
-        emitStepEvent(
-          app,
-          sessionId,
-          { step, status: "retrying", attempt, transient: true, message },
-          context,
-        );
+        emitStepEvent(app, sessionId, { step, status: "retrying", attempt, transient: true, message }, context);
         logWarn(
           "provision",
           `[${sessionId}] step=${step} attempt ${attempt} failed (transient), retrying in ${backoff}ms: ${message}`,
@@ -268,11 +263,15 @@ export async function provisionStep<T>(
         { step, status: "failed", durationMs, attempts: attempt, transient, message, errorChain },
         context,
       );
-      logError(
-        "provision",
-        `[${sessionId}] step=${step} failed after ${attempt} attempt(s): ${message}`,
-        { sessionId, step, durationMs, attempts: attempt, transient, errorChain, ...context },
-      );
+      logError("provision", `[${sessionId}] step=${step} failed after ${attempt} attempt(s): ${message}`, {
+        sessionId,
+        step,
+        durationMs,
+        attempts: attempt,
+        transient,
+        errorChain,
+        ...context,
+      });
       throw new ProvisionStepError(step, error);
     }
   }

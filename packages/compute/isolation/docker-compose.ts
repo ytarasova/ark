@@ -1,5 +1,5 @@
 /**
- * DockerComposeRuntime -- runtime backed by docker compose.
+ * DockerComposeIsolation -- isolation backed by docker compose.
  *
  * Provisions a session by:
  *   1. Bringing up the user's docker-compose stack (file, inline, or both).
@@ -30,10 +30,10 @@ import type {
   AgentHandle,
   Compute,
   ComputeHandle,
+  IsolationKind,
+  Isolation,
   LaunchOpts,
   PrepareCtx,
-  Runtime,
-  RuntimeKind,
 } from "../core/types.js";
 import {
   bootstrapContainer,
@@ -61,7 +61,7 @@ import { logDebug } from "../../core/observability/structured-log.js";
 // Docker interactions are routed through a small hook surface so unit tests
 // can swap in stubs without touching the filesystem or shelling out.
 
-export interface DockerComposeRuntimeHooks {
+export interface DockerComposeIsolationHooks {
   pullImage?: (image: string) => Promise<void>;
   createContainer?: typeof createContainer;
   startContainer?: (name: string) => Promise<void>;
@@ -79,7 +79,7 @@ export interface DockerComposeRuntimeHooks {
   resolveArkSourceRoot?: () => string | null;
 }
 
-// ── Runtime ─────────────────────────────────────────────────────────────────
+// ── Isolation ───────────────────────────────────────────────────────────────
 
 /**
  * State persisted on `handle.meta.dockerCompose` so `shutdown` can undo
@@ -96,16 +96,16 @@ export interface DockerComposeMeta {
   workdir: string;
 }
 
-export class DockerComposeRuntime implements Runtime {
-  readonly kind: RuntimeKind = "compose";
+export class DockerComposeIsolation implements Isolation {
+  readonly kind: IsolationKind = "compose";
   readonly name = "docker-compose";
 
   private clientFactory: ((url: string) => ArkdClient) | null = null;
-  private hooks: DockerComposeRuntimeHooks;
+  private hooks: DockerComposeIsolationHooks;
 
   constructor(
     private readonly app: AppContext,
-    hooks: DockerComposeRuntimeHooks = {},
+    hooks: DockerComposeIsolationHooks = {},
   ) {
     this.hooks = hooks;
   }
@@ -116,7 +116,7 @@ export class DockerComposeRuntime implements Runtime {
   }
 
   /** Test-only: merge in additional hook overrides. */
-  setHooks(hooks: DockerComposeRuntimeHooks): void {
+  setHooks(hooks: DockerComposeIsolationHooks): void {
     this.hooks = { ...this.hooks, ...hooks };
   }
 
@@ -129,7 +129,7 @@ export class DockerComposeRuntime implements Runtime {
 
     if (!composeCfg) {
       throw new Error(
-        `DockerComposeRuntime.prepare: no compose config found in ${workdir}/arc.json. ` +
+        `DockerComposeIsolation.prepare: no compose config found in ${workdir}/arc.json. ` +
           `Set "compose": true, "compose": { "file": "..." } or "compose": { "inline": {...} }.`,
       );
     }
@@ -137,7 +137,7 @@ export class DockerComposeRuntime implements Runtime {
     const arkSource = (this.hooks.resolveArkSourceRoot ?? resolveArkSourceRoot)();
     if (!arkSource) {
       throw new Error(
-        "Cannot locate ark source tree on host. DockerComposeRuntime needs the ark repo mounted at /opt/ark; " +
+        "Cannot locate ark source tree on host. DockerComposeIsolation needs the ark repo mounted at /opt/ark; " +
           "run from a source checkout.",
       );
     }
@@ -263,7 +263,7 @@ export class DockerComposeRuntime implements Runtime {
     if (cfg.file) {
       const abs = isAbsolute(cfg.file) ? cfg.file : pathResolve(workdir, cfg.file);
       if (!existsSync(abs)) {
-        throw new Error(`DockerComposeRuntime.prepare: compose file not found: ${abs}`);
+        throw new Error(`DockerComposeIsolation.prepare: compose file not found: ${abs}`);
       }
       files.push(abs);
     }
@@ -276,7 +276,7 @@ export class DockerComposeRuntime implements Runtime {
     }
 
     if (files.length === 0) {
-      throw new Error(`DockerComposeRuntime.prepare: compose config has neither file nor inline spec`);
+      throw new Error(`DockerComposeIsolation.prepare: compose config has neither file nor inline spec`);
     }
     return files;
   }

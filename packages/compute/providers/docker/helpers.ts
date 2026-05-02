@@ -154,7 +154,7 @@ export async function bootstrapContainer(name: string, opts: BootstrapOpts = {})
  * Build the bootstrap shell script used to install arkd's runtime deps
  * (tmux, git, bun, claude) inside an arbitrary container.
  *
- * Exported so non-default callers (`DevcontainerRuntime` compose branch) can
+ * Exported so non-default callers (`DevcontainerIsolation` compose branch) can
  * reuse the exact same script against a container they didn't create via
  * `createContainer`. The default `bootstrapContainer` entry point wraps this
  * + `docker exec -i`; callers that need a different exec surface (e.g. a

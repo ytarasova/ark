@@ -150,12 +150,12 @@ describe("ComputeService", async () => {
       const stored: Compute[] = [];
       const fakeRepo = {
         insert: mock(
-          async (row: { name: string; compute_kind: string; runtime_kind: string; status: ComputeStatus }) => {
+          async (row: { name: string; compute_kind: string; isolation_kind: string; status: ComputeStatus }) => {
             const c = {
               name: row.name,
               status: row.status,
               compute_kind: row.compute_kind,
-              runtime_kind: row.runtime_kind,
+              isolation_kind: row.isolation_kind,
               config: {},
               is_template: false,
               cloned_from: null,

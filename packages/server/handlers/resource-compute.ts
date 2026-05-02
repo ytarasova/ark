@@ -51,7 +51,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("compute/create", async (p) => {
-    // Accept either legacy `{provider}` or new `{compute, runtime}`. When
+    // Accept either legacy `{provider}` or new `{compute, isolation}`. When
     // only `provider` is given, the repo derives the pair via providerToPair.
     // When only the new axes are given, we reverse-map to the best-matching
     // legacy provider name so back-compat reads keep working.
@@ -59,7 +59,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
       name,
       provider,
       compute: computeKind,
-      runtime: runtimeKind,
+      isolation: isolationKind,
       config,
       is_template,
       cloned_from,
@@ -67,16 +67,16 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
       name: string;
       provider?: import("../../types/index.js").ComputeProviderName;
       compute?: import("../../types/index.js").ComputeKindName;
-      runtime?: import("../../types/index.js").RuntimeKindName;
+      isolation?: import("../../types/index.js").IsolationKindName;
       config?: Partial<import("../../types/index.js").ComputeConfig>;
       is_template?: boolean;
       cloned_from?: string;
     }>(p, ["name"]);
 
     let effectiveProvider = provider;
-    if (!effectiveProvider && computeKind && runtimeKind) {
+    if (!effectiveProvider && computeKind && isolationKind) {
       const { pairToProvider } = await import("../../compute/adapters/provider-map.js");
-      effectiveProvider = (pairToProvider({ compute: computeKind, runtime: runtimeKind }) ??
+      effectiveProvider = (pairToProvider({ compute: computeKind, isolation: isolationKind }) ??
         "local") as import("../../types/index.js").ComputeProviderName;
     }
 
@@ -112,13 +112,13 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
       name,
       provider: effectiveProvider,
       compute: computeKind,
-      runtime: runtimeKind,
+      isolation: isolationKind,
       config,
       is_template,
       cloned_from,
     });
     // RPC wire format still carries `provider` for back-compat clients; derive
-    // it from the (compute_kind, runtime_kind) axes.
+    // it from the (compute_kind, isolation_kind) axes.
     return { compute: { ...created, provider: providerOf(created) } };
   });
 
@@ -160,10 +160,10 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     return result;
   });
 
-  // Surface registered Compute / Runtime kinds so the web UI can populate
+  // Surface registered Compute / Isolation kinds so the web UI can populate
   // dropdowns without duplicating our enum.
   router.handle("compute/kinds", async () => ({ kinds: app.listComputes() }));
-  router.handle("runtime/kinds", async () => ({ kinds: app.listRuntimes() }));
+  router.handle("runtime/kinds", async () => ({ kinds: app.listIsolations() }));
 
   router.handle("compute/update", async (p) => {
     const { name, fields } = extract<ComputeUpdateParams>(p, ["name", "fields"]);
@@ -219,7 +219,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
       await app.computeService.create({
         name: cloneName,
         compute: compute.compute_kind,
-        runtime: compute.runtime_kind,
+        isolation: compute.isolation_kind,
         config: JSON.parse(JSON.stringify(compute.config ?? {})),
         is_template: false,
         cloned_from: compute.name,
@@ -401,7 +401,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const configTemplates = app.config.computeTemplates ?? [];
     const dbNames = new Set(dbTemplates.map((t) => t.name));
     // Every template carries both the legacy provider name AND the new
-    // two-axis (compute, runtime) pair so web clients don't have to maintain
+    // two-axis (compute, isolation) pair so web clients don't have to maintain
     // a duplicate provider-map table. Source of truth:
     // packages/compute/adapters/provider-map.ts.
     const withAxes = (t: { name: string; description?: string | null; provider: string; config: unknown }) => {
@@ -411,7 +411,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         description: t.description ?? undefined,
         provider: t.provider,
         compute: pair.compute,
-        runtime: pair.runtime,
+        isolation: pair.isolation,
         config: t.config,
       };
     };

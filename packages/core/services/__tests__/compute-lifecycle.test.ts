@@ -85,7 +85,7 @@ describe("garbageCollectComputeIfTemplate", () => {
     await app.computeService.create({
       name: "test-k8s",
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: "ctx", namespace: "ns", image: "img" },
     });
     expect(await app.computes.get("test-k8s")).not.toBeNull();
@@ -99,7 +99,7 @@ describe("garbageCollectComputeIfTemplate", () => {
     await app.computeService.create({
       name: "busy-k8s",
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: "ctx", namespace: "ns", image: "img" },
     });
     const session = await app.sessions.create({
@@ -121,7 +121,7 @@ describe("garbageCollectComputeIfTemplate", () => {
     await app.computeService.create({
       name: "ephemeral-k8s",
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: { context: "ctx", namespace: "ns", image: "img" },
     });
     const session = await app.sessions.create({
@@ -139,11 +139,11 @@ describe("garbageCollectComputeIfTemplate", () => {
     expect(await app.computes.get("ephemeral-k8s")).toBeNull();
   });
 
-  it("local + docker (template runtime over persistent kind) gets gc'd", async () => {
+  it("local + docker (template isolation over persistent kind) gets gc'd", async () => {
     await app.computeService.create({
       name: "local-docker",
       compute: "local",
-      runtime: "docker",
+      isolation: "docker",
       config: { image: "alpine" },
     });
     const gc = await garbageCollectComputeIfTemplate(app, "local-docker");
@@ -158,7 +158,7 @@ describe("garbageCollectComputeIfTemplate", () => {
     await app.computeService.create({
       name: "ec2-clone",
       compute: "ec2",
-      runtime: "direct",
+      isolation: "direct",
       config: {},
       cloned_from: "ec2-template",
     });
@@ -174,7 +174,7 @@ describe("garbageCollectComputeIfTemplate", () => {
     await app.computeService.create({
       name: "ec2-persistent",
       compute: "ec2",
-      runtime: "direct",
+      isolation: "direct",
       config: {},
     });
     const gc = await garbageCollectComputeIfTemplate(app, "ec2-persistent");
@@ -196,10 +196,10 @@ describe("garbageCollectComputeIfTemplate", () => {
     // infrastructure externally -- deleting the row through GC would leak
     // the external resource. The service-layer canDelete guard must kick in
     // and the GC helper must swallow the resulting error and return false.
-    // Provider name must match what `providerOf({compute_kind, runtime_kind})`
+    // Provider name must match what `providerOf({compute_kind, isolation_kind})`
     // returns -- the registry is keyed by the legacy provider name derived
     // from the two-axis kinds, NOT by the row's `provider` column. For
-    // {compute_kind:"k8s", runtime_kind:"direct"} that's "k8s". Registering
+    // {compute_kind:"k8s", isolation_kind:"direct"} that's "k8s". Registering
     // under "k8s" just shadows the production K8s provider for this app
     // instance.
     app.registerProvider(makeStubProvider({ name: "k8s", canDelete: false }));
@@ -207,7 +207,7 @@ describe("garbageCollectComputeIfTemplate", () => {
       name: "stub-row",
       provider: "k8s" as any,
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       config: {},
     });
 
@@ -230,7 +230,7 @@ describe("garbageCollectComputeIfTemplate", () => {
       name: "stub-parent",
       provider: "stub-nodelete-2" as any,
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       is_template: true,
       config: {},
     });
@@ -239,7 +239,7 @@ describe("garbageCollectComputeIfTemplate", () => {
       name: "stub-clone",
       provider: "stub-nodelete-2" as any,
       compute: "k8s",
-      runtime: "direct",
+      isolation: "direct",
       cloned_from: "stub-parent",
       config: {},
     });

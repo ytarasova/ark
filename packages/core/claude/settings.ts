@@ -281,12 +281,7 @@ export function verifySettings(settingsPath: string): string[] {
  * Idempotent: calling twice with the same args produces identical output.
  * User hooks are never clobbered -- ark entries are removed first, then re-added.
  */
-export function writeSettings(
-  sessionId: string,
-  arkdUrl: string,
-  workdir: string,
-  opts?: ClaudeSettingsOpts,
-): string {
+export function writeSettings(sessionId: string, arkdUrl: string, workdir: string, opts?: ClaudeSettingsOpts): string {
   const claudeDir = join(workdir, ".claude");
   mkdirSync(claudeDir, { recursive: true });
   const settingsPath = join(claudeDir, "settings.local.json");

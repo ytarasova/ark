@@ -157,7 +157,8 @@ export function useSessionDetail({
     {
       id: "diff",
       label: "Files",
-      badge: filesChanged > 0 ? `${filesChanged} · +${diffData?.insertions || 0} -${diffData?.deletions || 0}` : undefined,
+      badge:
+        filesChanged > 0 ? `${filesChanged} · +${diffData?.insertions || 0} -${diffData?.deletions || 0}` : undefined,
     },
     { id: "logs", label: "Logs" },
     { id: "terminal", label: "Terminal" },

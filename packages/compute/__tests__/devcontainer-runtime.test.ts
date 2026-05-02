@@ -1,5 +1,5 @@
 /**
- * DevcontainerRuntime unit tests.
+ * DevcontainerIsolation unit tests.
  *
  * Every docker / arkd interaction is stubbed so we never touch the daemon.
  * We assert on the sequence of operations (image build -> create -> bootstrap
@@ -16,7 +16,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { DevcontainerRuntime, type DevcontainerRuntimeMeta } from "../runtimes/devcontainer.js";
+import { DevcontainerIsolation, type DevcontainerIsolationMeta } from "../isolation/devcontainer.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, LaunchOpts, PrepareCtx } from "../core/types.js";
 import type { ArkdClient } from "../../arkd/client.js";
@@ -183,7 +183,7 @@ function buildHarness(opts: HarnessOpts = {}) {
     return { stdout: "", stderr: "" };
   };
 
-  const runtime = new DevcontainerRuntime(fakeApp, {
+  const runtime = new DevcontainerIsolation(fakeApp, {
     buildImage,
     allocatePort,
     createContainer,
@@ -203,7 +203,7 @@ function buildHarness(opts: HarnessOpts = {}) {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe("DevcontainerRuntime", async () => {
+describe("DevcontainerIsolation", async () => {
   let tmpCleanup: string[] = [];
 
   beforeEach(() => {
@@ -218,7 +218,7 @@ describe("DevcontainerRuntime", async () => {
   });
 
   it("has kind=devcontainer and matching name", () => {
-    const r = new DevcontainerRuntime(fakeApp);
+    const r = new DevcontainerIsolation(fakeApp);
     expect(r.kind).toBe("devcontainer");
     expect(r.name).toBe("devcontainer");
   });
@@ -245,7 +245,7 @@ describe("DevcontainerRuntime", async () => {
       expect(idx("startArkdInContainer")).toBeGreaterThan(idx("bootstrapContainer"));
       expect(idx("waitForArkdHealth")).toBeGreaterThan(idx("startArkdInContainer"));
 
-      const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerRuntimeMeta;
+      const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerIsolationMeta;
       expect(meta).toBeTruthy();
       expect(meta.mode).toBe("image");
       expect(meta.forwarderName).toBeNull();
@@ -366,7 +366,7 @@ describe("DevcontainerRuntime", async () => {
       expect(socatArgs[netIdx + 1]).toBe("compose_default");
       expect(socatArgs.some((a) => a.includes("127.0.0.1:45678:19300"))).toBe(true);
 
-      const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerRuntimeMeta;
+      const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerIsolationMeta;
       expect(meta.mode).toBe("compose");
       expect(meta.containerName).toBe("cid-compose-1");
       expect(meta.composeService).toBe("devcontainer");

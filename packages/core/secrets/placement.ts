@@ -52,9 +52,7 @@ export async function placeAllSecrets(
   // generic blobs) auto-attach regardless so a session can use git+ssh
   // without every runtime YAML having to enumerate the keypair name.
   const eligible = <T extends { name: string; type: string }>(refs: T[]): T[] =>
-    opts.narrow
-      ? refs.filter((r) => r.type !== "env-var" || opts.narrow!.has(r.name))
-      : refs;
+    opts.narrow ? refs.filter((r) => r.type !== "env-var" || opts.narrow!.has(r.name)) : refs;
 
   const stringSelected = eligible(stringRefs);
   const blobSelected = eligible(blobRefs);

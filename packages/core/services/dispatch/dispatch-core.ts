@@ -23,7 +23,7 @@
  * ── ComputeTarget migration call chart ─────────────────────────────────────
  *
  * The dispatch path today still consumes the legacy `ComputeProvider`
- * interface. Plan to flip onto `ComputeTarget` (Compute × Runtime
+ * interface. Plan to flip onto `ComputeTarget` (Compute × Isolation
  * composition) is in
  * `docs/superpowers/plans/2026-05-01-compute-target-dispatch-flip-plan.md`.
  *

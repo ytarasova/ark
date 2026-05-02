@@ -1,5 +1,5 @@
 /**
- * DockerComposeRuntime unit tests.
+ * DockerComposeIsolation unit tests.
  *
  * All Docker interactions are stubbed via the runtime's `hooks` surface so
  * the tests can run without a real Docker daemon. We assert:
@@ -17,7 +17,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { parse as parseYaml } from "yaml";
 
-import { DockerComposeRuntime, type DockerComposeMeta } from "../runtimes/docker-compose.js";
+import { DockerComposeIsolation, type DockerComposeMeta } from "../isolation/docker-compose.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, PrepareCtx } from "../core/types.js";
 import type { AppContext } from "../../core/app.js";
@@ -80,9 +80,9 @@ interface HookOverrides {
  * Build a runtime preloaded with stubbed hooks. Returns both the runtime and
  * the call recorder so tests can assert on exact arguments.
  */
-function makeRuntime(overrides: HookOverrides = {}): { runtime: DockerComposeRuntime; calls: HookCalls } {
+function makeRuntime(overrides: HookOverrides = {}): { runtime: DockerComposeIsolation; calls: HookCalls } {
   const calls = freshCalls();
-  const runtime = new DockerComposeRuntime(fakeApp, {
+  const runtime = new DockerComposeIsolation(fakeApp, {
     resolveArkSourceRoot: () => (overrides.arkSourceNull ? null : "/opt/ark-source"),
     allocatePort: async () => {
       const port = overrides.portSeed ?? 45000;
@@ -194,9 +194,9 @@ function ctx(): PrepareCtx {
 
 // ── Basic identity ──────────────────────────────────────────────────────────
 
-describe("DockerComposeRuntime -- identity", () => {
+describe("DockerComposeIsolation -- identity", () => {
   it("declares kind=compose and name=docker-compose", () => {
-    const r = new DockerComposeRuntime(fakeApp);
+    const r = new DockerComposeIsolation(fakeApp);
     expect(r.kind).toBe("compose");
     expect(r.name).toBe("docker-compose");
   });
@@ -204,7 +204,7 @@ describe("DockerComposeRuntime -- identity", () => {
 
 // ── prepare (happy paths) ───────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- file only", async () => {
+describe("DockerComposeIsolation.prepare -- file only", async () => {
   it("passes the resolved compose file to composeUpWithFiles and does not write an inline tempfile", async () => {
     writeArc({ compose: true });
     const { runtime, calls } = makeRuntime();
@@ -265,7 +265,7 @@ describe("DockerComposeRuntime.prepare -- file only", async () => {
 
 // ── prepare (inline only) ───────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- inline only", async () => {
+describe("DockerComposeIsolation.prepare -- inline only", async () => {
   it("writes the inline spec as YAML and passes it as a single -f", async () => {
     // Remove the default docker-compose.yml so only inline is used.
     rmSync(composePath);
@@ -283,7 +283,7 @@ describe("DockerComposeRuntime.prepare -- inline only", async () => {
     // The above disables the stub; we route through the real module.
     // But the stub we originally passed also wrote a fake `# stub` line to
     // the path -- reset by re-instantiating without the hook.
-    const runtime2 = new DockerComposeRuntime(fakeApp, {
+    const runtime2 = new DockerComposeIsolation(fakeApp, {
       resolveArkSourceRoot: () => "/opt/ark-source",
       allocatePort: async () => 45100,
       pullImage: async (image) => {
@@ -355,7 +355,7 @@ describe("DockerComposeRuntime.prepare -- inline only", async () => {
 
 // ── prepare (file + inline) ─────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- file + inline", async () => {
+describe("DockerComposeIsolation.prepare -- file + inline", async () => {
   it("passes both files, file first, inline second", async () => {
     const inline = { services: { extra: { image: "busybox" } } };
     writeArc({ compose: { file: "docker-compose.yml", inline } });
@@ -395,7 +395,7 @@ describe("DockerComposeRuntime.prepare -- file + inline", async () => {
 
 // ── shutdown ────────────────────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.shutdown", async () => {
+describe("DockerComposeIsolation.shutdown", async () => {
   it("removes the inline tempfile and runs compose down", async () => {
     rmSync(composePath);
     writeArc({ compose: { inline: { services: { q: { image: "rabbitmq" } } } } });
@@ -444,7 +444,7 @@ describe("DockerComposeRuntime.shutdown", async () => {
 
 // ── rollback on sidecar failure ─────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- rollback", async () => {
+describe("DockerComposeIsolation.prepare -- rollback", async () => {
   it("rolls the compose stack + inline tempfile back when bootstrap fails", async () => {
     rmSync(composePath);
     writeArc({ compose: { inline: { services: { web: { image: "nginx" } } } } });
@@ -501,7 +501,7 @@ describe("DockerComposeRuntime.prepare -- rollback", async () => {
 
 // ── arc.json surface errors ─────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- config errors", async () => {
+describe("DockerComposeIsolation.prepare -- config errors", async () => {
   it("throws a clear error when arc.json has no compose block", async () => {
     writeArc({ ports: [{ port: 3000 }] });
     const { runtime } = makeRuntime();

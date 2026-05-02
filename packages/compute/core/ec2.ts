@@ -32,10 +32,11 @@
  * `capabilities.snapshot = true` still reported so dispatch can hint
  * at the eventual shape -- tests assert both.
  *
- * Runtime composition: EC2Compute pairs with any Runtime (DirectRuntime,
- * DockerRuntime, DevcontainerRuntime, DockerComposeRuntime). The runtime's
- * container / devcontainer / compose logic is completely unchanged -- the
- * Runtime just calls `compute.getArkdUrl(h)` and talks to arkd through the
+ * Isolation composition: EC2Compute pairs with any Isolation (DirectIsolation,
+ * DockerIsolation, DevcontainerIsolation, DockerComposeIsolation). The
+ * isolation's container / devcontainer / compose logic is completely
+ * unchanged -- the Isolation just calls `compute.getArkdUrl(h)` and talks
+ * to arkd through the
  * tunnel exactly like LocalCompute. That works because arkd inside the EC2
  * instance owns every container it launches via its own docker / devcontainer
  * / compose machinery, and those all listen back on the instance's loopback

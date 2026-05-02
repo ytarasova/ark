@@ -87,19 +87,18 @@ export { K8sProvider, KataProvider };
 // arc.json
 export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
 
-// ── Compute + Runtime split ────────────────────────────────────────────────
+// ── Compute + Isolation split ──────────────────────────────────────────────
 //
 // New primary abstractions. Live alongside ComputeProvider; the old interface
-// retires once every dispatch path reads from these. See
-// `.workflow/plan/compute-runtime-vision.md`.
+// retires once every dispatch path reads from these. See `docs/architecture.md`.
 
 export type {
   Compute as NewCompute,
   ComputeCapabilities,
   ComputeHandle,
   ComputeKind,
-  Runtime,
-  RuntimeKind,
+  Isolation,
+  IsolationKind,
   AgentHandle,
   ProvisionLatency,
   PrepareCtx,
@@ -115,8 +114,8 @@ export type { EC2HandleMeta, EC2ProvisionConfig, EC2ComputeHelpers } from "./cor
 export { K8sCompute } from "./core/k8s.js";
 export type { K8sComputeConfig, K8sHandleMeta, K8sComputeDeps } from "./core/k8s.js";
 export { KataCompute, DEFAULT_KATA_RUNTIME_CLASS } from "./core/k8s-kata.js";
-export { DirectRuntime } from "./runtimes/direct.js";
-export { DockerComposeRuntime } from "./runtimes/docker-compose.js";
+export { DirectIsolation } from "./isolation/direct.js";
+export { DockerComposeIsolation } from "./isolation/docker-compose.js";
 export { ComputeTarget } from "./core/compute-target.js";
 export { computeProviderToTarget } from "./adapters/legacy.js";
 
@@ -128,7 +127,7 @@ export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./core/firec
 export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker/compute.js";
 
 export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
-export type { ComputeRuntimePair } from "./adapters/provider-map.js";
+export type { ComputeIsolationPair } from "./adapters/provider-map.js";
 
 // ── Snapshot persistence ───────────────────────────────────────────────────
 

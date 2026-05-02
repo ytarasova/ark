@@ -79,7 +79,7 @@ const baseCompute = {
   name: "k8s-e2e-test",
   provider: "k8s" as const,
   compute_kind: "k8s" as const,
-  runtime_kind: "direct" as const,
+  isolation_kind: "direct" as const,
   config: {
     provider: "k8s" as const,
     context: "test-ctx",

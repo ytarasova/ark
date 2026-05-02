@@ -61,7 +61,7 @@ export class ComputeResolver {
 
   /**
    * Clone a template row into a per-session concrete row. Inherits provider,
-   * compute_kind, runtime_kind and a deep copy of the template's config so
+   * compute_kind, isolation_kind and a deep copy of the template's config so
    * per-session mutations (e.g. an assigned pod IP) don't leak back.
    */
   private async cloneTemplate(templateName: string, sessionId: string, log: (msg: string) => void): Promise<string> {
@@ -87,7 +87,7 @@ export class ComputeResolver {
     await this.deps.computeService.create({
       name: cloneName,
       compute: tmpl.compute_kind,
-      runtime: tmpl.runtime_kind,
+      isolation: tmpl.isolation_kind,
       // Deep-copy via JSON round-trip so later per-session mutations don't
       // leak back into the template row.
       config: JSON.parse(JSON.stringify(tmpl.config ?? {})),

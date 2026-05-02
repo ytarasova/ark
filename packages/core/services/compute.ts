@@ -16,7 +16,7 @@ import type {
   ComputeStatus,
   ComputeProviderName,
   ComputeKindName,
-  RuntimeKindName,
+  IsolationKindName,
   ComputeConfig,
   CreateComputeOpts,
 } from "../../types/index.js";
@@ -37,8 +37,8 @@ export class ComputeService {
     // / RPC callers) wins, else derive from the compute/runtime pair, else
     // default to "local".
     let providerName: ComputeProviderName | undefined = opts.provider;
-    if (!providerName && opts.compute && opts.runtime) {
-      providerName = (pairToProvider({ compute: opts.compute, runtime: opts.runtime }) ?? opts.compute) as any;
+    if (!providerName && opts.compute && opts.isolation) {
+      providerName = (pairToProvider({ compute: opts.compute, isolation: opts.isolation }) ?? opts.compute) as any;
     }
     providerName = providerName ?? ("local" as ComputeProviderName);
 
@@ -63,16 +63,16 @@ export class ComputeService {
     // until `provision()` brings them online.
     const initialStatus = provider.initialStatus as ComputeStatus;
 
-    // Derive compute/runtime axes from explicit opts, falling back to the
+    // Derive compute/isolation axes from explicit opts, falling back to the
     // legacy provider-name mapping (providerToPair).
     const fallback = providerToPair(providerName);
     const compute_kind = (opts.compute ?? fallback.compute) as ComputeKindName;
-    const runtime_kind = (opts.runtime ?? fallback.runtime) as RuntimeKindName;
+    const isolation_kind = (opts.isolation ?? fallback.isolation) as IsolationKindName;
 
     return this.computes.insert({
       name: opts.name,
       compute_kind,
-      runtime_kind,
+      isolation_kind,
       status: initialStatus,
       config: opts.config,
       is_template: opts.is_template,

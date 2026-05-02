@@ -1,5 +1,5 @@
 /**
- * DevcontainerRuntime -- runtime backed by devcontainer.json.
+ * DevcontainerIsolation -- isolation backed by devcontainer.json.
  *
  * Turns a project's `.devcontainer/devcontainer.json` into a provisioned,
  * arkd-hosting container that the conductor can reach over HTTP.
@@ -39,10 +39,10 @@ import type {
   AgentHandle,
   Compute,
   ComputeHandle,
+  IsolationKind,
+  Isolation,
   LaunchOpts,
   PrepareCtx,
-  Runtime,
-  RuntimeKind,
 } from "../core/types.js";
 import {
   ARKD_INTERNAL_PORT,
@@ -64,7 +64,7 @@ import {
 const execFileAsync = promisify(execFile);
 
 /** Stored under `handle.meta.devcontainer` so shutdown has everything it needs. */
-export interface DevcontainerRuntimeMeta {
+export interface DevcontainerIsolationMeta {
   /** Which branch ran during prepare. */
   mode: "image" | "compose";
   /** Container we talk arkd to. For compose mode, the compose-owned container id. */
@@ -86,7 +86,7 @@ export interface DevcontainerRuntimeMeta {
 }
 
 /** Injected surface so tests can stub docker / arkd without hitting the daemon. */
-export interface DevcontainerRuntimeDeps {
+export interface DevcontainerIsolationDeps {
   /** Build a devcontainer image from a shape. Default: the real `buildDevcontainerImage`. */
   buildImage?(workdir: string, shape: DevcontainerShape): Promise<string>;
   /** Resolve shape from workdir. Default: `resolveDevcontainerShape`. */
@@ -119,15 +119,15 @@ export interface DevcontainerRuntimeDeps {
   arkdClientFactory?(url: string): ArkdClient;
 }
 
-export class DevcontainerRuntime implements Runtime {
-  readonly kind: RuntimeKind = "devcontainer";
+export class DevcontainerIsolation implements Isolation {
+  readonly kind: IsolationKind = "devcontainer";
   readonly name = "devcontainer";
 
-  private deps: Required<DevcontainerRuntimeDeps>;
+  private deps: Required<DevcontainerIsolationDeps>;
 
   constructor(
     private readonly app: AppContext,
-    deps: DevcontainerRuntimeDeps = {},
+    deps: DevcontainerIsolationDeps = {},
   ) {
     this.deps = {
       buildImage: deps.buildImage ?? buildDevcontainerImage,
@@ -152,8 +152,8 @@ export class DevcontainerRuntime implements Runtime {
   }
 
   /** Test-only: swap any subset of deps after construction. */
-  setDeps(deps: DevcontainerRuntimeDeps): void {
-    this.deps = { ...this.deps, ...(deps as Required<DevcontainerRuntimeDeps>) };
+  setDeps(deps: DevcontainerIsolationDeps): void {
+    this.deps = { ...this.deps, ...(deps as Required<DevcontainerIsolationDeps>) };
   }
 
   // ── prepare ──────────────────────────────────────────────────────────────
@@ -162,14 +162,14 @@ export class DevcontainerRuntime implements Runtime {
     const shape = this.deps.resolveShape(ctx.workdir);
     if (!shape) {
       throw new Error(
-        `DevcontainerRuntime.prepare: no devcontainer.json found under ${ctx.workdir}. ` +
+        `DevcontainerIsolation.prepare: no devcontainer.json found under ${ctx.workdir}. ` +
           `Expected .devcontainer/devcontainer.json or .devcontainer.json.`,
       );
     }
 
     if (Object.keys(shape.features).length > 0) {
       const names = Object.keys(shape.features).join(", ");
-      ctx.onLog?.(`[devcontainer-runtime] warning: devcontainer features not yet supported, ignoring: ${names}`);
+      ctx.onLog?.(`[devcontainer] warning: devcontainer features not yet supported, ignoring: ${names}`);
     }
 
     const conductorUrl = this.conductorUrl();
@@ -223,7 +223,7 @@ export class DevcontainerRuntime implements Runtime {
       throw err;
     }
 
-    const meta: DevcontainerRuntimeMeta = {
+    const meta: DevcontainerIsolationMeta = {
       mode: "image",
       containerName,
       arkdHostPort,
@@ -249,7 +249,7 @@ export class DevcontainerRuntime implements Runtime {
     const service = shape.composeService;
     if (!service) {
       throw new Error(
-        `DevcontainerRuntime.prepare: devcontainer.json has dockerComposeFile but no "service" field. ` +
+        `DevcontainerIsolation.prepare: devcontainer.json has dockerComposeFile but no "service" field. ` +
           `Ark needs to know which service the agent attaches to.`,
       );
     }
@@ -268,7 +268,7 @@ export class DevcontainerRuntime implements Runtime {
     const containerId = (psResult.stdout ?? "").trim().split("\n")[0]?.trim();
     if (!containerId) {
       throw new Error(
-        `DevcontainerRuntime.prepare: docker compose ps found no container for service "${service}" ` +
+        `DevcontainerIsolation.prepare: docker compose ps found no container for service "${service}" ` +
           `in ${shape.composeFile}.`,
       );
     }
@@ -321,7 +321,7 @@ export class DevcontainerRuntime implements Runtime {
       throw err;
     }
 
-    const meta: DevcontainerRuntimeMeta = {
+    const meta: DevcontainerIsolationMeta = {
       mode: "compose",
       containerName: containerId,
       arkdHostPort,
@@ -351,7 +351,7 @@ export class DevcontainerRuntime implements Runtime {
   // ── shutdown ─────────────────────────────────────────────────────────────
 
   async shutdown(_compute: Compute, h: ComputeHandle): Promise<void> {
-    const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerRuntimeMeta | undefined;
+    const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerIsolationMeta | undefined;
     if (!meta) return;
 
     // Order matters: forwarder first (it holds the host port), then
@@ -376,10 +376,10 @@ export class DevcontainerRuntime implements Runtime {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  private getMeta(h: ComputeHandle): DevcontainerRuntimeMeta {
-    const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerRuntimeMeta | undefined;
+  private getMeta(h: ComputeHandle): DevcontainerIsolationMeta {
+    const meta = (h.meta as Record<string, unknown>).devcontainer as DevcontainerIsolationMeta | undefined;
     if (!meta) {
-      throw new Error("DevcontainerRuntime: handle has no devcontainer meta. Was prepare() called?");
+      throw new Error("DevcontainerIsolation:handle has no devcontainer meta. Was prepare() called?");
     }
     return meta;
   }
@@ -413,7 +413,7 @@ export class DevcontainerRuntime implements Runtime {
       .map((l) => l.trim())
       .find((l) => l.length > 0);
     if (!first) {
-      throw new Error(`DevcontainerRuntime: could not resolve compose network for container ${containerId}`);
+      throw new Error(`DevcontainerIsolation:could not resolve compose network for container ${containerId}`);
     }
     return first;
   }
@@ -423,7 +423,7 @@ export class DevcontainerRuntime implements Runtime {
       await this.deps.removeContainer(name);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const line = `[devcontainer-runtime] rm ${name} failed (non-fatal): ${msg}`;
+      const line = `[devcontainer] rm ${name} failed (non-fatal): ${msg}`;
       if (ctx?.onLog) ctx.onLog(line);
       else this.logShutdownError(`rm ${name}`, err);
     }
@@ -441,7 +441,7 @@ export class DevcontainerRuntime implements Runtime {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const line = `[devcontainer-runtime] compose down ${composeFile} failed (non-fatal): ${msg}`;
+      const line = `[devcontainer] compose down ${composeFile} failed (non-fatal): ${msg}`;
       if (ctx?.onLog) ctx.onLog(line);
       else this.logShutdownError(`compose down ${composeFile}`, err);
     }
@@ -451,7 +451,7 @@ export class DevcontainerRuntime implements Runtime {
     const msg = err instanceof Error ? err.message : String(err);
     // Stderr rather than stdout so log aggregators pick it up as a warning.
     // No-op in production paths that redirect both; still useful in dev.
-    console.warn(`[devcontainer-runtime] ${op} failed (non-fatal): ${msg}`);
+    console.warn(`[devcontainer] ${op} failed (non-fatal): ${msg}`);
   }
 }
 

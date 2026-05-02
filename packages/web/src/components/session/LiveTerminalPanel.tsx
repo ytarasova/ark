@@ -201,13 +201,7 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
               : "Idle";
 
   const statusColor =
-    status === "connected"
-      ? "running"
-      : status === "error"
-        ? "failed"
-        : status === "reconnecting"
-          ? "waiting"
-          : "idle";
+    status === "connected" ? "running" : status === "error" ? "failed" : status === "reconnecting" ? "waiting" : "idle";
 
   return (
     <div className="panel-card" data-testid="live-terminal-panel" style={{ display: isActive ? undefined : "none" }}>
