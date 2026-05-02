@@ -44,10 +44,16 @@ export class ArkServer {
   private connections = new Map<string, ServerConnection>();
   private connCounter = 0;
   private auth: ServerAuthConfig | null = null;
+  private app: import("../core/app.js").AppContext | null = null;
 
   constructor() {
     this.router.requireInitialization();
     this.router.broadcast = this.notify.bind(this);
+  }
+
+  /** Capture the AppContext so non-JSON-RPC routes (like /mcp) can use it. */
+  attachApp(appCtx: import("../core/app.js").AppContext): void {
+    this.app = appCtx;
   }
 
   /**
@@ -285,6 +291,21 @@ export class ArkServer {
           };
           if (server.upgrade(req, { data })) return;
           return new Response("WebSocket upgrade failed", { status: 500 });
+        }
+
+        // /mcp -- MCP HTTP endpoint (Streamable HTTP transport).
+        if (url.pathname === "/mcp") {
+          const mcpApp = self.app ?? app;
+          if (!mcpApp) return new Response("MCP route requires AppContext", { status: 503 });
+          let ctx: TenantContext;
+          try {
+            ctx = await self.resolveContextFromCredentials({ authorizationHeader, queryToken });
+          } catch (err: any) {
+            return new Response(`Unauthorized: ${err?.message ?? "auth failed"}`, { status: 401 });
+          }
+          const tenantApp = ctx.tenantId ? mcpApp.forTenant(ctx.tenantId) : mcpApp;
+          const { handleMcpRequest } = await import("./mcp/index.js");
+          return handleMcpRequest(req, tenantApp, ctx);
         }
 
         const data: RpcData = { kind: "rpc", authorizationHeader, queryToken };

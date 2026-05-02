@@ -39,6 +39,7 @@ describe("app-client: remote-mode (--server url)", () => {
     const s = new ArkServer();
     registerAllHandlers(s.router, app);
     s.attachLifecycle(app);
+    s.attachApp(app);
     server = s.startWebSocket(port);
   });
 
@@ -81,6 +82,7 @@ describe("app-client: auto-discovery against a running local daemon", () => {
     const s = new ArkServer();
     registerAllHandlers(s.router, app);
     s.attachLifecycle(app);
+    s.attachApp(app);
     server = s.startWebSocket(port);
 
     // No --server flag; the client helper should see the listening daemon

@@ -18,6 +18,7 @@ beforeAll(async () => {
 
   server = new ArkServer();
   registerAllHandlers(server.router, app);
+  server.attachApp(app);
 
   // Use a high port to avoid collisions with other tests
   port = 19489;

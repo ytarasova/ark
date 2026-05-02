@@ -66,6 +66,7 @@ beforeAll(async () => {
   (server.router as any).requireInit = false;
   registerAllHandlers(server.router, app);
   server.attachAuth(app);
+  server.attachApp(app);
   port = await allocatePort();
   baseWs = `ws://localhost:${port}`;
   ws = server.startWebSocket(port, { app });
