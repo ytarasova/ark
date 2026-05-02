@@ -1,6 +1,14 @@
 /**
  * Profile system -- isolated session namespaces.
  * Each profile gets its own set of sessions via group_name prefix.
+ *
+ * Persistence is local-only: profiles live in `<arkDir>/profiles.json`. In
+ * hosted (control-plane) mode `setProfilesArkDir` is never called by the
+ * conductor (`AppContext._initFilesystem` short-circuits in hosted mode), so
+ * the module-level `_arkDir` stays null. The mutating CRUD functions throw a
+ * clear error when called without an arkDir; `listProfiles` returns []. A
+ * future migration can move profile storage to a tenant-scoped DB store; for
+ * now any caller hitting these in hosted mode is a bug.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -15,10 +23,16 @@ export interface Profile {
 
 let _arkDir: string | null = null;
 
-/** Set the ark directory for profile storage. Called during app boot. */
-export function setProfilesArkDir(arkDir: string): void {
+/**
+ * Set the ark directory for profile storage. Called during app boot.
+ * Pass `null` to clear (used by tests that need to simulate "hosted mode
+ * never bound an arkDir" between runs).
+ */
+export function setProfilesArkDir(arkDir: string | null): void {
   _arkDir = arkDir;
 }
+
+const HOSTED_UNAVAILABLE = "profiles unavailable in hosted mode (no per-process arkDir)";
 
 function profilesPath(): string {
   if (!_arkDir) throw new Error("Profiles arkDir not set. Call setProfilesArkDir() first.");
@@ -49,10 +63,14 @@ export function setActiveProfile(name: string): void {
 }
 
 export function listProfiles(): Profile[] {
+  // Hosted mode never calls setProfilesArkDir; treat the missing arkDir as
+  // "no profiles configured" rather than crashing the listing endpoint.
+  if (!_arkDir) return [];
   return loadProfiles();
 }
 
 export function createProfile(name: string, description?: string): Profile {
+  if (!_arkDir) throw new Error(HOSTED_UNAVAILABLE);
   const profiles = loadProfiles();
   if (profiles.find((p) => p.name === name)) {
     throw new Error(`Profile "${name}" already exists`);
@@ -64,6 +82,7 @@ export function createProfile(name: string, description?: string): Profile {
 }
 
 export function deleteProfile(name: string): boolean {
+  if (!_arkDir) throw new Error(HOSTED_UNAVAILABLE);
   if (name === "default") throw new Error("Cannot delete the default profile");
   const profiles = loadProfiles();
   const idx = profiles.findIndex((p) => p.name === name);

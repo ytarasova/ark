@@ -44,8 +44,9 @@ export function setLogLevel(level: LogLevel): void {
 export function setLogComponents(components: LogComponent[] | null): void {
   _components = components ? new Set(components) : null;
 }
-/** Set the ark directory for log file output. Called during app boot. */
-export function setLogArkDir(arkDir: string): void {
+/** Set the ark directory for log file output. Called during app boot.
+ * Pass `null` to clear (tests that simulate a never-bound hosted state). */
+export function setLogArkDir(arkDir: string | null): void {
   _arkDir = arkDir;
 }
 

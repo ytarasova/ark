@@ -138,6 +138,36 @@ export class AppContext {
     // `start()` on each launcher in canonical order. Awilix tracks every
     // resolution so `container.dispose()` later tears them down in reverse.
     this._container = buildContainer({ app: this, config: this.config, db, bootOptions: this.options });
+
+    // Re-apply a test-mode override across the placeholder->real container
+    // swap. Production callers never touch `_modeOverrideForTest`; tests use
+    // `_setModeForTest` to simulate hosted mode against a SQLite test DB.
+    if (this._modeOverrideForTest) {
+      this._container.register({ mode: asValue(this._modeOverrideForTest) });
+    }
+    // Apply any test-only cradle overrides queued via
+    // `_setContainerOverridesForTest`. Used by hosted-mode regression tests
+    // to inject stub blob/snapshot stores that satisfy the H6/H7 boot
+    // guards without requiring real S3 / Postgres.
+    if (Object.keys(this._containerOverridesForTest).length > 0) {
+      const wrapped: Record<string, ReturnType<typeof asValue>> = {};
+      for (const [k, v] of Object.entries(this._containerOverridesForTest)) {
+        wrapped[k] = asValue(v);
+      }
+      this._container.register(wrapped);
+    }
+
+    // Eagerly resolve the cluster of stores whose hosted-mode contract is
+    // "no local-disk fallback" so a misconfigured deployment fails at boot
+    // with a clear error rather than at first session/pause or first input
+    // upload (potentially under load). The factories themselves contain the
+    // real configuration check; we just trip them here so awilix surfaces
+    // the throw before lifecycle.start() spins up the conductor.
+    if (this.mode.kind === "hosted") {
+      this._container.resolve("blobStore");
+      this._container.resolve("snapshotStore");
+    }
+
     await this._container.cradle.lifecycle.start();
 
     // Test profile: register the noop executor for every real runtime name.
@@ -322,6 +352,24 @@ export class AppContext {
   }
 
   private _initFilesystem(): void {
+    // Hosted mode: the conductor is a stateless multi-tenant control-plane
+    // process. Per-process arkDir paths are not tenant-scoped and are lost
+    // on pod restart, so we never materialise them. The structured-log file
+    // sink and the profiles store both no-op when their arkDir is null --
+    // skipping the setLog*/setProfiles* calls keeps them that way.
+    //
+    // We also stamp `ARK_MODE=hosted` on the process env so leaf helpers
+    // (`claude/trust.ts`, anything that can't take an AppContext) can gate
+    // local-fs writes without re-importing AppContext.
+    //
+    // Local mode keeps the existing behaviour: mkdir the four standard dirs
+    // (ark/tracks/worktrees/logs) and bind the JSONL log + profiles file to
+    // arkDir so subsequent writes land on disk.
+    if (this.mode.kind === "hosted") {
+      process.env.ARK_MODE = "hosted";
+      return;
+    }
+
     for (const dir of [
       this.config.dirs.ark,
       this.config.dirs.tracks,
@@ -595,6 +643,38 @@ export class AppContext {
     }
     return this._preBootMode;
   }
+
+  /**
+   * Test-only: install a pre-built `AppMode` so the accessor returns it
+   * during boot (when phase is "booting") and after boot (via the
+   * container override below). Used by `forHostedTestAsync` to simulate
+   * hosted-mode contracts without standing up a real Postgres.
+   *
+   * Must be called BEFORE `boot()`. Sets the pre-boot cache and queues a
+   * post-boot container registration so the swap survives `buildContainer`.
+   */
+  _setModeForTest(mode: AppMode): void {
+    this._preBootMode = mode;
+    // Persist the override across the placeholder->real container swap that
+    // happens inside `boot()`. The hook fires once buildContainer finishes
+    // wiring and right before lifecycle.start runs.
+    this._modeOverrideForTest = mode;
+  }
+
+  /**
+   * Test-only: queue arbitrary cradle overrides to apply after the
+   * placeholder->real container swap inside `boot()`. Use to inject stub
+   * stores (e.g. a fake snapshotStore) that would otherwise refuse hosted
+   * mode at boot.
+   */
+  _setContainerOverridesForTest(overrides: Record<string, unknown>): void {
+    this._containerOverridesForTest = { ...this._containerOverridesForTest, ...overrides };
+  }
+
+  /** @internal -- consumed by `boot()` to re-apply a test mode after the container swap. */
+  private _modeOverrideForTest: AppMode | null = null;
+  /** @internal -- consumed by `boot()` to re-apply test stubs after the container swap. */
+  private _containerOverridesForTest: Record<string, unknown> = {};
 
   // ── Tenant scoping ───────────────────────────────────────────────────
   //

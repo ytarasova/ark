@@ -14,6 +14,8 @@ import { beforeEach, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { AppContext } from "../app.js";
 import type { Session, SessionStatus, Compute, ComputeProviderName, ComputeStatus } from "../../types/index.js";
+import { buildHostedAppMode } from "../modes/app-mode.js";
+import type { ArkConfig } from "../config.js";
 
 /**
  * Snapshot current ark-* tmux sessions. Call before tests start, then pass
@@ -203,6 +205,68 @@ export function mockCompute(overrides: Partial<Compute> & { name?: string } = {}
     updated_at: new Date().toISOString(),
     ...overrides,
   };
+}
+
+/**
+ * Construct an AppContext that *believes* it is in hosted mode without
+ * needing a real Postgres connection.
+ *
+ * Implementation details:
+ *   1. Build the AppContext under the `test` profile (SQLite + ephemeral
+ *      arkDir + the noop executor + in-memory secret store).
+ *   2. Use `_setModeForTest` to install a hosted AppMode. The override is
+ *      applied to the pre-boot mode cache AND queued for re-application
+ *      across the placeholder->real container swap that happens inside
+ *      `boot()`, so every reader -- pre-boot, mid-boot, post-boot -- sees
+ *      the hosted branch.
+ *
+ * Pass `{ stubBlobStore: true, stubSnapshotStore: true }` to satisfy the
+ * H6/H7 boot guards with throwaway stubs -- needed when the test asserts
+ * something OTHER than the boot guards themselves (e.g. that the profiles
+ * store is unavailable in hosted mode). Without these stubs, boot throws
+ * because the production factories refuse local-disk fallback.
+ *
+ * Caller is responsible for `await ctx.boot()` (or NOT booting if the test
+ * is asserting that boot itself throws).
+ */
+export interface ForHostedTestOptions extends Partial<ArkConfig> {
+  /** Inject a stub LocalDiskBlobStore (under tmp) so H6 doesn't fire. */
+  stubBlobStore?: boolean;
+  /** Inject a stub FsSnapshotStore (under tmp) so H7 doesn't fire. */
+  stubSnapshotStore?: boolean;
+}
+
+export async function forHostedTestAsync(overrides?: ForHostedTestOptions): Promise<AppContext> {
+  const { stubBlobStore, stubSnapshotStore, ...rest } = overrides ?? {};
+  const ctx = await AppContext.forTestAsync(rest);
+  // Hosted-mode AppMode but pinned to the sqlite dialect that the test
+  // SQLite DB actually uses. The hosted-mode call sites under audit branch
+  // on `mode.kind === "hosted"`, NOT on `mode.database.dialect`, so this
+  // hybrid is sufficient to drive the regression assertions without
+  // standing up a real Postgres. The migrations capability is rebuilt for
+  // sqlite so `_openDatabase` + `_initSchema` succeed against the test DB.
+  const productionHosted = buildHostedAppMode({ dialect: "sqlite", url: null }, ctx.config as ArkConfig);
+  const { buildMigrationsCapability } = await import("../modes/migrations-capability.js");
+  const sqliteHostedMode = {
+    ...productionHosted,
+    migrations: buildMigrationsCapability("sqlite"),
+  };
+  ctx._setModeForTest(sqliteHostedMode);
+
+  if (stubBlobStore || stubSnapshotStore) {
+    const overridesForContainer: Record<string, unknown> = {};
+    if (stubBlobStore) {
+      const { LocalDiskBlobStore } = await import("../storage/local-disk.js");
+      overridesForContainer.blobStore = new LocalDiskBlobStore(`${ctx.config.dirs.ark}/stub-blobs`);
+    }
+    if (stubSnapshotStore) {
+      const { FsSnapshotStore } = await import("../../compute/core/snapshot-store-fs.js");
+      overridesForContainer.snapshotStore = new FsSnapshotStore(`${ctx.config.dirs.ark}/stub-snapshots`);
+    }
+    ctx._setContainerOverridesForTest(overridesForContainer);
+  }
+
+  return ctx;
 }
 
 /** Poll a condition until it's true or timeout. Better than arbitrary setTimeout. */
