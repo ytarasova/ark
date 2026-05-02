@@ -147,9 +147,10 @@ export interface LaunchAgentOpts {
   initialPrompt: string;
   /**
    * PlacementCtx produced by `buildLaunchEnv`. Forwarded through the
-   * executor onto provider.launch so SSH-medium providers can flush
-   * queued file ops post-provision. Optional -- absent when the provider
-   * doesn't implement `buildPlacementCtx`, or there's no resolved compute.
+   * executor onto `runTargetLifecycle` so the compute's `flushPlacement`
+   * step can deliver the queued file ops via the medium-specific
+   * transport. Optional -- absent when no resolved compute or when the
+   * placement queue ended up empty.
    */
   placement?: PlacementCtx;
 }

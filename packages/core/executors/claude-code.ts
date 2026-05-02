@@ -81,11 +81,11 @@ export const claudeCodeExecutor: Executor = {
 
     // For remote dispatch the launcher must `cd` into the workdir on the
     // REMOTE host -- not the conductor's local Mac path. Providers that
-    // need a translation (e.g. RemoteWorktreeProvider clones to
-    // `${REMOTE_HOME}/Projects/<repo>`) implement `resolveWorkdir`; the
-    // returned path also drives the heredoc target for the embedded files,
-    // and is passed through to `provider.launch` so tmux's `-c <workdir>`
-    // and the launcher agree.
+    // need a translation (e.g. EC2Compute resolves to
+    // `${REMOTE_HOME}/Projects/<sid>/<repo>`) implement `resolveWorkdir`;
+    // the returned path drives both the heredoc target for embedded
+    // files AND the workdir threaded into `runTargetLifecycle` so tmux's
+    // `-c <workdir>` and the launcher agree.
     const launcherWorkdir =
       isRemote && compute && provider?.resolveWorkdir
         ? (provider.resolveWorkdir(compute, session) ?? effectiveWorkdir)
@@ -109,7 +109,8 @@ export const claudeCodeExecutor: Executor = {
         conductorUrl,
         channelConfig,
         // No `originalRepoDir` for remote -- the source repo is on the
-        // conductor; the remote freshly clones in `provider.launch`.
+        // conductor; the remote freshly clones in
+        // `Compute.prepareWorkspace` (driven from `runTargetLifecycle`).
         runtimeMcpServers,
         mcpConfigsDir: resolveMcpConfigsDir(),
         // codebase-memory binary lives on the conductor's filesystem; the

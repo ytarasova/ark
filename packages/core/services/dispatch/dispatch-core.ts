@@ -213,8 +213,9 @@ export class CoreDispatcher {
       // The full context-injected task is too large for ARG_MAX; it goes via
       // system prompt + channel delivery instead.
       initialPrompt: session.summary ?? task.slice(0, 2000),
-      // Forward the deferred PlacementCtx (when the provider built one) so
-      // the executor can hand it to provider.launch for post-provision flush.
+      // Forward the deferred PlacementCtx so the executor can hand it to
+      // `runTargetLifecycle` -- the `flush-secrets` step delivers the
+      // queued file ops via the compute's medium-specific transport.
       placement: launchEnv.placement,
     });
     if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
