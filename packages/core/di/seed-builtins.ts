@@ -48,18 +48,33 @@ const SPECS: KindSpec[] = [
  * Seed every kind of builtin resource into the DB. Idempotent.
  *
  * Returns void; a summary line is logged at info level.
+ *
+ * Hosted-mode strictness: if NEITHER any builtin dir was found NOR any row
+ * already exists in the DB, the seeder throws. This catches a freshly
+ * deployed conductor whose container missed the bundled YAMLs (e.g. a
+ * distroless image without an install prefix) -- the previous behaviour
+ * silently logged a warning and left the picker empty. Local mode stays
+ * tolerant: developers running off a partial source checkout can have a
+ * subset of builtins on disk without the seeder erroring.
+ *
+ * The optional `opts.baseDir` override is for tests only -- production
+ * callers always go through `resolveStoreBaseDir()`.
  */
-export async function seedBuiltinResources(app: AppContext): Promise<void> {
-  const base = resolveStoreBaseDir();
+export async function seedBuiltinResources(app: AppContext, opts?: { baseDir?: string }): Promise<void> {
+  const base = opts?.baseDir ?? resolveStoreBaseDir();
   const counts: Record<Kind, number> = { flow: 0, agent: 0, skill: 0, recipe: 0, runtime: 0 };
   let total = 0;
+  const missingDirs: string[] = [];
+  let dirsFound = 0;
 
   for (const spec of SPECS) {
     const dir = join(base, spec.subdir);
     if (!existsSync(dir)) {
+      missingDirs.push(`${spec.kind}=${dir}`);
       logWarn("general", `seedBuiltins: ${spec.kind} dir missing`, { dir });
       continue;
     }
+    dirsFound++;
 
     const store = spec.pick(app);
     const files = readdirSync(dir).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
@@ -100,8 +115,42 @@ export async function seedBuiltinResources(app: AppContext): Promise<void> {
     }
   }
 
+  // Hosted mode: a brand-new conductor with no builtin dirs AND no existing
+  // rows means the picker will be empty -- every dispatch fails with a
+  // confusing "agent not found". Surface it as a deploy error instead.
+  if (app.mode.kind === "hosted" && dirsFound === 0) {
+    const anyExisting = await hasAnyExistingRows(app);
+    if (!anyExisting) {
+      throw new Error(
+        `seedBuiltins: hosted-mode boot found no builtin resource dirs under ` +
+          `${base} AND no existing rows in resource_definitions. Missing: ${missingDirs.join(", ")}. ` +
+          `Verify the conductor image bundles the resource YAMLs.`,
+      );
+    }
+  }
+
   logInfo(
     "general",
     `seeded ${total} builtin resources: flows=${counts.flow}, agents=${counts.agent}, skills=${counts.skill}, recipes=${counts.recipe}, runtimes=${counts.runtime}`,
   );
+}
+
+/**
+ * Cheap existence check: did any spec's store report at least one row?
+ * Used by the hosted-mode strictness guard to distinguish "fresh broken
+ * deploy" from "operator overrode every builtin and removed the bundles".
+ */
+async function hasAnyExistingRows(app: AppContext): Promise<boolean> {
+  for (const spec of SPECS) {
+    try {
+      const store = spec.pick(app) as { list?: () => Promise<unknown[]> };
+      if (typeof store.list === "function") {
+        const rows = await store.list();
+        if (Array.isArray(rows) && rows.length > 0) return true;
+      }
+    } catch {
+      // ignore -- caller will see the seeder error above if nothing exists
+    }
+  }
+  return false;
 }
