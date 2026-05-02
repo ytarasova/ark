@@ -8,6 +8,7 @@ import type { ComputeProvider } from "../../../compute/types.js";
 import type { ComputeTarget } from "../../../compute/core/compute-target.js";
 import type { SessionLifecycleDeps } from "./types.js";
 import * as claude from "../../claude/claude.js";
+import { killSessionAsync } from "../../infra/tmux.js";
 import { safeAsync } from "../../safe.js";
 import { saveCheckpoint } from "../../session/checkpoint.js";
 import { logDebug, logError, logInfo } from "../../observability/structured-log.js";
@@ -75,7 +76,10 @@ export class SessionTerminator {
       await p.cleanupSession(c, session);
     });
     if (!stopped && session.session_id) {
-      await d.getLauncher().kill(session.session_id);
+      // No provider could be resolved (e.g., compute row missing) but the
+      // session has a tmux name on file -- kill it directly so we don't
+      // leave a zombie pane on the conductor host.
+      await killSessionAsync(session.session_id);
     }
 
     await this.withComputeTarget(session, `stop ${sessionId}: shutdown runtime`, async (target, c) => {
@@ -154,7 +158,9 @@ export class SessionTerminator {
       await p.cleanupSession(c, session);
     });
     if (!handled && session.session_id) {
-      await d.getLauncher().kill(session.session_id);
+      // Same fallback as `stop`: provider couldn't be resolved but a tmux
+      // name exists -- direct tmux kill so we don't leak the pane.
+      await killSessionAsync(session.session_id);
     }
 
     if (session.workdir) {

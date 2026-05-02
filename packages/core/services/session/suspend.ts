@@ -5,6 +5,7 @@
 
 import type { Session } from "../../../types/index.js";
 import type { SessionLifecycleDeps } from "./types.js";
+import { killSessionAsync, sendKeysAsync } from "../../infra/tmux.js";
 
 export class SessionSuspender {
   constructor(private readonly deps: SessionLifecycleDeps) {}
@@ -29,7 +30,7 @@ export class SessionSuspender {
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
     if (session.session_id) {
-      await d.getLauncher().kill(session.session_id);
+      await killSessionAsync(session.session_id);
     }
 
     await d.sessions.update(sessionId, { status: "archived", session_id: null });
@@ -65,7 +66,7 @@ export class SessionSuspender {
     }
     if (!session.session_id) return { ok: false, message: "No tmux session" };
 
-    await d.getLauncher().sendKeys(session.session_id, "C-c");
+    await sendKeysAsync(session.session_id, "C-c");
 
     await d.sessions.update(sessionId, { status: "waiting" });
     await d.events.log(sessionId, "session_interrupted", {
