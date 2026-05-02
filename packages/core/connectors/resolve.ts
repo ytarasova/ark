@@ -6,7 +6,6 @@
  *
  * Used by:
  *   - packages/core/executors/claude-code.ts (claude executor path)
- *   - packages/core/services/agent-launcher.ts (legacy tmux launcher path)
  *
  * The merge precedence is: existing .mcp.json > runtime mcp_servers >
  * flow connectors > inline (ark-channel always overwrites). Flow connectors

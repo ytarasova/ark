@@ -40,7 +40,7 @@ export const claudeCodeExecutor: Executor = {
 
     // Determine conductor URL based on compute type. Default + remote both
     // use `http://localhost:<port>` -- for remote that resolves on the EC2
-    // host, where the reverse tunnel established by prepareRemoteEnvironment
+    // host, where the reverse tunnel established by `EC2Compute.setupTransport`
     // forwards back to the conductor's actual port. Read the live port from
     // app.config so a non-default `--conductor-port` is reflected in the
     // baked-in URL (DEFAULT_CONDUCTOR_URL is hardcoded to 19100 and would
@@ -192,7 +192,7 @@ export const claudeCodeExecutor: Executor = {
     // REMOTE dispatch the conductor can't read EC2's filesystem, so the
     // sentinel mechanism doesn't apply -- session completion is reported
     // via the ark hooks (Stop / SessionEnd / StopFailure) curling back
-    // through the reverse tunnel set up in prepareRemoteEnvironment. We
+    // through the reverse tunnel set up by `EC2Compute.setupTransport`. We
     // still need ARK_SESSION_DIR set to *something* writable on the
     // remote; otherwise the launcher would `mkdir -p` the conductor's
     // path on the EC2 host, leaving a phantom `/Users/<name>/.ark/...`
@@ -248,8 +248,7 @@ export const claudeCodeExecutor: Executor = {
 
     // Remote compute (providers that don't support local worktrees).
     //
-    // Routes through ComputeTarget rather than the legacy
-    // `prepareRemoteEnvironment + provider.launch` pair. `runTargetLifecycle`
+    // Routes through ComputeTarget. `runTargetLifecycle`
     // walks the per-dispatch lifecycle inside structured `provisioning_step`
     // events: compute-start (if stopped) -> ensure-reachable -> flush-secrets
     // -> prepare-workspace -> runtime-prepare -> launch-agent. Each step is

@@ -43,21 +43,6 @@ export interface SyncOpts {
   onLog?: (msg: string) => void;
 }
 
-/**
- * Arguments for `ComputeProvider.prepareForLaunch`. The dispatcher
- * passes its `AppContext` and the session id so the provider can emit
- * `provisioning_step` events on the right session timeline; `compute`
- * is the row the provider acts against. Mutating `compute.config` is
- * fine and expected (e.g. EC2 stores the freshly-allocated forward
- * port there) -- the dispatcher uses the same reference downstream.
- */
-export interface PrepareForLaunchOpts {
-  app: import("../core/app.js").AppContext;
-  compute: Compute;
-  session: Session;
-  onLog?: (msg: string) => void;
-}
-
 export interface IsolationMode {
   value: string;
   label: string;
@@ -103,27 +88,6 @@ export interface ComputeProvider {
 
   /** Get the ArkD daemon URL for this compute target. */
   getArkdUrl?(compute: Compute): string;
-
-  /**
-   * Bring the compute target's agent-runtime channel into a "ready"
-   * state -- network reachable, arkd responsive, events stream
-   * subscribed. Called by the dispatcher between compute auto-start
-   * and the worktree clone, exactly once per dispatch.
-   *
-   * Each provider knows its own medium-specific steps:
-   *   - Local: no-op (arkd is on the same host).
-   *   - EC2 / SSM: SSH connectivity check, forward `-L` tunnel, arkd
-   *     /health probe, events-stream subscribe.
-   *   - K8s: pod readiness probe, port-forward, arkd /health probe.
-   *   - Docker (local sidecar): wait for the sidecar to be healthy.
-   *
-   * Throws on hard failure (no retries left, non-transient error).
-   * Implementations are responsible for emitting `provisioning_step`
-   * events via the `provisionStep` helper from
-   * `core/services/provisioning-steps.ts` so the timeline shows a
-   * uniform per-step trail across providers.
-   */
-  prepareForLaunch?(opts: PrepareForLaunchOpts): Promise<void>;
 
   /**
    * Where the agent should `cd` and where the launcher should write embedded

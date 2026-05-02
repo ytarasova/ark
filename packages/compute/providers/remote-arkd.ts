@@ -11,25 +11,13 @@
 
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
-import { sshExec, sshKeyPath } from "./ec2/ssh.js";
-import { setupForwardTunnel } from "./ec2/ports.js";
+import { sshKeyPath } from "./ec2/ssh.js";
 import { EC2PlacementCtx } from "./ec2/placement-ctx.js";
-import type {
-  Compute,
-  Session,
-  ProvisionOpts,
-  SyncOpts,
-  IsolationMode,
-  LaunchOpts,
-  PrepareForLaunchOpts,
-} from "../types.js";
+import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts } from "../types.js";
 import type { PlacementCtx } from "../../core/secrets/placement-types.js";
 import { DeferredPlacementCtx } from "../../core/secrets/deferred-placement-ctx.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
-import { allocatePort } from "../../core/config/port-allocator.js";
 import { logDebug, logError, logInfo } from "../../core/observability/structured-log.js";
-import { provisionStep } from "../../core/services/provisioning-steps.js";
-import { startArkdEventsConsumer } from "../../core/conductor/arkd-events-consumer.js";
 
 const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
 const REMOTE_USER = "ubuntu";
@@ -55,7 +43,7 @@ interface RemoteConfig {
   /**
    * Local port on the conductor that the SSM-tunneled SSH `-L` is listening
    * on, forwarding to remote `localhost:19300`. Set by
-   * `prepareRemoteEnvironment` after the forward tunnel is established;
+   * `EC2Compute.setupTransport` after the forward tunnel is established;
    * read by `getArkdUrl` so `ArkdClient` reaches arkd via the local tunnel
    * instead of trying to hit the (private, unroutable) instance IP directly.
    */
@@ -92,8 +80,9 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   getArkdUrl(compute: Compute): string {
     const cfg = compute.config as RemoteConfig;
     // Preferred SSM-only path: when an SSH `-L` forward tunnel is up
-    // (set up in `prepareRemoteEnvironment`), the conductor reaches arkd
-    // via localhost. This wins over the legacy `arkd_url` field because
+    // (set up by `EC2Compute.setupTransport` via `Compute.ensureReachable`),
+    // the conductor reaches arkd via localhost. This wins over the legacy
+    // `arkd_url` field because
     // `provision()` writes a private-IP `arkd_url` for back-compat -- and
     // that URL is unreachable from the conductor's network in the SSM-only
     // model. The forward port being present means the tunnel is the
@@ -106,142 +95,13 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     throw new Error(`Compute '${compute.name}' has no arkd_local_forward_port, arkd_url, or ip`);
   }
 
-  // ── prepareForLaunch ──────────────────────────────────────────────────
+  // ── Transport setup ────────────────────────────────────────────────────
   //
-  // Bring the conductor's connection to arkd into a "ready" state:
-  // SSH-over-SSM connectivity, forward `-L` tunnel, arkd /health probe,
-  // events-stream subscribe. Each step is wrapped in `provisionStep`
-  // so the session timeline shows a uniform per-step trail.
-  //
-  // The dispatcher calls this once between compute-start and the first
-  // `client.run` -- everything downstream rides the established tunnel.
-
-  /** Per-attempt SSM SSH timeout. Cold-start ~25s; warm 1-3s. */
-  private static readonly SSM_CONNECT_TIMEOUT_MS = Number(process.env.ARK_SSM_CONNECT_TIMEOUT_MS ?? 45_000);
-  /** Total budget for the arkd /health probe (SSH `-L` settles in 5-10s). */
-  private static readonly ARKD_PROBE_BUDGET_MS = Number(process.env.ARK_ARKD_PROBE_BUDGET_MS ?? 30_000);
-  /** Per-attempt /health probe fetch timeout. */
-  private static readonly ARKD_PROBE_FETCH_TIMEOUT_MS = 2_000;
-  /** Sleep between /health probe attempts. */
-  private static readonly ARKD_PROBE_INTERVAL_MS = 500;
-
-  async prepareForLaunch(opts: PrepareForLaunchOpts): Promise<void> {
-    const { app, compute, session, onLog } = opts;
-    const sid = session.id;
-    const cfg = compute.config as RemoteConfig;
-    const instanceId = cfg.instance_id;
-    if (!instanceId) {
-      // Pre-provisioning state -- nothing to set up. The dispatcher
-      // wouldn't normally call us here, but be defensive.
-      return;
-    }
-    const region = cfg.region ?? "us-east-1";
-    const awsProfile = cfg.aws_profile;
-    const log = onLog ?? (() => {});
-    const stepCtx = { compute: compute.name, instanceId };
-
-    log("Checking host connectivity (via SSM)...");
-    await provisionStep(
-      app,
-      sid,
-      "connectivity-check",
-      async () => {
-        const { exitCode } = await sshExec(sshKeyPath(compute.name), instanceId, "echo ok", {
-          timeout: RemoteArkdBase.SSM_CONNECT_TIMEOUT_MS,
-          region,
-          awsProfile,
-        });
-        if (exitCode !== 0) throw new Error(`ssh returned non-zero exit ${exitCode}`);
-      },
-      { retries: 1, retryBackoffMs: 1_000, context: stepCtx },
-    );
-
-    const tunnel = await provisionStep(
-      app,
-      sid,
-      "forward-tunnel",
-      async () => {
-        const localPort = await allocatePort();
-        const t = await setupForwardTunnel(sshKeyPath(compute.name), instanceId, ARKD_REMOTE_PORT, localPort, {
-          region,
-          awsProfile,
-        });
-        if (!t.pid) {
-          throw new Error(
-            `forward tunnel did not register a PID (localhost:${t.localPort} -> ${instanceId}:${ARKD_REMOTE_PORT})`,
-          );
-        }
-        return t;
-      },
-      { retries: 2, retryBackoffMs: 750, context: stepCtx },
-    );
-    log(
-      `Arkd forward tunnel ${tunnel.reused ? "reused" : "established"} ` +
-        `(pid ${tunnel.pid}) localhost:${tunnel.localPort} -> ${instanceId}:${ARKD_REMOTE_PORT}`,
-    );
-    // Persist + mutate in-memory: provider.launch downstream reads
-    // compute.config.arkd_local_forward_port via getArkdUrl. Updating
-    // only the DB leaves the in-memory copy stale and the dispatch
-    // POSTs to a localhost port that no longer routes (forensic from
-    // s-qeu3ux3gry).
-    await app.computes.mergeConfig(compute.name, { arkd_local_forward_port: tunnel.localPort });
-    (compute.config as RemoteConfig).arkd_local_forward_port = tunnel.localPort;
-
-    await provisionStep(
-      app,
-      sid,
-      "arkd-probe",
-      () => this.probeArkdReady(tunnel.localPort),
-      { context: { ...stepCtx, localPort: tunnel.localPort, budgetMs: RemoteArkdBase.ARKD_PROBE_BUDGET_MS } },
-    );
-
-    await provisionStep(
-      app,
-      sid,
-      "events-consumer-start",
-      async () => {
-        startArkdEventsConsumer(
-          app,
-          compute.name,
-          `http://localhost:${tunnel.localPort}`,
-          process.env.ARK_ARKD_TOKEN ?? null,
-        );
-      },
-      { context: stepCtx },
-    );
-  }
-
-  /**
-   * Poll arkd /health until the inner SSM session is fully through and
-   * arkd answers, or the budget is exhausted.
-   *
-   * Why not just retry the next /exec call? Because the SSH `-L` listener
-   * appears in pgrep BEFORE the SSM session through it has finished
-   * establishing. The first 5-10s after `setupForwardTunnel` returns
-   * are racy -- a connect attempt hits the local listener but the inner
-   * session is still mid-handshake, the kernel returns "connection
-   * refused", and Bun's keep-alive pool POISONS subsequent fetches to
-   * the same `localhost:<port>` even after the tunnel has settled. The
-   * probe burns the racy window with cheap fetches so the first real
-   * dispatch fetch lands cleanly.
-   */
-  private async probeArkdReady(localPort: number): Promise<void> {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < RemoteArkdBase.ARKD_PROBE_BUDGET_MS) {
-      try {
-        const r = await fetch(`http://localhost:${localPort}/health`, {
-          signal: AbortSignal.timeout(RemoteArkdBase.ARKD_PROBE_FETCH_TIMEOUT_MS),
-        });
-        if (r.ok) return;
-      } catch {
-        /* SSH tunnel still settling -- back off and try again */
-      }
-      await new Promise((resolve) => setTimeout(resolve, RemoteArkdBase.ARKD_PROBE_INTERVAL_MS));
-    }
-    throw new Error(
-      `arkd at localhost:${localPort} did not become reachable within ${RemoteArkdBase.ARKD_PROBE_BUDGET_MS}ms`,
-    );
-  }
+  // Forward-tunnel + arkd /health + events-consumer-start used to live in
+  // an interim `prepareForLaunch` hook on this class. The same logic now
+  // lives on `EC2Compute.setupTransport` (called via `Compute.ensureReachable`
+  // from `runTargetLifecycle`); legacy provider rows still bridge through
+  // `packages/compute/adapters/legacy.ts -> ComputeTarget(EC2Compute, ...)`.
 
   protected getArkdRequestTimeoutMs(compute: Compute): number | undefined {
     const cfg = compute.config as RemoteConfig;
@@ -271,9 +131,10 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
   /**
    * Flush a DeferredPlacementCtx onto a real EC2PlacementCtx. Called by every
-   * subclass at the top of `launch()` -- after `prepareRemoteEnvironment` (in
-   * the executor) has guaranteed the compute is started + reachable, and
-   * before the agent process is spawned.
+   * subclass at the top of `launch()` -- after `Compute.ensureReachable` (run
+   * by `runTargetLifecycle` for live ComputeTarget dispatch, or invoked
+   * indirectly via the legacy adapter) has guaranteed the compute is started
+   * + reachable, and before the agent process is spawned.
    *
    * Behaviour:
    *   - No-op when no deferred ctx was attached (e.g. a session with only
@@ -465,10 +326,10 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       // Stop pulling events from this compute's arkd before tearing down
       // the forward tunnel that carries the stream.
       stopArkdEventsConsumer(compute.name);
-      // Tear down the arkd forward tunnel established in
-      // prepareRemoteEnvironment. We key off (instance_id, ARKD_REMOTE_PORT)
-      // -- the local port is dynamically allocated and may or may not be
-      // in the config (it gets cleared below).
+      // Tear down the arkd forward tunnel established by
+      // `EC2Compute.setupTransport`. We key off (instance_id,
+      // ARKD_REMOTE_PORT) -- the local port is dynamically allocated and
+      // may or may not be in the config (it gets cleared below).
       await safeAsync(`[remote] destroy: teardown arkd forward tunnel for ${compute.name}`, async () => {
         await teardownForwardTunnel(cfg.instance_id!, ARKD_REMOTE_PORT);
       });
@@ -570,9 +431,9 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       await safeAsync(`[remote] stop: teardown arkd forward tunnel for ${compute.name}`, async () => {
         await teardownForwardTunnel(cfg.instance_id!, ARKD_REMOTE_PORT);
       });
-      // Clear the local-forward port -- on next start, prepareRemoteEnvironment
-      // will allocate a fresh one (the previous local port may be reused by
-      // unrelated processes while we're stopped).
+      // Clear the local-forward port -- on next start,
+      // `EC2Compute.setupTransport` will allocate a fresh one (the previous
+      // local port may be reused by unrelated processes while we're stopped).
       await safeAsync(`[remote] stop: clear arkd_local_forward_port for ${compute.name}`, async () => {
         await this.app.computes.mergeConfig(compute.name, { arkd_local_forward_port: undefined });
       });
@@ -723,73 +584,15 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
     return `${REMOTE_HOME}/Projects/${session.id}/${this.repoBasename(session)}`;
   }
 
-  async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
-    const sid = session.id;
-    const stepCtx = { compute: compute.name, session: sid };
-
-    // Step 5: flush deferred secret placements. Each writeFile/appendFile
-    // op pipes through SSH; the queue can be 5-15 ops for a typical
-    // session (env-var + ssh-private-key + known_hosts + ssh config).
-    // Retry on transient SSH/SSM blips -- the ops are idempotent
-    // (marker-keyed appendFile, same-path writeFile).
-    await provisionStep(
-      this.app,
-      sid,
-      "flush-secrets",
-      () => this.flushDeferredPlacement(compute, opts),
-      { retries: 1, retryBackoffMs: 1_000, context: stepCtx },
+  async launch(_compute: Compute, _session: Session, _opts: LaunchOpts): Promise<string> {
+    // Deprecated: live dispatch routes through `ComputeTarget(EC2Compute,
+    // DirectRuntime)` via `runTargetLifecycle`. Legacy callers that still
+    // hold a RemoteWorktreeProvider can map to the new target through
+    // `packages/compute/adapters/legacy.ts:computeProviderToTarget`.
+    throw new Error(
+      "RemoteWorktreeProvider.launch is deprecated; dispatch via ComputeTarget. " +
+        "See packages/compute/adapters/legacy.ts.",
     );
-
-    const client = this.getClient(compute);
-
-    // Step 6: git clone on remote. Source URL / path:
-    //   - session.config.remoteRepo (preferred): clone-on-remote URL
-    //   - session.repo (fallback): conductor-local path, only meaningful
-    //     when conductor and compute share a filesystem
-    // Without a remote-reachable URL the agent runs against an empty
-    // workdir; we skip the clone to surface the misconfig at the agent
-    // stage rather than silently corrupting the dispatch.
-    const remoteWorkdir = this.resolveWorkdir(compute, session);
-    const source = this.cloneSource(session);
-    if (source && remoteWorkdir) {
-      await provisionStep(
-        this.app,
-        sid,
-        "git-clone",
-        async () => {
-          // The remoteWorkdir is session-scoped (resolveWorkdir embeds
-          // session.id), so the parent directory exists once we mkdir
-          // -p it; the leaf is guaranteed-fresh on first clone. No
-          // `rm -rf` needed.
-          await client.run({
-            command: "mkdir",
-            args: ["-p", remoteWorkdir.replace(/\/[^/]+$/, "")],
-            timeout: 15_000,
-          });
-          await client.run({ command: "git", args: ["clone", source, remoteWorkdir], timeout: 120_000 });
-        },
-        { retries: 2, retryBackoffMs: 1_000, context: { ...stepCtx, source, dest: remoteWorkdir } },
-      );
-    }
-
-    // Step 7: spawn the agent inside tmux. tmux's `-c <workdir>` flag
-    // wants the same path the launcher script `cd`s into, otherwise we
-    // race against the launcher's own cd. No retry: tmux session names
-    // don't dedupe by name, so a re-launch would leak the prior pane.
-    await provisionStep(
-      this.app,
-      sid,
-      "launch-agent",
-      () =>
-        client.launchAgent({
-          sessionName: opts.tmuxName,
-          script: opts.launcherContent,
-          workdir: remoteWorkdir ?? opts.workdir,
-        }),
-      { context: { ...stepCtx, tmuxName: opts.tmuxName } },
-    );
-    logInfo("compute", `[trace:${sid}] launch.done compute=${compute.name}`);
-    return opts.tmuxName;
   }
 }
 

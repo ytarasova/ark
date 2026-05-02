@@ -12,8 +12,11 @@
  *   - `sshExecArgs` validates and escapes its argv. We intercept the underlying
  *     ssh invocation by pointing at a non-routable host with a very short
  *     timeout and inspecting the built-up remote command via a spy.
- *   - Concrete call sites (sync.ts, agent-launcher.ts) no longer contain the
- *     vulnerable template-string patterns.
+ *   - Concrete call sites (sync.ts, docker-compose runtime) no longer contain
+ *     the vulnerable template-string patterns. The compose-up exec used to
+ *     live in `core/services/agent-launcher.ts:applyContainerSetup`; after
+ *     the ComputeTarget dispatch flip it moved onto `DockerComposeRuntime`,
+ *     which delegates to argv-form `composeUpWithFiles` (no shell -c).
  */
 
 import { describe, test, expect } from "bun:test";
@@ -120,12 +123,24 @@ describe("call-site regression guards -- user-derived vars never land unescaped"
     expect(src).toMatch(/shellEscape\(token\)/);
   });
 
-  test("agent-launcher.ts shell-escapes the workdir before cd", () => {
-    const src = readFileSync(join(ROOT, "packages/core/services/agent-launcher.ts"), "utf-8");
-    // Old vulnerable pattern must be gone.
-    expect(src).not.toMatch(/cd \$\{effectiveWorkdir\} && docker compose up/);
-    // Safe replacement must be present.
-    expect(src).toMatch(/shellEscape\(effectiveWorkdir\)/);
-    expect(src).toMatch(/cd \$\{quotedWorkdir\} && docker compose up/);
+  test("docker-compose runtime uses argv-form exec (no shell -c interpolation)", () => {
+    const src = readFileSync(join(ROOT, "packages/compute/runtimes/docker-compose.ts"), "utf-8");
+    // The runtime must never shell-interpolate workdir / files into a
+    // `sh -c \`...\${var}...\`` template -- the old agent-launcher.ts
+    // pattern. Compose work is done via argv-form helpers that exec
+    // `docker` directly with separated args.
+    expect(src).not.toMatch(/sh\s+-c\s+`[^`]*\$\{/);
+    // Safe replacement: argv-form composeUpWithFiles delegate.
+    expect(src).toMatch(/composeUpWithFiles/);
+  });
+
+  test("docker compose argv helpers exec docker with separated args (no shell)", () => {
+    const src = readFileSync(join(ROOT, "packages/compute/providers/docker/compose.ts"), "utf-8");
+    // The legacy template-string `cd ${workdir} && docker compose up`
+    // pattern must NOT be present. compose lifecycle goes through
+    // execFile("docker", [...]) with cwd: workdir.
+    expect(src).not.toMatch(/sh\s+-c\s+`[^`]*\$\{/);
+    expect(src).not.toMatch(/cd \$\{[a-zA-Z_]+\} && docker compose/);
+    expect(src).toMatch(/execFileAsync\("docker",/);
   });
 });

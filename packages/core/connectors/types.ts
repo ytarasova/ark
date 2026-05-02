@@ -6,8 +6,7 @@
  *
  *   - "mcp"     : the connector mounts an MCP server (file or inline) into
  *                 the agent's session. Same merge path as runtime-level
- *                 mcp_servers (see packages/core/claude/claude.ts and
- *                 packages/core/services/agent-launcher.ts).
+ *                 mcp_servers (see packages/core/claude/claude.ts).
  *   - "rest"    : a thin REST adapter (no agent-side tool surface). Used by
  *                 server-side code -- not yet plumbed into agents.
  *   - "context" : a connector that contributes prefill text to the session
