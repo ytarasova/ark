@@ -50,8 +50,9 @@
 
 import { spawn } from "child_process";
 
-import { REMOTE_USER } from "../providers/ec2/constants.js";
+import { REMOTE_HOME, REMOTE_USER } from "../providers/ec2/constants.js";
 import type { AppContext } from "../../core/app.js";
+import type { Session } from "../../types/session.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -754,6 +755,35 @@ export class EC2Compute implements Compute {
   getArkdUrl(h: ComputeHandle): string {
     const meta = readMeta(h);
     return `http://localhost:${meta.arkdLocalPort}`;
+  }
+
+  // ── resolveWorkdir ───────────────────────────────────────────────────────
+  //
+  // Translate the conductor-side workdir path to where the cloned worktree
+  // lives on the remote host. Pure transform; no I/O. Mirrors the legacy
+  // `RemoteWorktreeProvider.resolveWorkdir` shape:
+  //   `${REMOTE_HOME}/Projects/<sessionId>/<repoBasename>`
+  // The path is session-scoped so concurrent / sequential sessions on the
+  // same compute don't collide. We prefer `session.config.remoteRepo` (the
+  // clone-on-remote URL) over `session.repo` (conductor-local path). If
+  // neither is set we return null and the caller falls back to
+  // `session.workdir`.
+  //
+  // `remoteHome` is read off `handle.meta.ec2` for forward-compat with
+  // custom AMIs that ship a different default user; today the EC2 provision
+  // path doesn't write the field, so the fallback `/home/ubuntu` matches
+  // the legacy `REMOTE_USER` constant.
+
+  resolveWorkdir(h: ComputeHandle, session: Session): string | null {
+    const cloneSource = (session.config as { remoteRepo?: string } | null | undefined)?.remoteRepo ?? session.repo;
+    if (!cloneSource) return null;
+    const repoBasename =
+      cloneSource
+        .split("/")
+        .pop()
+        ?.replace(/\.git$/, "") ?? "project";
+    const remoteHome = (h.meta.ec2 as { remoteHome?: string } | undefined)?.remoteHome ?? REMOTE_HOME;
+    return `${remoteHome}/Projects/${session.id}/${repoBasename}`;
   }
 
   // ── snapshot / restore (deferred) ────────────────────────────────────────

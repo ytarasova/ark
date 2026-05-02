@@ -163,6 +163,23 @@ export interface Compute {
   getArkdUrl(h: ComputeHandle): string;
 
   /**
+   * Translate a conductor-side workdir path to the path the compute
+   * exposes for the agent's `cd` and tmux `-c`. Pure transform; no I/O.
+   *
+   *   - LocalCompute: returns null (caller falls back to session.workdir
+   *     since conductor and compute share a filesystem).
+   *   - EC2Compute: returns `${remoteHome}/Projects/<sid>/<repo>`.
+   *   - K8sCompute: returns `/workspace/<sid>/<repo>` (or whatever the
+   *     pod's mount layout dictates).
+   *   - FirecrackerCompute: same shape as EC2 inside the microVM.
+   *
+   * Optional: impls that share the conductor's filesystem layout omit.
+   * Callers that get null fall back to `session.workdir` / the conductor-
+   * side path.
+   */
+  resolveWorkdir?(h: ComputeHandle, session: import("../../types/session.js").Session): string | null;
+
+  /**
    * Make the compute reachable from the conductor. Idempotent. Called
    * on every dispatch (fresh provision AND rehydrated handle).
    *

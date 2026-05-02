@@ -30,6 +30,7 @@
  */
 
 import type { AppContext } from "../../../core/app.js";
+import type { Session } from "../../../types/session.js";
 import { logInfo } from "../../../core/observability/structured-log.js";
 import type {
   Compute,
@@ -272,6 +273,29 @@ export class FirecrackerCompute implements Compute {
 
   getArkdUrl(h: ComputeHandle): string {
     return readMeta(h).arkdUrl;
+  }
+
+  // ── resolveWorkdir ───────────────────────────────────────────────────────
+  //
+  // Mirror the EC2 path shape inside the microVM:
+  //   `${guestHome}/Projects/<sessionId>/<repoBasename>`
+  // The legacy `LocalFirecrackerProvider` did not implement this hook, so we
+  // adopt the EC2 layout for forward compatibility (the VM rootfs ships with
+  // /home/ubuntu by default; override via `handle.meta.firecracker.guestHome`
+  // when a custom rootfs uses a different user). Returns null when neither
+  // `session.config.remoteRepo` nor `session.repo` is set so the caller
+  // falls back to `session.workdir`.
+
+  resolveWorkdir(h: ComputeHandle, session: Session): string | null {
+    const cloneSource = (session.config as { remoteRepo?: string } | null | undefined)?.remoteRepo ?? session.repo;
+    if (!cloneSource) return null;
+    const repoBasename =
+      cloneSource
+        .split("/")
+        .pop()
+        ?.replace(/\.git$/, "") ?? "project";
+    const guestHome = (h.meta.firecracker as { guestHome?: string } | undefined)?.guestHome ?? "/home/ubuntu";
+    return `${guestHome}/Projects/${session.id}/${repoBasename}`;
   }
 
   // ── ensureReachable ──────────────────────────────────────────────────────

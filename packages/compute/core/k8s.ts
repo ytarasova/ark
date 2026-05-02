@@ -24,6 +24,7 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import type { AppContext } from "../../core/app.js";
+import type { Session } from "../../types/session.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import type {
   Compute,
@@ -374,6 +375,19 @@ export class K8sCompute implements Compute {
   getArkdUrl(h: ComputeHandle): string {
     const meta = this.readMeta(h);
     return `http://localhost:${meta.arkdLocalPort}`;
+  }
+
+  // ── resolveWorkdir ───────────────────────────────────────────────────────
+  //
+  // Pod-side mount layout is TBD: the legacy K8sProvider didn't implement
+  // this hook (sessions ran against a conductor-shared workdir under the
+  // local-host adapter), and the future plan for k8s-launched arkd has not
+  // yet committed to a layout (`/workspace/<sid>/<repo>` is the leading
+  // candidate but not wired). Returning null here lets the dispatcher fall
+  // back to `session.workdir` until the layout is decided.
+
+  resolveWorkdir(_h: ComputeHandle, _session: Session): string | null {
+    return null;
   }
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {

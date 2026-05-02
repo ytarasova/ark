@@ -53,6 +53,10 @@ export class LocalCompute implements Compute {
     // to set up.
   }
 
+  // resolveWorkdir intentionally omitted: LocalCompute shares the
+  // conductor's filesystem layout, so callers fall back to
+  // `session.workdir` (the conductor-side path is the right path).
+
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {
     throw new NotSupportedError(this.kind, "snapshot");
   }
