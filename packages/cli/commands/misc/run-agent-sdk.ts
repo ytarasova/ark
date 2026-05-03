@@ -49,9 +49,21 @@ export function registerRunAgentSdkCommand(program: Command): void {
         process.exit(2);
       }
 
+      // Hook endpoint resolution: prefer ARK_ARKD_URL (remote dispatch -- the
+      // local arkd buffers hooks; the conductor pulls them via /events/stream),
+      // fall back to ARK_CONDUCTOR_URL (local dispatch -- the agent runs on the
+      // conductor host and can post directly).
+      const arkdUrl = process.env.ARK_ARKD_URL;
       const conductorUrl = process.env.ARK_CONDUCTOR_URL;
-      if (!conductorUrl) {
-        console.warn("[agent-sdk launch] ARK_CONDUCTOR_URL is not set -- conductor hook forwarding disabled");
+      const hookEndpoint = arkdUrl
+        ? `${arkdUrl}/hooks/forward`
+        : conductorUrl
+          ? `${conductorUrl}/hooks/status`
+          : undefined;
+      if (!hookEndpoint) {
+        console.warn(
+          "[agent-sdk launch] neither ARK_ARKD_URL nor ARK_CONDUCTOR_URL is set -- hook forwarding disabled",
+        );
       }
 
       const result = await runAgentSdkLaunch({
@@ -63,7 +75,7 @@ export function registerRunAgentSdkCommand(program: Command): void {
         maxTurns: optionalNumber("ARK_MAX_TURNS"),
         maxBudgetUsd: optionalNumber("ARK_MAX_BUDGET_USD"),
         systemAppend: process.env.ARK_SYSTEM_PROMPT_APPEND,
-        conductorUrl,
+        hookEndpoint,
         authToken: process.env.ARK_API_TOKEN,
       });
 
