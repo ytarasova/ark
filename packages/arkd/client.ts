@@ -23,6 +23,9 @@ import type {
   AgentStatusRes,
   AgentCaptureReq,
   AgentCaptureRes,
+  AgentInterventionReq,
+  AgentInterventionRes,
+  InterventionEnvelope,
   AgentAttachOpenReq,
   AgentAttachOpenRes,
   AgentAttachInputReq,
@@ -126,6 +129,59 @@ export class ArkdClient {
 
   async captureOutput(req: AgentCaptureReq): Promise<AgentCaptureRes> {
     return this.post("/agent/capture", req);
+  }
+
+  // ── Mid-session interventions (conductor -> agent) ───────────────────────
+
+  /**
+   * Publish a steer / user message to a running agent. Returns immediately
+   * once arkd has accepted the envelope; `delivered` reports whether the
+   * agent's stream consumer was already parked (true) or whether arkd had to
+   * buffer it for a not-yet-attached consumer (false).
+   */
+  async sendIntervention(req: AgentInterventionReq): Promise<AgentInterventionRes> {
+    const { sessionName, ...body } = req;
+    const path = `/agent/intervention?session=${encodeURIComponent(sessionName)}`;
+    return this.post<typeof body, AgentInterventionRes>(path, body);
+  }
+
+  /**
+   * Subscribe to the intervention stream for a session. The returned async
+   * iterable yields one InterventionEnvelope per ndjson line; the underlying
+   * fetch stays open as long as the consumer is iterating. Cancel by
+   * breaking out of the for-await loop or aborting the AbortSignal.
+   */
+  async *streamInterventions(
+    sessionName: string,
+    opts?: { signal?: AbortSignal },
+  ): AsyncIterable<InterventionEnvelope> {
+    const url = `${this.baseUrl}/agent/interventions/stream?session=${encodeURIComponent(sessionName)}`;
+    const headers: Record<string, string> = {};
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+    const res = await fetch(url, { headers, signal: opts?.signal });
+    if (!res.ok || !res.body) {
+      throw new ArkdClientError(res.status, `intervention stream failed: ${res.status}`, undefined);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (!line.trim()) continue;
+        try {
+          yield JSON.parse(line) as InterventionEnvelope;
+        } catch {
+          // Skip malformed lines; arkd never emits them, but a future
+          // protocol drop should not crash the SDK loop.
+        }
+      }
+    }
   }
 
   // ── Terminal attach (live) ───────────────────────────────────────────────

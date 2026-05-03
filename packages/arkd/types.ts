@@ -110,6 +110,29 @@ export interface AgentCaptureRes {
   output: string;
 }
 
+// ── Mid-session interventions (conductor -> agent) ─────────────────────────
+
+/**
+ * One steer / user message published from the conductor to a running agent.
+ * The agent's claude-agent runtime drains these via /agent/interventions/stream
+ * and pushes each `content` into its PromptQueue. `control: "interrupt"` aborts
+ * the in-flight SDK iteration so the new message is processed immediately;
+ * otherwise the message lands at the end of the queue.
+ */
+export interface InterventionEnvelope {
+  content: string;
+  control?: "interrupt";
+}
+
+export interface AgentInterventionReq extends InterventionEnvelope {
+  sessionName: string;
+}
+export interface AgentInterventionRes {
+  ok: true;
+  /** False when no agent has subscribed yet -- the message is still queued. */
+  delivered: boolean;
+}
+
 // ── Terminal attach (live) ──────────────────────────────────────────────────
 
 /**

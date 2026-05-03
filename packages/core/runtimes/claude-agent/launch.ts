@@ -32,6 +32,7 @@ function resolveClaudeExecutable(): string | undefined {
 }
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { startInterventionTail } from "./intervention-tail.js";
+import { startInterventionStream } from "./intervention-stream.js";
 import { createAskUserMcpServer } from "./mcp-ask-user.js";
 
 /**
@@ -791,16 +792,32 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   process.on("SIGTERM", onSigterm);
   process.on("SIGINT", onSigint);
 
-  const interventionPath = join(sessionDir, "interventions.jsonl");
-  const stopTail = startInterventionTail({
-    path: interventionPath,
-    onMessage: (content) => queue.push(content),
-    onInterrupt: () => {
-      interruptFlag.fired = true;
-      abortHolder.ref.abort();
-    },
-    onError: (err) => console.error(`[agent-sdk launch] intervention tail error: ${err.message}`),
-  });
+  // Mid-session interventions: prefer the arkd wire stream (production path)
+  // when ARK_ARKD_URL is reachable; fall back to the legacy file-tail for
+  // dev / test scenarios that run without arkd. The same callbacks fire in
+  // both cases so the prompt-queue / abort wiring downstream stays identical.
+  const arkdUrlForStream = process.env.ARK_ARKD_URL;
+  const stopTail: () => void = arkdUrlForStream
+    ? startInterventionStream({
+        arkdUrl: arkdUrlForStream,
+        sessionName: sessionId,
+        authToken: process.env.ARK_API_TOKEN,
+        onMessage: (content) => queue.push(content),
+        onInterrupt: () => {
+          interruptFlag.fired = true;
+          abortHolder.ref.abort();
+        },
+        onError: (err) => console.error(`[agent-sdk launch] intervention stream error: ${err.message}`),
+      })
+    : startInterventionTail({
+        path: join(sessionDir, "interventions.jsonl"),
+        onMessage: (content) => queue.push(content),
+        onInterrupt: () => {
+          interruptFlag.fired = true;
+          abortHolder.ref.abort();
+        },
+        onError: (err) => console.error(`[agent-sdk launch] intervention tail error: ${err.message}`),
+      });
 
   let sdkSessionId: string | undefined;
   let attempt = 0;

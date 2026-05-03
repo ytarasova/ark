@@ -94,7 +94,35 @@ export class StaleStateDetector {
       // receive the write.
       const running = await this.app.sessions.listAcrossTenants({ status: "running" });
       for (const s of running) {
-        if (s.session_id && !(await sessionExistsAsync(s.session_id))) {
+        if (!s.session_id) continue;
+
+        // Provider-aware liveness check: for any session whose compute has a
+        // remote provider (EC2 / k8s / etc.), `tmux has-session` on the
+        // conductor host is meaningless -- the pane lives on the worker.
+        // Ask the provider via arkd instead. A bare local check would mark
+        // every remote session "Agent process exited while Ark was not
+        // running" on every daemon reload (#422 family). Local sessions
+        // (no compute or local provider with no checkSession) keep the
+        // legacy local-tmux check.
+        let alive: boolean;
+        try {
+          const tenantApp = this.app.forTenant(s.tenant_id);
+          const { provider, compute } = await tenantApp.resolveProvider(s);
+          if (provider?.checkSession && compute) {
+            alive = await provider.checkSession(compute, s.session_id, s);
+          } else {
+            alive = await sessionExistsAsync(s.session_id);
+          }
+        } catch {
+          // Provider lookup itself failed (e.g. expired AWS creds at boot).
+          // Don't treat as dead -- a transient cred issue must not nuke
+          // every running remote session. Skip this scan; the next status
+          // poll will catch a genuinely-dead session via the same path
+          // when creds are healthy.
+          continue;
+        }
+
+        if (!alive) {
           const tenantApp = this.app.forTenant(s.tenant_id);
           await tenantApp.sessions.update(s.id, {
             status: "failed",

@@ -36,6 +36,7 @@ import { handleChannelRoutes } from "./routes/channel.js";
 import { handleMiscRoutes } from "./routes/misc.js";
 import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "./routes/attach.js";
 import { handleEventsRoutes } from "./routes/events.js";
+import { handleInterventionRoutes } from "./routes/interventions.js";
 
 declare const Bun: BunLike;
 
@@ -196,6 +197,11 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
         // `/agent/attach/*` paths hit the live-attach handler first.
         const attachRes = await handleAttachRoutes(req, path);
         if (attachRes) return attachRes;
+
+        // Intervention routes must come before generic agent routes so
+        // `/agent/intervention*` paths hit the queue handler first.
+        const interventionRes = await handleInterventionRoutes(req, path, ctx);
+        if (interventionRes) return interventionRes;
 
         const agentRes = await handleAgentRoutes(req, path, ctx);
         if (agentRes) return agentRes;

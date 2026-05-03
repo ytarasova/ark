@@ -73,6 +73,36 @@ export async function send(
   // Persist user message to conversation history before sending to agent
   await app.messages.send(sessionId, "user", message, "text");
 
+  // Dispatch on runtime kind:
+  //   - claude-agent: in-process Anthropic SDK with its own PromptQueue, fed
+  //     by the arkd intervention stream. Send via provider.sendIntervention
+  //     so remote-dispatch sessions reach the worker's arkd queue, not the
+  //     conductor's tmux. Local claude-agent uses local-arkd, same code path.
+  //   - claude-code (legacy CLI in tmux): keep the tmux send-keys path. Only
+  //     works when the pane is on the conductor host -- remote claude-code is
+  //     a separate ticket (#418/#422 family) and out of scope here.
+  // The dispatcher writes session.config.launch_executor when it resolves the
+  // runtime for launch (post-launch.ts). Older sessions store the legacy
+  // "agent-sdk" name; both map to the in-process SDK runtime.
+  const launchExecutor = (session.config?.launch_executor as string | undefined) ?? "";
+  const isClaudeAgent = launchExecutor === "claude-agent" || launchExecutor === "agent-sdk";
+
+  if (isClaudeAgent) {
+    const { provider, compute } = await app.resolveProvider(session);
+    if (provider?.sendIntervention && compute) {
+      try {
+        await provider.sendIntervention(compute, session, message);
+        return { ok: true, message: "Delivered" };
+      } catch (e: any) {
+        return { ok: false, message: `intervention publish failed: ${e?.message ?? e}` };
+      }
+    }
+    // No provider with sendIntervention -- claude-agent without arkd is a
+    // dev-mode-only configuration; nothing to send to.
+    return { ok: false, message: "claude-agent has no reachable arkd to publish to" };
+  }
+
+  // claude-code path: tmux send-keys via sendReliable.
   const { sendReliable } = await import("../send-reliable.js");
   const result = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });
   return { ok: result.ok, message: result.message };

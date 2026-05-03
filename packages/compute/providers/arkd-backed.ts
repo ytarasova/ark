@@ -108,6 +108,18 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
     return res.output;
   }
 
+  async sendIntervention(compute: Compute, session: Session, content: string): Promise<{ delivered: boolean }> {
+    if (!session.session_id) {
+      throw new Error("session has no active agent (session_id is null)");
+    }
+    const client = this.getClient(compute, session);
+    const res = await client.sendIntervention({
+      sessionName: session.session_id,
+      content,
+    });
+    return { delivered: res.delivered };
+  }
+
   async checkSession(compute: Compute, tmuxSessionId: string, session?: Session): Promise<boolean> {
     const client = this.getClient(compute, session);
     const res = await client.agentStatus({ sessionName: tmuxSessionId });
