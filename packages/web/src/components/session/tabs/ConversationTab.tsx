@@ -9,9 +9,10 @@ import { ToolBlock } from "../tool-block/index.js";
 import { TypingIndicator } from "../../ui/TypingIndicator.js";
 import { SessionSummary } from "../../ui/SessionSummary.js";
 import { AttachedFiles } from "../AttachedFiles.js";
-import { formatTime } from "../timeline-builder.js";
+import { formatTime, groupTimelineByStage } from "../timeline-builder.js";
 import { renderAgentContent } from "../event-builder.js";
 import { friendlyAgentName } from "../../../lib/inline-display.js";
+import { StageGroupHeader } from "../StageGroupHeader.js";
 
 interface ConversationTabProps {
   session: any;
@@ -83,63 +84,89 @@ export function ConversationTab({
           {displayAgent} is working... Switch to the Terminal tab to see live output.
         </div>
       )}
-      {timeline.map((item, i) => {
-        if (item.kind === "user")
-          return (
-            <UserMessage key={"u-" + i} timestamp={item.timestamp}>
-              <p>{item.content}</p>
-            </UserMessage>
-          );
-        if (item.kind === "agent")
-          return (
-            <AgentMessage
-              key={"a-" + i}
-              agentName={item.agentName}
-              model={item.model}
-              timestamp={item.timestamp}
-              isThinking={item.isThinking}
-            >
-              {renderAgentContent(item.content, item.type)}
-            </AgentMessage>
-          );
-        if (item.kind === "system") {
-          // Payload behind the row -- shown when the user expands the card.
-          // Fall back to the whole event if there's no data object.
-          const details = item.rawEvent ? (item.rawEvent.data ?? item.rawEvent) : undefined;
-          return (
-            <SystemEvent key={"s-" + i} timestamp={item.timestamp} stage={item.stage} details={details}>
-              {item.content}
-            </SystemEvent>
-          );
-        }
-        if (item.kind === "tool") {
-          if (item.toolName) {
-            const blockStatus =
-              item.status === "running"
-                ? "running"
-                : item.status === "error"
-                  ? "err"
-                  : item.status === "interrupted"
-                    ? "incomplete"
-                    : "ok";
-            return (
-              <ToolBlock
-                key={"t-" + i}
-                name={item.toolName}
-                input={item.toolInput}
-                output={item.toolOutput}
-                status={blockStatus}
-                durationMs={item.durationMs}
-                elapsed={item.duration}
-              />
-            );
+      {(() => {
+        const groups = groupTimelineByStage(timeline, events ?? [], session);
+        const namedGroups = groups.filter((g) => g.name != null);
+        // The flow's stage list, used to show "stage 2/3" counters on each
+        // group. Inline flows are not surfaced here -- callers without a flow
+        // definition just see counters omitted.
+        const flowStages: string[] = (session?.flow_stages ?? session?.config?.flow_stages ?? []) as string[];
+        const totalStages = Array.isArray(flowStages) && flowStages.length > 0 ? flowStages.length : namedGroups.length;
+        const indexOf = (name: string | null): number | undefined => {
+          if (name == null) return undefined;
+          if (Array.isArray(flowStages) && flowStages.length > 0) {
+            const i = flowStages.indexOf(name);
+            return i >= 0 ? i : undefined;
           }
-          if (item.status === "error")
-            return <ToolCallFailed key={"t-" + i} label={item.label} duration={item.duration} error={item.error} />;
-          return <ToolCallRow key={"t-" + i} label={item.label} duration={item.duration} status={item.status} />;
-        }
-        return null;
-      })}
+          return namedGroups.findIndex((g) => g.name === name);
+        };
+        return groups.map((group, gi) => (
+          <StageGroupHeader
+            key={`stage-${gi}-${group.name ?? "setup"}`}
+            group={group}
+            index={indexOf(group.name)}
+            total={group.name != null ? totalStages : undefined}
+          >
+            {group.items.map((item: any, i: number) => {
+              if (item.kind === "user")
+                return (
+                  <UserMessage key={"u-" + i} timestamp={item.timestamp}>
+                    <p>{item.content}</p>
+                  </UserMessage>
+                );
+              if (item.kind === "agent")
+                return (
+                  <AgentMessage
+                    key={"a-" + i}
+                    agentName={item.agentName}
+                    model={item.model}
+                    timestamp={item.timestamp}
+                    isThinking={item.isThinking}
+                  >
+                    {renderAgentContent(item.content, item.type)}
+                  </AgentMessage>
+                );
+              if (item.kind === "system") {
+                const details = item.rawEvent ? (item.rawEvent.data ?? item.rawEvent) : undefined;
+                return (
+                  <SystemEvent key={"s-" + i} timestamp={item.timestamp} stage={item.stage} details={details}>
+                    {item.content}
+                  </SystemEvent>
+                );
+              }
+              if (item.kind === "tool") {
+                if (item.toolName) {
+                  const blockStatus =
+                    item.status === "running"
+                      ? "running"
+                      : item.status === "error"
+                        ? "err"
+                        : item.status === "interrupted"
+                          ? "incomplete"
+                          : "ok";
+                  return (
+                    <ToolBlock
+                      key={"t-" + i}
+                      name={item.toolName}
+                      input={item.toolInput}
+                      output={item.toolOutput}
+                      status={blockStatus}
+                      durationMs={item.durationMs}
+                      elapsed={item.duration}
+                    />
+                  );
+                }
+                if (item.status === "error")
+                  return (
+                    <ToolCallFailed key={"t-" + i} label={item.label} duration={item.duration} error={item.error} />
+                  );
+                return <ToolCallRow key={"t-" + i} label={item.label} duration={item.duration} status={item.status} />;
+              }
+              return null;
+            })}
+          </StageGroupHeader>
+        ));
+      })()}
       {timeline.length === 0 &&
         conversationMessages.map((m: any, i: number) => {
           if (m.role === "user")

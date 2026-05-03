@@ -127,11 +127,18 @@ export class HookStatusApplier {
       }
     }
 
-    // Don't override terminal status -- late hooks can fire after session is done or manually stopped
+    // Don't override terminal status -- late hooks can fire after session is
+    // done. Once a session is failed/completed/stopped the only legitimate
+    // transition out is `retryWithContext` (which goes through a different
+    // path); a late SessionEnd / Stop / etc. must not flip the row back to
+    // `ready` or `running` (#435: auto_merge fails -> status=failed, then a
+    // delayed SessionEnd from the still-running EC2 agent maps SessionEnd to
+    // "ready" via `statusMap[SessionEnd] = "ready"` and silently un-fails
+    // the row -- UI shows PENDING + dispatch_failed simultaneously).
     if (newStatus && session.status === "completed" && newStatus !== "completed") {
       newStatus = undefined;
     }
-    if (newStatus && session.status === "failed" && newStatus === "running") {
+    if (newStatus && session.status === "failed" && newStatus !== "failed") {
       newStatus = undefined;
     }
     if (newStatus && session.status === "stopped" && newStatus !== "stopped") {

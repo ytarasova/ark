@@ -13,6 +13,7 @@ import { ScrollProgress } from "./ui/ScrollProgress.js";
 import { ConfirmDialog } from "./ui/ConfirmDialog.js";
 
 import { normalizeStatus } from "./session/timeline-builder.js";
+import { resolveDisplayStatus } from "./session/display-status.js";
 import { HeaderActions } from "./session/HeaderActions.js";
 import { DiffFooter, TodosFooter } from "./session/TabFooter.js";
 import { TabPanels } from "./session/TabPanels.js";
@@ -164,7 +165,7 @@ export function SessionDetail({
       <SessionHeader
         sessionId={session.id}
         summary={session.summary || session.id}
-        status={normalizeStatus(session.status)}
+        status={resolveDisplayStatus(session, d.events ?? [], normalizeStatus)}
         ancestors={ancestors}
         onBack={onBack}
         onMaximize={onMaximize}

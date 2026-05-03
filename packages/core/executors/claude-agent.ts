@@ -298,6 +298,31 @@ export const claudeAgentExecutor: Executor = {
     return { state: "idle" };
   },
 
+  async probeStatus({ session, handle, compute, provider }) {
+    // claude-agent runs as a Bun process spawned via arkd /process/spawn,
+    // NOT in tmux. The default `provider.checkSession` would query
+    // /agent/status (tmux has-session) and always return false for a
+    // process-based handle, flipping the row to completed within ~3s of
+    // launch (#435). Use /process/status, which kill(pid, 0)s the actual
+    // PID arkd recorded at spawn time.
+    if (!provider.statusProcessByHandle) {
+      // Provider can't tell us about processes -- safest answer is
+      // "still running" so we don't false-positive into completed.
+      return { state: "running" };
+    }
+    const status = await provider.statusProcessByHandle(compute, session, handle);
+    if (status.running) return { state: "running", pid: status.pid };
+    if (typeof status.exitCode === "number") {
+      return status.exitCode === 0
+        ? { state: "completed", exitCode: status.exitCode }
+        : { state: "failed", error: `process exited with code ${status.exitCode}` };
+    }
+    // No record of the handle on arkd at all -- treat as gone, but
+    // distinguish from a clean exit so the poller's "completed -> ready
+    // -> mediate" branch can still fire.
+    return { state: "not_found" };
+  },
+
   async send(_handle: string, _message: string): Promise<void> {
     // Legacy handle-based send is meaningless for claude-agent (no stdin
     // surface). Conductor calls sendUserMessage() below for live steers,
