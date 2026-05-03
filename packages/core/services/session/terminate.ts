@@ -71,14 +71,32 @@ export class SessionTerminator {
       logDebug("session", "fall through to tmux kill");
     }
 
-    const stopped = await this.withProvider(session, `stop ${sessionId}`, async (p, c) => {
-      await p.killAgent(c, session);
-      await p.cleanupSession(c, session);
-    });
-    if (!stopped && session.session_id) {
-      // No provider could be resolved (e.g., compute row missing) but the
-      // session has a tmux name on file -- kill it directly so we don't
-      // leave a zombie pane on the conductor host.
+    // Resolve provider explicitly so we can tell apart "no provider" from
+    // "provider call threw". The local-tmux fallback below is ONLY safe
+    // when there's truly no compute provider for this session -- when a
+    // provider exists but its kill failed (e.g. arkd unreachable on EC2),
+    // running `tmux kill-session` against the conductor's local daemon
+    // does nothing useful and silently masks the real failure (#422 / #425
+    // family). Surface the failure as a log line and continue with the DB
+    // state transition; the agent on the worker may stay alive but at
+    // least the operator sees the session as stopped in the dashboard.
+    const { provider, compute } = await d.resolveProvider(session);
+    if (provider && compute) {
+      const ok = await safeAsync(`stop ${sessionId}`, async () => {
+        await provider.killAgent(compute, session);
+        await provider.cleanupSession(compute, session);
+      });
+      if (!ok) {
+        logError(
+          "session",
+          `stop ${sessionId}: provider.killAgent failed; agent on worker may still be running. ` +
+            `Status will still flip to 'stopped' so the dashboard reflects operator intent.`,
+        );
+      }
+    } else if (session.session_id) {
+      // No provider resolved -- legacy local-only sessions or test fixtures.
+      // Use local tmux. Safe here because absence of provider implies the
+      // tmux pane is on the conductor's host.
       await killSessionAsync(session.session_id);
     }
 
@@ -153,13 +171,24 @@ export class SessionTerminator {
     const session = await d.sessions.get(sessionId);
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-    const handled = await this.withProvider(session, `delete ${sessionId}`, async (p, c) => {
-      await p.killAgent(c, session);
-      await p.cleanupSession(c, session);
-    });
-    if (!handled && session.session_id) {
-      // Same fallback as `stop`: provider couldn't be resolved but a tmux
-      // name exists -- direct tmux kill so we don't leak the pane.
+    // Same shape as stop(): only fall back to local tmux when there's
+    // truly no provider for this session. Otherwise treat a provider-side
+    // kill failure as a logged warning, not an excuse to fire local tmux
+    // (which can't reach the worker's pane). #422 / #425 family.
+    const { provider, compute } = await d.resolveProvider(session);
+    if (provider && compute) {
+      const ok = await safeAsync(`delete ${sessionId}`, async () => {
+        await provider.killAgent(compute, session);
+        await provider.cleanupSession(compute, session);
+      });
+      if (!ok) {
+        logError(
+          "session",
+          `delete ${sessionId}: provider.killAgent failed; agent on worker may still be running. ` +
+            `DB row will still be deleted so the dashboard reflects operator intent.`,
+        );
+      }
+    } else if (session.session_id) {
       await killSessionAsync(session.session_id);
     }
 
