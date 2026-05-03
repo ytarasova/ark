@@ -264,7 +264,7 @@ test("forwards SessionStart on system/init", async () => {
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(calls),
   });
 
@@ -333,7 +333,7 @@ test("forwards PreToolUse and PostToolUse for a tool call", async () => {
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(calls),
   });
 
@@ -393,7 +393,7 @@ test("forwards one PreToolUse per tool_use block when multiple in same assistant
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(calls),
   });
 
@@ -432,7 +432,7 @@ test("forwards Stop then StopFailure with error details when result is an error"
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(calls),
   });
 
@@ -458,7 +458,7 @@ test("forwards Stop then StopFailure with error details when result is an error"
   expect(calls[1].body.error).toBeTruthy();
 });
 
-test("skips forwarding when conductorUrl is undefined", async () => {
+test("skips forwarding when hookEndpoint is undefined", async () => {
   const calls: FetchCall[] = [];
   const dir = makeTmpDir();
   const promptFile = join(dir, "prompt.txt");
@@ -486,11 +486,11 @@ test("skips forwarding when conductorUrl is undefined", async () => {
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    // No conductorUrl
+    // No hookEndpoint
     fetchFn: makeFakeFetch(calls),
   });
 
-  // No fetch calls despite having a fetchFn -- conductorUrl was undefined
+  // No fetch calls despite having a fetchFn -- hookEndpoint was undefined
   expect(calls.length).toBe(0);
   // Transcript still written
   expect(result.exitCode).toBe(0);
@@ -531,7 +531,7 @@ test("forward errors are logged but do not crash the loop", async () => {
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: throwingFetch,
   });
 
@@ -566,7 +566,7 @@ test("includes Authorization header when authToken is provided", async () => {
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     authToken: "my-secret-token",
     fetchFn: makeFakeFetch(calls),
   });
@@ -612,7 +612,7 @@ test("PostToolUse with array content is JSON-stringified", async () => {
     worktree: "/tmp",
     promptFile,
     stream: stream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(calls),
   });
 
@@ -924,7 +924,7 @@ test("compact_boundary emits Notification hook AND re-feeds original prompt", as
     worktree: "/tmp",
     promptFile,
     streamFactory: (prompt) => stream(prompt as AsyncIterable<SDKUserMessage>),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(hookCalls),
   });
 
@@ -977,7 +977,7 @@ test("transition-driving hook (SessionEnd/StopFailure) is always the final hook 
     worktree: "/tmp",
     promptFile: promptFile1,
     stream: successStream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(successCalls),
   });
 
@@ -1016,7 +1016,7 @@ test("transition-driving hook (SessionEnd/StopFailure) is always the final hook 
     worktree: "/tmp",
     promptFile: promptFile2,
     stream: errorStream(),
-    conductorUrl: "http://c:19100",
+    hookEndpoint: "http://c:19100/hooks/status",
     fetchFn: makeFakeFetch(errorCalls),
   });
 

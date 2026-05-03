@@ -71,15 +71,15 @@ export interface ComputeProvider {
 
   /**
    * Publish a steer / user message to a running agent (claude-agent runtime).
-   * For arkd-backed providers this posts to /agent/intervention on the worker;
-   * the agent's intervention-stream consumer pushes the content into its
+   * For arkd-backed providers this posts to /agent/user-message on the worker;
+   * the agent's user-message-stream consumer pushes the content into its
    * PromptQueue. Optional so legacy providers can opt out -- callers that get
    * `undefined` here MUST fall back to the local-tmux send path explicitly
    * rather than silently no-op. Returns true when arkd reported the message
    * was handed to a parked stream consumer; false means it was buffered for
    * a not-yet-attached consumer (still queued, will be delivered on connect).
    */
-  sendIntervention?(compute: Compute, session: Session, content: string): Promise<{ delivered: boolean }>;
+  sendUserMessage?(compute: Compute, session: Session, content: string): Promise<{ delivered: boolean }>;
 
   /** Clean up session resources (worktrees, remote checkouts, etc). */
   cleanupSession(compute: Compute, session: Session): Promise<void>;

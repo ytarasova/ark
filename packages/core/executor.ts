@@ -77,6 +77,29 @@ export type ExecutorStatus =
   | { state: "failed"; error: string }
   | { state: "not_found" };
 
+/**
+ * Context passed to `Executor.sendUserMessage`. Each runtime owns the strategy
+ * for getting a user message into its agent loop:
+ *   - claude-agent: arkd `/agent/user-message` (wire) -> PromptQueue
+ *   - claude-code: tmux send-keys to the agent's pane (paste-buffer + Enter)
+ *   - goose / cli-agent / subprocess: stdin or tmux per their delivery mode
+ *
+ * The Executor sees app + session + compute, so it can resolve the right
+ * provider, port, and worker -- the conductor doesn't need to know which
+ * transport applies to which runtime.
+ */
+export interface SendUserMessageOpts {
+  app: import("./app.js").AppContext;
+  session: import("../types/session.js").Session;
+  message: string;
+}
+
+export interface SendUserMessageResult {
+  ok: boolean;
+  /** Human-readable status -- shown in the UI when ok=false. */
+  message: string;
+}
+
 export interface Executor {
   name: string;
   launch(opts: LaunchOpts): Promise<LaunchResult>;
@@ -87,7 +110,20 @@ export interface Executor {
    */
   terminate?(handle: string): Promise<void>;
   status(handle: string): Promise<ExecutorStatus>;
+  /**
+   * Legacy lower-level send: writes to the underlying handle (tmux pane name
+   * for tmux-based executors, ignored by claude-agent which has no stdin
+   * surface). Kept for callers that already have a handle and don't need
+   * the runtime-aware path.
+   */
   send(handle: string, message: string): Promise<void>;
+  /**
+   * Runtime-polymorphic send. The conductor's session.send() delegates here;
+   * each executor implements the right transport for its runtime. Optional
+   * so legacy executors that only support handle-based send still work via
+   * the default delegate in `services/session-output.ts:send`.
+   */
+  sendUserMessage?(opts: SendUserMessageOpts): Promise<SendUserMessageResult>;
   capture(handle: string, lines?: number): Promise<string>;
 }
 

@@ -108,12 +108,12 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
     return res.output;
   }
 
-  async sendIntervention(compute: Compute, session: Session, content: string): Promise<{ delivered: boolean }> {
+  async sendUserMessage(compute: Compute, session: Session, content: string): Promise<{ delivered: boolean }> {
     if (!session.session_id) {
       throw new Error("session has no active agent (session_id is null)");
     }
     const client = this.getClient(compute, session);
-    const res = await client.sendIntervention({
+    const res = await client.sendUserMessage({
       sessionName: session.session_id,
       content,
     });

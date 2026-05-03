@@ -57,7 +57,18 @@ async function makeHarness(): Promise<Harness> {
   const recipes = new DbResourceStore<any>(db, "recipe", { description: "", flow: "default" });
   const runtimes = new DbResourceStore<any>(db, "runtime", { description: "", type: "cli-agent", command: [] });
 
-  const app = { flows, agents, skills, recipes, runtimes } as unknown as AppContext;
+  // seed-builtins.ts reads app.mode.kind to enforce stricter checks in hosted
+  // mode. The test harness only exercises the local-mode path, so a minimal
+  // mode stub is enough -- the real mode object lives on the AppContext built
+  // in production via the Awilix container.
+  const app = {
+    flows,
+    agents,
+    skills,
+    recipes,
+    runtimes,
+    mode: { kind: "local" },
+  } as unknown as AppContext;
   return { app, db, flows, agents, skills, recipes, runtimes };
 }
 

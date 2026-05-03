@@ -500,6 +500,17 @@ export const claudeCodeExecutor: Executor = {
     await tmux.sendTextAsync(handle, message);
   },
 
+  async sendUserMessage({ session, message }) {
+    if (!session.session_id) return { ok: false, message: "session has no active agent" };
+    // claude-code agents run inside a local tmux pane. sendReliable retries
+    // on paste-marker stalls (Claude Code's bracketed-paste handler can
+    // swallow Enter on first try). Remote claude-code sessions are tracked
+    // separately under #418/#422 -- the local-only path is intentional here.
+    const { sendReliable } = await import("../send-reliable.js");
+    const r = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });
+    return { ok: r.ok, message: r.message };
+  },
+
   async capture(handle: string, lines?: number): Promise<string> {
     return tmux.capturePaneAsync(handle, { lines });
   },

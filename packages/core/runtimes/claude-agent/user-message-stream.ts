@@ -3,7 +3,7 @@
  *
  * Replaces the file-tail (`intervention-tail.ts`) for production: instead of
  * watching `<sessionDir>/interventions.jsonl`, the agent long-polls arkd's
- * `/agent/interventions/stream`. Same external contract as the file-tail
+ * `/agent/user-messages/stream`. Same external contract as the file-tail
  * (`onMessage` per line, optional `onInterrupt` for control:"interrupt"
  * envelopes), so the launch.ts call sites swap over with a one-line change.
  *
@@ -22,9 +22,9 @@
  * that don't have a reachable arkd, but the production path goes through here.
  */
 
-import { ArkdClient, type InterventionEnvelope } from "../../../arkd/index.js";
+import { ArkdClient, type UserMessageEnvelope } from "../../../arkd/index.js";
 
-export interface InterventionStreamOpts {
+export interface UserMessageStreamOpts {
   arkdUrl: string;
   sessionName: string;
   authToken?: string;
@@ -48,7 +48,7 @@ export interface InterventionStreamOpts {
  * (250ms, 500ms, 1s, 2s, capped) until `stop()` is called. Tests inject a
  * test-only `client` so they can drive specific failure modes.
  */
-export function startInterventionStream(opts: InterventionStreamOpts & { client?: ArkdClient }): () => void {
+export function subscribeUserMessages(opts: UserMessageStreamOpts & { client?: ArkdClient }): () => void {
   const { arkdUrl, sessionName, authToken, onMessage, onInterrupt, onError } = opts;
 
   let stopped = false;
@@ -59,7 +59,7 @@ export function startInterventionStream(opts: InterventionStreamOpts & { client?
     let backoffMs = 250;
     while (!stopped) {
       try {
-        for await (const env of client.streamInterventions(sessionName, { signal: ac.signal })) {
+        for await (const env of client.streamUserMessages(sessionName, { signal: ac.signal })) {
           if (typeof env.content === "string" && env.content.length > 0) {
             onMessage(env.content);
           }
@@ -94,4 +94,4 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export type { InterventionEnvelope };
+export type { UserMessageEnvelope };

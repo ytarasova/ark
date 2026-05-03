@@ -2,9 +2,9 @@
  * Intervention queue + stream: conductor -> agent steer-message bus.
  *
  * Mirrors the hook pipeline (`/hooks/forward` + `/events/stream`) but in the
- * opposite direction. Producers (conductor) POST to /agent/intervention?
+ * opposite direction. Producers (conductor) POST to /agent/user-message?
  * session=<sid>; consumers (the claude-agent SDK loop) long-poll
- * /agent/interventions/stream?session=<sid> and receive each queued envelope
+ * /agent/user-messages/stream?session=<sid> and receive each queued envelope
  * as one NDJSON line.
  *
  * Why an in-memory queue:
@@ -24,12 +24,12 @@
 
 import { json, type RouteCtx, requireSafeTmuxName, SAFE_TMUX_NAME_RE } from "../internal.js";
 import { logDebug, logInfo } from "../../core/observability/structured-log.js";
-import type { AgentInterventionReq, AgentInterventionRes, InterventionEnvelope } from "../types.js";
+import type { AgentUserMessageReq, AgentUserMessageRes, UserMessageEnvelope } from "../types.js";
 
 interface PerSessionState {
-  ring: InterventionEnvelope[];
+  ring: UserMessageEnvelope[];
   /** Resolvers waiting to drain. Each call to drain() returns at most one envelope. */
-  waiters: Array<(env: InterventionEnvelope) => void>;
+  waiters: Array<(env: UserMessageEnvelope) => void>;
   /** True while at least one stream consumer is actively connected. */
   hasActiveStream: boolean;
 }
@@ -45,7 +45,7 @@ function stateFor(sessionName: string): PerSessionState {
   return s;
 }
 
-function enqueue(sessionName: string, env: InterventionEnvelope): boolean {
+function enqueue(sessionName: string, env: UserMessageEnvelope): boolean {
   const s = stateFor(sessionName);
   // Hand directly to a waiter when one is parked, otherwise buffer.
   const waiter = s.waiters.shift();
@@ -57,18 +57,18 @@ function enqueue(sessionName: string, env: InterventionEnvelope): boolean {
   return false;
 }
 
-function dequeue(sessionName: string, signal: AbortSignal): Promise<InterventionEnvelope | null> {
+function dequeue(sessionName: string, signal: AbortSignal): Promise<UserMessageEnvelope | null> {
   const s = stateFor(sessionName);
   const buffered = s.ring.shift();
   if (buffered) return Promise.resolve(buffered);
   if (signal.aborted) return Promise.resolve(null);
-  return new Promise<InterventionEnvelope | null>((resolve) => {
+  return new Promise<UserMessageEnvelope | null>((resolve) => {
     const onAbort = () => {
       const idx = s.waiters.indexOf(deliver);
       if (idx >= 0) s.waiters.splice(idx, 1);
       resolve(null);
     };
-    const deliver = (env: InterventionEnvelope) => {
+    const deliver = (env: UserMessageEnvelope) => {
       signal.removeEventListener("abort", onAbort);
       resolve(env);
     };
@@ -92,21 +92,21 @@ export function _resetForTests(): void {
   sessions.clear();
 }
 
-function ndjsonLine(env: InterventionEnvelope): Uint8Array {
+function ndjsonLine(env: UserMessageEnvelope): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(env) + "\n");
 }
 
-export async function handleInterventionRoutes(req: Request, path: string, _ctx: RouteCtx): Promise<Response | null> {
+export async function handleUserMessageRoutes(req: Request, path: string, _ctx: RouteCtx): Promise<Response | null> {
   // ── Producer: conductor -> queue ───────────────────────────────────────
-  if (req.method === "POST" && path === "/agent/intervention") {
+  if (req.method === "POST" && path === "/agent/user-message") {
     const url = new URL(req.url);
     const session = url.searchParams.get("session");
     if (!session || !SAFE_TMUX_NAME_RE.test(session)) {
       return json({ error: "missing or invalid `session` query param" }, 400);
     }
-    let body: AgentInterventionReq;
+    let body: AgentUserMessageReq;
     try {
-      body = (await req.json()) as AgentInterventionReq;
+      body = (await req.json()) as AgentUserMessageReq;
     } catch {
       return json({ error: "invalid JSON body" }, 400);
     }
@@ -116,16 +116,16 @@ export async function handleInterventionRoutes(req: Request, path: string, _ctx:
     if (body.control !== undefined && body.control !== "interrupt") {
       return json({ error: "`control` must be omitted or 'interrupt'" }, 400);
     }
-    const env: InterventionEnvelope = body.control
+    const env: UserMessageEnvelope = body.control
       ? { content: body.content, control: body.control }
       : { content: body.content };
     const delivered = enqueue(session, env);
-    const res: AgentInterventionRes = { ok: true, delivered };
+    const res: AgentUserMessageRes = { ok: true, delivered };
     return json(res);
   }
 
   // ── Consumer: agent long-poll stream ───────────────────────────────────
-  if (req.method === "GET" && path === "/agent/interventions/stream") {
+  if (req.method === "GET" && path === "/agent/user-messages/stream") {
     const url = new URL(req.url);
     const session = url.searchParams.get("session");
     if (!session) return json({ error: "missing `session` query param" }, 400);
@@ -143,7 +143,7 @@ export async function handleInterventionRoutes(req: Request, path: string, _ctx:
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        logInfo("compute", `arkd interventions: stream opened for ${session}`);
+        logInfo("compute", `arkd user-messages: stream opened for ${session}`);
         void (async () => {
           try {
             while (!ac.signal.aborted) {
@@ -152,7 +152,7 @@ export async function handleInterventionRoutes(req: Request, path: string, _ctx:
               try {
                 controller.enqueue(ndjsonLine(env));
               } catch {
-                logDebug("compute", "interventions: enqueue threw, stream closed");
+                logDebug("compute", "user-messages: enqueue threw, stream closed");
                 ac.abort();
               }
             }
@@ -163,7 +163,7 @@ export async function handleInterventionRoutes(req: Request, path: string, _ctx:
             } catch {
               /* already closed */
             }
-            logInfo("compute", `arkd interventions: stream closed for ${session}`);
+            logInfo("compute", `arkd user-messages: stream closed for ${session}`);
           }
         })();
       },

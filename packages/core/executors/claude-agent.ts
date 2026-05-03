@@ -393,8 +393,30 @@ export const claudeAgentExecutor: Executor = {
   },
 
   async send(_handle: string, _message: string): Promise<void> {
-    // The claude-agent runtime does not accept mid-session input via stdin.
-    // All context is delivered via the prompt file before launch.
+    // Legacy handle-based send: claude-agent has no stdin surface; the
+    // conductor uses sendUserMessage() below for live steers (which goes
+    // through arkd /agent/user-message -> PromptQueue).
+  },
+
+  async sendUserMessage({ app, session, message }) {
+    if (!session.session_id) return { ok: false, message: "session has no active agent" };
+    const tenantApp = session.tenant_id ? app.forTenant(session.tenant_id) : app;
+    const { provider, compute } = await tenantApp.resolveProvider(session);
+    if (!provider?.sendUserMessage || !compute) {
+      // claude-agent always runs on an arkd-backed provider (local-arkd or
+      // remote-arkd). Falling here means the compute row is broken; surface
+      // it instead of silently dropping the message.
+      return {
+        ok: false,
+        message: "claude-agent has no reachable arkd-backed provider for this session",
+      };
+    }
+    try {
+      await provider.sendUserMessage(compute, session, message);
+      return { ok: true, message: "Delivered" };
+    } catch (e: any) {
+      return { ok: false, message: `user-message publish failed: ${e?.message ?? e}` };
+    }
   },
 
   async capture(handle: string, lines = 80): Promise<string> {
