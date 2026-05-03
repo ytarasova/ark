@@ -48,10 +48,10 @@ cd ark
 make install          # requires Bun + tmux pre-installed
 
 # 2. Verify
-ark doctor            # check prerequisites (bun, tmux, git, gh, claude)
+ark doctor            # check prerequisites (bun, tmux, git, plus optional: gh, claude, codegraph)
 ark --version
-ark agent list        # shows 12 builtin agents
-ark flow list         # shows 14 builtin flows
+ark agent list        # shows 13 builtin agents
+ark flow list         # shows 15 user-facing builtin flows (plus harness flows)
 
 # 3. Start a session from a recipe and dispatch it
 ark session start \
@@ -180,7 +180,7 @@ ark session delete <id>         # hard delete (worktree + rows)
 
 A flow is a DAG of stages. Each stage has an agent, a gate type, optional verify scripts, and optional dependencies. Flows live in `flows/definitions/*.yaml` and follow the same three-tier resolution as other resources (builtin, `~/.ark/flows/`, `.ark/flows/`).
 
-### Builtin flows (14)
+### Builtin flows (15)
 
 | Name              | Purpose                                                                        |
 | ----------------- | ------------------------------------------------------------------------------ |
@@ -196,8 +196,11 @@ A flow is a DAG of stages. Each stage has an agent, a gate type, optional verify
 | `brainstorm`      | Explore ideas -> synthesize -> plan. Interactive ideation with human steering. |
 | `conditional`     | Conditional routing -- branch based on review outcome, converge at PR.         |
 | `docs`            | Lightweight docs flow: plan -> implement -> PR. No verify/review.              |
+| `goose-recipe`    | Run a Goose recipe autonomously in one stage. Recipe path via `--file`.        |
 | `islc`            | Full ISLC loop (Intake, Spec, Landing, Close).                                 |
 | `islc-quick`      | Condensed ISLC for small tickets.                                              |
+
+`ark flow list` also surfaces internal harness flows (`e2e-noop`, `e2e-noop-agent`, `smoke-rohit-*`, `fan-out-execute`, `islc-execute-subtask`, `islc-quick-execute-subtask`). These are wired as children of the public flows above and are not meant to be dispatched directly.
 
 ### YAML structure
 
@@ -262,22 +265,23 @@ Ark cleanly separates the role of an agent from the tool that runs it.
 
 At dispatch, agent config and runtime config are merged. Agent-level values take precedence over runtime defaults. You can override the runtime on the CLI with `--runtime`.
 
-### Agents (12 builtin roles)
+### Agents (13 builtin roles)
 
-| Role               | Purpose                                     |
-| ------------------ | ------------------------------------------- |
-| `ticket-intake`    | Parse tickets, extract requirements.        |
-| `spec-planner`     | Write the spec/plan.                        |
-| `plan-auditor`     | Audit a plan before implementation.         |
-| `planner`          | General planning role.                      |
-| `implementer`      | Write code for a spec.                      |
-| `task-implementer` | Implement a single task (fan-out child).    |
-| `verifier`         | Run and interpret verification.             |
-| `reviewer`         | Structured code review (P0-P3 JSON output). |
-| `documenter`       | Update docs.                                |
-| `closer`           | Final checks, PR/merge.                     |
-| `retro`            | Post-session retrospective and learnings.   |
-| `worker`           | Generic task runner (fan-out child).        |
+| Role                  | Purpose                                           |
+| --------------------- | ------------------------------------------------- |
+| `ticket-intake`       | Parse tickets, extract requirements.              |
+| `spec-planner`        | Write the spec/plan.                              |
+| `plan-auditor`        | Audit a plan before implementation.               |
+| `planner`             | General planning role.                            |
+| `implementer`         | Write code for a spec.                            |
+| `task-implementer`    | Implement a single task (fan-out child).          |
+| `verifier`            | Run and interpret verification.                   |
+| `reviewer`            | Structured code review (P0-P3 JSON output).       |
+| `documenter`          | Update docs.                                      |
+| `closer`              | Final checks, PR/merge.                           |
+| `retro`               | Post-session retrospective and learnings.         |
+| `worker`              | Generic task runner (fan-out child).              |
+| `goose-recipe-runner` | Executes a Goose recipe file (goose-recipe flow). |
 
 ```bash
 ark agent list
@@ -290,14 +294,14 @@ ark agent show implementer
 # agents/implementer.yaml
 name: implementer
 description: Implements a plan into working code
-runtime: claude # default runtime; override with --runtime
+runtime: claude-agent # default runtime for builtin agents; override with --runtime
 model: sonnet # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
-  You are working on {repo} (branch {branch}).
-  Ticket: {ticket}
-  Task: {summary}
-  Workdir: {workdir}
+  You are working on {{repo}} (branch {{branch}}).
+  Ticket: {{ticket}}
+  Task: {{summary}}
+  Workdir: {{workdir}}
   Write minimal, correct code. Run tests before claiming done.
 skills: [test-writing, self-review, sanity-gate]
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
@@ -305,17 +309,20 @@ permission_mode: bypassPermissions
 env: {}
 ```
 
-Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
+Template variables substituted at dispatch time (Nunjucks -- double braces): `{{ticket}}`, `{{summary}}`, `{{repo}}`, `{{branch}}`, `{{workdir}}`.
 
-### Runtimes (5)
+### Runtimes (6)
 
-| Name         | Tool                        | Billing                     | Transcript parser                  |
-| ------------ | --------------------------- | --------------------------- | ---------------------------------- |
-| `claude`     | Claude Code CLI             | api (per token)             | claude                             |
-| `claude-max` | Claude Code (Max sub)       | subscription ($200/mo flat) | claude                             |
-| `codex`      | OpenAI Codex CLI            | api                         | codex (default model: gpt-5-codex) |
-| `gemini`     | Google Gemini CLI           | api                         | gemini                             |
-| `goose`      | Goose CLI (Block / LF AAIF) | api                         | goose                              |
+| Name           | Tool                           | Billing                     | Transcript parser                  |
+| -------------- | ------------------------------ | --------------------------- | ---------------------------------- |
+| `claude-agent` | Anthropic Agent SDK in-process | api (per token)             | agent-sdk                          |
+| `claude-code`  | Claude Code CLI (in tmux)      | api (per token)             | claude                             |
+| `claude-max`   | Claude Code (Max sub)          | subscription ($200/mo flat) | claude                             |
+| `codex`        | OpenAI Codex CLI               | api                         | codex (default model: gpt-5-codex) |
+| `gemini`       | Google Gemini CLI              | api                         | gemini                             |
+| `goose`        | Goose CLI (Block / LF AAIF)    | api                         | goose                              |
+
+`claude-agent` is the default runtime for every builtin agent as of v0.21. It runs the Anthropic Agent SDK in-process (no tmux, no Claude Code CLI install required) and supports gateway-routed providers via the `compat` field (e.g. `compat: [bedrock]` for AWS Bedrock / TrueFoundry gateways).
 
 ```bash
 ark runtime list
@@ -342,29 +349,27 @@ ark session start --repo . --summary "Big refactor" \
 ```yaml
 # runtimes/codex.yaml
 name: codex
-description: OpenAI Codex CLI
-type: cli-agent # claude-code | cli-agent | subprocess
-command: ["codex", "--auto"]
-task_delivery: stdin # stdin | file | arg
-billing_mode: api # api | subscription | free
-transcript_parser: codex # selects CodexTranscriptParser
-models:
-  - id: gpt-5-codex
-    label: "GPT-5 Codex"
-  - id: gpt-5
-    label: "GPT-5"
-default_model: gpt-5-codex
-env:
-  OPENAI_API_KEY: "${OPENAI_API_KEY}"
+description: "OpenAI Codex CLI"
+type: cli-agent # claude-agent | claude-code | cli-agent | goose | subprocess
+command: ["codex", "--approval-mode", "full-auto"]
+task_delivery: arg # stdin | file | arg
+billing:
+  mode: api # api | subscription | free
+  transcript_parser: codex # selects CodexTranscriptParser
+task_prompt: |
+  When you finish, stop with a final assistant message that summarizes what
+  you accomplished. The UI picks up that summary automatically.
 ```
 
-Three executor types are registered at boot:
+Five executor types are registered at boot:
 
-- `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
-- `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
+- `claude-agent` -- runs the Anthropic Agent SDK in-process (default for builtin agents, no tmux).
+- `claude-code` -- launches Claude Code CLI in tmux with hooks and an MCP channel.
+- `cli-agent` -- any other CLI tool in tmux, with worktree isolation (codex, gemini, ...).
+- `goose` -- Block's Goose agent runner.
 - `subprocess` -- generic child process, no tmux.
 
-Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture`.
+Each executor implements a consistent surface (`launch`, `kill`, `status`, `send`, plus per-type extensions) that the session orchestrator drives.
 
 ---
 
@@ -399,7 +404,7 @@ A project-level skill with the same name overrides a global or builtin one.
 ```yaml
 # agents/reviewer.yaml
 name: reviewer
-runtime: claude
+runtime: claude-agent
 skills: [code-review, security-scan, self-review]
 ```
 
@@ -1085,7 +1090,7 @@ If the daemon is already running on those ports, both `ark web` and the desktop 
 
 ## 22. Messaging Bridges
 
-Ark can send notifications to Telegram, Slack, and Discord when session events occur (stage completion, failures, etc.).
+Ark can send notifications to Slack (via webhook) and email (via SMTP) when session events occur -- stage completion, failures, and other lifecycle events -- so you can monitor long-running sessions remotely.
 
 ### Configuration
 
@@ -1093,20 +1098,30 @@ Create `~/.ark/bridge.json`:
 
 ```json
 {
-  "telegram": {
-    "botToken": "123456:ABC-DEF...",
-    "chatId": "-1001234567890"
-  },
   "slack": {
     "webhookUrl": "https://hooks.slack.com/services/T.../B.../..."
   },
-  "discord": {
-    "webhookUrl": "https://discord.com/api/webhooks/..."
+  "email": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "secure": false,
+    "auth": {
+      "user": "ark@example.com",
+      "pass": "app-password"
+    },
+    "from": "Ark <ark@example.com>",
+    "to": "ops@example.com"
   }
 }
 ```
 
-You can configure one, two, or all three. Notifications fire on stage completion, session errors, and other lifecycle events.
+You can configure one or both. Start the bridge on the daemon with:
+
+```bash
+ark conductor bridge
+```
+
+`to` accepts either a single address or an array. The `secure` flag matches nodemailer's convention (true = implicit TLS, false = STARTTLS on port 587).
 
 ---
 
@@ -1132,7 +1147,7 @@ Schedules let you run sessions on a cron schedule -- recurring tasks like nightl
 # Create a recurring schedule
 ark schedule add \
   --cron "0 9 * * *" \
-  --recipe quick-fix \
+  --flow quick \
   --repo /path/to/repo \
   --summary "Daily lint check"
 
@@ -1151,16 +1166,16 @@ The web dashboard also has a Schedules page with full CRUD for managing recurrin
 
 Additional CLI commands for diagnostics, initialization, and programmatic access.
 
-| Command         | Purpose                                                                                               |
-| --------------- | ----------------------------------------------------------------------------------------------------- |
-| `ark doctor`    | Check system prerequisites (bun, tmux, git, gh, claude). Guards `session start` against missing deps. |
-| `ark init`      | Initialize Ark for a repo -- creates `.ark.yaml`, runs prerequisite checks.                           |
-| `ark acp`       | Start a headless JSON-RPC server on stdin/stdout for programmatic access.                             |
-| `ark repo-map`  | Generate a repository structure map.                                                                  |
-| `ark pr list`   | List sessions bound to PRs.                                                                           |
-| `ark pr status` | Show session bound to a specific PR URL.                                                              |
-| `ark watch`     | Watch GitHub issues with a label and auto-create sessions for new matches.                            |
-| `ark config`    | Open `~/.ark/config.yaml` in your editor.                                                             |
+| Command         | Purpose                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ark doctor`    | Check system prerequisites (bun/tmux/git required; gh/claude/codegraph optional). Guards `session start` against missing deps. |
+| `ark init`      | Initialize Ark for a repo -- creates `.ark.yaml`, runs prerequisite checks.                                                    |
+| `ark acp`       | Start a headless JSON-RPC server on stdin/stdout for programmatic access.                                                      |
+| `ark repo-map`  | Generate a repository structure map.                                                                                           |
+| `ark pr list`   | List sessions bound to PRs.                                                                                                    |
+| `ark pr status` | Show session bound to a specific PR URL.                                                                                       |
+| `ark watch`     | Watch GitHub issues with a label and auto-create sessions for new matches.                                                     |
+| `ark config`    | Open `~/.ark/config.yaml` in your editor.                                                                                      |
 
 ---
 
@@ -1227,7 +1242,7 @@ ark daemon start
 ark daemon status
 
 # Schedule a recurring session
-ark schedule add --cron "0 9 * * *" --recipe quick-fix \
+ark schedule add --cron "0 9 * * *" --flow quick \
   --repo . --summary "Daily lint check"
 
 # Inspect costs
@@ -1243,4 +1258,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 15 user-facing flows (including autonomous-sdlc and conditional routing), 13 agents, 6 runtimes (Claude Agent SDK, Claude Code, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Slack/email), profiles, schedules, and CLI utilities.
