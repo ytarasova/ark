@@ -586,7 +586,7 @@ export class K8sProvider implements ComputeProvider {
     }
   }
 
-  async checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean> {
+  async checkSession(compute: Compute, tmuxSessionId: string, _session?: Session): Promise<boolean> {
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
     const ns = cfg.namespace;

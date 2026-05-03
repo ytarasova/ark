@@ -85,8 +85,10 @@ export interface ComputeProvider {
     opts?: { onLog?: (msg: string) => void; onProgress?: (msg: string) => void },
   ): Promise<void>;
 
-  /** Get the ArkD daemon URL for this compute target. */
-  getArkdUrl?(compute: Compute): string;
+  /** Get the ArkD daemon URL for this compute target. Pass the session when
+   *  available so the URL prefers the session's own SSM tunnel port (#423)
+   *  over the per-compute fallback. */
+  getArkdUrl?(compute: Compute, session?: Session): string;
 
   /**
    * Where the agent should `cd` and where the launcher should write embedded
@@ -135,7 +137,10 @@ export interface ComputeProvider {
   readonly supportsSecretMount: boolean;
 
   // ── Session lifecycle (extended) ──────────────────────────────────────
-  checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean>;
+  /** Probe whether the agent's tmux pane is alive on the worker. Pass the
+   *  session when available so the arkd RPC routes via the per-session SSM
+   *  tunnel (#423); without session, falls back to the compute-level URL. */
+  checkSession(compute: Compute, tmuxSessionId: string, session?: Session): Promise<boolean>;
   getAttachCommand(compute: Compute, session: Session): string[];
   buildChannelConfig(
     sessionId: string,

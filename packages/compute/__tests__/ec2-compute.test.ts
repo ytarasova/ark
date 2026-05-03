@@ -417,38 +417,36 @@ describe("EC2Compute", async () => {
     //   2. stale-PID kill + respawn -- when /health probes false, the
     //      old PID must be killed AND a fresh startPortForward happen.
 
-    it("second call with healthy reused tunnel does not spawn again", async () => {
+    it("each call spawns a fresh tunnel; previously-recorded forward is left alone (#423)", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const handle = makeProvisionedHandle({ portForwardPid: 12345, arkdLocalPort: 60001 });
 
-      // First call -- the recorded PID is alive AND fetchHealth returns
-      // true (default), so the reuse branch should fire on Phase 1 and we
-      // expect zero `startPortForward` calls.
+      // First call -- always allocates a new tunnel, never reuses the
+      // recorded one. Per-session isolation #423: reuse caused multiple
+      // sessions to share a tunnel that one of them would later see as
+      // dead through compute-config staleness.
       await c.ensureReachable!(handle, { app, sessionId: "s-1" });
       let openCalls = calls.filter((call) => call.fn === "startPortForward");
-      expect(openCalls.length).toBe(0);
+      expect(openCalls.length).toBe(1);
 
-      // Second call -- still healthy. Same expectation.
-      await c.ensureReachable!(handle, { app, sessionId: "s-1" });
+      // Second call -- another fresh tunnel.
+      await c.ensureReachable!(handle, { app, sessionId: "s-2" });
       openCalls = calls.filter((call) => call.fn === "startPortForward");
-      expect(openCalls.length).toBe(0);
+      expect(openCalls.length).toBe(2);
 
-      // The kill helper must NOT have fired -- nothing was stale.
+      // The kill helper must NOT have fired here. Killing the prior
+      // forward could kill a sibling session's still-active tunnel.
+      // Per-session cleanup is a separate concern.
       const kills = calls.filter((call) => call.fn === "killPortForward");
       expect(kills.length).toBe(0);
     });
 
-    it("second call with a dead tunnel kills the orphan and respawns", async () => {
-      const recordedPort = 60001;
-      const recordedPid = 12345;
-
+    it("each call writes its own (port, pid) to the compute meta (#423)", async () => {
       let openCount = 0;
-      let killCount = 0;
-      const kills: number[] = [];
-      const opens: Array<Record<string, unknown>> = [];
+      const allocPorts = [60100, 60101, 60102];
 
       const helpers: EC2ComputeHelpers = {
         ssmExec: async () => ({ stdout: "ok", stderr: "", exitCode: 0 }),
@@ -459,20 +457,13 @@ describe("EC2Compute", async () => {
         startInstance: async () => ({ publicIp: null, privateIp: null }),
         stopInstance: async () => {},
         describeInstance: async () => ({ publicIp: null, privateIp: null }),
-        startPortForward: (o) => {
+        startPortForward: () => {
           openCount += 1;
-          opens.push(o);
           return { pid: 90000 + openCount };
         },
-        killPortForward: (pid) => {
-          killCount += 1;
-          kills.push(pid);
-        },
-        allocatePort: async () => recordedPort + 1,
-        fetchHealth: async (url) => {
-          if (url.includes(`localhost:${recordedPort}`)) return false;
-          return true;
-        },
+        killPortForward: () => {},
+        allocatePort: async () => allocPorts[openCount] ?? 60999,
+        fetchHealth: async () => true,
         poll: async (check) => {
           for (let i = 0; i < 3; i++) if (await check()) return true;
           return false;
@@ -482,16 +473,21 @@ describe("EC2Compute", async () => {
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      const handle = makeProvisionedHandle({ portForwardPid: recordedPid, arkdLocalPort: recordedPort });
+      const handle = makeProvisionedHandle({ portForwardPid: 12345, arkdLocalPort: 60001 });
 
       await c.ensureReachable!(handle, { app, sessionId: "s-1" });
+      const meta1 = (handle.meta as { ec2: EC2HandleMeta }).ec2;
+      expect(meta1.arkdLocalPort).toBe(60100);
+      expect(meta1.portForwardPid).toBe(90001);
 
-      expect(killCount).toBe(1);
-      expect(kills[0]).toBe(recordedPid);
-      expect(openCount).toBe(1);
-      const meta = (handle.meta as { ec2: EC2HandleMeta }).ec2;
-      expect(meta.arkdLocalPort).toBe(recordedPort + 1);
-      expect(meta.portForwardPid).toBe(90001);
+      await c.ensureReachable!(handle, { app, sessionId: "s-2" });
+      const meta2 = (handle.meta as { ec2: EC2HandleMeta }).ec2;
+      expect(meta2.arkdLocalPort).toBe(60101);
+      expect(meta2.portForwardPid).toBe(90002);
+
+      // Two `startPortForward` calls; zero kills (sibling session
+      // cleanup is out of scope here).
+      expect(openCount).toBe(2);
     });
   });
 

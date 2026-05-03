@@ -570,23 +570,26 @@ export class EC2Compute implements Compute {
       );
     }
 
-    // Phase 1: forward-tunnel. Reuse the existing one when healthy.
+    // Phase 1: forward-tunnel. Per-session isolation (#423) -- always allocate
+    // a fresh tunnel. The previous behaviour reused the compute handle's
+    // recorded tunnel when its /health probe answered, which meant multiple
+    // sessions on the same compute shared one tunnel. When that tunnel later
+    // died (process exit, AWS SSM session timeout), every session reading
+    // through it failed simultaneously. Fresh-per-call gives each session its
+    // own tunnel keyed by its own local port; the port is persisted to
+    // session.config below so concurrent sessions can't stomp each other.
+    //
+    // Cost: one `aws ssm start-session` process per session (~15 MB). Bounded
+    // by your concurrency. Worth the isolation guarantee.
+    //
+    // We do NOT tear down the previously-recorded forward here -- the
+    // compute handle's meta is shared by every dispatch on this compute,
+    // so killing meta.portForwardPid could kill a sibling session's still-
+    // active tunnel. Per-session pid tracking + cleanup lives in
+    // session.config; the meta becomes a "latest fresh tunnel" pointer.
+    // Orphan tunnels at the end of a session's life are a follow-up
+    // concern, tracked separately.
     const tunnelFn = async (): Promise<{ localPort: number; portForwardPid: number; reused: boolean }> => {
-      // Idempotent reuse: if we already recorded a forward and arkd answers
-      // through it, keep using it. This is the rehydrate-after-multi-stage
-      // path -- a stale meta from 5 minutes ago whose forward process is still
-      // alive should not provoke a respawn.
-      if (meta.portForwardPid !== null && meta.portForwardPid > 0 && meta.arkdLocalPort > 0) {
-        const probeUrl = `http://localhost:${meta.arkdLocalPort}`;
-        const live = await this.helpers.fetchHealth(`${probeUrl}/health`, 2000);
-        if (live) {
-          return { localPort: meta.arkdLocalPort, portForwardPid: meta.portForwardPid, reused: true };
-        }
-        // Old forward is dead -- tear down the recorded PID before respawning
-        // so we don't leak the orphaned process.
-        await this.helpers.killPortForward(meta.portForwardPid);
-      }
-
       log("[ec2] Opening SSM port-forward to arkd...");
       const localPort = await this.helpers.allocatePort();
       const { pid } = await this.helpers.startPortForward({
@@ -607,6 +610,24 @@ export class EC2Compute implements Compute {
     // teardown can find the right pid to kill.
     meta.arkdLocalPort = tunnel.localPort;
     meta.portForwardPid = tunnel.portForwardPid;
+
+    // Per-session port persistence (#423). Multiple sessions targeting the
+    // same compute used to stomp each other's port via `compute.config.
+    // arkd_local_forward_port`; the latest write would win and older
+    // sessions would read a dead port if their tunnel was no longer the
+    // canonical one. Writing the resolved local port to `session.config`
+    // lets the conductor's arkd client pick a port that's known live for
+    // THIS session. The compute-level field stays as a back-compat
+    // fallback for read paths that don't yet have a session in scope.
+    if (opts.app && opts.sessionId) {
+      try {
+        await opts.app.sessions.mergeConfig(opts.sessionId, {
+          arkd_local_forward_port: tunnel.localPort,
+        });
+      } catch {
+        // best-effort: tunnel still works via the fallback
+      }
+    }
 
     // Phase 2: arkd /health probe through the (possibly fresh) forward.
     const arkdUrl = `http://localhost:${tunnel.localPort}`;

@@ -97,19 +97,31 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   /** Subclass isolation type label for cloud-init extras. */
   abstract readonly isolationType: string;
 
-  getArkdUrl(compute: Compute): string {
+  getArkdUrl(compute: Compute, session?: Session): string {
+    // Session-aware lookup (#423): when a session is in scope, the ONLY
+    // acceptable source is `session.config.arkd_local_forward_port`, which
+    // EC2Compute.setupTransport writes after the session's SSM tunnel is up.
+    // No fallbacks: a session-bearing call without the per-session port is
+    // a hard bug -- ensureReachable was skipped, or the conductor is trying
+    // to talk to arkd before the tunnel was provisioned. Surfacing the error
+    // is the only way to keep concurrent sessions from stomping each other.
+    if (session) {
+      const sessionPort = (session.config as { arkd_local_forward_port?: number } | null | undefined)
+        ?.arkd_local_forward_port;
+      if (!sessionPort) {
+        throw new Error(
+          `Session '${session.id}' has no arkd_local_forward_port; ensureReachable must run before any arkd RPC.`,
+        );
+      }
+      return `http://localhost:${sessionPort}`;
+    }
+
+    // Compute-level lookup (no session). Used for provision-time health
+    // probes and the per-compute events consumer. The per-compute port
+    // here is "the latest tunnel that came up for this compute" -- it can
+    // become stale, but no session is depending on it for correctness.
     const cfg = compute.config as RemoteConfig;
-    // Preferred SSM-only path: when an SSM port-forward is up
-    // (set up by `EC2Compute.setupTransport` via `Compute.ensureReachable`),
-    // the conductor reaches arkd via localhost. This wins over the legacy
-    // `arkd_url` field because
-    // `provision()` writes a private-IP `arkd_url` for back-compat -- and
-    // that URL is unreachable from the conductor's network in the SSM-only
-    // model. The forward port being present means the tunnel is the
-    // canonical path; honour it first.
     if (cfg.arkd_local_forward_port) return `http://localhost:${cfg.arkd_local_forward_port}`;
-    // Operator override or legacy in-VPC deployment where the conductor
-    // can still reach the private IP directly.
     if (cfg.arkd_url) return cfg.arkd_url;
     if (cfg.ip) return `http://${cfg.ip}:${ARKD_REMOTE_PORT}`;
     throw new Error(`Compute '${compute.name}' has no arkd_local_forward_port, arkd_url, or ip`);

@@ -110,7 +110,10 @@ async function probeSessionStatus(
     try {
       const { provider, compute } = await resolveProvider(app, session);
       if (provider && compute) {
-        const running = await provider.checkSession(compute, handle);
+        // Pass the session through so the provider reads
+        // session.config.arkd_local_forward_port (#423) instead of the
+        // shared compute-level field.
+        const running = await provider.checkSession(compute, handle, session);
         return running ? { state: "running" } : { state: "not_found" };
       }
     } catch (err: any) {
