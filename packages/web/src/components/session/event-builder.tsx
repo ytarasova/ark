@@ -289,9 +289,15 @@ export function buildRichTimelineEvent(ev: any, i: number): TimelineEvent {
         {previewText && <span className="text-[var(--fg-muted)]">{" -- " + previewText}</span>}
       </span>
     );
+    // Show the preview with real line breaks + total length. `task_full` was
+    // dropped from emit in #417 (it duplicated the prompt into every event
+    // row). Older sessions may still carry it; if so, include it verbatim.
     const detailParts: string[] = [];
+    if (preview) detailParts.push(preview);
     if (taskLen > 0) detailParts.push("Prompt length: " + String(taskLen) + " chars");
-    if (data.task_full) detailParts.push("Full prompt:\n" + data.task_full);
+    if (typeof data.task_full === "string" && data.task_full) {
+      detailParts.push("Full prompt:\n" + data.task_full);
+    }
     detail = detailParts.join("\n\n");
     color = "blue";
   } else if (evType === "dispatch" || evType === "advance") {
