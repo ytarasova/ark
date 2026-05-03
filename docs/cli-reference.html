@@ -64,7 +64,7 @@
 <p>Auto-generated from the Commander.js tree. Run <code>make docs-cli</code> to regenerate.</p>
 </blockquote>
 <blockquote>
-<p>Version: 0.21.10</p>
+<p>Version: 0.21.30</p>
 </blockquote>
 <h2>Usage</h2>
 <pre><code>ark [options] &lt;command&gt;
@@ -256,7 +256,7 @@
 </tr>
 <tr>
 <td><a href="#ark-run-agent-sdk"><code>ark run-agent-sdk</code></a></td>
-<td>Run the agent-sdk launch script (internal -- used by agent-sdk executor)</td>
+<td>Run the claude-agent launch script (internal -- used by claude-agent executor)</td>
 </tr>
 <tr>
 <td><a href="#ark-config"><code>ark config</code></a></td>
@@ -848,8 +848,8 @@
 </tr>
 </tbody></table>
 <h3><code>ark session interrupt</code></h3>
-<p>Interrupt a running agent (Ctrl+C) without killing the session</p>
-<p><strong>Synopsis:</strong> <code>ark session interrupt &lt;id&gt;</code></p>
+<p>Interrupt a running agent and inject a correction message for the next turn</p>
+<p><strong>Synopsis:</strong> <code>ark session interrupt &lt;id&gt; &lt;content&gt;</code></p>
 <p><strong>Arguments:</strong></p>
 <table>
 <thead>
@@ -863,6 +863,11 @@
 <td><code>id</code></td>
 <td>yes</td>
 <td>Session ID</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>yes</td>
+<td>Correction message to inject as the next user turn</td>
 </tr>
 </tbody></table>
 <h3><code>ark session archive</code></h3>
@@ -1253,14 +1258,14 @@
 <td>Compute kind (local, firecracker, ec2, k8s, k8s-kata)</td>
 </tr>
 <tr>
-<td><code>--runtime &lt;kind&gt;</code></td>
+<td><code>--isolation &lt;kind&gt;</code></td>
 <td></td>
-<td>Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container)</td>
+<td>Isolation kind (direct, docker, compose, devcontainer, firecracker-in-container)</td>
 </tr>
 <tr>
 <td><code>--provider &lt;type&gt;</code></td>
 <td></td>
-<td>[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime.</td>
+<td>[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --isolation.</td>
 </tr>
 <tr>
 <td><code>--template</code></td>
@@ -1298,24 +1303,24 @@
 <td>Architecture: x64, arm</td>
 </tr>
 <tr>
-<td><code>--region &lt;region&gt;</code></td>
+<td><code>--aws-region &lt;region&gt;</code></td>
 <td><code>&quot;us-east-1&quot;</code></td>
-<td>Region</td>
+<td>AWS region</td>
 </tr>
 <tr>
-<td><code>--profile &lt;profile&gt;</code></td>
+<td><code>--aws-profile &lt;profile&gt;</code></td>
 <td></td>
 <td>AWS profile</td>
 </tr>
 <tr>
-<td><code>--subnet-id &lt;id&gt;</code></td>
+<td><code>--aws-subnet-id &lt;id&gt;</code></td>
 <td></td>
-<td>Subnet ID</td>
+<td>AWS subnet ID</td>
 </tr>
 <tr>
-<td><code>--tag &lt;key=value&gt;</code></td>
+<td><code>--aws-tag &lt;key=value&gt;</code></td>
 <td><code>[]</code></td>
-<td>Tag (repeatable)</td>
+<td>AWS tag (repeatable)</td>
 </tr>
 <tr>
 <td><code>--context &lt;name&gt;</code></td>
@@ -1468,24 +1473,24 @@
 <td>Architecture: x64, arm</td>
 </tr>
 <tr>
-<td><code>--region &lt;region&gt;</code></td>
+<td><code>--aws-region &lt;region&gt;</code></td>
 <td></td>
 <td>AWS region</td>
 </tr>
 <tr>
-<td><code>--profile &lt;profile&gt;</code></td>
+<td><code>--aws-profile &lt;profile&gt;</code></td>
 <td></td>
 <td>AWS profile</td>
 </tr>
 <tr>
-<td><code>--subnet-id &lt;id&gt;</code></td>
+<td><code>--aws-subnet-id &lt;id&gt;</code></td>
 <td></td>
-<td>Subnet ID</td>
+<td>AWS subnet ID</td>
 </tr>
 <tr>
 <td><code>--ingress &lt;cidrs&gt;</code></td>
 <td></td>
-<td>SSH ingress CIDRs (comma-separated, or &#39;open&#39; for 0.0.0.0/0)</td>
+<td>Security-group ingress CIDRs (comma-separated, or &#39;open&#39; for 0.0.0.0/0)</td>
 </tr>
 <tr>
 <td><code>--idle-minutes &lt;min&gt;</code></td>
@@ -1780,12 +1785,12 @@
 <td>Architecture (ec2)</td>
 </tr>
 <tr>
-<td><code>--region &lt;region&gt;</code></td>
+<td><code>--aws-region &lt;region&gt;</code></td>
 <td></td>
-<td>Region (ec2)</td>
+<td>AWS region (ec2)</td>
 </tr>
 <tr>
-<td><code>--profile &lt;profile&gt;</code></td>
+<td><code>--aws-profile &lt;profile&gt;</code></td>
 <td></td>
 <td>AWS profile (ec2)</td>
 </tr>
@@ -3170,24 +3175,6 @@
 <h2><code>ark auth</code></h2>
 <p>Manage authentication and API keys</p>
 <p><strong>Synopsis:</strong> <code>ark auth</code></p>
-<h3><code>ark auth setup</code></h3>
-<p>Set up Claude authentication (local or remote)</p>
-<p><strong>Synopsis:</strong> <code>ark auth setup [options]</code></p>
-<p><strong>Options:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>--host &lt;name&gt;</code></td>
-<td></td>
-<td>Run setup-token on a specific remote compute</td>
-</tr>
-</tbody></table>
 <h3><code>ark auth create-key</code></h3>
 <p>Create a new API key</p>
 <p><strong>Synopsis:</strong> <code>ark auth create-key [options]</code></p>
@@ -5257,7 +5244,7 @@
 <p>Run the MCP channel server (used by remote agents)</p>
 <p><strong>Synopsis:</strong> <code>ark channel</code></p>
 <h2><code>ark run-agent-sdk</code></h2>
-<p>Run the agent-sdk launch script (internal -- used by agent-sdk executor)</p>
+<p>Run the claude-agent launch script (internal -- used by claude-agent executor)</p>
 <p><strong>Synopsis:</strong> <code>ark run-agent-sdk</code></p>
 <h2><code>ark config</code></h2>
 <p>Open Ark config in your editor</p>
@@ -5465,6 +5452,16 @@
 <td></td>
 <td>Human-readable description</td>
 </tr>
+<tr>
+<td><code>--type &lt;type&gt;</code></td>
+<td><code>&quot;env-var&quot;</code></td>
+<td>Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)</td>
+</tr>
+<tr>
+<td><code>--metadata &lt;kv&gt;</code></td>
+<td><code>{}</code></td>
+<td>Repeatable key=value metadata pair</td>
+</tr>
 </tbody></table>
 <h3><code>ark secrets delete</code></h3>
 <p>Delete a secret.</p>
@@ -5507,7 +5504,7 @@
 <p><strong>Synopsis:</strong> <code>ark secrets blob list</code></p>
 <h4><code>ark secrets blob upload</code></h4>
 <p>Upload a directory as a named blob. Reads every file in <dir> (non-recursive).</p>
-<p><strong>Synopsis:</strong> <code>ark secrets blob upload &lt;name&gt; &lt;dir&gt;</code></p>
+<p><strong>Synopsis:</strong> <code>ark secrets blob upload [options] &lt;name&gt; &lt;dir&gt;</code></p>
 <p><strong>Arguments:</strong></p>
 <table>
 <thead>
@@ -5526,6 +5523,26 @@
 <td><code>dir</code></td>
 <td>yes</td>
 <td>Directory to upload</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--type &lt;type&gt;</code></td>
+<td><code>&quot;generic-blob&quot;</code></td>
+<td>Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)</td>
+</tr>
+<tr>
+<td><code>--metadata &lt;kv&gt;</code></td>
+<td><code>{}</code></td>
+<td>Repeatable key=value metadata pair</td>
 </tr>
 </tbody></table>
 <h4><code>ark secrets blob download</code></h4>
@@ -5615,6 +5632,24 @@
 <td><code>--print</code></td>
 <td></td>
 <td>Allow printing to a TTY (default: refuse to prevent shoulder surfing)</td>
+</tr>
+</tbody></table>
+<h3><code>ark secrets describe</code></h3>
+<p>Print a secret&#39;s type, metadata, and the providers that will place it</p>
+<p><strong>Synopsis:</strong> <code>ark secrets describe &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
 </tr>
 </tbody></table>
 <h2><code>ark cluster</code></h2>

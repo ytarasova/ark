@@ -2,7 +2,7 @@
 
 > Auto-generated from the Commander.js tree. Run `make docs-cli` to regenerate.
 
-> Version: 0.21.10
+> Version: 0.21.30
 
 ## Usage
 
@@ -61,7 +61,7 @@ ark [options] <command>
 | [`ark doctor`](#ark-doctor) | Check system prerequisites |
 | [`ark arkd`](#ark-arkd) | Start the arkd agent daemon |
 | [`ark channel`](#ark-channel) | Run the MCP channel server (used by remote agents) |
-| [`ark run-agent-sdk`](#ark-run-agent-sdk) | Run the agent-sdk launch script (internal -- used by agent-sdk executor) |
+| [`ark run-agent-sdk`](#ark-run-agent-sdk) | Run the claude-agent launch script (internal -- used by claude-agent executor) |
 | [`ark config`](#ark-config) | Open Ark config in your editor |
 | [`ark web`](#ark-web) | Start web dashboard |
 | [`ark openapi`](#ark-openapi) | Generate OpenAPI spec |
@@ -349,15 +349,16 @@ Pause a session (persists a snapshot when the compute supports it)
 
 ### `ark session interrupt`
 
-Interrupt a running agent (Ctrl+C) without killing the session
+Interrupt a running agent and inject a correction message for the next turn
 
-**Synopsis:** `ark session interrupt <id>`
+**Synopsis:** `ark session interrupt <id> <content>`
 
 **Arguments:**
 
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `id` | yes | Session ID |
+| `content` | yes | Correction message to inject as the next user turn |
 
 ### `ark session archive`
 
@@ -582,8 +583,8 @@ Create a new compute resource (concrete target or reusable template)
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--compute <kind>` |  | Compute kind (local, firecracker, ec2, k8s, k8s-kata) |
-| `--runtime <kind>` |  | Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container) |
-| `--provider <type>` |  | [deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime. |
+| `--isolation <kind>` |  | Isolation kind (direct, docker, compose, devcontainer, firecracker-in-container) |
+| `--provider <type>` |  | [deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --isolation. |
 | `--template` |  | Create a reusable template (blueprint) instead of a concrete compute target |
 | `--no-prompt` |  | Skip interactive prompts (fail if required fields are missing) |
 | `--image <image>` |  | Docker image (default: ubuntu:22.04) |
@@ -591,10 +592,10 @@ Create a new compute resource (concrete target or reusable template)
 | `--volume <mount>` | `[]` | Extra volume mount (repeatable) |
 | `--size <size>` | `"m"` | Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256) |
 | `--arch <arch>` | `"x64"` | Architecture: x64, arm |
-| `--region <region>` | `"us-east-1"` | Region |
-| `--profile <profile>` |  | AWS profile |
-| `--subnet-id <id>` |  | Subnet ID |
-| `--tag <key=value>` | `[]` | Tag (repeatable) |
+| `--aws-region <region>` | `"us-east-1"` | AWS region |
+| `--aws-profile <profile>` |  | AWS profile |
+| `--aws-subnet-id <id>` |  | AWS subnet ID |
+| `--aws-tag <key=value>` | `[]` | AWS tag (repeatable) |
 | `--context <name>` |  | Kubeconfig context (cluster) -- required |
 | `--namespace <ns>` |  | K8s namespace -- required |
 | `--kubeconfig <path>` |  | Path to kubeconfig (default: in-cluster or ~/.kube/config) |
@@ -670,10 +671,10 @@ Update compute configuration
 |------|---------|-------------|
 | `--size <size>` |  | Instance size |
 | `--arch <arch>` |  | Architecture: x64, arm |
-| `--region <region>` |  | AWS region |
-| `--profile <profile>` |  | AWS profile |
-| `--subnet-id <id>` |  | Subnet ID |
-| `--ingress <cidrs>` |  | SSH ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0) |
+| `--aws-region <region>` |  | AWS region |
+| `--aws-profile <profile>` |  | AWS profile |
+| `--aws-subnet-id <id>` |  | AWS subnet ID |
+| `--ingress <cidrs>` |  | Security-group ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0) |
 | `--idle-minutes <min>` |  | Idle shutdown timeout in minutes |
 | `--set <key=value>` | `[]` | Set arbitrary config key |
 
@@ -847,8 +848,8 @@ Create a compute template (convenience alias for 'compute create --template')
 | `--description <desc>` |  | Description |
 | `--size <size>` |  | Instance size (ec2) |
 | `--arch <arch>` |  | Architecture (ec2) |
-| `--region <region>` |  | Region (ec2) |
-| `--profile <profile>` |  | AWS profile (ec2) |
+| `--aws-region <region>` |  | AWS region (ec2) |
+| `--aws-profile <profile>` |  | AWS profile (ec2) |
 | `--image <image>` |  | Docker image (docker) |
 | `--namespace <ns>` |  | K8s namespace (k8s) |
 
@@ -2939,7 +2940,7 @@ Run the MCP channel server (used by remote agents)
 
 ## `ark run-agent-sdk`
 
-Run the agent-sdk launch script (internal -- used by agent-sdk executor)
+Run the claude-agent launch script (internal -- used by claude-agent executor)
 
 **Synopsis:** `ark run-agent-sdk`
 
@@ -3086,6 +3087,8 @@ Create or replace a secret. Reads value from stdin if piped, otherwise prompts.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-d, --description <text>` |  | Human-readable description |
+| `--type <type>` | `"env-var"` | Secret type (env-var, ssh-private-key, generic-blob, kubeconfig) |
+| `--metadata <kv>` | `{}` | Repeatable key=value metadata pair |
 
 ### `ark secrets delete`
 
@@ -3121,7 +3124,7 @@ List blob names (contents are never returned)
 
 Upload a directory as a named blob. Reads every file in <dir> (non-recursive).
 
-**Synopsis:** `ark secrets blob upload <name> <dir>`
+**Synopsis:** `ark secrets blob upload [options] <name> <dir>`
 
 **Arguments:**
 
@@ -3129,6 +3132,13 @@ Upload a directory as a named blob. Reads every file in <dir> (non-recursive).
 |----------|----------|-------------|
 | `name` | yes | Blob name (lowercase kebab-case, <=63 chars) |
 | `dir` | yes | Directory to upload |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--type <type>` | `"generic-blob"` | Secret type (env-var, ssh-private-key, generic-blob, kubeconfig) |
+| `--metadata <kv>` | `{}` | Repeatable key=value metadata pair |
 
 #### `ark secrets blob download`
 
@@ -3178,6 +3188,18 @@ Print a secret value to stdout. Refuses TTY stdout without --print.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--print` |  | Allow printing to a TTY (default: refuse to prevent shoulder surfing) |
+
+### `ark secrets describe`
+
+Print a secret's type, metadata, and the providers that will place it
+
+**Synopsis:** `ark secrets describe <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
 
 ## `ark cluster`
 
