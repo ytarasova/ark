@@ -47,7 +47,14 @@ export function StageGroupHeader({ group, index, total, children, defaultExpande
   const commits = group.artifacts.commits;
   const prUrl = group.artifacts.prUrl;
   const merged = group.artifacts.merged;
-  const hasArtifacts = filesCount > 0 || commits > 0 || !!prUrl || !!merged;
+  // Pending stages have not run yet -- any "artifacts" or "duration" we
+  // accumulated for them comes from stale events that shouldn't be
+  // attributed here (#435 repro: events stamped with a future stage
+  // before the agent actually got there). Suppress the chips so the
+  // header reads honestly: pending = nothing has happened here.
+  const isPending = group.status === "pending";
+  const hasArtifacts = !isPending && (filesCount > 0 || commits > 0 || !!prUrl || !!merged);
+  const showDuration = !isPending && group.duration;
 
   return (
     <section className="my-[14px] rounded-[8px] border border-[var(--border)] bg-[var(--bg-card)]/30 overflow-hidden">
@@ -153,7 +160,7 @@ export function StageGroupHeader({ group, index, total, children, defaultExpande
           </span>
         )}
 
-        {group.duration && (
+        {showDuration && (
           <span className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--fg-faint)] shrink-0 tabular-nums">
             {group.duration}
           </span>

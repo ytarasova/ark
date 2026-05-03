@@ -37,6 +37,11 @@ interface ConversationTabProps {
   /** Files changed in the worktree (from git diff). Used as a fallback when
    *  the agent didn't report `filesChanged` via the channel. */
   filesChangedCount?: number;
+  /** Canonical flow stage definitions ({name, agent, gate, ...} per stage)
+   *  from FlowStore. Used to compute "stage N/M" counters against the
+   *  flow's authoritative ordering instead of trusting whatever named
+   *  stages happen to appear in the event stream. */
+  flowStages?: any[];
 }
 
 /**
@@ -57,6 +62,7 @@ export function ConversationTab({
   agentIsTyping,
   bottomRef,
   filesChangedCount,
+  flowStages: flowStageDefs,
 }: ConversationTabProps) {
   const attachments = (session?.config?.attachments ?? []) as Array<{ name: string; content: string; type: string }>;
   // Resolve a display label that doesn't leak the literal "inline" placeholder
@@ -85,22 +91,35 @@ export function ConversationTab({
         </div>
       )}
       {(() => {
-        const groups = groupTimelineByStage(timeline, events ?? [], session);
+        // Canonical flow stage list -- the source of truth for "stage N/M"
+        // counters and which stages can legitimately appear at all. Falls
+        // back to the named groups in the event stream when the flow def
+        // isn't on hand (inline flows, transient render).
+        const canonicalNames: string[] = Array.isArray(flowStageDefs)
+          ? flowStageDefs.map((s: any) => (typeof s?.name === "string" ? s.name : null)).filter((s): s is string => !!s)
+          : [];
+        const groups = groupTimelineByStage(timeline, events ?? [], session, canonicalNames);
         const namedGroups = groups.filter((g) => g.name != null);
-        // The flow's stage list, used to show "stage 2/3" counters on each
-        // group. Inline flows are not surfaced here -- callers without a flow
-        // definition just see counters omitted.
-        const flowStages: string[] = (session?.flow_stages ?? session?.config?.flow_stages ?? []) as string[];
-        const totalStages = Array.isArray(flowStages) && flowStages.length > 0 ? flowStages.length : namedGroups.length;
+        const totalStages = canonicalNames.length > 0 ? canonicalNames.length : namedGroups.length;
         const indexOf = (name: string | null): number | undefined => {
           if (name == null) return undefined;
-          if (Array.isArray(flowStages) && flowStages.length > 0) {
-            const i = flowStages.indexOf(name);
+          if (canonicalNames.length > 0) {
+            const i = canonicalNames.indexOf(name);
             return i >= 0 ? i : undefined;
           }
           return namedGroups.findIndex((g) => g.name === name);
         };
-        return groups.map((group, gi) => (
+        // Hide stage groups that aren't in the canonical flow ordering.
+        // Sessions that lived through pre-fix bugs have events stamped
+        // with stage names that no longer exist in the flow (#435 repro:
+        // events stamped "merge" after the flow's merge action stage was
+        // removed; or stages from the old action-based flow before the
+        // pr-handler agent migration). Showing those produces impossible
+        // displays like "STAGE 3/4 pr DONE" while STAGE 2 is still
+        // running. The Setup (null-named) bucket always renders.
+        const visible =
+          canonicalNames.length > 0 ? groups.filter((g) => g.name == null || canonicalNames.includes(g.name)) : groups;
+        return visible.map((group, gi) => (
           <StageGroupHeader
             key={`stage-${gi}-${group.name ?? "setup"}`}
             group={group}

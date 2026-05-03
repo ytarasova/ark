@@ -141,6 +141,41 @@ describe("groupTimelineByStage", () => {
     expect(merge.status).toBe("failed");
   });
 
+  it("clamps post-current stages to pending regardless of historical events (#435)", () => {
+    // The bug repro: agent at stage="verify" still running, but old buggy
+    // events (from a status-poller false-positive that prematurely
+    // advanced session.stage and then was reconciled back) tagged events
+    // with stage="pr" and stage="merge". The display must NOT show
+    // "STAGE 3 pr DONE" while STAGE 2 is still running -- a stage strictly
+    // after session.stage in the canonical flow ordering is pending.
+    const events = [
+      ev("stage_started", { stage: "implement", data: { agent: "implementer" } }),
+      ev("stage_handoff", {
+        stage: "implement",
+        data: { from_stage: "implement", to_stage: "verify" },
+      }),
+      // legacy stamping from the bug period -- pretends pr + merge were reached
+      ev("action_executed", { stage: "pr", data: { action: "create_pr" } }),
+      ev("stage_handoff", { stage: "pr", data: { from_stage: "pr", to_stage: "merge" } }),
+      ev("hook_status", {
+        stage: "merge",
+        data: { event: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } },
+      }),
+    ];
+    const timeline = buildConversationTimeline(events, [], { status: "running", stage: "verify", flow: "quick" });
+    const groups = groupTimelineByStage(timeline, events, { status: "running", stage: "verify", flow: "quick" }, [
+      "implement",
+      "verify",
+      "pr",
+      "merge",
+    ]);
+
+    const pr = groups.find((g) => g.name === "pr");
+    const merge = groups.find((g) => g.name === "merge");
+    expect(pr?.status).toBe("pending");
+    expect(merge?.status).toBe("pending");
+  });
+
   it("attaches null-stage items to the most recent named stage when one exists", () => {
     // First stage_started event sets the cursor; a later message-only item
     // (no stage) should fold into that stage rather than the leading null
