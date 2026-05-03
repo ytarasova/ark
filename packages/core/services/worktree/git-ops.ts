@@ -351,7 +351,7 @@ export async function finishWorktree(
   const targetBranch = opts?.into ?? DEFAULT_BASE_BRANCH;
 
   // 1. Stop the session if running
-  if (!["completed", "failed", "stopped", "pending"].includes(session.status)) {
+  if (!["completed", "failed", "killed", "stopped", "pending"].includes(session.status)) {
     await app.sessionLifecycle.stop(sessionId);
   }
 

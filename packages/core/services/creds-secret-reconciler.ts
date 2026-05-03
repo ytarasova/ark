@@ -29,7 +29,7 @@ import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
 import type { K8sSecretsApi } from "./dispatch-claude-auth.js";
 
 /** Session statuses that mean "this session will never come back". */
-const TERMINAL_STATES = new Set(["completed", "failed", "archived", "stopped"]);
+const TERMINAL_STATES = new Set(["completed", "failed", "killed", "archived", "stopped"]);
 
 export interface ReconcileResult {
   deleted: number;

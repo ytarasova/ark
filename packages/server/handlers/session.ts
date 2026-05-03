@@ -495,8 +495,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   // ── session/kill -- hard terminate, no grace ──────────────────────────────
   //
   // Goes straight to SIGKILL (skips the SIGTERM grace that session/stop uses).
-  // Marks session `failed` with reason `killed` and runs D2 cleanup
-  // synchronously so post-conditions are reliable for the caller.
+  // Marks session `killed` (a distinct terminal state from `failed` so the
+  // dashboard and alerts can tell operator-initiated kills apart from crashes
+  // -- see #419) and runs D2 cleanup synchronously so post-conditions are
+  // reliable for the caller.
 
   router.handle("session/kill", async (params, notify, ctx) => {
     const { sessionId } = extract<{ sessionId: string }>(params, ["sessionId"]);
@@ -505,7 +507,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const s = await scoped.sessions.get(sessionId);
     if (!s) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
 
-    const terminalStatuses = ["completed", "failed", "archived", "stopped"];
+    const terminalStatuses = ["completed", "failed", "killed", "archived", "stopped"];
     if (terminalStatuses.includes(s.status)) {
       return { ok: false, message: `session already terminal (status=${s.status})` };
     }
@@ -526,10 +528,12 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       }
     }
 
-    // Mark session failed with reason "killed".
+    // Mark session "killed" (distinct from "failed") so operators can tell a
+    // deliberate kill apart from a real crash. `error` stays null -- a kill is
+    // not an error condition; the status itself carries the intent.
     await scoped.sessions.update(sessionId, {
-      status: "failed",
-      error: "killed",
+      status: "killed",
+      error: null,
       session_id: null,
     } as Partial<import("../../types/index.js").Session>);
 
@@ -590,7 +594,12 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // so this case must take precedence over the missing-session_id check
     // below -- otherwise the UI shows "not yet dispatched" for sessions that
     // ran end-to-end.
-    if (session.status === "completed" || session.status === "failed" || session.status === "archived") {
+    if (
+      session.status === "completed" ||
+      session.status === "failed" ||
+      session.status === "killed" ||
+      session.status === "archived"
+    ) {
       return {
         command: "",
         displayHint: "",

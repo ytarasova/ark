@@ -52,7 +52,7 @@ export async function garbageCollectComputeIfTemplate(
   // across every tenant that might still pin the row.
   const sessions = await app.sessions.listAcrossTenants({});
   const referencing = sessions.filter(
-    (s) => s.compute_name === computeName && !["completed", "failed", "stopped"].includes(s.status),
+    (s) => s.compute_name === computeName && !["completed", "failed", "killed", "stopped"].includes(s.status),
   );
   if (referencing.length > 0) {
     logDebug(

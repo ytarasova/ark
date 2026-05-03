@@ -25,13 +25,41 @@ describe("session_start", () => {
 });
 
 describe("session_kill", () => {
-  it("kills a target session", async () => {
+  it("kills a target session -- sets status=killed, not failed (#419)", async () => {
     const created = await h.app.sessions.create({ summary: "kill-target", flow: "bare" });
     const result = (await h.callTool("session_kill", { sessionId: created.id })) as { ok: boolean };
     expect(result.ok).toBe(true);
     const after = await h.app.sessions.get(created.id);
+    expect(after?.status).toBe("killed");
+    // Kill is not an error condition -- the status itself carries the intent.
+    expect(after?.error).toBeNull();
+  });
+
+  it("does not overwrite an already-failed session with killed", async () => {
+    const created = await h.app.sessions.create({ summary: "kill-terminal-failed", flow: "bare" });
+    await h.app.sessions.update(created.id, { status: "failed", error: "boom" } as any);
+    const result = (await h.callTool("session_kill", { sessionId: created.id })) as {
+      ok: boolean;
+      message?: string;
+    };
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("terminal");
+    const after = await h.app.sessions.get(created.id);
     expect(after?.status).toBe("failed");
-    expect(after?.error).toBe("killed");
+    expect(after?.error).toBe("boom");
+  });
+
+  it("is a no-op on an already-completed session", async () => {
+    const created = await h.app.sessions.create({ summary: "kill-terminal-completed", flow: "bare" });
+    await h.app.sessions.update(created.id, { status: "completed" } as any);
+    const result = (await h.callTool("session_kill", { sessionId: created.id })) as {
+      ok: boolean;
+      message?: string;
+    };
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("terminal");
+    const after = await h.app.sessions.get(created.id);
+    expect(after?.status).toBe("completed");
   });
 });
 

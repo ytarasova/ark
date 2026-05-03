@@ -227,6 +227,14 @@ function statusBadge(status: string): { label: string; bg: string; color: string
         border: "rgba(248,113,113,.35)",
         dot: "#f87171",
       };
+    case "killed":
+      return {
+        label: "killed",
+        bg: "linear-gradient(180deg, rgba(167,139,250,.18), rgba(167,139,250,.05))",
+        color: "#a78bfa",
+        border: "rgba(167,139,250,.35)",
+        dot: "#a78bfa",
+      };
     default:
       return {
         label: status,
@@ -244,20 +252,25 @@ function statusBadge(status: string): { label: string; bg: string; color: string
  */
 function SessionTile({ s, onSelect }: { s: RowSession; onSelect?: (id: string) => void }) {
   const badge = statusBadge(s.status);
-  const pctRaw = s.progress ?? (s.status === "completed" ? 1 : s.status === "failed" ? 0.35 : 0.62);
+  const pctRaw =
+    s.progress ?? (s.status === "completed" ? 1 : s.status === "failed" || s.status === "killed" ? 0.35 : 0.62);
   const pct = Math.max(0, Math.min(1, pctRaw));
   const fillBg =
     s.status === "completed"
       ? "linear-gradient(90deg, #34d399, #22b07e)"
       : s.status === "failed"
         ? "linear-gradient(90deg, #f87171, #dc5252)"
-        : "linear-gradient(90deg, #8b7aff, var(--primary))";
+        : s.status === "killed"
+          ? "linear-gradient(90deg, #a78bfa, #8b6fe0)"
+          : "linear-gradient(90deg, #8b7aff, var(--primary))";
   const fillGlow =
     s.status === "completed"
       ? "0 0 8px rgba(52,211,153,.5), 0 1px 0 rgba(255,255,255,.15) inset"
       : s.status === "failed"
         ? "0 0 8px rgba(248,113,113,.4), 0 1px 0 rgba(255,255,255,.15) inset"
-        : "0 0 8px rgba(107,89,222,.6), 0 1px 0 rgba(255,255,255,.15) inset";
+        : s.status === "killed"
+          ? "0 0 8px rgba(167,139,250,.4), 0 1px 0 rgba(255,255,255,.15) inset"
+          : "0 0 8px rgba(107,89,222,.6), 0 1px 0 rgba(255,255,255,.15) inset";
 
   const tokensLabel = fmtTokens(s.tokens);
   const costLabel = s.cost != null ? fmtCost(s.cost) : "";

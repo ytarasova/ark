@@ -17,6 +17,7 @@ const dotVariants = cva("inline-block rounded-full shrink-0 relative", {
       waiting: "bg-[var(--waiting)]",
       completed: "bg-[var(--completed)]",
       failed: "bg-[var(--failed)] shadow-[var(--failed-glow)]",
+      killed: "bg-[var(--killed)]",
       stopped: "bg-[var(--stopped)]",
       pending: "bg-[var(--stopped)] opacity-60",
     },
@@ -30,7 +31,7 @@ const dotVariants = cva("inline-block rounded-full shrink-0 relative", {
   defaultVariants: { status: "stopped", size: "md" },
 });
 
-export type SessionStatus = "running" | "waiting" | "completed" | "failed" | "stopped" | "pending";
+export type SessionStatus = "running" | "waiting" | "completed" | "failed" | "killed" | "stopped" | "pending";
 
 export interface StatusDotProps extends React.ComponentProps<"span">, VariantProps<typeof dotVariants> {
   status: SessionStatus;

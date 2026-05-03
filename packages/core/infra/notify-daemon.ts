@@ -67,10 +67,14 @@ export class NotifyDaemon {
         if (s.status === "running") hasRunning = true;
         if (["waiting", "blocked"].includes(s.status)) hasWaiting = true;
 
-        // Notify on meaningful transitions
+        // Notify on meaningful transitions. `killed` is included in the
+        // transition list (so operator-initiated kills still flow through
+        // the notifier), but not in the always-notify clause -- `failed`
+        // is a crash that demands attention, `killed` is user-initiated.
         if (prev && prev !== s.status) {
           const shouldNotify =
-            (prev === "running" && ["waiting", "blocked", "failed", "completed", "stopped"].includes(s.status)) ||
+            (prev === "running" &&
+              ["waiting", "blocked", "failed", "killed", "completed", "stopped"].includes(s.status)) ||
             s.status === "failed";
 
           if (shouldNotify) {

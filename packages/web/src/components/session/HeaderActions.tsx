@@ -65,7 +65,7 @@ export function HeaderActions({
   }
 
   const isBlocked = status === "blocked" && canShowGate;
-  const isTerminal = status === "stopped" || status === "completed" || status === "failed";
+  const isTerminal = status === "stopped" || status === "completed" || status === "failed" || status === "killed";
   const isArchived = status === "archived";
 
   // Build the overflow menu first so primary-button rendering can ignore it.

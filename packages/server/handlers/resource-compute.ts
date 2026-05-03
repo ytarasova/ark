@@ -28,7 +28,7 @@ export async function cleanZombieSessions(app: AppContext): Promise<number> {
   for (const ts of tmuxSessions) {
     const sessionId = ts.name.replace("ark-", "");
     const dbSession = await app.sessions.get(sessionId);
-    if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
+    if (!dbSession || ["failed", "killed", "completed", "stopped"].includes(dbSession.status)) {
       await killSessionAsync(ts.name);
       if (dbSession) await app.sessions.update(dbSession.id, { session_id: null });
       cleaned++;

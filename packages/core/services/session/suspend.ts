@@ -92,7 +92,7 @@ export class SessionSuspender {
       const session = await d.sessions.get(sessionId);
       if (!session) return { session: null, timedOut: false };
 
-      const terminal = ["completed", "failed", "stopped"].includes(session.status);
+      const terminal = ["completed", "failed", "killed", "stopped"].includes(session.status);
       if (terminal) return { session, timedOut: false };
 
       opts?.onStatus?.(session.status);

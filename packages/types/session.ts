@@ -7,6 +7,7 @@ export type SessionStatus =
   | "blocked"
   | "completed"
   | "failed"
+  | "killed"
   | "deleting"
   | "archived";
 
@@ -20,6 +21,7 @@ export const SESSION_STATUSES: readonly SessionStatus[] = [
   "blocked",
   "completed",
   "failed",
+  "killed",
   "archived",
 ] as const;
 
