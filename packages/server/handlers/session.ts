@@ -36,6 +36,24 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/start", async (params, notify, ctx) => {
     const opts = extract<SessionStartParams>(params, []);
     const scoped = resolveTenantApp(app, ctx);
+
+    // Flow-level requires_repo gate (#416). Code-modifying flows declare
+    // `requires_repo: true`; reject the dispatch up-front when no repo is
+    // pinned, instead of silently landing the session in an empty worktree
+    // where the agent has nothing to plan against. Inline flows always
+    // accept (tests + dynamic dispatch); only registered flow names are
+    // validated here.
+    const flowName = typeof opts.flow === "string" ? opts.flow : null;
+    if (flowName && !opts.repo) {
+      const flow = scoped.flows.get(flowName);
+      if (flow?.requires_repo) {
+        throw new RpcError(
+          `Flow '${flowName}' requires a repo. Pass repo: <git-url-or-local-path>.`,
+          ErrorCodes.INVALID_PARAMS,
+        );
+      }
+    }
+
     // Atomic create + dispatch: splitting these across two RPCs used to force
     // every caller (CLI, web, tests) to remember the second call or live with
     // a session stuck at status=ready until the conductor's 60s poll tick.

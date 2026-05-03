@@ -230,5 +230,13 @@ export interface FlowDefinition {
    * merge additively with runtime mcp_servers + session --with-mcp.
    */
   connectors?: string[];
+  /**
+   * When true, dispatch refuses sessions that don't pin a `repo`. Set on
+   * code-modifying flows (autonomous-sdlc, default, dag-parallel, ...) so
+   * `session_start` can't silently land them in an empty worktree where
+   * the agent has nothing to plan against. Defaults to false to keep
+   * bare/goose-recipe/e2e-noop flows working without a repo. See #416.
+   */
+  requires_repo?: boolean;
   source?: "builtin" | "user";
 }

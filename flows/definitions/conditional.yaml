@@ -1,6 +1,6 @@
 name: conditional
 description: "Conditional routing -- branch based on review outcome, converge at PR"
-
+requires_repo: true
 stages:
   - name: plan
     agent: planner

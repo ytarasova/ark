@@ -318,12 +318,40 @@ export class ArkServer {
           return handleMcpRequest(req, tenantApp, ctx);
         }
 
+        // OAuth Protected Resource Metadata (RFC 9728). MCP SDK clients
+        // (Claude Code / Desktop / Cursor) probe this endpoint before
+        // completing the auth handshake to learn how the resource accepts
+        // auth. Returning text/plain here would make `JSON.parse` throw in
+        // the SDK and the whole auth flow silently fails -- bearer never
+        // gets used. Empty `authorization_servers` declares "no OAuth flow,
+        // bearer-only". See #421.
+        if (req.method === "GET" && url.pathname.startsWith("/.well-known/oauth-protected-resource")) {
+          const subpath = url.pathname.slice("/.well-known/oauth-protected-resource".length);
+          const resourcePath = subpath || "/mcp";
+          const origin =
+            req.headers.get("x-forwarded-proto") && req.headers.get("x-forwarded-host")
+              ? `${req.headers.get("x-forwarded-proto")}://${req.headers.get("x-forwarded-host")}`
+              : `http://${req.headers.get("host") ?? "localhost"}`;
+          return Response.json({
+            resource: `${origin}${resourcePath}`,
+            authorization_servers: [],
+            bearer_methods_supported: ["header"],
+            resource_documentation: "https://github.com/ytarasova/ark/blob/main/docs/mcp.md",
+          });
+        }
+
         const data: RpcData = { kind: "rpc", authorizationHeader, queryToken };
         if (server.upgrade(req, { data })) return;
         if (url.pathname === "/health") {
           return Response.json({ status: "ok", pid: process.pid, uptime: process.uptime() });
         }
-        return new Response("Ark Server -- connect via WebSocket", { status: 200 });
+        // Friendly landing page for /. Other unknown paths get a JSON 404
+        // so any future SDK probe that JSON.parses the response doesn't
+        // explode on plain text. See #421.
+        if (url.pathname === "/" || url.pathname === "") {
+          return new Response("Ark Server -- connect via WebSocket", { status: 200 });
+        }
+        return Response.json({ error: "not found", path: url.pathname }, { status: 404 });
       },
       websocket: {
         async open(ws) {

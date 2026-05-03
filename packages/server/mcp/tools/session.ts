@@ -80,6 +80,17 @@ const sessionStart: ToolDef = {
   inputSchema: sessionStartInput,
   handler: async (input, { app }) => {
     const parsed = input as z.infer<typeof sessionStartInput>;
+
+    // Flow-level requires_repo gate (#416). Reject before any session row
+    // is written if the flow declares it requires a repo and the caller
+    // didn't pass one. Same logic as the JSON-RPC session/start handler.
+    if (parsed.flow && !parsed.repo) {
+      const flow = app.flows.get(parsed.flow);
+      if (flow?.requires_repo) {
+        throw new Error(`Flow '${parsed.flow}' requires a repo. Pass repo: <git-url-or-local-path>.`);
+      }
+    }
+
     // Mirror packages/server/handlers/session.ts session/start: delegate to
     // sessionLifecycle.start with the onCreated callback so the default
     // dispatcher listener kicks the background launcher synchronously.

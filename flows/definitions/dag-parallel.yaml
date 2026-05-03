@@ -1,6 +1,6 @@
 name: dag-parallel
 description: "Plan, then parallel implement + test, integrate, review, PR"
-stages:
+requires_repo: truestages:
   - name: plan
     agent: planner
     gate: manual

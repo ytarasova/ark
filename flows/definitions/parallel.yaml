@@ -1,6 +1,6 @@
 name: parallel
 description: "Plan → parallel implement (fork/join) → review → merge"
-stages:
+requires_repo: truestages:
   - name: plan
     agent: planner
     gate: manual

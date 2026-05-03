@@ -1,6 +1,6 @@
 name: islc-execute-subtask
 description: "One subtask in the islc execute fan-out -- runs the task-implementer agent on one subtask."
-stages:
+requires_repo: truestages:
   - name: implement
     agent: task-implementer
     gate: auto
