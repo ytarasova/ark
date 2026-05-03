@@ -376,6 +376,7 @@ export class AppContext {
   private async _rehydrateRunningSessions(): Promise<void> {
     const { logInfo: li, logWarn: lw } = await import("./observability/structured-log.js");
     let pollers = 0;
+    let stalePortsCleared = 0;
     const computesNeedingTransport = new Map<string, string>();
     try {
       // Hosted deployments may have running sessions in many tenants; sweep
@@ -383,6 +384,26 @@ export class AppContext {
       // tenant, no extra cost.
       const sessions = await this.sessions.listAcrossTenants({ status: "running", limit: 500 });
       for (const session of sessions) {
+        // RESILIENCE: clear `arkd_local_forward_port` from session config on
+        // boot. The port indexes a SSM port-forward subprocess that lived on
+        // the PREVIOUS conductor process -- once the daemon restarts that
+        // tunnel is dead, but the port stays cached on the session row. The
+        // next arkd RPC (status-poller, action stages, terminal attach...)
+        // would post to a port that nobody's listening on and fail with
+        // ECONNREFUSED. Clearing here forces the next ensureReachable to
+        // allocate a fresh tunnel before any RPC fires.
+        const cfg = session.config as Record<string, unknown> | null;
+        if (cfg && typeof cfg.arkd_local_forward_port === "number") {
+          try {
+            const tenantApp = this.forTenant(session.tenant_id);
+            const next = { ...cfg };
+            delete next.arkd_local_forward_port;
+            await tenantApp.sessions.update(session.id, { config: next });
+            stalePortsCleared++;
+          } catch (err: any) {
+            lw("boot", `rehydrate: failed to clear stale port for ${session.id}: ${err?.message ?? err}`);
+          }
+        }
         if (!session.session_id || !session.compute_name) continue;
         // Track the (compute, tenant) pair so we restart consumers exactly once
         // per compute, scoped to a tenant that owns at least one session there.
@@ -429,8 +450,11 @@ export class AppContext {
       }
     }
 
-    if (pollers > 0 || consumers > 0) {
-      li("boot", `rehydrated ${pollers} status pollers + ${consumers} events consumers for in-flight sessions`);
+    if (pollers > 0 || consumers > 0 || stalePortsCleared > 0) {
+      li(
+        "boot",
+        `rehydrated ${pollers} status pollers + ${consumers} events consumers, cleared ${stalePortsCleared} stale arkd-tunnel ports for in-flight sessions`,
+      );
     }
   }
 

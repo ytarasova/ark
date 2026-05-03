@@ -104,7 +104,33 @@ async function resolveRemoteRouting(
     return { remote: false };
   }
 
-  const arkdUrl = provider.getArkdUrl(compute);
+  // RESILIENCE: ensure the arkd transport is up before we build the client.
+  // After a daemon restart the previous SSM tunnel is dead but its port may
+  // still be cached on session.config / compute.config. Calling
+  // `target.compute.ensureReachable` re-allocates a fresh tunnel and writes
+  // the new port; without this, the action stage would post to a dead
+  // localhost port and fail with ECONNREFUSED.
+  try {
+    const { resolveComputeTarget } = await import("../../compute-resolver.js");
+    const { target } = await resolveComputeTarget(app, session);
+    if (target?.compute.ensureReachable) {
+      const handle = { kind: target.compute.kind, name: compute.name, meta: {} };
+      await target.compute.ensureReachable(handle, { app, sessionId: session.id });
+    }
+  } catch (err: any) {
+    logWarn(
+      "session",
+      `runGit: ensureReachable failed for session ${session.id}: ${err?.message ?? err}; ` +
+        `proceeding with cached arkd URL (RPC may fail with ECONNREFUSED)`,
+    );
+  }
+
+  // Fetch the (possibly refreshed) session row so getArkdUrl reads the
+  // freshly-written port. Pass the session into getArkdUrl so the
+  // session-aware lookup runs (the per-session port wins over the
+  // compute-level cache, see #423).
+  const refreshed = (await app.sessions.get(session.id)) ?? session;
+  const arkdUrl = provider.getArkdUrl(compute, refreshed);
   const cfg = compute.config as { arkd_request_timeout_ms?: number } | null | undefined;
   const requestTimeoutMs = typeof cfg?.arkd_request_timeout_ms === "number" ? cfg.arkd_request_timeout_ms : undefined;
   const client = new ArkdClient(arkdUrl, requestTimeoutMs ? { requestTimeoutMs } : undefined);

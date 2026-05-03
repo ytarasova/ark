@@ -34,6 +34,7 @@ import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { startInterventionTail } from "./intervention-tail.js";
 import { subscribeUserMessages } from "./user-message-stream.js";
 import { createAskUserMcpServer } from "./mcp-ask-user.js";
+import { createStageControlMcpServer } from "./mcp-stage-control.js";
 
 /**
  * SDK user message shape accepted by the Anthropic Agent SDK when passing an
@@ -59,6 +60,16 @@ class PromptQueue implements AsyncIterable<SDKUserMessage> {
     const resolver = this.resolvers.shift();
     if (resolver) resolver({ value: msg, done: false });
     else this.pending.push(msg);
+  }
+
+  /**
+   * Number of buffered messages waiting to be drained. Used by the Stop hook
+   * to decide whether end_turn is actually safe to stop on -- a non-zero
+   * count means the SDK has unread user input it should process before
+   * exiting.
+   */
+  pendingCount(): number {
+    return this.pending.length;
   }
 
   close(): void {
@@ -133,6 +144,11 @@ export interface RunAgentSdkLaunchOpts {
 export interface RunAgentSdkLaunchResult {
   exitCode: number;
   sawResult: boolean;
+  /**
+   * Reason text passed by the agent's `complete_stage` tool call (if any).
+   * Surfaces in conductor events so the UI can show "Stage complete: <why>".
+   */
+  stageCompleteReason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -782,10 +798,24 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   //   3. `claude` on PATH (dev workstations with npm-installed claude-code)
   const claudeExePath = resolveClaudeExecutable();
 
-  // Mount the ask_user MCP server so agents can ask mid-run questions as
-  // first-class conductor events (parity with the claude runtime's
-  // `report(question)` tool). Only when we can actually reach the conductor --
-  // tests skip this by leaving ARK_CONDUCTOR_URL unset.
+  // ── Stage-completion contract ────────────────────────────────────────────
+  //
+  // end_turn is the SDK's "this assistant turn is finished" signal -- NOT
+  // "this stage is complete". We make stage completion EXPLICIT via the
+  // `complete_stage` tool. The flag below is set by that tool and read by
+  // the SDK's Stop hook to decide whether to actually stop the SDK.
+  //
+  // The SDK is allowed to stop only when:
+  //   - complete_stage has been called (agent says it's done), AND
+  //   - the user-input PromptQueue has no pending messages.
+  //
+  // Anything else (model decided to end_turn but no explicit complete, or a
+  // new user message arrived in the queue) makes the Stop hook return
+  // `decision: "block"` with a reason. The SDK feeds the reason back as a
+  // user turn and the agent keeps going.
+  let stageCompleteRequested = false;
+  let stageCompleteReason: string | undefined;
+
   const mcpServers: Record<string, ReturnType<typeof createAskUserMcpServer>> = {};
   if (opts.conductorUrl) {
     mcpServers["ark-ask-user"] = createAskUserMcpServer({
@@ -795,11 +825,26 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
       stage: process.env.ARK_STAGE ?? "",
     });
   }
+  mcpServers["ark-stage-control"] = createStageControlMcpServer({
+    onCompleteStage: (reason) => {
+      stageCompleteRequested = true;
+      stageCompleteReason = reason;
+    },
+  });
 
   const sdkOptions: Options = {
     cwd: worktree,
     env: sdkEnv as Record<string, string | undefined>,
-    allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__ark-ask-user__ask_user"],
+    allowedTools: [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "mcp__ark-ask-user__ask_user",
+      "mcp__ark-stage-control__complete_stage",
+    ],
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     executable: "bun",
@@ -809,6 +854,31 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
     ...(claudeExePath ? { pathToClaudeCodeExecutable: claudeExePath } : {}),
     ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
+    // Stop hook: gates the SDK's actual stop on the explicit-complete +
+    // empty-queue contract above. Returning `decision: "block"` with a
+    // `reason` makes the SDK feed that text back as a user message and
+    // continue iterating; returning `{}` lets the SDK stop normally.
+    hooks: {
+      Stop: [
+        {
+          hooks: [
+            async () => {
+              const queueHasPending = queue.pendingCount() > 0;
+              if (stageCompleteRequested && !queueHasPending) {
+                return {};
+              }
+              const reason = !stageCompleteRequested
+                ? "end_turn fired but `complete_stage` has not been called. Either continue working " +
+                  "on the stage's task, or call `mcp__ark-stage-control__complete_stage` if the work " +
+                  "the user asked for in this stage is finished."
+                : "A new user message arrived after you signaled completion. Read it from the next " +
+                  "user turn and respond before stopping.";
+              return { decision: "block" as const, reason };
+            },
+          ],
+        },
+      ],
+    },
   };
 
   // Mutable abort holder so the intervention tail always sees the current controller.
@@ -885,6 +955,27 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         // Loop -- start a new query with options.resume = sdkSessionId.
         continue;
       }
+
+      // The Stop hook only allows the SDK to actually stop when
+      // complete_stage was called AND the queue is empty. So a "completed"
+      // outcome here means the agent has finalised its work; close out.
+      // Any other outcome (interrupted past the attempt cap, etc.) also
+      // exits cleanly via the existing return below.
+      if (dr.outcome === "completed" && stageCompleteRequested && queue.pendingCount() === 0) {
+        return {
+          exitCode: dr.exitCode,
+          sawResult: dr.sawResult,
+          stageCompleteReason,
+        } as RunAgentSdkLaunchResult;
+      }
+
+      // Defensive: if drainStream returned "completed" but the contract
+      // wasn't met (Stop hook should have blocked, but in tests with a
+      // mock stream the hook never runs), loop back so behaviour matches
+      // the production-hook path. Tests that expect a single-shot exit
+      // should set stageCompleteRequested via injection or call
+      // complete_stage explicitly.
+      if (dr.outcome === "completed") continue;
 
       return { exitCode: dr.exitCode, sawResult: dr.sawResult };
     }
