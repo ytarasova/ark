@@ -1,6 +1,7 @@
 name: pr-review
 description: "Plan, implement, create PR, wait for review approval, then merge"
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: plan
     agent: planner
     gate: manual

@@ -1,6 +1,7 @@
 name: islc
 description: "Intent-to-Software Lifecycle -- full pipeline from Jira ticket to merged PR with for-each execution"
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: ticket-intake
     agent: ticket-intake
     gate: auto

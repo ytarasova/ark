@@ -1,6 +1,7 @@
 name: quick
 description: "Quick flow: implement -> verify -> PR (no planning, no review)"
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: implement
     agent: implementer
     gate: auto

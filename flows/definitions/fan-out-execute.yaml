@@ -1,6 +1,7 @@
 name: fan-out-execute
 description: "One subtask spawned by the fan-out demo flow -- runs the planner agent on one subtask."
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: implement
     agent: implementer
     gate: auto
