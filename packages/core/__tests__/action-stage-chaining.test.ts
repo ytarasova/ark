@@ -110,6 +110,68 @@ describe("action stage chaining", async () => {
     expect(actionEvents.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("SECOND action failing after first succeeds still marks session failed (#435)", async () => {
+    // Repro for #435: a stage chain where the FIRST action succeeds and the
+    // SECOND action fails was leaving session.status="ready" with
+    // session.error set -- a state machine inconsistency that surfaced in
+    // the UI as PENDING badge alongside a failed Errors tab.
+    //
+    // Flow: agent -> action:close (succeeds) -> action:auto_merge (fails,
+    // no pr_url). The mediator's recursive chain call (action_chain source)
+    // must propagate the failed status all the way out, not let the outer
+    // mediate's stage_handoff event reset it.
+    app.flows.save("test-second-action-fails", {
+      name: "test-second-action-fails",
+      stages: [
+        { name: "work", agent: "worker", gate: "auto" },
+        { name: "first", action: "close", gate: "auto" },
+        { name: "second", action: "auto_merge", gate: "auto" },
+      ],
+    } as any);
+
+    const session = await app.sessions.create({
+      summary: "second-action-fails repro",
+      flow: "test-second-action-fails",
+    });
+    await app.sessions.update(session.id, { status: "ready", stage: "work" });
+
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
+      autoDispatch: true,
+      source: "test",
+    });
+
+    expect(result.ok).toBe(true);
+
+    // Wait for the chain: first (close) succeeds, advances to second
+    // (auto_merge), which fails because there's no pr_url.
+    await waitFor(
+      async () => {
+        const s = await app.sessions.get(session.id);
+        return s?.status === "failed" || (s?.status === "ready" && (s?.error ?? "").includes("auto_merge"));
+      },
+      { timeout: 5000, message: "Expected session to settle with failed status or ready+error" },
+    );
+
+    const updated = await app.sessions.get(session.id);
+
+    // The bug (#435): status was "ready" while error was set -> UI showed
+    // PENDING badge while errors tab said failed. The fix must transition
+    // status to "failed" when ANY action in the chain fails.
+    expect(updated?.status).toBe("failed");
+    expect(updated?.error).toBeTruthy();
+    expect((updated?.error ?? "").toLowerCase()).toContain("auto_merge");
+
+    // first (close) DID run; second (auto_merge) ATTEMPTED.
+    const events = await app.events.list(session.id);
+    const actionExecuted = events.filter((e) => e.type === "action_executed").map((e) => e.data?.action);
+    expect(actionExecuted).toContain("close");
+
+    // dispatch_failed event records the failure for ops visibility.
+    const dispatchFailed = events.filter((e) => e.type === "dispatch_failed");
+    expect(dispatchFailed.length).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(dispatchFailed[dispatchFailed.length - 1])).toContain("auto_merge");
+  });
+
   it("action failure stops chain and sets failed status", async () => {
     // Flow: agent -> action:create_pr -> action:auto_merge
     // create_pr will fail because session has no workdir/repo

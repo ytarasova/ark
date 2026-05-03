@@ -260,10 +260,34 @@ function fallbackBranchUrl(host: GitHost, remoteUrl: string | null, branch: stri
   const sshMatch = normalized.match(/^git@([^:]+):(.+?)(\.git)?$/);
   if (sshMatch) normalized = `https://${sshMatch[1]}/${sshMatch[2]}`;
   normalized = normalized.replace(/\.git$/, "");
+  // For Bitbucket / GitLab the "branch" page IS where the operator manually
+  // opens a PR -- they emit no Create-PR URL on push. Returning the branch
+  // URL is a useful hint even though it's not a real PR URL.
   if (host === "bitbucket") return `${normalized}/branch/${encodeURIComponent(branch)}`;
   if (host === "gitlab") return `${normalized}/-/tree/${encodeURIComponent(branch)}`;
-  if (host === "github") return `${normalized}/tree/${encodeURIComponent(branch)}`;
+  // For GitHub we DELIBERATELY do NOT return a tree URL: GitHub PRs require
+  // explicit creation via `gh pr create` or the API; storing a tree URL as
+  // pr_url breaks downstream `gh pr merge <url>` (the conductor's auto_merge
+  // action) which only accepts /pull/<N> URLs. Returning null forces the
+  // caller to either resolve a real PR URL via gh (when available) or
+  // record `pr_url=null` so auto_merge surfaces a clear "no PR URL" error
+  // instead of feeding an invalid URL to gh.
+  if (host === "github") return null;
   return normalized;
+}
+
+/**
+ * Recognize the URL shapes `gh pr merge` accepts as a real PR URL:
+ *   - https://github.com/owner/repo/pull/<N>
+ *   - https://github.com/owner/repo/pull/<N>/...
+ *
+ * Tree URLs (`/tree/<branch>`), branch URLs, and the bare repo URL all
+ * fall through. Used by `mergeWorktreePR` to refuse merge attempts where
+ * `pr_url` was populated with a non-PR URL by an earlier degraded-path.
+ */
+export function isGithubPrUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /^https?:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+(\/|$)/.test(url);
 }
 
 /**
@@ -492,6 +516,24 @@ export async function mergeWorktreePR(
     return {
       ok: false,
       message: `auto-merge not supported for non-github hosts (host=${host}, pr_url=${prUrl})`,
+    };
+  }
+
+  // Refuse non-PR URLs. The pr stage's degraded path (push succeeded but no
+  // PR was created -- e.g. remote-GitHub session with `gh` only on the
+  // conductor and a parsing miss) used to fall back to a `/tree/<branch>`
+  // URL; running `gh pr merge` against that returns "fatal: not a git
+  // repository" because gh resolves the URL to a tree page, not a PR.
+  // Validate up front and surface a clear error pointing the operator at
+  // the actual fix (use the github connector / create the PR explicitly).
+  if (!isGithubPrUrl(prUrl)) {
+    return {
+      ok: false,
+      message:
+        `Cannot auto-merge: session.pr_url is not a GitHub pull-request URL (got '${prUrl}'). ` +
+        `The pr stage may have recorded a branch URL because the conductor couldn't reach the GitHub API ` +
+        `to create the PR. Resolve by either creating the PR manually and updating session.pr_url, ` +
+        `or by re-running the pr stage with the github connector mounted (see #436).`,
     };
   }
 

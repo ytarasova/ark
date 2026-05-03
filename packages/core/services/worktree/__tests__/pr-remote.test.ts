@@ -24,7 +24,7 @@ import type { Server } from "bun";
 import { AppContext } from "../../../app.js";
 import { setApp, clearApp } from "../../../__tests__/test-helpers.js";
 import { allocatePort } from "../../../config/port-allocator.js";
-import { createWorktreePR, mergeWorktreePR, detectGitHost, parseCreatePrUrl } from "../pr.js";
+import { createWorktreePR, mergeWorktreePR, detectGitHost, parseCreatePrUrl, isGithubPrUrl } from "../pr.js";
 import type { Compute, Session } from "../../../../types/index.js";
 import type { ComputeProvider } from "../../../../compute/types.js";
 
@@ -270,9 +270,57 @@ describe("createWorktreePR (remote compute)", () => {
   });
 });
 
+// ── isGithubPrUrl: only matches /pull/<N> URLs ──────────────────────────────
+
+describe("isGithubPrUrl", () => {
+  it("matches canonical PR URLs", () => {
+    expect(isGithubPrUrl("https://github.com/ytarasova/ark/pull/123")).toBe(true);
+    expect(isGithubPrUrl("https://github.com/ytarasova/ark/pull/1")).toBe(true);
+    expect(isGithubPrUrl("https://github.com/ytarasova/ark/pull/123/files")).toBe(true);
+  });
+
+  it("rejects tree / branch / repo URLs (the degraded-path output that broke auto_merge)", () => {
+    // This is the bug from the screenshot in #436: pr stage stored a
+    // `/tree/<branch>` URL as pr_url and downstream `gh pr merge` failed.
+    expect(isGithubPrUrl("https://github.com/ytarasova/ark/tree/main")).toBe(false);
+    expect(isGithubPrUrl("https://github.com/ytarasova/ark/tree/feat%2Fx")).toBe(false);
+    expect(isGithubPrUrl("https://github.com/ytarasova/ark")).toBe(false);
+    expect(isGithubPrUrl("https://github.com/ytarasova/ark.git")).toBe(false);
+  });
+
+  it("rejects non-github hosts and falsy values", () => {
+    expect(isGithubPrUrl("https://bitbucket.org/owner/repo/pull-requests/1")).toBe(false);
+    expect(isGithubPrUrl("https://gitlab.com/owner/repo/-/merge_requests/1")).toBe(false);
+    expect(isGithubPrUrl(null)).toBe(false);
+    expect(isGithubPrUrl(undefined)).toBe(false);
+    expect(isGithubPrUrl("")).toBe(false);
+  });
+});
+
 // ── mergeWorktreePR: bitbucket / non-github degrades cleanly ────────────────
 
 describe("mergeWorktreePR", () => {
+  it("refuses to feed a /tree/<branch> URL to gh pr merge (#436)", async () => {
+    // Repro for #436: the pr stage's degraded path stored a tree URL as
+    // pr_url. mergeWorktreePR then ran `gh pr merge <tree-url>` which
+    // returned "fatal: not a git repository". The fix validates that
+    // pr_url is a real PR URL before invoking gh.
+    const session = await app.sessions.create({
+      summary: "merge tree URL",
+      flow: "quick",
+      repo: "git@github.com:ytarasova/ark.git",
+    });
+    await app.sessions.update(session.id, {
+      pr_url: "https://github.com/ytarasova/ark/tree/main",
+    });
+
+    const result = await mergeWorktreePR(app, session.id);
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/not a GitHub pull-request URL/);
+    // Error message points the operator at the right fix path (#436 connector)
+    expect(result.message).toContain("#436");
+  });
+
   it("returns ok:false with a clear message for non-github PR URLs", async () => {
     const session = await app.sessions.create({
       summary: "merge non-github",
