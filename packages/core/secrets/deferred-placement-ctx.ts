@@ -1,5 +1,5 @@
 /**
- * Deferred PlacementCtx -- two-phase placement support for SSH-medium providers.
+ * Deferred PlacementCtx -- two-phase placement support for remote-medium providers.
  *
  * Background: typed-secret placement runs in two distinct windows.
  *
@@ -10,11 +10,11 @@
  *     happen pre-launch.
  *
  *   Phase B (post-provision, in provider.launch):
- *     file-typed secrets need a live medium (an SSH connection, a known IP,
- *     a docker exec channel, ...). For EC2 the IP is only known AFTER the
- *     provider provisions the instance during `launch()`. Trying to build
- *     the real EC2PlacementCtx in Phase A always failed with `Compute has
- *     no IP -- cannot build EC2 PlacementCtx`.
+ *     file-typed secrets need a live medium (an SSM session, a known IP,
+ *     a docker exec channel, ...). For EC2 the instance_id is only known
+ *     AFTER the provider provisions the instance during `launch()`. Trying
+ *     to build the real EC2PlacementCtx in Phase A always failed with
+ *     `Compute has no instance_id -- cannot build EC2 PlacementCtx`.
  *
  * The DeferredPlacementCtx bridges the two phases: it captures `setEnv`
  * synchronously (so `getEnv()` is correct in Phase A) and queues every
@@ -51,7 +51,7 @@ export class DeferredPlacementCtx implements PlacementCtx {
    * @param homeRoot Used to expand "~/foo" tokens placers may pass through
    *   `expandHome()` while running pre-launch. Defaults to /home/ubuntu --
    *   the EC2 family is the only current consumer; override for other
-   *   SSH-medium hosts (e.g. /home/ec2-user, /root in a container).
+   *   remote-medium hosts (e.g. /home/ec2-user, /root in a container).
    */
   constructor(private readonly homeRoot: string = "/home/ubuntu") {}
 

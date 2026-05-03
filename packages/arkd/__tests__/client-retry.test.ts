@@ -2,9 +2,9 @@
  * ArkdClient retry-on-transient-transport-error tests.
  *
  * Background: live EC2 dispatch failed mid-`/exec` with
- * `TypeError: The socket connection was closed unexpectedly`. The forward
- * SSH tunnel and arkd were both verified healthy seconds after the failure
- * via curl, so the failure was a transient socket-pool / tunnel-multiplex
+ * `TypeError: The socket connection was closed unexpectedly`. The SSM
+ * port-forward and arkd were both verified healthy seconds after the failure
+ * via curl, so the failure was a transient socket-pool / port-forward
  * blip rather than a real outage. ArkdClient now retries POST/GET twice
  * (250ms, 1s) on transport-level errors. ArkdClientError (real arkd-side
  * failures with a code) is NOT retried.

@@ -28,13 +28,13 @@ export interface LaunchEnvResult {
   error?: string;
   /**
    * The PlacementCtx used during pre-launch placement, when the provider
-   * implements `buildPlacementCtx`. For SSH-medium providers this is a
-   * `DeferredPlacementCtx` whose queued file ops the provider replays
-   * post-provision via `flushDeferredPlacement`. For providers that can
-   * place pre-launch (k8s) it's the real ctx that already executed the
-   * file ops -- there is nothing to flush, but plumbing it through is
-   * harmless. Undefined when the provider has no buildPlacementCtx, or
-   * the session has no resolved compute.
+   * implements `buildPlacementCtx`. For remote-medium providers (EC2 over
+   * SSM, ...) this is a `DeferredPlacementCtx` whose queued file ops the
+   * provider replays post-provision via `flushDeferredPlacement`. For
+   * providers that can place pre-launch (k8s) it's the real ctx that
+   * already executed the file ops -- there is nothing to flush, but
+   * plumbing it through is harmless. Undefined when the provider has no
+   * buildPlacementCtx, or the session has no resolved compute.
    */
   placement?: PlacementCtx;
 }

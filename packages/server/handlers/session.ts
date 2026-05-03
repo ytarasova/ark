@@ -558,7 +558,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   //
   // For remote compute targets (ec2, k8s, ...), we delegate to the provider's
   // `getAttachCommand(compute, session)` so the returned string includes the
-  // SSH / kubectl prefix the user needs to run locally.
+  // `aws ssm start-session` / `kubectl exec` prefix the user needs to run locally.
   router.handle("session/attach-command", async (params, _notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const scoped = resolveTenantApp(app, ctx);

@@ -253,10 +253,10 @@ export interface Compute {
    *
    * Provider-specific behaviour:
    *   - LocalCompute: no-op (arkd is on the same host as the conductor).
-   *   - EC2Compute: SSH-over-SSM connectivity check, forward `-L`
-   *     tunnel, arkd /health probe, events-stream subscribe. Mutates
+   *   - EC2Compute: SSM connectivity check, AWS-StartPortForwardingSession
+   *     to arkd, arkd /health probe, events-stream subscribe. Mutates
    *     `handle.meta.ec2.arkdLocalPort` so the next call to
-   *     `getArkdUrl(h)` resolves to the new tunnel.
+   *     `getArkdUrl(h)` resolves to the new local-side port.
    *   - K8sCompute: kubectl port-forward, arkd /health probe.
    *   - FirecrackerCompute: TAP bridge wiring, microVM ssh probe.
    *
@@ -292,9 +292,9 @@ export interface Compute {
    *
    *   - LocalCompute: flushes onto a `LocalPlacementCtx` that writes
    *     files directly via `fs.promises.writeFile`.
-   *   - EC2Compute: flushes onto an `EC2PlacementCtx` that pipes
-   *     `tar c | ssh tar x` to deliver bytes (mode-preserving) and
-   *     `sed -i` for marker-keyed appends.
+   *   - EC2Compute: flushes onto an `EC2PlacementCtx` that ships bytes
+   *     via `ssm.SendCommand` (base64-decode on the remote, mode-
+   *     preserving) and uses `sed -i` for marker-keyed appends.
    *   - K8sCompute: flushes onto a `K8sPlacementCtx` that uses
    *     `kubectl cp` for writes and `kubectl exec` for appends.
    *   - FirecrackerCompute: flushes onto a microVM-aware ctx (over
@@ -304,9 +304,9 @@ export interface Compute {
    * overwrites by path. A second call with an empty queue is a no-op.
    *
    * Ordering invariant: `ensureReachable` MUST have run on this handle
-   * before `flushPlacement` so the compute medium (SSH tunnel, kubectl
-   * port-forward, microVM bridge) is live; some impls (e.g. EC2) read
-   * transport fields from `handle.meta` that ensureReachable populates.
+   * before `flushPlacement` so the compute medium (SSM port-forward,
+   * kubectl port-forward, microVM bridge) is live; some impls (e.g. EC2)
+   * read transport fields from `handle.meta` that ensureReachable populates.
    */
   flushPlacement?(h: ComputeHandle, opts: FlushPlacementOpts): Promise<void>;
 

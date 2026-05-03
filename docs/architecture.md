@@ -828,7 +828,7 @@ Six structured `provisioning_step` events fire in order; each step is optional a
 | # | Step | Owner | What |
 |---|---|---|---|
 | 1 | `compute-start` | Compute | If status=stopped, Compute.start. 1 retry / 2s backoff |
-| 2 | `ensure-reachable` | Compute | SSH/kubectl tunnel + arkd /health. Idempotent, no retry |
+| 2 | `ensure-reachable` | Compute | SSM/kubectl port-forward + arkd /health. Idempotent, no retry |
 | 3 | `flush-secrets` | Compute | Replay deferred typed-secret placement. 1 retry / 1s |
 | 4 | `prepare-workspace` | Compute | mkdir + git clone via arkd. 2 retries / 1s |
 | 5 | `isolation-prepare` | Isolation | Bring up compose / build devcontainer / boot microVM. 1 retry |

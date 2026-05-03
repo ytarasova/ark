@@ -194,12 +194,12 @@ describe("channel-types", () => {
         type: "error",
         sessionId: "s-err",
         stage: "deploy",
-        error: "SSH connection refused",
+        error: "SSM connection refused",
       };
       expect(msg.type).toBe("error");
       expect(msg.sessionId).toBe("s-err");
       expect(msg.stage).toBe("deploy");
-      expect(msg.error).toBe("SSH connection refused");
+      expect(msg.error).toBe("SSM connection refused");
     });
   });
 

@@ -186,7 +186,7 @@ export function registerServerDaemonCommands(serverCmd: Command) {
 
       // Ignore SIGPIPE explicitly. macOS default action on SIGPIPE is
       // TERMINATE -- writes to a socket whose peer closed (SSM session
-      // disconnect, SSH tunnel mid-stream hiccup, fetch peer reset)
+      // disconnect, port-forward mid-stream hiccup, fetch peer reset)
       // crash the daemon with NO graceful shutdown, NO uncaughtException
       // (signals don't go through the JS exception path), NO crash report.
       // Node ignores SIGPIPE by default; Bun does not. Live evidence: every

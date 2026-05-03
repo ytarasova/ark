@@ -6,9 +6,10 @@
  *
  * The provisioner runs ~7 ordered steps -- connectivity-check,
  * forward-tunnel, arkd-probe, events-consumer-start, flush-secrets,
- * git-clone, launch-agent. Each step has its own failure mode (SSH
- * settling latency, Bun keep-alive pool corruption, transient SSM
- * blips, ...) and its own appropriate retry budget. Without a uniform
+ * git-clone, launch-agent. Each step has its own failure mode (SSM
+ * agent settling latency, Bun keep-alive pool corruption, transient
+ * port-forward blips, ...) and its own appropriate retry budget.
+ * Without a uniform
  * wrapper, every step ends up with a hand-rolled try/catch + ad-hoc
  * `logInfo` trace + ad-hoc retry, the trace lives only in `ark.jsonl`,
  * and the failure that lands in the UI is a bare `socket closed`

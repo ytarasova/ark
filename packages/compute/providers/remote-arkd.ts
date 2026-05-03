@@ -130,9 +130,10 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
   /**
    * Build a DeferredPlacementCtx for the EC2 family. This runs pre-launch on
-   * the dispatcher, where the medium (SSH connection) is *not* yet available:
-   * for a stopped/destroyed compute the IP is only assigned during
-   * `provider.start` / `provider.provision` inside `provider.launch`.
+   * the dispatcher, where the medium (SSM session against the instance) is
+   * *not* yet available: for a stopped/destroyed compute the instance_id is
+   * only assigned during `provider.start` / `provider.provision` inside
+   * `provider.launch`.
    *
    * The deferred ctx captures `setEnv` synchronously (so env-typed secrets
    * land in the launch env the dispatcher hands to executor.launch) and

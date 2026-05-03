@@ -139,11 +139,11 @@ config:
 
 All four remote providers extend `RemoteArkdBase` (in `packages/compute/providers/remote-arkd.ts`). They share EC2 provisioning via direct AWS SDK calls + cloud-init. Cloud-init installs bun, the ark CLI, and systemd-registers `arkd.service` listening on port 19300.
 
-**SSH transport runs over AWS SSM Session Manager.** The conductor connects with `ssh -o ProxyCommand="aws ssm start-session ..." ubuntu@<instance-id>` -- no public IP is allocated, no security-group ingress rule is required, and the only outbound traffic from the instance is HTTPS to the SSM endpoint. As a consequence:
+**Transport is pure AWS SSM (no SSH).** The conductor reaches arkd through `aws ssm start-session --document AWS-StartPortForwardingSession --target <instance-id> ...` and runs remote shell commands via `ssm.SendCommand`. No public IP is allocated, no security-group ingress rule is required, and the only outbound traffic from the instance is HTTPS to the SSM endpoint. As a consequence:
 
 - Provisioned instances have an IAM instance profile attached carrying `AmazonSSMManagedInstanceCore`. The default profile name is `ArkEC2SsmInstanceProfile`; override per-call via the `iamInstanceProfile` opt or globally via the `ARK_EC2_INSTANCE_PROFILE` env var. **Pre-create this profile in your AWS account before first use** (Ark does not create it for you).
 - Security groups created by Ark have NO ingress rules.
-- The instance address is the EC2 instance_id; `compute.config.instance_id` is the canonical field for the SSH transport. The `ip` field is retained only for back-compat reading (e.g. the optional codegraph HTTP path).
+- The instance address is the EC2 instance_id; `compute.config.instance_id` is the canonical field for the SSM transport. The `ip` field is retained only for back-compat reading (e.g. the optional codegraph HTTP path).
 
 Common config:
 ```yaml

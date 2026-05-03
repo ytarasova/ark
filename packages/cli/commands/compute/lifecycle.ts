@@ -77,7 +77,7 @@ export function registerLifecycleCommands(computeCmd: Command) {
     .option("--aws-region <region>", "AWS region")
     .option("--aws-profile <profile>", "AWS profile")
     .option("--aws-subnet-id <id>", "AWS subnet ID")
-    .option("--ingress <cidrs>", "SSH ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0)")
+    .option("--ingress <cidrs>", "Security-group ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0)")
     .option("--idle-minutes <min>", "Idle shutdown timeout in minutes")
     .option(
       "--set <key=value>",

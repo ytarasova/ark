@@ -231,12 +231,13 @@ export class ArkdClient {
 
   /**
    * Recognize transient transport-level fetch failures: a stale pooled
-   * keep-alive socket closed by the peer (or the SSH tunnel that carries it)
-   * surfaces as `TypeError: The socket connection was closed unexpectedly`.
-   * Bun's connection pool can hand out a socket that the underlying tunnel
-   * has already torn down without the runtime noticing -- the next fetch
-   * issues an HTTP request, the kernel returns RST, and we get this error.
-   * Retrying immediately opens a fresh socket and almost always succeeds.
+   * keep-alive socket closed by the peer (or the SSM port-forward that
+   * carries it) surfaces as `TypeError: The socket connection was closed
+   * unexpectedly`. Bun's connection pool can hand out a socket that the
+   * underlying tunnel has already torn down without the runtime noticing --
+   * the next fetch issues an HTTP request, the kernel returns RST, and we
+   * get this error. Retrying immediately opens a fresh socket and almost
+   * always succeeds.
    *
    * We intentionally do NOT retry timeouts (those are caller-shaped) or
    * ArkdClientError (those are real arkd-side rejects with codes).

@@ -11,13 +11,14 @@
  *      provider to start it (EC2 StartInstances, k8s pod boot, ...).
  *      1 retry, 2_000ms backoff: providers occasionally need a moment
  *      to register the start before health probes succeed.
- *   2. `ensure-reachable`   -- transport setup (SSH-over-SSM, kubectl
+ *   2. `ensure-reachable`   -- transport setup (SSM port-forward, kubectl
  *      port-forward, microVM bridge). Idempotent + already probes
  *      internally; no retry.
  *   3. `flush-secrets`      -- replay deferred typed-secret placement
  *      onto the compute medium. Must run BEFORE prepare-workspace
  *      because the workspace clone uses the SSH key the placement
- *      delivered. 1 retry, 1_000ms backoff for transient SSH blips.
+ *      delivered (the SSH key is for git, not for the compute transport).
+ *      1 retry, 1_000ms backoff for transient transport blips.
  *   4. `prepare-workspace`  -- mkdir + git clone via arkd HTTP. 2
  *      retries, 1_000ms backoff (matches the legacy `git-clone` step
  *      that lived inside `RemoteWorktreeProvider.launch`).
@@ -69,9 +70,10 @@ export interface RunTargetLifecycleOpts {
   placement?: DeferredPlacementCtx;
   /**
    * When true (default), `target.compute.ensureReachable` runs every
-   * dispatch -- including rehydrated handles where the SSH tunnel may
-   * have died. Set false only when you know the transport is up
-   * (e.g., immediately after a fresh provision in the same call site).
+   * dispatch -- including rehydrated handles where the SSM port-forward
+   * (or other transport) may have died. Set false only when you know
+   * the transport is up (e.g., immediately after a fresh provision in
+   * the same call site).
    */
   ensureReachable?: boolean;
   /**

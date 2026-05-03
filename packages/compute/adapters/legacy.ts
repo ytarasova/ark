@@ -91,7 +91,7 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
   }
   if (provider instanceof RemoteWorktreeProvider) {
     // Legacy "ec2" -- arkd runs on the instance; DirectIsolation forwards
-    // launches straight through the EC2Compute SSH tunnel.
+    // launches straight through the EC2Compute SSM port-forward.
     return new ComputeTarget(new EC2Compute(app), new DirectIsolation(app), app);
   }
   if (provider instanceof RemoteDockerProvider) {
