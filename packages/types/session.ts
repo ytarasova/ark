@@ -36,6 +36,14 @@ export interface SessionConfig {
   worktree?: string | boolean;
   /** Git URL to clone on compute target (no local repo needed) */
   remoteRepo?: string;
+  /**
+   * Local port the conductor's SSM forward-tunnel for this session is bound
+   * to. Set by `EC2Compute.setupTransport` after the tunnel comes up. The
+   * conductor's arkd client reads this in preference to `compute.config.
+   * arkd_local_forward_port` so concurrent sessions on the same compute
+   * don't stomp each other's port. See #423.
+   */
+  arkd_local_forward_port?: number;
   // Lifecycle
   _pre_delete_status?: string;
   _deleted_at?: string;

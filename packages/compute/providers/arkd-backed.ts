@@ -61,7 +61,7 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
   abstract buildLaunchEnv(session: Session): Record<string, string>;
 
   /** Returns the base URL for the arkd instance on this compute target. */
-  abstract getArkdUrl(compute: Compute): string;
+  abstract getArkdUrl(compute: Compute, session?: Session): string;
 
   /**
    * Per-compute override for the arkd HTTP client request timeout (ms).
@@ -77,13 +77,13 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
 
   // ── Concrete: delegated to arkd ─────────────────────────────────────────
 
-  protected getClient(compute: Compute): ArkdClient {
+  protected getClient(compute: Compute, session?: Session): ArkdClient {
     const timeoutMs = this.getArkdRequestTimeoutMs(compute);
-    return new ArkdClient(this.getArkdUrl(compute), timeoutMs ? { requestTimeoutMs: timeoutMs } : undefined);
+    return new ArkdClient(this.getArkdUrl(compute, session), timeoutMs ? { requestTimeoutMs: timeoutMs } : undefined);
   }
 
-  async launch(_compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
-    const client = this.getClient(_compute);
+  async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
+    const client = this.getClient(compute, session);
     await client.launchAgent({
       sessionName: opts.tmuxName,
       script: opts.launcherContent,
@@ -94,13 +94,13 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
 
   async killAgent(compute: Compute, session: Session): Promise<void> {
     if (!session.session_id) return;
-    const client = this.getClient(compute);
+    const client = this.getClient(compute, session);
     await client.killAgent({ sessionName: session.session_id });
   }
 
   async captureOutput(compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
     if (!session.session_id) return "";
-    const client = this.getClient(compute);
+    const client = this.getClient(compute, session);
     const res = await client.captureOutput({
       sessionName: session.session_id,
       lines: opts?.lines,
@@ -108,8 +108,8 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
     return res.output;
   }
 
-  async checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean> {
-    const client = this.getClient(compute);
+  async checkSession(compute: Compute, tmuxSessionId: string, session?: Session): Promise<boolean> {
+    const client = this.getClient(compute, session);
     const res = await client.agentStatus({ sessionName: tmuxSessionId });
     return res.running;
   }

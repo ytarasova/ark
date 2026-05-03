@@ -90,18 +90,16 @@ async function findForwardTunnelPid(instanceId: string, remotePort: number): Pro
 
 /**
  * Read the local-side port a forward is bound to by parsing the matched AWS
- * CLI command line. Used by `setupForwardTunnel` to recover the local port
- * for an *existing* forward.
+ * CLI command line. Was used by the now-removed setupForwardTunnel reuse
+ * branch; kept for any future caller that needs to inspect a specific
+ * forward's local port (e.g. for diagnostics or a re-attach UI).
  */
-async function readForwardTunnelLocalPort(pid: number, remotePort: number): Promise<number | null> {
+// @ts-expect-error keep for diagnostics; prefix-rename if reused
+async function _readForwardTunnelLocalPort(pid: number, remotePort: number): Promise<number | null> {
   try {
     const { stdout } = await execFileAsync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf-8" });
-    // Match `localPortNumber=<port>` *paired with* the same `portNumber=<remotePort>`
-    // already on the line so we don't pick the wrong forward when multiple
-    // are running.
     const match = stdout.match(new RegExp(`portNumber=${remotePort}[^\\s]*localPortNumber=(\\d+)`));
     if (!match) {
-      // CLI may have placed localPortNumber first; try the reverse.
       const alt = stdout.match(new RegExp(`localPortNumber=(\\d+)[^\\s]*portNumber=${remotePort}`));
       if (!alt) return null;
       const port = parseInt(alt[1], 10);
@@ -116,8 +114,21 @@ async function readForwardTunnelLocalPort(pid: number, remotePort: number): Prom
 
 /**
  * Spawn a background SSM port-forward so the conductor can reach a service
- * on the remote host. If a forward for `(instanceId, remotePort)` is already
- * running, we reuse it and return its existing local port for idempotency.
+ * on the remote host.
+ *
+ * Per-session isolation (#423): we deliberately DO NOT reuse an existing
+ * tunnel that matches `(instanceId, remotePort)`. Each caller gets its own
+ * tunnel on its own local port. Reuse caused subtle bugs where session A
+ * and session B shared a tunnel; when A's setup wrote the port to compute
+ * config and B's setup later overwrote it, the first session was reading a
+ * port that pointed at a different (or dead) tunnel. With per-session
+ * tunnels, every session's port is private, persisted to its own
+ * `session.config.arkd_local_forward_port`, and stays valid for the
+ * session's lifetime.
+ *
+ * Cost: N concurrent sessions => N tunnels. Each tunnel is a single
+ * `aws ssm start-session` process (~15 MB) — bounded by your concurrency.
+ * Worth it for the isolation guarantee.
  */
 export async function setupForwardTunnel(
   instanceId: string,
@@ -125,15 +136,6 @@ export async function setupForwardTunnel(
   localPort: number,
   ssm: SsmConnectOpts,
 ): Promise<{ pid: number | null; localPort: number; reused: boolean }> {
-  const existing = await findForwardTunnelPid(instanceId, remotePort);
-  if (existing) {
-    const existingLocal = await readForwardTunnelLocalPort(existing, remotePort);
-    if (existingLocal) {
-      return { pid: existing, localPort: existingLocal, reused: true };
-    }
-    // Stale match (couldn't read the ps line) -- fall through and respawn.
-  }
-
   const { pid } = await ssmStartPortForward({
     instanceId,
     region: ssm.region,

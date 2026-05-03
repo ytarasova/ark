@@ -192,6 +192,13 @@ export class AppContext {
     // for_each_checkpoint so the loop resumes from where it left off.
     void this._reconcileForEachSessions();
 
+    // Rehydrate status pollers + arkd events consumers for sessions that were
+    // already mid-flight when the previous daemon process exited. Without
+    // this, `bun --watch` reloads and operator restarts orphan running
+    // sessions -- the worker keeps going but the conductor goes blind.
+    // See #424 for the failure mode.
+    void this._rehydrateRunningSessions();
+
     // Hosted-mode only: on a fresh DB the `resource_definitions` table is empty,
     // so `agent/list` + friends return []. Seed the builtin YAMLs shipped with
     // the source tree (or install prefix) on every boot; the seeder is idempotent
@@ -348,6 +355,82 @@ export class AppContext {
       }
     } catch {
       // Best-effort -- log nothing so tests don't see noise.
+    }
+  }
+
+  /**
+   * Re-arm status pollers + arkd events consumers for sessions that were
+   * `running` when the daemon last stopped. Without this, hot-reloads
+   * (`bun --watch`) and operator restarts orphan in-flight sessions: the
+   * agents on the worker keep going, but the conductor stops polling and
+   * stops draining the arkd events stream, so the UI never sees progress
+   * and the session never auto-advances on completion. Closes #424.
+   *
+   * The status poller registry + the events-consumer registry are owned
+   * by AppContext; they were torn down on the previous container's
+   * disposal. Pollers are normally started by `post-launch.ts` on the
+   * dispatch path. Events consumers are started by `EC2Compute.setup-
+   * Transport` (and equivalents) during provisioning. Neither path runs
+   * for an already-launched session at boot; this method fills that gap.
+   */
+  private async _rehydrateRunningSessions(): Promise<void> {
+    const { logInfo: li, logWarn: lw } = await import("./observability/structured-log.js");
+    let pollers = 0;
+    const computesNeedingTransport = new Map<string, string>();
+    try {
+      // Hosted deployments may have running sessions in many tenants; sweep
+      // across all of them. Local single-tenant mode degenerates to one
+      // tenant, no extra cost.
+      const sessions = await this.sessions.listAcrossTenants({ status: "running", limit: 500 });
+      for (const session of sessions) {
+        if (!session.session_id || !session.compute_name) continue;
+        // Track the (compute, tenant) pair so we restart consumers exactly once
+        // per compute, scoped to a tenant that owns at least one session there.
+        if (!computesNeedingTransport.has(session.compute_name)) {
+          computesNeedingTransport.set(session.compute_name, session.tenant_id);
+        }
+        try {
+          const { startStatusPoller } = await import("./executors/status-poller.js");
+          // Runtime defaults to claude-code -- the executor registry resolves the
+          // concrete executor from this name. The actual handle (tmux session
+          // name) is on session_id.
+          const cfg = session.config as Record<string, unknown> | null;
+          const runtime = (typeof cfg?.runtime === "string" && cfg.runtime) || "claude-code";
+          startStatusPoller(this.forTenant(session.tenant_id), session.id, session.session_id, runtime);
+          pollers++;
+        } catch (err: any) {
+          lw("boot", `rehydrate poller failed for ${session.id}: ${err?.message ?? err}`);
+        }
+      }
+    } catch (err: any) {
+      lw("boot", `_rehydrateRunningSessions: scan failed: ${err?.message ?? err}`);
+      return;
+    }
+
+    let consumers = 0;
+    for (const [computeName, tenantId] of computesNeedingTransport) {
+      try {
+        const tenantApp = this.forTenant(tenantId);
+        const compute = await tenantApp.computes.get(computeName);
+        if (!compute) continue;
+        const { resolveProvider } = await import("./compute-resolver.js");
+        // resolveProvider takes a session; synthesise a minimal one here since
+        // we just need the provider lookup -- it only reads compute_name + tenant_id.
+        const fakeSession = { compute_name: computeName, tenant_id: tenantId } as import("../types/session.js").Session;
+        const { provider } = await resolveProvider(tenantApp, fakeSession);
+        if (!provider) continue;
+        const arkdUrl = (provider as { getArkdUrl?: (c: typeof compute) => string }).getArkdUrl?.(compute);
+        if (!arkdUrl) continue;
+        const { startArkdEventsConsumer } = await import("./conductor/arkd-events-consumer.js");
+        startArkdEventsConsumer(tenantApp, computeName, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
+        consumers++;
+      } catch (err: any) {
+        lw("boot", `rehydrate consumer failed for ${computeName}: ${err?.message ?? err}`);
+      }
+    }
+
+    if (pollers > 0 || consumers > 0) {
+      li("boot", `rehydrated ${pollers} status pollers + ${consumers} events consumers for in-flight sessions`);
     }
   }
 
