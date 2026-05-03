@@ -662,3 +662,200 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
 
   return items;
 }
+
+// ── Stage grouping ──────────────────────────────────────────────────────────
+
+export interface StageArtifacts {
+  /** PR URL surfaced by `pr_created` / `action_executed:create_pr` / `pr_detected`. */
+  prUrl?: string;
+  /** Distinct file paths the agent edited or wrote during the stage. Derived
+   *  from `Edit` / `Write` / `MultiEdit` PreToolUse rows. */
+  filesTouched: string[];
+  /** Number of `git commit` invocations seen in the stage's Bash tool calls. */
+  commits: number;
+  /** Branch name -- captured from `pr_created` or `action_executed` payloads. */
+  branch?: string;
+  /** Auto-merge / merge action result, if it ran during this stage. */
+  merged?: { ok: boolean; prUrl?: string };
+}
+
+export interface StageGroup {
+  /** Stage name (e.g. "implement", "verify", "pr"). May be `null` for items
+   *  that arrived before the first `stage_started` (provisioning, etc.). */
+  name: string | null;
+  /** Agent for the stage, when known. */
+  agent?: string;
+  /** Stage status derived from session/flow state plus event signals. */
+  status: "active" | "done" | "failed" | "pending";
+  /** First event timestamp seen in the group. Used for ordering. */
+  startTime?: string;
+  /** Last event timestamp seen in the group. */
+  endTime?: string;
+  /** Computed duration label (e.g. "27s", "2m 14s"). */
+  duration?: string;
+  /** Artifacts discovered during the stage. */
+  artifacts: StageArtifacts;
+  /** Original timeline items in arrival order. */
+  items: any[];
+}
+
+function durationBetween(startIso: string, endIso: string): string {
+  const ms = Math.max(0, new Date(endIso).getTime() - new Date(startIso).getTime());
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.floor((ms % 60_000) / 1000);
+  return mins < 60 ? `${mins}m ${secs}s` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+function deriveStageStatus(
+  stageName: string | null,
+  session: any,
+  events: any[],
+): "active" | "done" | "failed" | "pending" {
+  if (!stageName) return "done";
+  const sessionStatus = String(session?.status ?? "");
+  const sessionStage = session?.stage ?? null;
+
+  // Per-stage signals from the event stream.
+  let lastFailure = false;
+  let sawCompletion = false;
+  let sawHandoffAway = false;
+  for (const ev of events) {
+    const evStage = ev.stage || ev.data?.stage || null;
+    const evType = String(ev.type ?? "");
+    if (evType === "stage_handoff") {
+      const data = typeof ev.data === "object" && ev.data ? ev.data : {};
+      if (data.from_stage === stageName && data.to_stage && data.to_stage !== stageName) sawHandoffAway = true;
+    }
+    if (evStage !== stageName) continue;
+    if (evType === "stage_completed") sawCompletion = true;
+    if (evType === "session_failed" || evType === "dispatch_failed" || evType === "stage_failed") lastFailure = true;
+  }
+
+  if (sessionStage === stageName) {
+    if (sessionStatus === "failed") return "failed";
+    if (sessionStatus === "completed") return "done";
+    if (sessionStatus === "stopped") return "failed";
+    if (sessionStatus === "running" || sessionStatus === "ready" || sessionStatus === "waiting") return "active";
+    return "pending";
+  }
+
+  // Stage isn't the current one. If we saw a handoff away or completion, it's done.
+  if (sawHandoffAway || sawCompletion) return lastFailure ? "failed" : "done";
+  return lastFailure ? "failed" : "pending";
+}
+
+/**
+ * Bucket a flat timeline into per-stage groups, in stage-arrival order.
+ *
+ * Items inherit their `stage` field from the underlying event payload (set in
+ * `buildConversationTimeline`). Items with no stage are folded into the
+ * preceding stage when one exists, otherwise into a leading `null` group
+ * that captures provisioning / pre-stage events.
+ *
+ * Each group also accumulates artifacts discovered in the stage's events:
+ * PR URL, distinct files touched, commit count, branch, merge result.
+ * Callers render the group header (name + agent + status + duration +
+ * artifacts) above the group's items.
+ */
+export function groupTimelineByStage(items: any[], events: any[], session: any): StageGroup[] {
+  const groups: StageGroup[] = [];
+  const indexByName = new Map<string | null, number>();
+
+  function ensureGroup(name: string | null): StageGroup {
+    const existing = indexByName.get(name);
+    if (existing != null) return groups[existing];
+    const group: StageGroup = {
+      name,
+      status: "pending",
+      artifacts: { filesTouched: [], commits: 0 },
+      items: [],
+    };
+    indexByName.set(name, groups.length);
+    groups.push(group);
+    return group;
+  }
+
+  // Walk timeline items: bucket each into its stage; null-stage items
+  // attach to the most recent named group when one exists.
+  let lastNamedStage: string | null = null;
+  for (const item of items) {
+    const stageName: string | null = item.stage ?? lastNamedStage ?? null;
+    if (item.stage) lastNamedStage = item.stage;
+    const group = ensureGroup(stageName);
+    group.items.push(item);
+  }
+
+  // Walk events to (a) extract artifacts and (b) infer agent + start/end.
+  // `stage_started` carries agent + model; `action_executed` / `pr_created`
+  // carry artifacts; tool calls carry file paths and commit counts.
+  for (const ev of events ?? []) {
+    const stageName = ev.stage || ev.data?.stage || null;
+    const data = typeof ev.data === "object" && ev.data ? ev.data : {};
+    const evType = String(ev.type ?? "");
+    const ts = String(ev.created_at ?? "");
+    if (!ts) continue;
+
+    const target = stageName != null ? indexByName.get(stageName) : null;
+    if (target == null) continue;
+    const group = groups[target];
+
+    if (!group.startTime || ts < group.startTime) group.startTime = ts;
+    if (!group.endTime || ts > group.endTime) group.endTime = ts;
+
+    if (evType === "stage_started") {
+      group.agent = data.agent || group.agent;
+    }
+
+    if (evType === "pr_created" || evType === "pr_detected") {
+      const url = data.pr_url || ev.data?.data?.pr_url;
+      if (url) group.artifacts.prUrl = url;
+      if (data.branch) group.artifacts.branch = data.branch;
+    }
+
+    if (evType === "action_executed") {
+      const action = String(data.action ?? "");
+      const url = data.pr_url || ev.data?.data?.pr_url;
+      if ((action === "create_pr" || action === "auto_create_pr") && url) {
+        group.artifacts.prUrl = url;
+      }
+      if (action === "merge_pr" || action === "merge" || action === "auto_merge") {
+        group.artifacts.merged = { ok: true, prUrl: url };
+      }
+    }
+
+    if (evType === "hook_status" && data.event === "PreToolUse") {
+      const toolName = String(data.tool_name ?? "");
+      const input = (data.tool_input ?? {}) as Record<string, unknown>;
+      if (toolName === "Edit" || toolName === "Write" || toolName === "MultiEdit" || toolName === "write_file") {
+        const path = String(input.file_path ?? input.path ?? "");
+        if (path && !group.artifacts.filesTouched.includes(path)) {
+          group.artifacts.filesTouched.push(path);
+        }
+      }
+      if (toolName === "Bash" || toolName === "bash") {
+        const cmd = String(input.command ?? "");
+        if (/(?:^|[\s&|;])git\s+commit\b/.test(cmd)) group.artifacts.commits += 1;
+      }
+    }
+  }
+
+  // Fall back to first/last item timestamps when the event walk missed some
+  // groups (e.g. message-only groups before any event-derived signal).
+  for (const group of groups) {
+    if (!group.startTime && group.items.length > 0) group.startTime = group.items[0].timestamp;
+    if (!group.endTime && group.items.length > 0) group.endTime = group.items[group.items.length - 1].timestamp;
+    if (group.startTime && group.endTime) {
+      // timestamps from items are wall-clock strings (HH:MM:SS) -- skip
+      // duration calc when only those are available; we only get a useful
+      // duration when startTime/endTime came from event ISO timestamps.
+      if (group.startTime.includes("T") && group.endTime.includes("T")) {
+        group.duration = durationBetween(group.startTime, group.endTime);
+      }
+    }
+    group.status = deriveStageStatus(group.name, session, events ?? []);
+  }
+
+  return groups;
+}
