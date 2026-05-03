@@ -198,7 +198,116 @@ export const claudeAgentExecutor: Executor = {
     // These override all other env sources so operator-rotated values take effect.
     const secretEnv = opts.env ?? {};
 
-    // Resolve the launch command (handles compiled vs dev mode)
+    // Remote dispatch (EC2/k8s/Firecracker): the SDK loop must run on the
+    // worker, not on the conductor. Build a launcher script that arkd's
+    // /agent/launch endpoint runs in tmux on the worker. The worker has the
+    // compiled `ark` binary at `${REMOTE_HOME}/.ark/bin/ark`; the
+    // `run-agent-sdk` subcommand is the same SDK loop that runs locally
+    // via Bun.spawn. Hooks post to the worker's local arkd
+    // (ARK_ARKD_URL=localhost:19300) which buffers + forwards to the
+    // conductor via /events/stream. Same plumbing claude-code uses.
+    const isRemote = !!(compute && provider && !provider.supportsWorktree);
+    if (isRemote) {
+      // Remote-compute paths come from the provider, not from this executor.
+      // - workdir: provider.resolveWorkdir(compute, session) is the canonical
+      //   answer; falls through to runTargetLifecycle's own resolution.
+      // - $HOME: the launcher uses bash's $HOME so the path adapts to whatever
+      //   user the worker runs as (ubuntu on EC2, root in some k8s images,
+      //   ec2-user on Amazon Linux, etc.). We don't hardcode the value here.
+      // - session/prompt scratch space: /tmp is universal on Linux and writable
+      //   without owning a home dir.
+      const remoteSessionDir = `/tmp/ark-${session.id}`;
+      const remotePromptFile = `${remoteSessionDir}/task.txt`;
+      const remoteWorkdir = provider!.resolveWorkdir?.(compute!, session) ?? effectiveWorkdir ?? null;
+      const tmuxName = `ark-${session.id}`;
+
+      // Per-arkd hook posting: redirect from the conductor URL to the
+      // worker's local arkd, which carries hooks via /events/stream. The
+      // SDK launcher's main() picks ARK_ARKD_URL over ARK_CONDUCTOR_URL.
+      const remoteEnv: Record<string, string> = {
+        ...arkEnv,
+        ARK_SESSION_DIR: remoteSessionDir,
+        ...(remoteWorkdir ? { ARK_WORKTREE: remoteWorkdir } : {}),
+        ARK_PROMPT_FILE: remotePromptFile,
+        ARK_ARKD_URL: "http://localhost:19300",
+      };
+      // ARK_CONDUCTOR_URL on the worker would resolve to the worker's
+      // own loopback (no conductor there); drop it.
+      delete remoteEnv.ARK_CONDUCTOR_URL;
+
+      const { shellQuote } = await import("../claude/args.js");
+      const exports = Object.entries({ ...remoteEnv, ...secretEnv })
+        .map(([k, v]) => `export ${k}=${shellQuote(String(v))}`)
+        .join("\n");
+
+      // Heredoc the prompt content so the worker doesn't need a separate
+      // file copy. Quoted tag (`'ARK_EOF_PROMPT'`) suppresses $-expansion
+      // so the prompt lands verbatim.
+      const launcherContent = [
+        "#!/bin/bash",
+        // PATH set to find the installed `ark` binary regardless of the
+        // worker user. The compiled binary lives at `$HOME/.ark/bin/ark`
+        // for any user that ran the standard installer.
+        'export PATH="$HOME/.ark/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"',
+        `mkdir -p ${shellQuote(remoteSessionDir)}`,
+        `cat > ${shellQuote(remotePromptFile)} <<'ARK_EOF_PROMPT'`,
+        opts.task,
+        "ARK_EOF_PROMPT",
+        exports,
+        ...(remoteWorkdir ? [`cd ${shellQuote(remoteWorkdir)}`] : []),
+        `if ark run-agent-sdk; then :; else`,
+        "  code=$?",
+        `  mkdir -p ${shellQuote(remoteSessionDir)} 2>/dev/null || true`,
+        `  echo "$code" > ${shellQuote(remoteSessionDir)}/exit-code`,
+        '  echo "claude-agent exited with code $code." >&2',
+        "fi",
+        "exec bash",
+        "",
+      ].join("\n");
+
+      log("Launching claude-agent on remote via arkd /agent/launch...");
+      const { resolveTargetAndHandle } = await import("../services/dispatch/target-resolver.js");
+      const { runTargetLifecycle } = await import("../services/dispatch/target-lifecycle.js");
+      const { target, handle } = await resolveTargetAndHandle(app, session);
+      if (!target || !handle) {
+        return { ok: false, handle: "", message: "no compute target resolved for remote claude-agent dispatch" };
+      }
+      try {
+        // arkd's /agent/launch needs a non-null workdir for tmux's `-c <dir>`.
+        // Empty string would land tmux in /tmp; that's wrong but safe -- the
+        // launcher script itself does its own `cd` to remoteWorkdir when
+        // present.
+        const launchWorkdir = remoteWorkdir ?? "";
+        await runTargetLifecycle(
+          app,
+          session.id,
+          target,
+          handle,
+          {
+            tmuxName,
+            workdir: launchWorkdir,
+            launcherContent,
+            ports: [],
+          },
+          {
+            prepareCtx: { workdir: launchWorkdir, onLog: log },
+            workspace: {
+              source: (session.config as { remoteRepo?: string } | null)?.remoteRepo ?? session.repo ?? null,
+              remoteWorkdir,
+            },
+            placement: opts.placement,
+            computeStatus: compute!.status,
+          },
+        );
+      } catch (err: any) {
+        return { ok: false, handle: "", message: `remote launch failed: ${err?.message ?? err}` };
+      }
+      await app.sessions.update(session.id, { session_id: tmuxName });
+      return { ok: true, handle: tmuxName };
+    }
+
+    // Local dispatch: spawn the SDK loop in-process on the conductor.
+    // Resolve the launch command (handles compiled vs dev mode).
     const launchSpec = agentSdkLaunchSpec();
     const cmd = [launchSpec.command, ...launchSpec.args];
 

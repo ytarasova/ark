@@ -106,11 +106,16 @@ export interface RunAgentSdkLaunchOpts {
    */
   streamFactory?: (prompt: AsyncIterable<SDKUserMessage>, options: Record<string, unknown>) => AsyncIterable<unknown>;
   /**
-   * Conductor base URL (e.g. "http://localhost:19100"). When undefined,
-   * hook forwarding is skipped entirely. In production, read from
-   * ARK_CONDUCTOR_URL env var. Undefined in tests that do not inject it.
+   * Fully-resolved hook endpoint URL. In production, `main()` selects:
+   *   - `${ARK_ARKD_URL}/hooks/forward` when arkd is reachable (remote
+   *     dispatch on EC2/k8s -- arkd buffers + the conductor pulls via
+   *     /events/stream)
+   *   - `${ARK_CONDUCTOR_URL}/hooks/status` when the agent runs on the
+   *     same host as the conductor (local dispatch)
+   *
+   * Undefined disables hook forwarding entirely (test fixtures).
    */
-  conductorUrl?: string;
+  hookEndpoint?: string;
   /**
    * Optional bearer token for the conductor's Authorization header.
    * When set, every hook POST includes "Authorization: Bearer <token>".
@@ -288,26 +293,44 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
 }
 
 interface ForwardDeps {
-  conductorUrl: string | undefined;
+  /**
+   * Fully-resolved hook endpoint URL. Set by `main()` to either
+   * `${ARK_ARKD_URL}/hooks/forward` (remote dispatch) or
+   * `${ARK_CONDUCTOR_URL}/hooks/status` (local). Undefined when neither
+   * env var is set -- forwarding is then disabled.
+   */
+  hookEndpoint: string | undefined;
   arkSessionId: string;
   authToken?: string;
   fetchFn?: typeof fetch;
 }
 
 /**
- * Forward one SDKMessage to the conductor /hooks/status endpoint.
+ * Forward one SDKMessage to the appropriate hook endpoint.
+ *
+ * Two modes:
+ *   - LOCAL dispatch: post to `${conductorUrl}/hooks/status` -- direct to
+ *     the conductor since the agent runs on the same host.
+ *   - REMOTE dispatch (EC2/k8s): post to `${arkdUrl}/hooks/forward` -- the
+ *     local arkd's events ring then carries the hook to the conductor via
+ *     `/events/stream`. There is no reverse network path from the worker
+ *     to the conductor in pure-SSM mode.
+ *
+ * `deps.hookEndpoint` is the fully-resolved URL (computed in main() based
+ * on which env var is set: ARK_ARKD_URL wins for remote, falls back to
+ * ARK_CONDUCTOR_URL for local).
  *
  * Each forward is awaited serially to preserve event order. Any network
- * error is logged to stderr but never propagates -- a conductor outage must
- * not break the agent loop. The transcript.jsonl remains the source of truth.
+ * error is logged to stderr but never propagates -- an outage must not
+ * break the agent loop. The transcript.jsonl remains the source of truth.
  */
 async function forwardToConductor(message: unknown, deps: ForwardDeps): Promise<void> {
-  if (!deps.conductorUrl) return;
+  if (!deps.hookEndpoint) return;
   const hooks = messageToHooks(message, deps.arkSessionId);
   const doFetch = deps.fetchFn ?? fetch;
   for (const hook of hooks) {
     try {
-      await doFetch(`${deps.conductorUrl}/hooks/status?session=${encodeURIComponent(deps.arkSessionId)}`, {
+      await doFetch(`${deps.hookEndpoint}?session=${encodeURIComponent(deps.arkSessionId)}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -317,7 +340,7 @@ async function forwardToConductor(message: unknown, deps: ForwardDeps): Promise<
       });
     } catch (err) {
       const msg = (err as Error)?.message ?? String(err);
-      console.error(`[agent-sdk launch] conductor hook forward failed: ${msg}`);
+      console.error(`[agent-sdk launch] hook forward failed: ${msg}`);
     }
   }
 }
@@ -475,7 +498,7 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   }
 
   const forwardDeps: ForwardDeps = {
-    conductorUrl: opts.conductorUrl,
+    hookEndpoint: opts.hookEndpoint,
     arkSessionId: sessionId,
     authToken: opts.authToken,
     fetchFn: opts.fetchFn,
@@ -862,9 +885,15 @@ async function main(): Promise<void> {
   const maxBudgetUsd = optionalNumber("ARK_MAX_BUDGET_USD");
   const systemAppend = process.env.ARK_SYSTEM_PROMPT_APPEND;
 
+  // Hook endpoint resolution: prefer ARK_ARKD_URL (the local arkd on the
+  // worker, which forwards via /events/stream to the conductor). Falls back
+  // to ARK_CONDUCTOR_URL for local dispatch where the agent runs on the
+  // conductor host. Tests leave both unset to disable forwarding.
+  const arkdUrl = process.env.ARK_ARKD_URL;
   const conductorUrl = process.env.ARK_CONDUCTOR_URL;
-  if (!conductorUrl) {
-    console.warn("[agent-sdk launch] ARK_CONDUCTOR_URL is not set -- conductor hook forwarding disabled");
+  const hookEndpoint = arkdUrl ? `${arkdUrl}/hooks/forward` : conductorUrl ? `${conductorUrl}/hooks/status` : undefined;
+  if (!hookEndpoint) {
+    console.warn("[agent-sdk launch] neither ARK_ARKD_URL nor ARK_CONDUCTOR_URL is set -- hook forwarding disabled");
   }
   const authToken = process.env.ARK_API_TOKEN;
 
@@ -877,6 +906,11 @@ async function main(): Promise<void> {
     maxTurns,
     maxBudgetUsd,
     systemAppend,
+    hookEndpoint,
+    // Pass the conductor URL through unchanged for the ask-user MCP path.
+    // That feature requires a direct conductor reach for inbound RPCs and
+    // doesn't have a "via arkd" route yet -- when only ARK_ARKD_URL is set
+    // (remote dispatch), ask-user is silently disabled.
     conductorUrl,
     authToken,
   });
