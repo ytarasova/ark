@@ -1,6 +1,7 @@
 name: default
 description: "Full SDLC flow: intake -> plan -> audit -> implement -> verify -> PR -> review -> close -> retro"
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: intake
     agent: ticket-intake
     gate: auto

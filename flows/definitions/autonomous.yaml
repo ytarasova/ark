@@ -1,6 +1,7 @@
 name: autonomous
 description: "Single agent session -- fully autonomous, auto-completes on agent report"
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: work
     agent: worker
     gate: auto

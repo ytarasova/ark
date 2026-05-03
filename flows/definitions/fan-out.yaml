@@ -1,6 +1,7 @@
 name: fan-out
 description: Plan then execute tasks in parallel
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: plan
     agent: planner
     gate: manual
