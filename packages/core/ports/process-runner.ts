@@ -7,8 +7,11 @@
  * `session-lifecycle.ts`, `stage-orchestrator.ts`, and `services/worktree/*`.
  *
  * Local binding: `LocalProcessRunner` (thin wrapper around Bun.spawn).
- * Control-plane binding: `RemoteProcessRunner` (SSH via the existing pool).
  * Test binding: `MockProcessRunner` returning pre-configured results.
+ *
+ * (A control-plane binding was scaffolded as `RemoteProcessRunner` over an
+ * SSH pool; both the binding and the SSH transport were removed when the
+ * conductor->arkd path moved to AWS SSM.)
  *
  * All adapters MUST pass args as an array (execFile-style) -- never
  * concatenate user input into a shell string.
