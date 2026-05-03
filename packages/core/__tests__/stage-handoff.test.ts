@@ -132,7 +132,8 @@ describe("mediateStageHandoff", async () => {
     });
 
     it("advances through multiple stages to completion", async () => {
-      // quick flow: implement -> verify -> pr -> merge
+      // quick flow (post-#436): implement -> verify -> pr (last stage; the
+      // pr-handler agent owns both PR creation and auto-merge queueing).
       const session = await app.sessions.create({ summary: "multi-stage test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
@@ -153,21 +154,13 @@ describe("mediateStageHandoff", async () => {
       expect(r2.ok).toBe(true);
       expect(r2.toStage).toBe("pr");
 
-      // Step 3: pr -> merge
+      // Step 3: pr -> completed (pr is now the terminal stage)
       const r3 = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
       expect(r3.ok).toBe(true);
-      expect(r3.toStage).toBe("merge");
-
-      // Step 4: merge -> completed
-      const r4 = await app.sessionHooks.mediateStageHandoff(session.id, {
-        autoDispatch: false,
-        source: "test",
-      });
-      expect(r4.ok).toBe(true);
-      expect(r4.flowCompleted).toBe(true);
+      expect(r3.flowCompleted).toBe(true);
 
       const final = await app.sessions.get(session.id);
       expect(final?.status).toBe("completed");

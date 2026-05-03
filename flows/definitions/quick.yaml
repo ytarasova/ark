@@ -13,11 +13,6 @@ stages:
     depends_on: [implement]
 
   - name: pr
-    action: create_pr
+    agent: pr-handler
     gate: auto
     depends_on: [verify]
-
-  - name: merge
-    action: auto_merge
-    gate: auto
-    depends_on: [pr]

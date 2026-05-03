@@ -38,6 +38,6 @@ stages:
     depends_on: [integrate]
 
   - name: pr
-    action: create_pr
+    agent: pr-handler
     gate: auto
     depends_on: [review]

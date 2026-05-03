@@ -34,7 +34,7 @@ stages:
       Close the session -- implementation was rejected.
 
   - name: pr
-    action: create_pr
+    agent: pr-handler
     gate: auto
 
 edges:

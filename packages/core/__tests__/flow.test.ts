@@ -305,10 +305,13 @@ describe("getStageAction", () => {
     expect(action.agent).toBe("spec-planner");
   });
 
-  it("returns action type with action name", () => {
+  it("returns agent type for the default flow's pr stage (#436 migration)", () => {
+    // The default flow's pr stage was migrated from `action: create_pr` to
+    // `agent: pr-handler` -- the pr-handler agent owns PR creation via the
+    // in-process ark-github MCP server.
     const action = getStageAction(getApp(), "default", "pr");
-    expect(action.type).toBe("action");
-    expect(action.action).toBe("create_pr");
+    expect(action.type).toBe("agent");
+    expect(action.agent).toBe("pr-handler");
   });
 
   it("returns fork type with defaults", () => {
@@ -355,30 +358,33 @@ describe("getStageAction", () => {
     expect(action.optional).toBeUndefined();
   });
 
-  it("returns auto_merge action for autonomous-sdlc merge stage", () => {
-    const action = getStageAction(getApp(), "autonomous-sdlc", "merge");
-    expect(action.type).toBe("action");
-    expect(action.action).toBe("auto_merge");
+  it("returns agent:pr-handler for autonomous-sdlc pr stage (#436 migration)", () => {
+    // The autonomous-sdlc flow used to have a separate `merge` action stage
+    // running auto_merge. Both create_pr and auto_merge now collapse into a
+    // single `pr` stage handled by the pr-handler agent.
+    const action = getStageAction(getApp(), "autonomous-sdlc", "pr");
+    expect(action.type).toBe("agent");
+    expect(action.agent).toBe("pr-handler");
   });
 });
 
 // ── autonomous-sdlc flow ────────────────────────────────────────────────────
 
 describe("autonomous-sdlc flow", () => {
-  it("includes merge stage after pr", () => {
+  it("ends at the pr stage (merge stage was collapsed into pr-handler in #436)", () => {
     const stages = getStages(getApp(), "autonomous-sdlc");
     const names = stages.map((s) => s.name);
-    expect(names).toEqual(["plan", "implement", "verify", "review", "pr", "merge"]);
+    expect(names).toEqual(["plan", "implement", "verify", "review", "pr"]);
   });
 
-  it("merge stage depends on pr", () => {
-    const stage = getStage(getApp(), "autonomous-sdlc", "merge");
+  it("pr stage depends on review", () => {
+    const stage = getStage(getApp(), "autonomous-sdlc", "pr");
     expect(stage).not.toBeNull();
-    expect(stage!.depends_on).toEqual(["pr"]);
+    expect(stage!.depends_on).toEqual(["review"]);
   });
 
-  it("merge stage has auto gate", () => {
-    const result = evaluateGate(getApp(), "autonomous-sdlc", "merge", {});
+  it("pr stage has auto gate", () => {
+    const result = evaluateGate(getApp(), "autonomous-sdlc", "pr", {});
     expect(result.canProceed).toBe(true);
   });
 });

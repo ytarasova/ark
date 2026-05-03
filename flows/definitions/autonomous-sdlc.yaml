@@ -50,11 +50,6 @@ stages:
       If changes look good, report(completed) with approval summary.
 
   - name: pr
-    action: create_pr
+    agent: pr-handler
     gate: auto
     depends_on: [review]
-
-  - name: merge
-    action: auto_merge
-    gate: auto
-    depends_on: [pr]

@@ -13,6 +13,6 @@ stages:
     on_failure: "retry(1)"
 
   - name: pr
-    action: create_pr
+    agent: pr-handler
     gate: auto
     depends_on: [implement]

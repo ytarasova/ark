@@ -188,8 +188,9 @@ describe("Auto completion path (quick flow)", async () => {
 
   it("advance() on last auto-gate stage completes the session", async () => {
     const session = await app.sessions.create({ summary: "auto last stage", flow: "quick" });
-    // merge is the last stage in quick flow
-    await app.sessions.update(session.id, { status: "ready", stage: "merge" });
+    // After #436 the quick flow ends at the `pr` stage -- the merge action
+    // stage was collapsed into the pr-handler agent.
+    await app.sessions.update(session.id, { status: "ready", stage: "pr" });
 
     const advResult = await app.stageAdvance.advance(session.id);
     expect(advResult.ok).toBe(true);
@@ -257,7 +258,9 @@ describe("Auto completion path (quick flow)", async () => {
     await app.sessions.update(session.id, r2.updates);
     await app.stageAdvance.advance(session.id);
 
-    // Now at pr stage -- simulate pr completion
+    // Now at pr stage -- simulate pr completion. After #436 the quick flow
+    // ends at the pr stage (the pr-handler agent owns both create + auto
+    // queue-merge), so finishing pr completes the session.
     await app.sessions.update(session.id, { status: "running" });
     const r3 = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
@@ -268,22 +271,9 @@ describe("Auto completion path (quick flow)", async () => {
       commits: [],
     });
     await app.sessions.update(session.id, r3.updates);
-    await app.stageAdvance.advance(session.id);
-
-    // Now at merge stage -- simulate merge completion
-    await app.sessions.update(session.id, { status: "running" });
-    const r4 = await app.sessionHooks.applyReport(session.id, {
-      type: "completed",
-      sessionId: session.id,
-      stage: "merge",
-      summary: "Merged",
-      filesChanged: [],
-      commits: [],
-    });
-    await app.sessions.update(session.id, r4.updates);
     const finalAdv = await app.stageAdvance.advance(session.id);
 
-    // Session should now be completed (merge is last stage)
+    // Session should now be completed (pr is the last stage in quick).
     expect(finalAdv.ok).toBe(true);
     expect(finalAdv.message).toContain("completed");
     const final = await app.sessions.get(session.id);

@@ -70,10 +70,12 @@ describe("autonomous-sdlc flow structure", () => {
     expect(stage!.depends_on).toEqual(["verify"]);
   });
 
-  it("stages are ordered: plan -> implement -> verify -> review -> pr -> merge", () => {
+  it("stages are ordered: plan -> implement -> verify -> review -> pr", () => {
+    // The merge action stage was removed in #436 -- the pr-handler agent
+    // now owns both create_pr + queue auto-merge in a single stage.
     const stages = flow.getStages(app, "autonomous-sdlc");
     const names = stages.map((s) => s.name);
-    expect(names).toEqual(["plan", "implement", "verify", "review", "pr", "merge"]);
+    expect(names).toEqual(["plan", "implement", "verify", "review", "pr"]);
   });
 
   it("verify stage has on_failure retry", () => {
@@ -327,7 +329,7 @@ describe("autonomous-sdlc pipeline with quality gates", async () => {
     const session = await app.sessions.create({ summary: "full pipeline test", flow: "autonomous-sdlc" });
     await app.sessions.update(session.id, { status: "ready", stage: "plan" });
 
-    const stageSequence = ["plan", "implement", "verify", "review", "pr", "merge"];
+    const stageSequence = ["plan", "implement", "verify", "review", "pr"];
 
     for (let i = 0; i < stageSequence.length; i++) {
       const currentStage = stageSequence[i];

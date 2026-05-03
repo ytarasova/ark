@@ -35,6 +35,7 @@ import { startInterventionTail } from "./intervention-tail.js";
 import { subscribeUserMessages } from "./user-message-stream.js";
 import { createAskUserMcpServer } from "./mcp-ask-user.js";
 import { createStageControlMcpServer } from "./mcp-stage-control.js";
+import { createGithubMcpServer } from "./mcp-github.js";
 
 /**
  * SDK user message shape accepted by the Anthropic Agent SDK when passing an
@@ -139,6 +140,21 @@ export interface RunAgentSdkLaunchOpts {
    * so no real HTTP connections are made.
    */
   fetchFn?: typeof fetch;
+  /**
+   * Conductor base URL (e.g. "http://localhost:19100") used by the in-process
+   * `ask_user` MCP server for direct conductor reach. When undefined, the
+   * ask_user MCP is silently disabled. In production this is read from
+   * ARK_CONDUCTOR_URL.
+   */
+  conductorUrl?: string;
+  /**
+   * GitHub bearer token for the in-process `ark-github` MCP server. When set,
+   * `mcp__ark-github__*` tools become available to the agent and can call the
+   * REST API directly (no node/npx on the worker required). When undefined,
+   * the github MCP server is not registered. In production this is read from
+   * the `GITHUB_TOKEN` env var (see the github connector's auth.envVar).
+   */
+  githubToken?: string;
 }
 
 export interface RunAgentSdkLaunchResult {
@@ -831,6 +847,17 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
       stageCompleteReason = reason;
     },
   });
+  // Mount the in-process github MCP only when a token is available. When
+  // GITHUB_TOKEN is unset, the server is omitted entirely so the agent's
+  // tool list doesn't include `mcp__ark-github__*` -- agents that try to
+  // call them get a clean "tool not found" rather than a runtime auth
+  // error. The pr-handler agent's prompt covers the fallback path.
+  if (opts.githubToken) {
+    mcpServers["ark-github"] = createGithubMcpServer({
+      token: opts.githubToken,
+      fetchFn: opts.fetchFn,
+    });
+  }
 
   const sdkOptions: Options = {
     cwd: worktree,
@@ -844,6 +871,13 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
       "Grep",
       "mcp__ark-ask-user__ask_user",
       "mcp__ark-stage-control__complete_stage",
+      // Github MCP tools are always allow-listed; they're only mountable
+      // when GITHUB_TOKEN is set, so listing them here when the server
+      // isn't registered is a no-op.
+      "mcp__ark-github__create_pr",
+      "mcp__ark-github__merge_pr",
+      "mcp__ark-github__get_pr_status",
+      "mcp__ark-github__list_prs",
     ],
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
@@ -1054,6 +1088,11 @@ async function main(): Promise<void> {
     // (remote dispatch), ask-user is silently disabled.
     conductorUrl,
     authToken,
+    // GITHUB_TOKEN is the env var the github connector's auth.envVar
+    // declares (see packages/core/connectors/definitions/github.ts).
+    // When set, the in-process `ark-github` MCP server is mounted so
+    // agents can create / merge / inspect PRs without `gh` on the box.
+    githubToken: process.env.GITHUB_TOKEN,
   });
 
   process.exit(result.exitCode);
