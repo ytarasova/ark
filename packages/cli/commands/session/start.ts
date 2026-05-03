@@ -71,6 +71,10 @@ export function registerStartCommands(session: Command) {
       },
       {} as Record<string, unknown>,
     )
+    .option(
+      "--dry-run",
+      "Validate the flow payload + declared inputs via flow/validate and exit without creating a session. Useful for CI and editor integrations.",
+    )
     .action(async (ticket, opts) => {
       const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../../core/prereqs.js");
       const prereqs = checkPrereqs();
@@ -106,6 +110,33 @@ export function registerStartCommands(session: Command) {
       for (const note of plan.notes) {
         if (note.kind === "warn") console.warn(chalk.yellow(note.message));
         else console.log(chalk.dim(note.message));
+      }
+
+      // --dry-run: validate the fully-resolved flow payload server-side and
+      // exit without creating a session. We pass the request's flow + inputs
+      // + repo (the same values that would go to session/start) so the
+      // verdict matches what dispatch would see.
+      if (opts.dryRun) {
+        const flowArg = plan.request.flow as string | Record<string, unknown> | undefined;
+        if (!flowArg) {
+          console.error(chalk.red("--dry-run requires a flow (--flow <name-or-path>)."));
+          process.exit(1);
+        }
+        const result = await ark.flowValidate({
+          flow: flowArg as never,
+          inputs: plan.request.inputs as Record<string, unknown> | undefined,
+          repo: plan.request.repo as string | undefined,
+        });
+        if (result.ok) {
+          const label = result.flow?.name ?? (typeof flowArg === "string" ? flowArg : "(inline)");
+          const stageList = result.flow?.stages?.join(" > ") ?? "";
+          console.log(chalk.green(`Dry-run OK: flow '${label}' would dispatch`));
+          if (stageList) console.log(chalk.dim(`  stages: ${stageList}`));
+          return;
+        }
+        console.error(chalk.red(`Dry-run failed (${result.problems.length} problem(s)):`));
+        for (const p of result.problems) console.error(chalk.red(`  - ${p}`));
+        process.exit(1);
       }
 
       const s = await ark.sessionStart(plan.request);

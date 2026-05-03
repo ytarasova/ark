@@ -570,6 +570,12 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: {},
     sampleResponse: { ok: true },
   },
+  "flow/validate": {
+    validRequest: { flow: { name: "inline", stages: [{ name: "main", gate: "auto" }] } },
+    // Missing `flow` field -- rejected by Zod before the handler runs.
+    invalidRequest: {},
+    sampleResponse: { ok: true, problems: [], flow: { name: "inline", stages: ["main"] } },
+  },
   "worktree/list": {
     validRequest: {},
     invalidRequest: [] as unknown as Record<string, unknown>,

@@ -1593,6 +1593,48 @@ export type FlowDeleteRequest = z.infer<typeof flowDeleteRequest>;
 export const flowDeleteResponse = z.object({ ok: z.boolean() });
 export type FlowDeleteResponse = z.infer<typeof flowDeleteResponse>;
 
+// ── flow/validate ───────────────────────────────────────────────────────────
+//
+// Dry-run validation for inline + named flow payloads. Runs the same
+// structural (Zod), semantic (DAG, for_each, on_outcome), and input-contract
+// checks that `session/start` would apply, but never creates a session or
+// registers the flow on the ephemeral overlay. Callers (CLI `--dry-run`,
+// web Create Flow form, external tooling) can surface problems in a single
+// round-trip.
+
+export const flowValidateRequest = z
+  .object({
+    // Same shape as `session/start.flow` -- accept either a name lookup or a
+    // literal inline definition. A missing `flow` field is rejected below so
+    // the handler never has to distinguish unset from invalid.
+    flow: z.union([z.string(), inlineFlowSchema]),
+    // Session inputs to validate against the flow's declared contract. Same
+    // flat-bag shape as `session/start.inputs` -- key/value pairs with
+    // optional `$type`-tagged rich-content values.
+    inputs: sessionInputsSchema.optional(),
+    // When set, flows that declare `requires_repo: true` are still allowed;
+    // leave unset to exercise the repo gate exactly as `session/start` would.
+    repo: z.string().optional(),
+  })
+  .loose();
+export type FlowValidateRequest = z.infer<typeof flowValidateRequest>;
+
+export const flowValidateResponse = z.object({
+  ok: z.boolean(),
+  // Human-readable list of problems. Empty when `ok: true`.
+  problems: z.array(z.string()),
+  // Echoed back on success so callers can confirm they validated the
+  // flow they expected to validate (especially for path-resolved inline
+  // flows parsed on the client).
+  flow: z
+    .object({
+      name: z.string(),
+      stages: z.array(z.string()),
+    })
+    .optional(),
+});
+export type FlowValidateResponse = z.infer<typeof flowValidateResponse>;
+
 // ── worktree/list ───────────────────────────────────────────────────────────
 
 export const worktreeListRequest = z.object({}).loose();
@@ -2079,6 +2121,7 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "agent/delete": { request: agentDeleteRequest, response: agentDeleteResponse },
   "flow/create": { request: flowCreateRequest, response: flowCreateResponse },
   "flow/delete": { request: flowDeleteRequest, response: flowDeleteResponse },
+  "flow/validate": { request: flowValidateRequest, response: flowValidateResponse },
   "worktree/list": { request: worktreeListRequest, response: worktreeListResponse },
   "worktree/diff": { request: worktreeDiffRequest, response: worktreeDiffResponse },
   "worktree/finish": { request: worktreeFinishRequest, response: worktreeFinishResponse },
