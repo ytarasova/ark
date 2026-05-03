@@ -1,6 +1,6 @@
 name: reviewer
 description: "Reviews code changes and produces structured P0-P3 review output"
-runtime: claude-code
+runtime: claude-agent
 model: sonnet
 max_turns: 50
 system_prompt: |

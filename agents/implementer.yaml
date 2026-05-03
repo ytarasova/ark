@@ -1,6 +1,6 @@
 name: implementer
 description: "Implements features or fixes with production-quality code and tests"
-runtime: claude-code
+runtime: claude-agent
 model: opus
 max_turns: 200
 system_prompt: |

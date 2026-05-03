@@ -1,6 +1,6 @@
 name: retro
 description: "Automated retrospective on the ISLC workflow run"
-runtime: claude-code
+runtime: claude-agent
 model: sonnet
 max_turns: 50
 system_prompt: |

@@ -1,6 +1,6 @@
 name: worker
 description: "General-purpose autonomous agent for any coding task"
-runtime: claude-code
+runtime: claude-agent
 model: opus
 max_turns: 200
 system_prompt: |

@@ -1,6 +1,6 @@
 name: plan-auditor
 description: "Audits plan coverage against spec requirements"
-runtime: claude-code
+runtime: claude-agent
 model: sonnet
 max_turns: 50
 system_prompt: |
