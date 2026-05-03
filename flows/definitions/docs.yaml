@@ -1,6 +1,7 @@
 name: docs
 description: "Lightweight flow for documentation: plan -> implement -> PR. No verify/review -- docs don't need test suites or code review."
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: plan
     agent: planner
     gate: auto

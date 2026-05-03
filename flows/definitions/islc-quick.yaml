@@ -1,6 +1,7 @@
 name: islc-quick
 description: "Fast ISLC -- ticket intake -> plan -> execute -> verify -> close (skip audit + retro)"
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: ticket-intake
     agent: ticket-intake
     gate: auto

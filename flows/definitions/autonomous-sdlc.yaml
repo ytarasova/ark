@@ -1,6 +1,7 @@
 name: autonomous-sdlc
 description: "Fully autonomous SDLC: plan -> implement -> verify -> review -> PR. All gates auto, no human needed."
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: plan
     agent: planner
     gate: auto

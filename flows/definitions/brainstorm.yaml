@@ -1,6 +1,7 @@
 name: brainstorm
 description: "Brainstorm flow: explore ideas -> synthesize -> plan. Interactive ideation with human steering."
-requires_repo: truestages:
+requires_repo: true
+stages:
   - name: explore
     agent: worker
     gate: manual
