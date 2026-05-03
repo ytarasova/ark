@@ -133,6 +133,28 @@ export const claudeAgentExecutor: Executor = {
     // which surfaces as a clear "no compute resolved" error at the call
     // site rather than a silent fall-through to LocalProvider.
     const { provider, compute } = await app.resolveProvider(session);
+
+    // Refuse to dispatch onto a non-local compute. The claude-agent executor
+    // runs the Anthropic Agent SDK in the conductor's own process and writes
+    // state to the conductor's local filesystem -- it has no path to ship
+    // itself onto an EC2 VM, k8s pod, or firecracker microVM. Without this
+    // guard, pairing `runtime: claude-agent` with an EC2 compute silently
+    // falls back to local spawn (setupSessionWorktree skips the worktree
+    // when provider.supportsWorktree is false, and Bun.spawn runs on the
+    // conductor), leaving the operator with a session that looks remote but
+    // isn't. Surface the mismatch so they can either fix the compute or
+    // switch the agent to `runtime: claude-code`.
+    if (compute && compute.compute_kind !== "local") {
+      return {
+        ok: false,
+        handle: "",
+        message:
+          `claude-agent runtime cannot dispatch onto '${compute.name}' (compute_kind=${compute.compute_kind}). ` +
+          `claude-agent runs in-process on the conductor and only supports local compute. ` +
+          `Use 'runtime: claude-code' for EC2/k8s/firecracker dispatch.`,
+      };
+    }
+
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
