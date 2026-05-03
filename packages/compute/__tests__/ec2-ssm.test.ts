@@ -66,12 +66,39 @@ describe("ssmCheckInstance", () => {
     expect(ok).toBe(false);
   });
 
-  it("swallows SDK errors and returns false (never throws)", async () => {
+  it("returns false on transient/network SDK errors (treats as offline, never throws)", async () => {
     const client = makeClient(() => {
       throw new Error("network unreachable");
     });
     const ok = await ssmCheckInstance({ instanceId: "i-abc", region: "us-east-1", client: client as any });
     expect(ok).toBe(false);
+  });
+
+  it("throws a clear refresh-creds error when AWS reports an expired token", async () => {
+    const client = makeClient(() => {
+      const err = new Error("The security token included in the request is expired");
+      (err as any).name = "ExpiredTokenException";
+      throw err;
+    });
+    await expect(
+      ssmCheckInstance({
+        instanceId: "i-abc",
+        region: "us-east-1",
+        awsProfile: "pai-risk-mlops",
+        client: client as any,
+      }),
+    ).rejects.toThrow(/expired or invalid.*aws sso login --profile pai-risk-mlops/);
+  });
+
+  it("throws on AccessDenied as well (auth bucket includes IAM denials)", async () => {
+    const client = makeClient(() => {
+      const err = new Error("User: arn:aws:iam::... is not authorized to perform: ssm:DescribeInstanceInformation");
+      (err as any).name = "AccessDeniedException";
+      throw err;
+    });
+    await expect(
+      ssmCheckInstance({ instanceId: "i-abc", region: "us-east-1", awsProfile: "p", client: client as any }),
+    ).rejects.toThrow(/expired or invalid/);
   });
 });
 

@@ -38,7 +38,35 @@ import { spawn } from "child_process";
 import * as fs from "fs";
 import type { SSMClient } from "@aws-sdk/client-ssm";
 import { shellEscape } from "./shell-escape.js";
-import { logDebug } from "../../../core/observability/structured-log.js";
+import { logDebug, logWarn } from "../../../core/observability/structured-log.js";
+
+// AWS SDK error names that indicate the local credentials/profile is unusable
+// (expired, missing, malformed, or not authorized). These must NOT be conflated
+// with "instance is reachable" -- the agent could be perfectly healthy and we
+// just lack the creds to ask. The connectivity-check provision step renders
+// whatever error we throw, so a clear "creds expired" surface here is what the
+// operator sees in the dashboard instead of a misleading "agent not online".
+const AUTH_ERROR_NAMES = new Set([
+  "ExpiredToken",
+  "ExpiredTokenException",
+  "InvalidClientTokenId",
+  "UnrecognizedClientException",
+  "AccessDenied",
+  "AccessDeniedException",
+  "AuthFailure",
+  "CredentialsProviderError",
+  "SSOTokenProviderFailure",
+  "SignatureDoesNotMatch",
+]);
+
+function isAuthError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const e = err as Error & { name?: string; Code?: string; $metadata?: unknown };
+  if (e.name && AUTH_ERROR_NAMES.has(e.name)) return true;
+  if (e.Code && AUTH_ERROR_NAMES.has(e.Code)) return true;
+  // Some SSO-cache failures surface only via the message text.
+  return /expired|sso.*token|token.*expired|credentials.*expired/i.test(e.message ?? "");
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -135,7 +163,15 @@ export async function ssmCheckInstance(opts: {
     const info = list[0];
     return info.PingStatus === "Online";
   } catch (err) {
-    logDebug("compute", `ssmCheckInstance: ${opts.instanceId} not reachable`, {
+    if (isAuthError(err)) {
+      const profile = opts.awsProfile ?? "default";
+      const original = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `AWS credentials for profile '${profile}' are expired or invalid (${original}). ` +
+          `Refresh them (e.g. \`aws sso login --profile ${profile}\`) and retry.`,
+      );
+    }
+    logWarn("compute", `ssmCheckInstance: ${opts.instanceId} probe failed (treating as offline)`, {
       error: err instanceof Error ? err.message : String(err),
     });
     return false;
