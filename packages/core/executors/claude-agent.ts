@@ -139,6 +139,12 @@ export const claudeAgentExecutor: Executor = {
       ARK_PROMPT_FILE: workerPromptFile,
       ARK_ARKD_URL: "http://localhost:19300",
     };
+    // Stage is baked in at provision time -- once the runtime is up, this
+    // label is immutable and stamped onto every hook the agent emits.
+    // Resolved from session.stage at launch (the dispatch context that
+    // produced this runtime instance), not from a global session row that
+    // can flap mid-flight (#435 root cause #3).
+    if (session.stage) arkEnv.ARK_STAGE = session.stage;
     if (opts.agent.model) arkEnv.ARK_MODEL = opts.agent.model;
     if (opts.agent.max_turns && opts.agent.max_turns > 0) arkEnv.ARK_MAX_TURNS = String(opts.agent.max_turns);
     const maxBudget = (opts.agent as Record<string, unknown>).max_budget_usd as number | undefined;

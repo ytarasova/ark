@@ -40,6 +40,13 @@ export class HookStatusApplier {
       this.deps;
     const result: HookStatusResult = { events: [] };
 
+    // Each runtime stamps the stage it was provisioned for onto its hook
+    // payload. Prefer that over `session.stage` for any event we log in
+    // response -- the latter flaps when the state machine advances
+    // mid-flight (#435) and would re-stamp the runtime's traffic with
+    // whichever stage happens to be current at write time.
+    const hookStage = (typeof payload.stage === "string" && payload.stage) || session.stage || undefined;
+
     // Check if this session uses manual gate (interactive - user controls lifecycle)
     const stageDef = session.stage ? getStage(session.flow, session.stage) : null;
     const isManualGate = stageDef?.gate === "manual";
@@ -101,7 +108,7 @@ export class HookStatusApplier {
           result.events!.push({
             type: "auto_commit",
             opts: {
-              stage: session.stage ?? undefined,
+              stage: hookStage,
               actor: "system",
               data: {
                 reason: "agent exited with uncommitted changes",
@@ -122,7 +129,7 @@ export class HookStatusApplier {
         result.updates.error = "Agent exited without committing any changes";
         result.events!.push({
           type: "completion_rejected",
-          opts: { stage: session.stage ?? undefined, actor: "system", data: { reason: "no commits on SessionEnd" } },
+          opts: { stage: hookStage, actor: "system", data: { reason: "no commits on SessionEnd" } },
         });
       }
     }
@@ -152,10 +159,12 @@ export class HookStatusApplier {
       }
     }
 
-    // Always log the hook event
+    // Always log the hook event. Stamp the runtime-provided stage rather
+    // than session.stage so the timeline attribution survives any mid-flight
+    // state-machine flap.
     result.events!.push({
       type: "hook_status",
-      opts: { actor: "hook", data: { event: hookEvent, ...payload } as Record<string, unknown> },
+      opts: { stage: hookStage, actor: "hook", data: { event: hookEvent, ...payload } as Record<string, unknown> },
     });
 
     // For manual gate: log errors/completions as events but don't change status
@@ -197,11 +206,11 @@ export class HookStatusApplier {
           type: "session_failed",
           opts: {
             actor: "system",
-            stage: session.stage ?? undefined,
+            stage: hookStage,
             data: {
               error: errorMsg,
               agent: session.agent,
-              stage: session.stage,
+              stage: hookStage,
               hook_event: hookEvent,
               command: payload.command ?? null,
               suggestions,
