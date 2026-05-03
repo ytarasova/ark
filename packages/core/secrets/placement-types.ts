@@ -13,7 +13,7 @@ export interface TypedSecret {
 
 /**
  * Verb-based contract a provider implements once. Placers call into these
- * verbs and never see the medium (SSH, k8s API, fs, etc.).
+ * verbs and never see the medium (SSM-via-arkd, k8s API, fs, etc.).
  */
 export interface PlacementCtx {
   /** Write a file on the target. Mode is bit-exact (placer chooses). */

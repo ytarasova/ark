@@ -26,11 +26,10 @@ export interface LaunchOpts {
    * Optional deferred PlacementCtx produced by the dispatcher's pre-launch
    * placement pass (see core/secrets/deferred-placement-ctx.ts). Providers
    * whose medium isn't ready until provision-time (EC2 family, anything
-   * SSH-keyed off `compute.config.instance_id`) flush its queued file ops
-   * onto a real ctx after `provider.start`/`provider.provision` has
-   * populated the instance address and before the agent process is
-   * spawned. Providers that can place pre-launch (k8s) leave this field
-   * unread.
+   * keyed off `compute.config.instance_id`) flush its queued file ops onto
+   * a real ctx after `provider.start`/`provider.provision` has populated
+   * the instance address and before the agent process is spawned.
+   * Providers that can place pre-launch (k8s) leave this field unread.
    */
   placement?: PlacementCtx;
 }
@@ -106,7 +105,7 @@ export interface ComputeProvider {
   /**
    * Build a `PlacementCtx` for the given session/compute pair so the typed-secret
    * placement dispatch can write files, append blocks, set env vars, and configure
-   * the provisioner against this provider's medium (SSH, k8s API, fs, ...).
+   * the provisioner against this provider's medium (SSM-via-arkd, k8s API, fs, ...).
    *
    * Optional in Phase 1: providers without an impl get the no-op fallback (placement
    * does not run for that compute), preserving the legacy claude-auth + stage/runtime

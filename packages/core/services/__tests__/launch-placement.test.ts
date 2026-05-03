@@ -244,9 +244,9 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
 
   it("returns the placement ctx so dispatch can forward it to provider.launch", async () => {
     // The dispatcher needs a handle on the ctx so it can pipe a deferred
-    // ctx through to provider.launch (where SSH-medium providers flush
-    // queued file ops once the IP is known). buildLaunchEnv exposes it
-    // as `result.placement`.
+    // ctx through to provider.launch (where remote-medium providers flush
+    // queued file ops once the instance is reachable). buildLaunchEnv
+    // exposes it as `result.placement`.
     const ctx = new MockPlacementCtx();
     app.registerProvider(makeStubProvider({ name: "local", buildCtx: async () => ctx }));
     await app.computes.insert({

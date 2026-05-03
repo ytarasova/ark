@@ -166,10 +166,12 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
 
   // 2. Security group.
   //
-  // SSM transport: the SG has NO ingress rules. SSH is tunneled through
-  // SSM Session Manager (outbound HTTPS to ssm.<region>.amazonaws.com),
-  // and arkd HTTP -- when the conductor needs it -- is reached via an
-  // SSH-forwarded local port. So nothing inbound is necessary.
+  // SSM transport: the SG has NO ingress rules. All conductor->instance
+  // traffic flows out of the instance over HTTPS to
+  // ssm.<region>.amazonaws.com via the SSM agent; arkd HTTP -- when the
+  // conductor needs it -- is reached via an SSM port-forward
+  // (`AWS-StartPortForwardingSession`) bound to a local-side port on the
+  // conductor. So nothing inbound is necessary.
   let sgId = opts.securityGroupId;
   let createdSg = false;
 
@@ -206,8 +208,8 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
   // 3. Launch instance.
   //
   // We attach an IAM instance profile so the instance can register with SSM
-  // (AmazonSSMManagedInstanceCore policy). The conductor's SSH transport is
-  // a Session Manager tunnel, which fails with `TargetNotConnected` when
+  // (AmazonSSMManagedInstanceCore policy). The conductor's transport is a
+  // Session Manager port-forward, which fails with `TargetNotConnected` when
   // the instance lacks SSM permissions. The IAM profile is expected to exist
   // already in the AWS account; if it doesn't, RunInstances returns
   // `InvalidParameterValue: Invalid IAM Instance Profile name`, and we

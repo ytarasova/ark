@@ -25,51 +25,18 @@ describe("hasTmux", () => {
 // ── attachCommand ────────────────────────────────────────────────────────────
 
 describe("attachCommand", () => {
-  it("returns local tmux attach when no host is provided", () => {
+  it("returns local tmux attach for any session name", () => {
     expect(attachCommand("ark-session-1")).toBe("tmux attach -t ark-session-1");
   });
 
-  it("returns local tmux attach when opts is empty", () => {
-    expect(attachCommand("s-abc", {})).toBe("tmux attach -t s-abc");
+  it("returns local tmux attach for short-form session names", () => {
+    expect(attachCommand("s-abc")).toBe("tmux attach -t s-abc");
   });
 
-  it("returns ssh + tmux for remote host", () => {
-    const cmd = attachCommand("ark-remote", { host: "10.0.0.1" });
-    expect(cmd).toBe("ssh -t ubuntu@10.0.0.1 tmux attach -t ark-remote");
-  });
-
-  it("defaults remote user to ubuntu", () => {
-    const cmd = attachCommand("s-1", { host: "myhost.dev" });
-    expect(cmd).toContain("ubuntu@myhost.dev");
-  });
-
-  it("uses custom user when provided", () => {
-    const cmd = attachCommand("s-1", { host: "myhost.dev", user: "admin" });
-    expect(cmd).toBe("ssh -t admin@myhost.dev tmux attach -t s-1");
-    expect(cmd).not.toContain("ubuntu");
-  });
-
-  it("includes -i flag for SSH key", () => {
-    const cmd = attachCommand("s-1", {
-      host: "myhost.dev",
-      sshKey: "/home/user/.ssh/my-key.pem",
-    });
-    expect(cmd).toBe("ssh -i /home/user/.ssh/my-key.pem -t ubuntu@myhost.dev tmux attach -t s-1");
-  });
-
-  it("combines SSH key and custom user", () => {
-    const cmd = attachCommand("s-1", {
-      host: "ec2.aws.com",
-      user: "ec2-user",
-      sshKey: "/keys/id_rsa",
-    });
-    expect(cmd).toBe("ssh -i /keys/id_rsa -t ec2-user@ec2.aws.com tmux attach -t s-1");
-  });
-
-  it("ignores sshKey and user when host is not set", () => {
-    const cmd = attachCommand("local-sess", { sshKey: "/key", user: "root" });
-    expect(cmd).toBe("tmux attach -t local-sess");
-  });
+  // Remote-compute attaches go through `provider.getAttachCommand(compute,
+  // session)` now (aws ssm start-session for EC2, kubectl exec for k8s).
+  // The old ssh-prefixed branch on this helper went away with the SSH-to-SSM
+  // transport migration; nothing in production code passed `host` anymore.
 });
 
 // ── writeLauncher ────────────────────────────────────────────────────────────
