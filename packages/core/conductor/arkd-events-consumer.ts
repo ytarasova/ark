@@ -1,21 +1,21 @@
 /**
- * Conductor-side reader for arkd's `/events/stream` long-poll. Replaces
- * the SSH `-R 19100:localhost:19100` reverse tunnel that previously
- * carried hook callbacks back to the conductor. The agent's launcher
- * hooks now POST to local arkd's `/hooks/forward`; arkd queues the
- * payloads; this module pulls them as NDJSON and feeds each line into
- * the existing `handleHookStatus` pipeline so nothing downstream
- * changes shape.
+ * Conductor-side reader for arkd's generic `hooks` channel
+ * (`/channel/hooks/subscribe`). Replaces the SSH `-R 19100:localhost:19100`
+ * reverse tunnel that previously carried hook callbacks back to the
+ * conductor. The agent's launcher hooks publish on the local arkd's `hooks`
+ * channel; arkd buffers envelopes; this module subscribes as NDJSON and
+ * dispatches each envelope into the existing handler pipelines so nothing
+ * downstream changes shape.
  *
- * Channel reports + agent-to-agent relays travel the same path. Pre-SSM
+ * Channel reports + agent-to-agent relays travel the same channel. Pre-SSM
  * arkd would POST these directly to `${conductor}/api/channel/<sid>` and
  * `${conductor}/api/relay`, which only worked because the SSH `-R` tunnel
  * mapped the compute's `localhost:19100` back to the dev-box conductor.
- * Under pure SSM there is no reverse path, so arkd now enqueues those
- * payloads as `channel-report` / `channel-relay` frames on the same ring
- * and we drain them here, dispatching through `handleReport` and the
- * channel-relay path respectively. See `arkd/routes/channel.ts` and
- * `arkd/routes/events.ts`.
+ * Under pure SSM there is no reverse path, so arkd publishes those payloads
+ * as `channel-report` / `channel-relay` envelopes on the same `hooks`
+ * channel and we drain them here, dispatching through `handleReport` and
+ * the channel-relay path respectively. See `arkd/routes/channel.ts` for
+ * publishers and `arkd/routes/channels.ts` for the generic pub/sub.
  *
  * One reader per remote compute. Started when the compute becomes
  * reachable (right after the forward tunnel is up), stopped when the
@@ -70,13 +70,7 @@ interface NdjsonChannelRelayFrame {
   ts: string;
 }
 
-interface NdjsonDroppedFrame {
-  kind: "dropped";
-  count: number;
-  ts: string;
-}
-
-type NdjsonFrame = NdjsonHookFrame | NdjsonChannelReportFrame | NdjsonChannelRelayFrame | NdjsonDroppedFrame;
+type NdjsonFrame = NdjsonHookFrame | NdjsonChannelReportFrame | NdjsonChannelRelayFrame;
 
 /**
  * Start the consumer for a compute. Idempotent: a second call for the
@@ -120,10 +114,10 @@ export function arkdEventsConsumerCount(): number {
 }
 
 /**
- * Long-running loop that opens `/events/stream` and stays connected
- * until told to stop. On any error other than a deliberate abort,
- * reconnects with exponential backoff (250ms -> 30s, jitter). Reset
- * to the floor on each successful read.
+ * Long-running loop that opens `/channel/hooks/subscribe` and stays
+ * connected until told to stop. On any error other than a deliberate
+ * abort, reconnects with exponential backoff (250ms -> 30s, jitter).
+ * Reset to the floor on each successful read.
  */
 async function runConsumerLoop(
   app: AppContext,
@@ -134,7 +128,7 @@ async function runConsumerLoop(
   let backoff = RECONNECT_MIN_MS;
   while (!entry.stopped) {
     try {
-      await readEventsStreamOnce(app, entry, arkdUrl, arkdToken);
+      await readHooksChannelOnce(app, entry, arkdUrl, arkdToken);
       // Clean stream end (server closed) -- reconnect immediately.
       backoff = RECONNECT_MIN_MS;
     } catch (err: unknown) {
@@ -162,17 +156,16 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Open the stream once and pump until end / error / abort. Resets the
- * outer backoff on the FIRST successful chunk so a flaky reconnect
- * loop can't get stuck doubling.
+ * Open the channel subscribe stream once and pump until end / error /
+ * abort.
  */
-async function readEventsStreamOnce(
+async function readHooksChannelOnce(
   app: AppContext,
   entry: ConsumerEntry,
   arkdUrl: string,
   arkdToken: string | null,
 ): Promise<void> {
-  const url = `${arkdUrl.replace(/\/+$/, "")}/events/stream`;
+  const url = `${arkdUrl.replace(/\/+$/, "")}/channel/hooks/subscribe`;
   const headers: Record<string, string> = {
     // Force a dedicated TCP socket for the long-poll stream so it never
     // enters Bun's keep-alive pool. Without this, every short-lived
@@ -185,10 +178,10 @@ async function readEventsStreamOnce(
 
   const resp = await fetch(url, { headers, signal: entry.abort.signal, keepalive: false });
   if (!resp.ok) {
-    throw new Error(`arkd /events/stream returned ${resp.status}`);
+    throw new Error(`arkd /channel/hooks/subscribe returned ${resp.status}`);
   }
   if (!resp.body) {
-    throw new Error("arkd /events/stream returned no body");
+    throw new Error("arkd /channel/hooks/subscribe returned no body");
   }
   logInfo("conductor", `arkd-events: stream connected compute=${entry.computeName}`);
 
@@ -228,9 +221,9 @@ function scopeApp(app: AppContext, tenantId: string | null): AppContext {
 
 /**
  * Parse one NDJSON line and route it to the right downstream handler.
- * Currently `hook`, `channel-report`, `channel-relay`, and `dropped`
- * are emitted; unknown kinds are logged and ignored so arkd can
- * introduce new frame types without breaking the conductor.
+ * Currently `hook`, `channel-report`, and `channel-relay` are emitted;
+ * unknown kinds are logged and ignored so arkd / publishers can introduce
+ * new envelope types without breaking the conductor.
  */
 async function dispatchFrame(app: AppContext, line: string): Promise<void> {
   let frame: NdjsonFrame;
@@ -242,10 +235,6 @@ async function dispatchFrame(app: AppContext, line: string): Promise<void> {
   }
   if (!frame || typeof (frame as { kind?: unknown }).kind !== "string") {
     logWarn("conductor", `arkd-events: untyped frame; ignoring`);
-    return;
-  }
-  if (frame.kind === "dropped") {
-    logWarn("conductor", `arkd-events: peer dropped ${frame.count} events`);
     return;
   }
   if (frame.kind === "hook") {

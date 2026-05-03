@@ -1,11 +1,12 @@
 /**
  * Wire-based subscriber for mid-session interventions.
  *
- * Replaces the file-tail (`intervention-tail.ts`) for production: instead of
- * watching `<sessionDir>/interventions.jsonl`, the agent long-polls arkd's
- * `/agent/user-messages/stream`. Same external contract as the file-tail
- * (`onMessage` per line, optional `onInterrupt` for control:"interrupt"
- * envelopes), so the launch.ts call sites swap over with a one-line change.
+ * The agent subscribes to the global `user-input` channel via arkd's generic
+ * pub/sub (`GET /channel/user-input/subscribe`). Envelopes carry `{ session,
+ * content, control? }`; we filter by `envelope.session === sessionName` so
+ * each agent only consumes its own steers. Same external contract as the
+ * legacy intervention-tail (`onMessage` per content, optional `onInterrupt`
+ * for control:"interrupt" envelopes).
  *
  * Why wire-based:
  *   - The publisher (conductor's session.send) doesn't need to know the
@@ -13,16 +14,29 @@
  *     either ship every steer through arkd just to write a file, or duplicate
  *     the path resolution; both are coupling the wrong way.
  *   - Backpressure / delivery acks: arkd reports `delivered: true` when an
- *     active stream consumer was parked, `false` when the message was
- *     buffered for a not-yet-attached consumer.
- *   - Same NDJSON framing + SSM-tunnel friendliness as the existing hook
- *     forward path -- one transport, one debugging story.
+ *     active subscriber was parked, `false` when the message was buffered
+ *     for a not-yet-attached consumer.
+ *   - Same NDJSON framing + SSM-tunnel friendliness as the hooks channel
+ *     (agent->conductor) -- one transport, one debugging story.
+ *
+ * Channel scope is GLOBAL: a single `user-input` queue is shared across all
+ * sessions on this arkd. Each subscriber filters envelopes whose `session`
+ * field matches its own ARK_SESSION_ID. This lets one consumer process
+ * drain everyone's user-input traffic without N subscriptions; in practice
+ * each agent only opens one subscriber for itself.
  *
  * The file-tail (`intervention-tail.ts`) is retained for dev/test scenarios
  * that don't have a reachable arkd, but the production path goes through here.
  */
 
-import { ArkdClient, type UserMessageEnvelope } from "../../../arkd/index.js";
+import { ArkdClient } from "../../../arkd/index.js";
+
+/** Envelope shape the conductor publishes on the `user-input` channel. */
+export interface UserMessageEnvelope {
+  session: string;
+  content: string;
+  control?: "interrupt";
+}
 
 export interface UserMessageStreamOpts {
   arkdUrl: string;
@@ -59,7 +73,11 @@ export function subscribeUserMessages(opts: UserMessageStreamOpts & { client?: A
     let backoffMs = 250;
     while (!stopped) {
       try {
-        for await (const env of client.streamUserMessages(sessionName, { signal: ac.signal })) {
+        for await (const env of client.subscribeToChannel<UserMessageEnvelope>("user-input", {
+          signal: ac.signal,
+        })) {
+          // Channel is global; ignore envelopes destined for other sessions.
+          if (env.session !== sessionName) continue;
           if (typeof env.content === "string" && env.content.length > 0) {
             onMessage(env.content);
           }
@@ -93,5 +111,3 @@ export function subscribeUserMessages(opts: UserMessageStreamOpts & { client?: A
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
-
-export type { UserMessageEnvelope };

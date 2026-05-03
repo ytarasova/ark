@@ -1,25 +1,25 @@
 /**
- * Tests for arkd channel relay - arkd as conductor transport layer.
+ * Tests for arkd channel relay -- arkd as conductor transport layer.
  *
- * Tests the 3 relay endpoints:
- *   POST /channel/:sessionId  - agent report enqueued for conductor stream
- *   POST /channel/relay       - agent-to-agent relay enqueued for conductor stream
- *   POST /channel/deliver     - conductor-to-agent delivery to local channel port
+ * Tests the 3 sibling routes:
+ *   POST /channel/:sessionId  -- agent report published on the `hooks` channel
+ *   POST /channel/relay       -- agent-to-agent relay published on the `hooks` channel
+ *   POST /channel/deliver     -- conductor-to-agent delivery to local channel port
  *
  * Also tests the /config endpoint for runtime conductorUrl management.
  *
  * Post-SSM-migration shape: report + relay no longer POST to the conductor
- * directly (the EC2 reverse tunnel is gone); instead they enqueue onto the
- * arkd events ring and the conductor pulls them via `/events/stream`. We
- * verify both that the channel routes still return success to the agent
- * AND that the conductor never receives a direct POST to `/api/channel/...`
- * or `/api/relay` from arkd.
+ * directly (the EC2 reverse tunnel is gone); instead they publish on arkd's
+ * generic `hooks` channel and the conductor subscribes via
+ * `/channel/hooks/subscribe`. We verify both that the channel routes still
+ * return success to the agent AND that the conductor never receives a
+ * direct POST to `/api/channel/...` or `/api/relay` from arkd.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { startArkd } from "../server.js";
 import { ArkdClient } from "../client.js";
-import { _resetEventBus } from "../routes/events.js";
+import { _resetForTests as resetChannels } from "../routes/channels.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let ARKD_PORT: number;
@@ -40,8 +40,9 @@ beforeAll(async () => {
   CONDUCTOR_PORT = await allocatePort();
   CHANNEL_PORT = await allocatePort();
   // Start arkd with conductor URL pointing to our mock. The conductor URL
-  // is no longer used for report/relay (those go through the events ring),
-  // but it still configures `/config` and is kept for back-compat probes.
+  // is no longer used for report/relay (those go through the `hooks`
+  // channel), but it still configures `/config` and is kept for back-compat
+  // probes.
   arkdServer = startArkd(ARKD_PORT, {
     quiet: true,
     conductorUrl: `http://localhost:${CONDUCTOR_PORT}`,
@@ -81,8 +82,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  // Reset the events ring so each test sees a clean queue.
-  _resetEventBus();
+  resetChannels();
   conductorRequests = [];
   channelRequests = [];
 });
@@ -105,6 +105,34 @@ describe("/config", async () => {
     await client.setConfig({ conductorUrl: `http://localhost:${CONDUCTOR_PORT}` });
   });
 });
+
+async function readFirstFrame(arkdPort: number): Promise<Record<string, unknown>> {
+  const abort = new AbortController();
+  const stream = await fetch(`http://localhost:${arkdPort}/channel/hooks/subscribe`, { signal: abort.signal });
+  expect(stream.status).toBe(200);
+  const reader = stream.body!.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let frame: Record<string, unknown> | null = null;
+  while (frame === null) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const nl = buf.indexOf("\n");
+    if (nl >= 0) {
+      const line = buf.slice(0, nl).trim();
+      if (line) frame = JSON.parse(line) as Record<string, unknown>;
+    }
+  }
+  abort.abort();
+  try {
+    await reader.cancel();
+  } catch {
+    /* already cancelled */
+  }
+  if (!frame) throw new Error("no frame received before stream closed");
+  return frame;
+}
 
 // ── Channel report enqueue (no direct POST to conductor) ───────────────────
 
@@ -141,9 +169,9 @@ describe("/channel/:sessionId (report enqueue)", async () => {
   });
 
   it("returns ok+forwarded even when no conductorUrl configured", async () => {
-    // The events-ring path doesn't depend on the conductor URL at all --
-    // arkd just queues and the conductor's long-poll consumer is
-    // responsible for pulling. So clearing the URL must not break report.
+    // The hooks-channel path doesn't depend on the conductor URL at all --
+    // arkd just publishes on the channel and the conductor's subscriber is
+    // responsible for draining. So clearing the URL must not break report.
     await client.setConfig({ conductorUrl: "" });
     const result = await client.channelReport("s-test-789", { type: "progress", message: "test" });
     expect(result.ok).toBe(true);
@@ -152,71 +180,24 @@ describe("/channel/:sessionId (report enqueue)", async () => {
     await client.setConfig({ conductorUrl: `http://localhost:${CONDUCTOR_PORT}` });
   });
 
-  it("enqueues a channel-report frame visible on /events/stream", async () => {
+  it("publishes a channel-report envelope visible on /channel/hooks/subscribe", async () => {
     await client.channelReport("s-stream-1", { type: "completed", summary: "done" });
 
-    const abort = new AbortController();
-    const stream = await fetch(`http://localhost:${ARKD_PORT}/events/stream`, { signal: abort.signal });
-    expect(stream.status).toBe(200);
-
-    const reader = stream.body!.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-    let frame: any = null;
-    while (frame === null) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const nl = buf.indexOf("\n");
-      if (nl >= 0) {
-        const line = buf.slice(0, nl).trim();
-        if (line) frame = JSON.parse(line);
-      }
-    }
-    abort.abort();
-    try {
-      await reader.cancel();
-    } catch {
-      /* already cancelled */
-    }
-
-    expect(frame).not.toBeNull();
+    const frame = await readFirstFrame(ARKD_PORT);
     expect(frame.kind).toBe("channel-report");
     expect(frame.session).toBe("s-stream-1");
-    expect(frame.body.type).toBe("completed");
-    expect(frame.body.summary).toBe("done");
+    expect((frame.body as Record<string, unknown>).type).toBe("completed");
+    expect((frame.body as Record<string, unknown>).summary).toBe("done");
   });
 
-  it("preserves tenantId from X-Ark-Tenant-Id header on the queued frame", async () => {
+  it("preserves tenantId from X-Ark-Tenant-Id header on the queued envelope", async () => {
     await fetch(`http://localhost:${ARKD_PORT}/channel/s-tenant-1`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Ark-Tenant-Id": "tenant-acme" },
       body: JSON.stringify({ type: "progress", message: "with tenant" }),
     });
 
-    const abort = new AbortController();
-    const stream = await fetch(`http://localhost:${ARKD_PORT}/events/stream`, { signal: abort.signal });
-    const reader = stream.body!.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-    let frame: any = null;
-    while (frame === null) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const nl = buf.indexOf("\n");
-      if (nl >= 0) {
-        const line = buf.slice(0, nl).trim();
-        if (line) frame = JSON.parse(line);
-      }
-    }
-    abort.abort();
-    try {
-      await reader.cancel();
-    } catch {
-      /* already cancelled */
-    }
-
+    const frame = await readFirstFrame(ARKD_PORT);
     expect(frame.kind).toBe("channel-report");
     expect(frame.tenantId).toBe("tenant-acme");
   });
@@ -239,40 +220,19 @@ describe("/channel/relay", async () => {
     expect(directHits.length).toBe(0);
   });
 
-  it("enqueues a channel-relay frame visible on /events/stream", async () => {
+  it("publishes a channel-relay envelope visible on /channel/hooks/subscribe", async () => {
     await client.channelRelay({
       from: "s-a",
       target: "s-b",
       message: "ping",
     });
 
-    const abort = new AbortController();
-    const stream = await fetch(`http://localhost:${ARKD_PORT}/events/stream`, { signal: abort.signal });
-    const reader = stream.body!.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-    let frame: any = null;
-    while (frame === null) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const nl = buf.indexOf("\n");
-      if (nl >= 0) {
-        const line = buf.slice(0, nl).trim();
-        if (line) frame = JSON.parse(line);
-      }
-    }
-    abort.abort();
-    try {
-      await reader.cancel();
-    } catch {
-      /* already cancelled */
-    }
-
+    const frame = await readFirstFrame(ARKD_PORT);
     expect(frame.kind).toBe("channel-relay");
-    expect(frame.body.from).toBe("s-a");
-    expect(frame.body.target).toBe("s-b");
-    expect(frame.body.message).toBe("ping");
+    const body = frame.body as Record<string, unknown>;
+    expect(body.from).toBe("s-a");
+    expect(body.target).toBe("s-b");
+    expect(body.message).toBe("ping");
   });
 });
 
@@ -315,7 +275,7 @@ describe("/channel/deliver", async () => {
 // ── Full round-trip ────────────────────────────────────────────────────────
 
 describe("full relay chain", async () => {
-  it("report -> arkd -> events ring (no direct conductor hit)", async () => {
+  it("report -> arkd -> hooks channel (no direct conductor hit)", async () => {
     // Simulate what channel.ts does: POST report to arkd
     const resp = await fetch(`http://localhost:${ARKD_PORT}/channel/s-roundtrip`, {
       method: "POST",
@@ -333,7 +293,7 @@ describe("full relay chain", async () => {
     expect(result.ok).toBe(true);
     expect(result.forwarded).toBe(true);
 
-    // No direct conductor POST -- the events ring is the only path.
+    // No direct conductor POST -- the hooks channel is the only path.
     await Bun.sleep(50);
     expect(conductorRequests.filter((r) => r.path.startsWith("/api/channel/")).length).toBe(0);
   });

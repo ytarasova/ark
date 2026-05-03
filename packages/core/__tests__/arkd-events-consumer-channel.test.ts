@@ -2,14 +2,15 @@
  * Conductor-side coverage for the SSM channel-report fix.
  *
  * The arkd events consumer (`packages/core/conductor/arkd-events-consumer.ts`)
- * pulls NDJSON frames from arkd's `/events/stream` long-poll. After the SSM
- * fix the stream carries `channel-report` and `channel-relay` frames in
- * addition to the existing `hook` frames; the consumer must dispatch them
- * through `handleReport` / the relay path so the conductor side-effects
- * (session updates, log events, message persistence, etc.) actually run.
+ * subscribes to arkd's `hooks` channel via the generic pub/sub primitive
+ * (`GET /channel/hooks/subscribe`). The channel carries `channel-report` and
+ * `channel-relay` envelopes in addition to the existing `hook` envelopes;
+ * the consumer must dispatch them through `handleReport` / the relay path
+ * so the conductor side-effects (session updates, log events, message
+ * persistence, etc.) actually run.
  *
  * This test stubs out a minimal arkd-like server that streams a single
- * `channel-report` frame, starts the consumer pointed at that stub, and
+ * `channel-report` envelope, starts the consumer pointed at that stub, and
  * verifies an `agent_progress` event was logged on the target session
  * exactly the way the legacy direct HTTP path used to.
  */
@@ -36,10 +37,11 @@ afterAll(async () => {
 });
 
 /**
- * Spin up a minimal HTTP server that mimics arkd's `/events/stream` shape:
- * for each incoming GET it streams the queued NDJSON lines exactly once
- * and then closes the response body. The consumer reconnects in a loop;
- * we only need one delivery to assert the dispatch path ran.
+ * Spin up a minimal HTTP server that mimics arkd's
+ * `/channel/hooks/subscribe` shape: for each incoming GET it streams the
+ * queued NDJSON lines exactly once and then closes the response body. The
+ * consumer reconnects in a loop; we only need one delivery to assert the
+ * dispatch path ran.
  */
 function startStubArkd(port: number, lines: string[]): { stop(): void } {
   return Bun.serve({
@@ -47,7 +49,7 @@ function startStubArkd(port: number, lines: string[]): { stop(): void } {
     hostname: "127.0.0.1",
     async fetch(req) {
       const url = new URL(req.url);
-      if (url.pathname !== "/events/stream") {
+      if (url.pathname !== "/channel/hooks/subscribe") {
         return new Response("not found", { status: 404 });
       }
       const enc = new TextEncoder();

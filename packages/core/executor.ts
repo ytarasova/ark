@@ -80,7 +80,7 @@ export type ExecutorStatus =
 /**
  * Context passed to `Executor.sendUserMessage`. Each runtime owns the strategy
  * for getting a user message into its agent loop:
- *   - claude-agent: arkd `/agent/user-message` (wire) -> PromptQueue
+ *   - claude-agent: arkd `/channel/user-input/publish` (wire) -> PromptQueue
  *   - claude-code: tmux send-keys to the agent's pane (paste-buffer + Enter)
  *   - goose / cli-agent / subprocess: stdin or tmux per their delivery mode
  *

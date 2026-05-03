@@ -234,12 +234,12 @@ export const claudeCodeExecutor: Executor = {
         log(`CRITICAL: buildChannelConfig produced no ark-channel entry for remote dispatch`);
       }
 
-      // Hooks curl arkd's `/hooks/forward`, not the conductor's
+      // Hooks curl arkd's `/channel/hooks/publish`, not the conductor's
       // `/hooks/status`. Arkd is reachable from the agent at localhost on
       // the agent's host (EC2 in remote mode, laptop in local mode), so
       // `localhost:<arkd_port>` is correct on whichever side runs the
-      // launcher script. The conductor pulls from arkd's `/events/stream`
-      // over the existing forward tunnel and re-dispatches each event.
+      // launcher script. The conductor subscribes to arkd's `hooks` channel
+      // over the existing forward tunnel and re-dispatches each envelope.
       const arkdHookUrl = `http://localhost:${app.config.ports.arkd}`;
       const settings = claude.buildSettings(session.id, arkdHookUrl, {
         autonomy: opts.autonomy,

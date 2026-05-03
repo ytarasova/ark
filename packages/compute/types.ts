@@ -63,6 +63,44 @@ export interface ComputeProvider {
   launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string>;
   attach(compute: Compute, session: Session): Promise<void>;
 
+  /**
+   * Generic process spawn on this compute (no tmux, no agent semantics). The
+   * agent runtime decides what to spawn -- a launcher script for claude-agent,
+   * `tmux new-session ...` for claude-code, etc. Returns the pid arkd assigned;
+   * the caller's `handle` is the bookkeeping key for subsequent kill/status.
+   *
+   * Optional so providers that don't talk to arkd (e.g. a pure-tmux local
+   * provider, if any survive) can omit it; callers that need this must check
+   * for undefined and surface a clear error.
+   */
+  spawnProcess?(
+    compute: Compute,
+    session: Session,
+    opts: {
+      handle: string;
+      cmd: string;
+      args: string[];
+      workdir: string;
+      env?: Record<string, string>;
+      logPath?: string;
+    },
+  ): Promise<{ pid: number }>;
+
+  /** Kill a previously-spawned process by handle (the runtime's bookkeeping key). */
+  killProcessByHandle?(
+    compute: Compute,
+    session: Session,
+    handle: string,
+    signal?: "SIGTERM" | "SIGKILL",
+  ): Promise<{ wasRunning: boolean }>;
+
+  /** Status of a previously-spawned process by handle. */
+  statusProcessByHandle?(
+    compute: Compute,
+    session: Session,
+    handle: string,
+  ): Promise<{ running: boolean; pid?: number; exitCode?: number }>;
+
   /** Kill the agent process for a session. */
   killAgent(compute: Compute, session: Session): Promise<void>;
 
@@ -71,13 +109,16 @@ export interface ComputeProvider {
 
   /**
    * Publish a steer / user message to a running agent (claude-agent runtime).
-   * For arkd-backed providers this posts to /agent/user-message on the worker;
-   * the agent's user-message-stream consumer pushes the content into its
-   * PromptQueue. Optional so legacy providers can opt out -- callers that get
-   * `undefined` here MUST fall back to the local-tmux send path explicitly
-   * rather than silently no-op. Returns true when arkd reported the message
-   * was handed to a parked stream consumer; false means it was buffered for
-   * a not-yet-attached consumer (still queued, will be delivered on connect).
+   * For arkd-backed providers this publishes on the global `user-input`
+   * channel (`POST /channel/user-input/publish`) with envelope `{ session,
+   * content }`; the agent's user-message-stream consumer subscribes to the
+   * same channel, filters envelopes by session id, and pushes content into
+   * its PromptQueue. Optional so legacy providers can opt out -- callers
+   * that get `undefined` here MUST fall back to the local-tmux send path
+   * explicitly rather than silently no-op. Returns true when arkd reported
+   * the message was handed to a parked subscriber; false means it was
+   * buffered for a not-yet-attached consumer (still queued, will be
+   * delivered on connect).
    */
   sendUserMessage?(compute: Compute, session: Session, content: string): Promise<{ delivered: boolean }>;
 

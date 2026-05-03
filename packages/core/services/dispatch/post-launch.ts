@@ -52,14 +52,17 @@ export async function finalizeLaunch(
     opts;
   const sessionId = session.id;
 
-  // Persist launch PID for process-tree tracking
-  if (launchPid) {
-    await deps.sessions.mergeConfig(sessionId, {
-      launch_pid: launchPid,
-      launch_executor: runtime,
-      launched_at: new Date().toISOString(),
-    });
-  }
+  // Persist runtime kind + launch metadata. launch_executor MUST land for
+  // every successful dispatch (it's how session.send() picks the right
+  // transport on subsequent steers); previously this was gated on
+  // `launchPid`, which arkd-backed launches don't return -- so EC2 / k8s
+  // sessions ended up with launch_executor=null and steers fell through
+  // to the claude-code/tmux path even though the agent ran claude-agent.
+  await deps.sessions.mergeConfig(sessionId, {
+    ...(launchPid ? { launch_pid: launchPid } : {}),
+    launch_executor: runtime,
+    launched_at: new Date().toISOString(),
+  });
 
   // Record HEAD sha at stage start for per-stage commit verification
   let stageStartSha: string | undefined;

@@ -15,6 +15,12 @@ import type {
   MkdirRes,
   ExecReq,
   ExecRes,
+  ProcessSpawnReq,
+  ProcessSpawnRes,
+  ProcessKillReq,
+  ProcessKillRes,
+  ProcessStatusReq,
+  ProcessStatusRes,
   AgentLaunchReq,
   AgentLaunchRes,
   AgentKillReq,
@@ -23,9 +29,6 @@ import type {
   AgentStatusRes,
   AgentCaptureReq,
   AgentCaptureRes,
-  AgentUserMessageReq,
-  AgentUserMessageRes,
-  UserMessageEnvelope,
   AgentAttachOpenReq,
   AgentAttachOpenRes,
   AgentAttachInputReq,
@@ -34,6 +37,7 @@ import type {
   AgentAttachResizeRes,
   AgentAttachCloseReq,
   AgentAttachCloseRes,
+  ChannelPublishRes,
   MetricsRes,
   ProbePortsRes,
   HealthRes,
@@ -113,7 +117,29 @@ export class ArkdClient {
     return this.post("/exec", req, { timeoutMs: effectiveTimeout });
   }
 
-  // ── Agent lifecycle ───────────────────────────────────────────────────────
+  // ── Generic process supervisor ───────────────────────────────────────────
+  //
+  // Generic spawn/kill/status keyed by a caller-supplied handle. The agent
+  // runtime decides what command to spawn (tmux for claude-code, plain bash
+  // for claude-agent, etc.); arkd just tracks pids. No "agent" semantics.
+
+  async spawnProcess(req: ProcessSpawnReq): Promise<ProcessSpawnRes> {
+    return this.post("/process/spawn", req);
+  }
+
+  async killProcess(req: ProcessKillReq): Promise<ProcessKillRes> {
+    return this.post("/process/kill", req);
+  }
+
+  async statusProcess(req: ProcessStatusReq): Promise<ProcessStatusRes> {
+    return this.post("/process/status", req);
+  }
+
+  // ── Agent lifecycle (LEGACY tmux wrappers) ───────────────────────────────
+  //
+  // Used by the claude-code runtime which still drives tmux directly. The
+  // claude-agent runtime moved to /process/spawn (generic). Phase C will
+  // retire these.
 
   async launchAgent(req: AgentLaunchReq): Promise<AgentLaunchRes> {
     return this.post("/agent/launch", req);
@@ -131,33 +157,38 @@ export class ArkdClient {
     return this.post("/agent/capture", req);
   }
 
-  // ── Mid-session user messages (conductor -> agent) ───────────────────────
+  // ── Generic channel pub/sub ──────────────────────────────────────────────
 
   /**
-   * Publish a steer / user message to a running agent. Returns immediately
-   * once arkd has accepted the envelope; `delivered` reports whether the
-   * agent's stream consumer was already parked (true) or whether arkd had to
-   * buffer it for a not-yet-attached consumer (false).
+   * Publish an opaque envelope to a named channel. arkd treats the envelope
+   * as opaque JSON -- subscribers see whatever fields the publisher set.
+   * `delivered` reports whether arkd handed the envelope directly to a
+   * parked subscriber (true) or buffered it on the channel ring for the
+   * next subscribe call (false). Buffered envelopes are still durable: the
+   * next subscriber drains them in FIFO order on connect.
    */
-  async sendUserMessage(req: AgentUserMessageReq): Promise<AgentUserMessageRes> {
-    const { sessionName, ...body } = req;
-    const path = `/agent/user-message?session=${encodeURIComponent(sessionName)}`;
-    return this.post<typeof body, AgentUserMessageRes>(path, body);
+  async publishToChannel(channel: string, envelope: Record<string, unknown>): Promise<ChannelPublishRes> {
+    return this.post(`/channel/${encodeURIComponent(channel)}/publish`, { envelope });
   }
 
   /**
-   * Subscribe to the user-message stream for a session. The returned async
-   * iterable yields one UserMessageEnvelope per ndjson line; the underlying
-   * fetch stays open as long as the consumer is iterating. Cancel by
-   * breaking out of the for-await loop or aborting the AbortSignal.
+   * Subscribe to a named channel. Returns an async iterable of envelopes;
+   * the underlying fetch stays open as long as the consumer is iterating.
+   * Cancel by breaking out of the for-await loop or aborting the
+   * AbortSignal. Each envelope is whatever the publisher passed to
+   * `publishToChannel` -- the typed shape is up to the publisher/consumer
+   * pair to agree on.
    */
-  async *streamUserMessages(sessionName: string, opts?: { signal?: AbortSignal }): AsyncIterable<UserMessageEnvelope> {
-    const url = `${this.baseUrl}/agent/user-messages/stream?session=${encodeURIComponent(sessionName)}`;
+  async *subscribeToChannel<E extends Record<string, unknown> = Record<string, unknown>>(
+    channel: string,
+    opts?: { signal?: AbortSignal },
+  ): AsyncIterable<E> {
+    const url = `${this.baseUrl}/channel/${encodeURIComponent(channel)}/subscribe`;
     const headers: Record<string, string> = {};
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     const res = await fetch(url, { headers, signal: opts?.signal });
     if (!res.ok || !res.body) {
-      throw new ArkdClientError(res.status, `user-message stream failed: ${res.status}`, undefined);
+      throw new ArkdClientError(`channel subscribe failed: ${res.status}`, undefined, res.status);
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -172,7 +203,7 @@ export class ArkdClient {
         buf = buf.slice(nl + 1);
         if (!line.trim()) continue;
         try {
-          yield JSON.parse(line) as UserMessageEnvelope;
+          yield JSON.parse(line) as E;
         } catch {
           // Skip malformed lines; arkd never emits them, but a future
           // protocol drop should not crash the SDK loop.

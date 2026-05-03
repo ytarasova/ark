@@ -108,9 +108,9 @@ export interface RunAgentSdkLaunchOpts {
   streamFactory?: (prompt: AsyncIterable<SDKUserMessage>, options: Record<string, unknown>) => AsyncIterable<unknown>;
   /**
    * Fully-resolved hook endpoint URL. In production, `main()` selects:
-   *   - `${ARK_ARKD_URL}/hooks/forward` when arkd is reachable (remote
-   *     dispatch on EC2/k8s -- arkd buffers + the conductor pulls via
-   *     /events/stream)
+   *   - `${ARK_ARKD_URL}/channel/hooks/publish` when arkd is reachable
+   *     (remote dispatch on EC2/k8s -- arkd buffers + the conductor
+   *     subscribes via /channel/hooks/subscribe)
    *   - `${ARK_CONDUCTOR_URL}/hooks/status` when the agent runs on the
    *     same host as the conductor (local dispatch)
    *
@@ -296,9 +296,11 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
 interface ForwardDeps {
   /**
    * Fully-resolved hook endpoint URL. Set by `main()` to either
-   * `${ARK_ARKD_URL}/hooks/forward` (remote dispatch) or
-   * `${ARK_CONDUCTOR_URL}/hooks/status` (local). Undefined when neither
-   * env var is set -- forwarding is then disabled.
+   * `${ARK_ARKD_URL}/channel/hooks/publish` (remote dispatch -- the local
+   * arkd's hooks channel buffers; conductor drains via subscribe) or
+   * `${ARK_CONDUCTOR_URL}/hooks/status` (local dispatch -- direct to the
+   * conductor). Undefined when neither env var is set -- forwarding is
+   * then disabled.
    */
   hookEndpoint: string | undefined;
   arkSessionId: string;
@@ -311,11 +313,14 @@ interface ForwardDeps {
  *
  * Two modes:
  *   - LOCAL dispatch: post to `${conductorUrl}/hooks/status` -- direct to
- *     the conductor since the agent runs on the same host.
- *   - REMOTE dispatch (EC2/k8s): post to `${arkdUrl}/hooks/forward` -- the
- *     local arkd's events ring then carries the hook to the conductor via
- *     `/events/stream`. There is no reverse network path from the worker
- *     to the conductor in pure-SSM mode.
+ *     the conductor since the agent runs on the same host. Body is the raw
+ *     hook payload; session id is in the query string.
+ *   - REMOTE dispatch (EC2/k8s): publish on the local arkd's `hooks`
+ *     channel via `${arkdUrl}/channel/hooks/publish`. Body wraps the hook
+ *     in `{ envelope: { kind: "hook", session, query, body } }`; the
+ *     conductor's hooks-channel subscriber dispatches by `kind`. There is
+ *     no reverse network path from the worker to the conductor in pure-SSM
+ *     mode, so the channel queue is the only conductor-reachable path.
  *
  * `deps.hookEndpoint` is the fully-resolved URL (computed in main() based
  * on which env var is set: ARK_ARKD_URL wins for remote, falls back to
@@ -329,16 +334,39 @@ async function forwardToConductor(message: unknown, deps: ForwardDeps): Promise<
   if (!deps.hookEndpoint) return;
   const hooks = messageToHooks(message, deps.arkSessionId);
   const doFetch = deps.fetchFn ?? fetch;
+  // Detect the arkd channel-publish path so we wrap the hook body in the
+  // generic envelope. Any other URL (e.g. the legacy conductor /hooks/status)
+  // gets the raw body + session query string.
+  const isChannelPublish = deps.hookEndpoint.endsWith("/channel/hooks/publish");
   for (const hook of hooks) {
     try {
-      await doFetch(`${deps.hookEndpoint}?session=${encodeURIComponent(deps.arkSessionId)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(deps.authToken ? { Authorization: `Bearer ${deps.authToken}` } : {}),
-        },
-        body: JSON.stringify(hook),
-      });
+      if (isChannelPublish) {
+        await doFetch(deps.hookEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(deps.authToken ? { Authorization: `Bearer ${deps.authToken}` } : {}),
+          },
+          body: JSON.stringify({
+            envelope: {
+              kind: "hook",
+              session: deps.arkSessionId,
+              query: `session=${encodeURIComponent(deps.arkSessionId)}`,
+              body: hook,
+              ts: new Date().toISOString(),
+            },
+          }),
+        });
+      } else {
+        await doFetch(`${deps.hookEndpoint}?session=${encodeURIComponent(deps.arkSessionId)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(deps.authToken ? { Authorization: `Bearer ${deps.authToken}` } : {}),
+          },
+          body: JSON.stringify(hook),
+        });
+      }
     } catch (err) {
       const msg = (err as Error)?.message ?? String(err);
       console.error(`[agent-sdk launch] hook forward failed: ${msg}`);
@@ -903,12 +931,17 @@ async function main(): Promise<void> {
   const systemAppend = process.env.ARK_SYSTEM_PROMPT_APPEND;
 
   // Hook endpoint resolution: prefer ARK_ARKD_URL (the local arkd on the
-  // worker, which forwards via /events/stream to the conductor). Falls back
-  // to ARK_CONDUCTOR_URL for local dispatch where the agent runs on the
-  // conductor host. Tests leave both unset to disable forwarding.
+  // worker, which buffers on its `hooks` channel; the conductor subscribes
+  // via /channel/hooks/subscribe). Falls back to ARK_CONDUCTOR_URL for
+  // local dispatch where the agent runs on the conductor host. Tests
+  // leave both unset to disable forwarding.
   const arkdUrl = process.env.ARK_ARKD_URL;
   const conductorUrl = process.env.ARK_CONDUCTOR_URL;
-  const hookEndpoint = arkdUrl ? `${arkdUrl}/hooks/forward` : conductorUrl ? `${conductorUrl}/hooks/status` : undefined;
+  const hookEndpoint = arkdUrl
+    ? `${arkdUrl}/channel/hooks/publish`
+    : conductorUrl
+      ? `${conductorUrl}/hooks/status`
+      : undefined;
   if (!hookEndpoint) {
     console.warn("[agent-sdk launch] neither ARK_ARKD_URL nor ARK_CONDUCTOR_URL is set -- hook forwarding disabled");
   }

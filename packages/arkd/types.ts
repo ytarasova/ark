@@ -74,7 +74,67 @@ export interface ExecRes {
   timedOut: boolean;
 }
 
-// ── Agent lifecycle ─────────────────────────────────────────────────────────
+// ── Generic process supervisor ───────────────────────────────────────────────
+//
+// arkd is a per-compute supervisor for *any* long-lived process. The agent
+// runtime decides what to launch (a tmux session for claude-code, a plain
+// `bash launcher.sh` for claude-agent, etc.); arkd just spawns + tracks the
+// pid against a caller-supplied handle. No "agent" semantics here.
+
+export interface ProcessSpawnReq {
+  /**
+   * Caller-provided handle for tracking. Must match the safe-name pattern
+   * (alnum + dash/underscore, 1..64). Used as the key for kill / status.
+   */
+  handle: string;
+  /** argv[0] -- the executable. Resolved via PATH. */
+  cmd: string;
+  /** argv[1..] */
+  args: string[];
+  /** Working directory for the child process. */
+  workdir: string;
+  /** Environment vars merged on top of arkd's own env. */
+  env?: Record<string, string>;
+  /**
+   * Optional file path to capture stdout + stderr (appended). When omitted
+   * the child's pipes are tied to /dev/null. The path is created with mkdir
+   * -p on the directory; arkd does not enforce confinement here -- the
+   * runtime that builds the launcher is responsible for keeping it inside
+   * its session dir.
+   */
+  logPath?: string;
+}
+export interface ProcessSpawnRes {
+  ok: true;
+  pid: number;
+}
+
+export interface ProcessKillReq {
+  handle: string;
+  /** SIGTERM (default) or SIGKILL. */
+  signal?: "SIGTERM" | "SIGKILL";
+}
+export interface ProcessKillRes {
+  ok: true;
+  /** False when the handle wasn't tracked or the pid was already gone. */
+  wasRunning: boolean;
+}
+
+export interface ProcessStatusReq {
+  handle: string;
+}
+export interface ProcessStatusRes {
+  running: boolean;
+  pid?: number;
+  exitCode?: number;
+}
+
+// ── Agent lifecycle (LEGACY tmux wrappers) ───────────────────────────────────
+//
+// Kept for the claude-code runtime which still drives tmux directly. The
+// claude-agent runtime moved to /process/* (generic) and /channel/* (generic).
+// Phase C will retire these in favour of having claude-code build its own
+// tmux argv and call /process/spawn the same way other runtimes do.
 
 export interface AgentLaunchReq {
   sessionName: string; // tmux session name
@@ -110,26 +170,29 @@ export interface AgentCaptureRes {
   output: string;
 }
 
-// ── Mid-session user messages (conductor -> agent) ─────────────────────────
+// ── Generic channel pub/sub ──────────────────────────────────────────────────
+//
+// Each runtime declares its own channel names (e.g. claude-agent uses
+// "user-input" inbound and "hooks" outbound). arkd doesn't know what's IN
+// any envelope -- it's just a typed JSON object on a per-channel queue.
+// Multi-tenant isolation is by channel name; consumers pick the right channel
+// for the runtime they expect.
 
-/**
- * One steer / user message published from the conductor to a running agent.
- * The agent's claude-agent runtime drains these via /agent/user-messages/stream
- * and pushes each `content` into its PromptQueue. `control: "interrupt"` aborts
- * the in-flight SDK iteration so the new message is processed immediately;
- * otherwise the message lands at the end of the queue.
- */
-export interface UserMessageEnvelope {
-  content: string;
-  control?: "interrupt";
+export interface ChannelPublishReq {
+  channel: string;
+  /**
+   * Caller-supplied envelope. arkd treats it as opaque JSON. Must be
+   * serializable; arkd writes JSON.stringify(envelope) + "\n" on the wire.
+   */
+  envelope: Record<string, unknown>;
 }
-
-export interface AgentUserMessageReq extends UserMessageEnvelope {
-  sessionName: string;
-}
-export interface AgentUserMessageRes {
+export interface ChannelPublishRes {
   ok: true;
-  /** False when no agent has subscribed yet -- the message is still queued. */
+  /**
+   * True when arkd handed the envelope directly to a parked subscriber;
+   * false when it was buffered for a not-yet-attached consumer (still
+   * delivered eventually -- subscribers drain the buffered ring on connect).
+   */
   delivered: boolean;
 }
 

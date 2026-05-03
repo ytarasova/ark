@@ -20,12 +20,17 @@ const ARK_HOOK_MARKER = "# ark-status";
 /**
  * Build the curl command Claude's hook system runs on every PreToolUse /
  * PostToolUse / AgentMessage / etc. event. The target is **local arkd**
- * (`http://localhost:<arkd-port>/hooks/forward`), not the conductor.
- * Arkd queues each event and the conductor pulls them via the existing
- * forward tunnel through `/events/stream`. This eliminates the brittle
- * SSH `-R` reverse tunnel that previously carried hook callbacks --
- * arkd is always reachable from the agent because both run on the same
- * host (laptop in local mode, EC2 in remote mode).
+ * (`http://localhost:<arkd-port>/channel/hooks/publish`), not the conductor.
+ * Arkd buffers each envelope on its global `hooks` channel; the conductor
+ * subscribes via `/channel/hooks/subscribe` and dispatches by `kind`. This
+ * eliminates the brittle SSH `-R` reverse tunnel that previously carried
+ * hook callbacks -- arkd is always reachable from the agent because both
+ * run on the same host (laptop in local mode, EC2 in remote mode).
+ *
+ * The hook payload that Claude streams on stdin is wrapped in a generic
+ * envelope (`{ envelope: { kind: "hook", session, query, body: <stdin> } }`)
+ * before posting, using `jq` to splice in the hook body so we don't have to
+ * shell out to read the stdin twice.
  *
  * `conductorUrl` is retained as a parameter only because callers persist
  * it in `_ark` metadata for human-debugging; it is NOT used for the
@@ -33,7 +38,21 @@ const ARK_HOOK_MARKER = "# ark-status";
  */
 function hookCommand(sessionId: string, arkdUrl: string, tenantId?: string): string {
   const tenantHeader = tenantId ? ` -H 'X-Ark-Tenant-Id: ${tenantId}'` : "";
-  return `curl -sf -X POST -H 'Content-Type: application/json'${tenantHeader} -d @- '${arkdUrl}/hooks/forward?session=${sessionId}' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`;
+  // Wrap the stdin hook body in the generic envelope expected by the
+  // hooks channel. `jq -c` handles arbitrary nested payloads safely; if
+  // jq isn't available we fall back to a `printf` wrapper so the hook
+  // still posts (with a string-encoded body, which the conductor's
+  // dispatcher tolerates).
+  const wrap =
+    `jq -c --arg s '${sessionId}' --arg q 'session=${sessionId}' ` +
+    `'{envelope:{kind:"hook",session:$s,query:$q,body:.,ts:(now|todate)}}' ` +
+    `2>/dev/null || ` +
+    `(body=$(cat); printf '{"envelope":{"kind":"hook","session":"${sessionId}","query":"session=${sessionId}","body":%s}}' "$body")`;
+  return (
+    `( ${wrap} ) | ` +
+    `curl -sf -X POST -H 'Content-Type: application/json'${tenantHeader} ` +
+    `-d @- '${arkdUrl}/channel/hooks/publish' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`
+  );
 }
 
 /**

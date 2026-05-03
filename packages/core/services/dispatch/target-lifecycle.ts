@@ -82,6 +82,15 @@ export interface RunTargetLifecycleOpts {
    * to skip the start step explicitly.
    */
   computeStatus?: string;
+  /**
+   * Optional override for the terminal `launch-agent` step. When provided
+   * runTargetLifecycle calls this fn instead of `target.launchAgent` --
+   * lets a runtime use a generic `provider.spawnProcess` (claude-agent
+   * headless model, future runtimes) instead of the legacy tmux launch
+   * embedded in the isolation impls. Returns the AgentHandle the caller
+   * wants to track in the session row.
+   */
+  launchOverride?: () => Promise<AgentHandle>;
 }
 
 export async function runTargetLifecycle(
@@ -166,8 +175,15 @@ export async function runTargetLifecycle(
     context: stepCtx,
   });
 
-  // 6. launch-agent -- existing behaviour, kept. No retry (tmux dedupe).
-  return provisionStep(app, sessionId, "launch-agent", () => target.launchAgent(handle, launchOpts), {
-    context: { ...stepCtx, tmuxName: launchOpts.tmuxName },
-  });
+  // 6. launch-agent -- terminal step. When `launchOverride` is set the
+  // runtime owns spawning (e.g. claude-agent uses provider.spawnProcess on
+  // arkd's generic /process/spawn instead of the isolation's tmux-based
+  // launchAgent); otherwise we keep the legacy isolation-driven path.
+  return provisionStep(
+    app,
+    sessionId,
+    "launch-agent",
+    () => (opts.launchOverride ? opts.launchOverride() : target.launchAgent(handle, launchOpts)),
+    { context: { ...stepCtx, tmuxName: launchOpts.tmuxName } },
+  );
 }

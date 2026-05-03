@@ -522,15 +522,16 @@ describe("Server lifecycle", async () => {
   });
 });
 
-// ── Channel report forwarding (post-SSM events-ring path) ─────────────────
+// ── Channel report forwarding (post-SSM hooks-channel path) ───────────────
 //
 // Pre-SSM these tests asserted that arkd POSTed reports directly to
 // `${conductor}/api/channel/...`. Under pure SSM that POST silently fails
 // (the EC2 instance's loopback doesn't host the conductor), so we now
-// enqueue onto the events ring and the conductor pulls them via
-// `/events/stream`. The assertions below check the new contract:
-// `{ ok: true, forwarded: true }` regardless of conductor reachability,
-// because reachability is the conductor consumer's problem, not arkd's.
+// publish on arkd's generic `hooks` channel and the conductor subscribes
+// via `/channel/hooks/subscribe`. The assertions below check the new
+// contract: `{ ok: true, forwarded: true }` regardless of conductor
+// reachability, because reachability is the conductor consumer's problem,
+// not arkd's.
 
 describe("Channel report forwarding", async () => {
   it("returns ok:true even when no conductor is reachable", async () => {

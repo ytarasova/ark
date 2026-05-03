@@ -33,10 +33,10 @@ import { handleExecRoutes } from "./routes/exec.js";
 import { handleAgentRoutes } from "./routes/agent.js";
 import { handleMetricsSnapshotRoutes } from "./routes/metrics-snapshot.js";
 import { handleChannelRoutes } from "./routes/channel.js";
+import { handleChannelRoutes as handleGenericChannelRoutes } from "./routes/channels.js";
 import { handleMiscRoutes } from "./routes/misc.js";
 import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "./routes/attach.js";
-import { handleEventsRoutes } from "./routes/events.js";
-import { handleUserMessageRoutes } from "./routes/user-messages.js";
+import { handleProcessRoutes } from "./routes/process.js";
 
 declare const Bun: BunLike;
 
@@ -198,19 +198,24 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
         const attachRes = await handleAttachRoutes(req, path);
         if (attachRes) return attachRes;
 
-        // Intervention routes must come before generic agent routes so
-        // `/agent/user-message*` paths hit the queue handler first.
-        const userMessageRes = await handleUserMessageRoutes(req, path, ctx);
-        if (userMessageRes) return userMessageRes;
+        // Generic channel pub/sub: POST /channel/{name}/publish,
+        // GET /channel/{name}/subscribe. Mounted BEFORE the legacy
+        // /channel/<sid> + /channel/relay + /channel/deliver routes so the
+        // verb-suffixed pattern matches first.
+        const genericChannelRes = await handleGenericChannelRoutes(req, path, ctx);
+        if (genericChannelRes) return genericChannelRes;
+
+        // Generic process supervisor (/process/*) is the modern replacement
+        // for the tmux-only /agent/* lifecycle. Mount it before the legacy
+        // agent routes so future moves to /process/spawn don't collide.
+        const processRes = await handleProcessRoutes(req, path, ctx);
+        if (processRes) return processRes;
 
         const agentRes = await handleAgentRoutes(req, path, ctx);
         if (agentRes) return agentRes;
 
         const channelRes = await handleChannelRoutes(req, path, ctx);
         if (channelRes) return channelRes;
-
-        const eventsRes = await handleEventsRoutes(req, path, ctx);
-        if (eventsRes) return eventsRes;
 
         const miscRes = await handleMiscRoutes(req, path, ctx);
         if (miscRes) return miscRes;

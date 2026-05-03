@@ -853,12 +853,15 @@ describe("buildSettings", () => {
     }
   });
 
-  it("bakes the arkd hook-forward URL into the curl command", () => {
-    // The launcher hook now POSTs to local arkd's `/hooks/forward`, not
-    // the conductor's `/hooks/status`. Arkd queues the event and the
-    // conductor pulls it via `/events/stream`. See commit c7f4d01d.
+  it("bakes the arkd channel-publish URL into the curl command", () => {
+    // The launcher hook now POSTs to local arkd's `/channel/hooks/publish`,
+    // not the conductor's `/hooks/status`. Arkd buffers the envelope on the
+    // `hooks` channel and the conductor subscribes via
+    // `/channel/hooks/subscribe`.
     const { content } = buildSettings("s-abc", "http://localhost:19300");
-    expect(content).toContain("http://localhost:19300/hooks/forward?session=s-abc");
+    expect(content).toContain("http://localhost:19300/channel/hooks/publish");
+    // Session id is embedded in the envelope (and in the wrapper's args).
+    expect(content).toContain("s-abc");
   });
 
   it("merges with an existing settings object instead of clobbering", () => {

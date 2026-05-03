@@ -115,9 +115,10 @@ describe("dispatch compute: config file writing", () => {
     mkdirSync(workdir, { recursive: true });
 
     const session = await getApp().sessions.create({ summary: "hooks-config-test" });
-    // Hooks now POST to local arkd's `/hooks/forward` (not the conductor's
-    // `/hooks/status`) -- arkd queues the event and the conductor pulls it
-    // via `/events/stream`. See commit c7f4d01d.
+    // Hooks now POST to local arkd's `/channel/hooks/publish` (not the
+    // conductor's `/hooks/status`) -- arkd buffers the envelope on the
+    // `hooks` channel and the conductor subscribes via
+    // `/channel/hooks/subscribe`.
     const arkdUrl = "http://localhost:19300";
 
     const settingsPath = claude.writeSettings(session.id, arkdUrl, workdir);
@@ -146,7 +147,7 @@ describe("dispatch compute: config file writing", () => {
     const stopHook = settings.hooks.Stop[0];
     expect(stopHook.hooks[0].command).toContain(session.id);
     expect(stopHook.hooks[0].command).toContain(arkdUrl);
-    expect(stopHook.hooks[0].command).toContain("/hooks/forward");
+    expect(stopHook.hooks[0].command).toContain("/channel/hooks/publish");
   });
 
   it("writes .mcp.json (channel config) to the working directory", async () => {

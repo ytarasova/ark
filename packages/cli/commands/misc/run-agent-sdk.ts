@@ -50,13 +50,13 @@ export function registerRunAgentSdkCommand(program: Command): void {
       }
 
       // Hook endpoint resolution: prefer ARK_ARKD_URL (remote dispatch -- the
-      // local arkd buffers hooks; the conductor pulls them via /events/stream),
-      // fall back to ARK_CONDUCTOR_URL (local dispatch -- the agent runs on the
-      // conductor host and can post directly).
+      // local arkd buffers hooks on its `hooks` channel; the conductor drains
+      // via /channel/hooks/subscribe), fall back to ARK_CONDUCTOR_URL (local
+      // dispatch -- the agent runs on the conductor host and can post directly).
       const arkdUrl = process.env.ARK_ARKD_URL;
       const conductorUrl = process.env.ARK_CONDUCTOR_URL;
       const hookEndpoint = arkdUrl
-        ? `${arkdUrl}/hooks/forward`
+        ? `${arkdUrl}/channel/hooks/publish`
         : conductorUrl
           ? `${conductorUrl}/hooks/status`
           : undefined;

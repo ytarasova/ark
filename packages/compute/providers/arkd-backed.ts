@@ -92,6 +92,45 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
     return opts.tmuxName;
   }
 
+  // ── Generic process supervisor (claude-agent runtime + future runtimes) ───
+
+  async spawnProcess(
+    compute: Compute,
+    session: Session,
+    opts: {
+      handle: string;
+      cmd: string;
+      args: string[];
+      workdir: string;
+      env?: Record<string, string>;
+      logPath?: string;
+    },
+  ): Promise<{ pid: number }> {
+    const client = this.getClient(compute, session);
+    const res = await client.spawnProcess(opts);
+    return { pid: res.pid };
+  }
+
+  async killProcessByHandle(
+    compute: Compute,
+    session: Session,
+    handle: string,
+    signal?: "SIGTERM" | "SIGKILL",
+  ): Promise<{ wasRunning: boolean }> {
+    const client = this.getClient(compute, session);
+    const res = await client.killProcess({ handle, signal });
+    return { wasRunning: res.wasRunning };
+  }
+
+  async statusProcessByHandle(
+    compute: Compute,
+    session: Session,
+    handle: string,
+  ): Promise<{ running: boolean; pid?: number; exitCode?: number }> {
+    const client = this.getClient(compute, session);
+    return client.statusProcess({ handle });
+  }
+
   async killAgent(compute: Compute, session: Session): Promise<void> {
     if (!session.session_id) return;
     const client = this.getClient(compute, session);
@@ -113,8 +152,10 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
       throw new Error("session has no active agent (session_id is null)");
     }
     const client = this.getClient(compute, session);
-    const res = await client.sendUserMessage({
-      sessionName: session.session_id,
+    // Publish on the global `user-input` channel; the agent subscribes on
+    // the same channel and filters envelopes by `session === session_id`.
+    const res = await client.publishToChannel("user-input", {
+      session: session.session_id,
       content,
     });
     return { delivered: res.delivered };

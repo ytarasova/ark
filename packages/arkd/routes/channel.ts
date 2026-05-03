@@ -13,12 +13,13 @@
  * itself, where no conductor runs, so the POST silently fails and the report
  * is lost (sessions stuck at "running" forever).
  *
- * Fix: instead of POSTing out to the conductor, enqueue the payload onto the
- * arkd events ring. The conductor's `arkd-events-consumer` long-poll on
- * `/events/stream` is the only conductor-reachable path post-SSH-removal, and
- * it now drains `channel-report` / `channel-relay` frames alongside the
- * existing hook frames. See `routes/events.ts` for the queue and
- * `core/conductor/arkd-events-consumer.ts` for the consumer dispatch.
+ * Fix: instead of POSTing out to the conductor, publish the payload onto
+ * the generic `hooks` channel. The conductor's `arkd-events-consumer`
+ * subscribes via `/channel/hooks/subscribe` -- the only conductor-reachable
+ * path post-SSH-removal -- and drains `channel-report` / `channel-relay`
+ * envelopes alongside the existing hook envelopes. See `routes/channels.ts`
+ * for the channel primitive and `core/conductor/arkd-events-consumer.ts`
+ * for the consumer dispatch.
  *
  * `/channel/deliver` is in the OPPOSITE direction (the conductor is calling
  * arkd over the forward `-L` tunnel to push a payload to a session's local
@@ -35,20 +36,37 @@ import type {
   ChannelDeliverRes,
 } from "../types.js";
 import { json, type RouteCtx } from "../internal.js";
-import { enqueueChannelReport, enqueueChannelRelay } from "./events.js";
+import { publishOnChannel } from "./channels.js";
+
+/**
+ * Channel name on which agent->conductor frames (hook events, channel
+ * reports, channel relays) are multiplexed. The conductor's
+ * `arkd-events-consumer` subscribes here and dispatches by `kind`.
+ */
+const HOOKS_CHANNEL = "hooks";
 
 function channelReport(sessionId: string, report: Record<string, unknown>, tenantId: string | null): ChannelReportRes {
-  // Hand off to the events ring; the conductor's `/events/stream`
-  // consumer pulls frames over the forward tunnel and dispatches them
-  // through the same `handleReport` pipeline the legacy direct POST
-  // used. Best-effort delivery -- if the conductor is disconnected the
-  // frame waits in the ring (bounded; oldest-drop on overflow).
-  enqueueChannelReport(sessionId, report, tenantId);
+  // Hand off to the generic `hooks` channel; the conductor subscribes via
+  // /channel/hooks/subscribe over the forward tunnel and dispatches each
+  // envelope by `kind`. Best-effort delivery -- if the conductor is
+  // disconnected the envelope waits buffered until the next subscribe.
+  publishOnChannel(HOOKS_CHANNEL, {
+    kind: "channel-report",
+    session: sessionId,
+    tenantId,
+    body: report,
+    ts: new Date().toISOString(),
+  });
   return { ok: true, forwarded: true };
 }
 
 function channelRelay(req: ChannelRelayReq, tenantId: string | null): ChannelRelayRes {
-  enqueueChannelRelay(req, tenantId);
+  publishOnChannel(HOOKS_CHANNEL, {
+    kind: "channel-relay",
+    tenantId,
+    body: req,
+    ts: new Date().toISOString(),
+  });
   return { ok: true, forwarded: true };
 }
 
@@ -66,9 +84,25 @@ async function channelDeliver(req: ChannelDeliverReq): Promise<ChannelDeliverRes
 }
 
 export async function handleChannelRoutes(req: Request, path: string, _ctx: RouteCtx): Promise<Response | null> {
-  // ── Channel: report (agent → conductor via arkd events ring) ─────────
-  if (req.method === "POST" && path.startsWith("/channel/") && !path.endsWith("/relay") && !path.endsWith("/deliver")) {
-    const sessionId = path.split("/")[2]!;
+  // ── Channel: report (agent → conductor via arkd hooks channel) ───────
+  // Pattern: POST /channel/<sessionId>  (no trailing verb)
+  // Excludes:
+  //   /channel/relay, /channel/deliver -- legacy sibling routes below
+  //   /channel/<name>/publish, /channel/<name>/subscribe -- generic
+  //     pub/sub routes handled by routes/channels.ts (mounted ahead).
+  if (
+    req.method === "POST" &&
+    path.startsWith("/channel/") &&
+    !path.endsWith("/relay") &&
+    !path.endsWith("/deliver") &&
+    !path.endsWith("/publish") &&
+    !path.endsWith("/subscribe")
+  ) {
+    const segments = path.split("/").filter(Boolean);
+    // Reject nested paths so the legacy report route can never collide with
+    // a future /channel/<name>/<verb> shape that hasn't been added yet.
+    if (segments.length !== 2) return null;
+    const sessionId = segments[1]!;
     const report = (await req.json()) as Record<string, unknown>;
     const tenantId = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
     return json(channelReport(sessionId, report, tenantId));
