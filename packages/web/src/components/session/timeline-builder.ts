@@ -712,10 +712,24 @@ function deriveStageStatus(
   stageName: string | null,
   session: any,
   events: any[],
+  flowOrder: string[],
 ): "active" | "done" | "failed" | "pending" {
   if (!stageName) return "done";
   const sessionStatus = String(session?.status ?? "");
   const sessionStage = session?.stage ?? null;
+
+  // Flow-order constraint: stages strictly AFTER the session's current
+  // position in the canonical flow ordering cannot be done/failed,
+  // regardless of historical event signals. Protects against displays
+  // like "STAGE 3/4 pr DONE" while STAGE 2 is still running -- a real
+  // scenario when the conductor had pre-fix bugs that prematurely
+  // advanced session.stage and stamped events with stages the agent
+  // never actually reached (#435).
+  if (flowOrder.length > 0 && sessionStage) {
+    const currentIdx = flowOrder.indexOf(sessionStage);
+    const stageIdx = flowOrder.indexOf(stageName);
+    if (currentIdx >= 0 && stageIdx > currentIdx) return "pending";
+  }
 
   // Per-stage signals from the event stream.
   let lastFailure = false;
@@ -759,7 +773,12 @@ function deriveStageStatus(
  * Callers render the group header (name + agent + status + duration +
  * artifacts) above the group's items.
  */
-export function groupTimelineByStage(items: any[], events: any[], session: any): StageGroup[] {
+export function groupTimelineByStage(
+  items: any[],
+  events: any[],
+  session: any,
+  flowOrder: string[] = [],
+): StageGroup[] {
   const groups: StageGroup[] = [];
   const indexByName = new Map<string | null, number>();
 
@@ -854,7 +873,7 @@ export function groupTimelineByStage(items: any[], events: any[], session: any):
         group.duration = durationBetween(group.startTime, group.endTime);
       }
     }
-    group.status = deriveStageStatus(group.name, session, events ?? []);
+    group.status = deriveStageStatus(group.name, session, events ?? [], flowOrder);
   }
 
   return groups;

@@ -265,6 +265,7 @@ export function SessionDetail({
         onToggleTodo={handleToggleTodo}
         errorEvents={d.errorEvents}
         stages={d.stages}
+        flowStages={d.flowStages}
       />
 
       {d.activeTab === "conversation" && (
