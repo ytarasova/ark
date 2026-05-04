@@ -550,21 +550,36 @@ export class EC2Compute implements Compute {
     const stepCtx = { compute: h.name, instanceId: meta.instanceId };
 
     // Phase 0 (rehydrate-only): connectivity-check via DescribeInstanceInformation.
-    // Fail fast if SSM itself isn't alive before we waste time on forward setup.
-    // Skipped on the fresh-provision path because `provision` already polled
-    // ssmCheckInstance to confirm the instance is up before it called us.
+    // Wait for the SSM agent to be Online before we waste time on forward
+    // setup. Skipped on the fresh-provision path because `provision`
+    // already polled ssmCheckInstance to confirm the instance is up
+    // before it called us.
+    //
+    // Uses ssmWaitForReady (30 attempts x 5s = 150s budget) instead of a
+    // single shot. The instance can be in the middle of a stop->start
+    // cycle, was started outside Ark, or just genuinely takes 30-60s for
+    // the SSM agent to register with the control plane after boot. A
+    // single-shot check failed every time in those cases, leaving the
+    // session stuck at "ensure-reachable failed".
     if (useStep) {
       await provisionStep(
         opts.app!,
         opts.sessionId!,
         "connectivity-check",
         async () => {
-          const online = await this.helpers.ssmCheckInstance({
+          const { ssmWaitForReady } = await import("../providers/ec2/ssm.js");
+          const online = await ssmWaitForReady({
             instanceId: meta.instanceId,
             region: meta.region,
             awsProfile: meta.awsProfile,
           });
-          if (!online) throw new Error(`SSM agent not online for ${meta.instanceId}`);
+          if (!online) {
+            throw new Error(
+              `SSM agent did not become online for ${meta.instanceId} within 150s. ` +
+                `Check the instance has the AmazonSSMManagedInstanceCore policy attached and ` +
+                `the SSM agent is running (sudo systemctl status amazon-ssm-agent).`,
+            );
+          }
         },
         { retries: 1, retryBackoffMs: 1_000, context: stepCtx },
       );
