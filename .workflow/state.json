@@ -1,21 +1,16 @@
 {
-  "branch": "fix/web-session-view-overhaul",
+  "branch": "ark-s-rsxlum1zsq",
   "last_completed_stage": 4,
   "verify_result": "PASS WITH WARNINGS",
   "critical_failures": 0,
-  "warnings": 3,
-  "verify_report_path": "/Users/paytmlabs/Projects/ark/.workflow/verify-report.md",
-  "timestamp": "2026-04-22T00:00:00Z",
+  "warnings": 5,
+  "verify_report_path": "/Users/paytmlabs/.ark/worktrees/s-rsxlum1zsq/.workflow/verify-report.md",
+  "timestamp": "2026-05-04T00:00:00Z",
   "test_results": {
-    "total": 144,
-    "passed": 144,
-    "failed": 0,
-    "note": "From prior run 2026-04-17. Worktree s-h33osnwveh was deleted before this verification pass; test re-execution not possible."
-  },
-  "handoff_test": {
-    "session": "s-h33osnwveh",
-    "worktree_available": false,
-    "bash_functional": false,
-    "fallback": "prior_run_state"
+    "total": 5583,
+    "passed": 5560,
+    "failed": 5,
+    "skipped": 15,
+    "note": "5 failures are pre-existing (EC2 creds expired x2, LocalCompute app=undefined predates branch, intermittent RPC, port collision in concurrent run). All branch-specific tests pass."
   }
 }
