@@ -242,6 +242,7 @@ Key fields:
 - `depends_on`: list of prior stage names for DAG ordering. Enables parallel execution of stages with no ordering constraint.
 - `action`: replaces `agent` for non-LLM stages. Built-in actions: `create_pr` (push branch + `gh pr create`), `auto_merge` (wait for CI then merge).
 - `edges`: explicit graph edges with `condition` expressions for conditional routing (see the `conditional` flow). Edges support `from`, `to`, `condition`, and `label` fields.
+- `on_outcome`: per-stage outcome-to-stage map. When the agent reports completion with an `outcome` field (e.g. `approved`, `rejected`, `needs_info`), the flow advances to the mapped stage instead of the linear next stage. Unmatched outcomes fall back to linear routing. Simpler than `edges` for pure agent-reported branching.
 - `task`: per-stage task prompt override. Template variables (`{summary}`, `{repo}`, `{workdir}`) are substituted at dispatch.
 - Fan-out stages wait for all their spawned children before the parent advances (auto-join on child completion).
 
