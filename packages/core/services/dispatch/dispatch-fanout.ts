@@ -48,7 +48,9 @@ export class FanOutDispatcher {
       }
     }
 
-    await this.deps.sessions.update(sessionId, { status: "running" });
+    // Fork parents have no agent of their own; the handle is never probed
+    // but satisfies the status-running-implies-session_id invariant (#435).
+    await this.deps.sessions.update(sessionId, { status: "running", session_id: `parent-${sessionId}` });
     await this.deps.events.log(sessionId, "fork_started", {
       stage: session.stage,
       actor: "system",
