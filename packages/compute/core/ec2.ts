@@ -641,8 +641,7 @@ export class EC2Compute implements Compute {
     // sessions would read a dead port if their tunnel was no longer the
     // canonical one. Writing the resolved local port to `session.config`
     // lets the conductor's arkd client pick a port that's known live for
-    // THIS session. The compute-level field stays as a back-compat
-    // fallback for read paths that don't yet have a session in scope.
+    // THIS session.
     if (opts.app && opts.sessionId) {
       try {
         await opts.app.sessions.mergeConfig(opts.sessionId, {
@@ -650,6 +649,26 @@ export class EC2Compute implements Compute {
         });
       } catch {
         // best-effort: tunnel still works via the fallback
+      }
+    }
+
+    // Compute-level fallback for read paths without a session in scope
+    // (compute panel metrics polling, status pollers between sessions).
+    // The session-scoped port above is authoritative for live sessions;
+    // this compute-level write is "the latest known-live tunnel for this
+    // compute", refreshed whenever ANY session boots. With this set,
+    // `getMetrics(compute)` reaches arkd through the session-allocated
+    // tunnel rather than the unreachable direct EC2 IP.
+    //
+    // Cleared on EC2 stop / destroy in remote-arkd.ts so a future re-
+    // provision doesn't reuse a port that no longer points anywhere.
+    if (opts.app) {
+      try {
+        await opts.app.computes.mergeConfig(h.name, {
+          arkd_local_forward_port: tunnel.localPort,
+        });
+      } catch {
+        // best-effort
       }
     }
 
