@@ -10,10 +10,18 @@
  *   - `hooks` channel: agent -> conductor. Carries hook events,
  *     channel-report frames, and channel-relay frames. Each envelope carries
  *     its own `kind` so the conductor's `arkd-events-consumer` can dispatch.
+ *     SINGLE-READER: there is exactly one conductor per arkd, so each
+ *     envelope is delivered to exactly one subscriber (the conductor).
+ *     Multiple readers would double-process every event.
  *
  *   - `user-input` channel: conductor -> agent. Carries `{ session, content,
  *     control? }` envelopes; the agent's user-message stream consumer
  *     filters by `envelope.session === ARK_SESSION_ID`.
+ *     BROADCAST: the channel is global (one wire, many sessions); each
+ *     subscriber filters by its own session id. Broadcasting means a
+ *     stale-but-readyState=OPEN subscriber from a dead session can't
+ *     silently absorb the only copy of an envelope intended for the live
+ *     subscriber of the new session.
  *
  * Why WebSocket for subscribers: previously this used HTTP/1.1 long-poll
  * (NDJSON over fetch+ReadableStream). That works in steady state but
@@ -32,11 +40,19 @@
  * Subscribers see every envelope on the channel; per-session filtering is
  * the consumer's responsibility, carried in the envelope.
  *
- * Fan-out semantics: each envelope goes to the FIRST open subscriber in
- * insertion order. This is deliberate: `hooks` is single-reader (one
- * conductor per arkd) and `user-input` is read by exactly one agent. If a
- * future channel needs true broadcast, add a `broadcast: true` flag to the
- * subscribe handshake; the extension point is obvious.
+ * Delivery semantics are per-channel:
+ *   - `user-input`: BROADCAST -- each subscriber filters by session id, so
+ *     every open subscriber gets a copy. Stale subscribers (dead sessions)
+ *     ignore non-matching envelopes; the live one consumes its own.
+ *   - everything else (including `hooks`): FAN-OUT-TO-FIRST -- the
+ *     envelope goes to the first OPEN subscriber in insertion order. Used
+ *     when there is exactly one logical reader (the conductor for hooks);
+ *     broadcasting would deliver each envelope to N readers and double-
+ *     process every event.
+ *
+ * Both modes evict zombies (readyState !== OPEN, or send returns <= 0) in
+ * the same pass that delivers, so a half-closed socket doesn't keep
+ * absorbing envelopes silently.
  *
  * Subscribe handshake: the server sends `{ "type": "subscribed" }` as the
  * very first frame on every new WS connection, from inside the `open()`
@@ -88,25 +104,25 @@ function stateFor(name: string): ChannelState {
   return s;
 }
 
+/**
+ * Channels with broadcast delivery semantics. Other channels fan out to
+ * the first open subscriber. See the file header for the per-channel
+ * rationale -- the short version: broadcast is for channels where every
+ * subscriber filters by some discriminator (e.g. session id) and we don't
+ * want stale subscribers to silently absorb the only copy of an envelope.
+ */
+const BROADCAST_CHANNELS = new Set(["user-input"]);
+
 function enqueue(name: string, envelope: Envelope): boolean {
   const s = stateFor(name);
   const payload = JSON.stringify(envelope);
-  // BROADCAST to every OPEN subscriber. The previous fan-out-to-first
-  // semantics had a brittle dependency on the close handler firing
-  // reliably: when a session ended without WebSocket close (process kill,
-  // SSM tunnel break) its subscriber stayed in `s.subscribers` with
-  // readyState=1 (Bun reports "open" until the next ping fails). The
-  // first-match send went to that zombie and the message was silently
-  // lost; the real subscriber for the new session never saw it.
-  //
-  // Broadcast is correct for our use case: each subscriber filters
-  // envelopes by `envelope.session === ARK_SESSION_ID`, so the channel
-  // is logically per-session even though the wire is global. Sending to
-  // all open subscribers means stale ones see the envelope, ignore it
-  // (different session id), and we still hit the live one.
-  //
-  // Zombie cleanup: subscribers whose send fails (ret <= 0) or whose
-  // readyState is not OPEN get evicted in this same pass.
+  const broadcast = BROADCAST_CHANNELS.has(name);
+
+  // Walk subscribers, evicting zombies (readyState !== OPEN, or send
+  // returns 0 which Bun uses to signal "socket closed/closing"). Bun's
+  // ws.send() does NOT throw on a half-closed socket -- it returns the
+  // byte count, with <=0 meaning the frame was not delivered. The
+  // previous try/catch pattern silently dropped envelopes in that case.
   const dead: Array<ServerWebSocket<ChannelWsData>> = [];
   let deliveredAny = false;
   for (const ws of s.subscribers) {
@@ -117,6 +133,9 @@ function enqueue(name: string, envelope: Envelope): boolean {
     const written = ws.send(payload);
     if (written > 0) {
       deliveredAny = true;
+      // Fan-out: stop at the first successful delivery. Broadcast: keep
+      // going so every live subscriber receives a copy.
+      if (!broadcast) break;
     } else {
       dead.push(ws);
     }
