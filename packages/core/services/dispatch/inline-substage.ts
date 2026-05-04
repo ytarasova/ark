@@ -117,7 +117,13 @@ export async function dispatchInlineSubStage(
   // Task: use the already-substituted subStage.task, or fall back to session summary.
   const task = subStage.task ?? session.summary ?? "";
 
-  const runtime = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
+  const runtime = agent._resolved_runtime_type ?? agent.runtime;
+  if (!runtime) {
+    return {
+      ok: false,
+      message: `No runtime resolvable for inline sub-stage '${subStage.name}' (agent '${agentName}' has no runtime field)`,
+    };
+  }
   const executor = deps.resolveExecutor(runtime);
   if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
 

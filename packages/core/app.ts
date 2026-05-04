@@ -420,7 +420,11 @@ export class AppContext {
           // (#435) -- claude-agent uses /process/status, not tmux. A wrong
           // runtime here makes the poller probe the wrong endpoint.
           const tenantApp = this.forTenant(session.tenant_id);
-          const runtime = (await resolveSessionExecutor(tenantApp, session)) ?? "claude-code";
+          const runtime = await resolveSessionExecutor(tenantApp, session);
+          if (!runtime) {
+            lw("boot", `rehydrate: no runtime for session ${session.id} -- skipping poller`);
+            continue;
+          }
           startStatusPoller(tenantApp, session.id, session.session_id, runtime);
           pollers++;
         } catch (err: any) {
