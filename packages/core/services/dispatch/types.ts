@@ -103,7 +103,7 @@ export interface ExecuteActionCb {
 
 /** Nested dispatch call used by fork/fan-out for child sessions. */
 export interface DispatchChildCb {
-  (sessionId: string): Promise<{ ok: boolean; message: string }>;
+  (sessionId: string): Promise<DispatchResult>;
 }
 
 /** Fork primitive from fork-join.ts (dynamic imported today). */
@@ -228,4 +228,23 @@ export interface DispatchDeps {
   getApp: GetAppCb;
 }
 
-export type DispatchResult = { ok: boolean; message: string };
+/**
+ * Contract for dispatch return values.
+ *
+ *   ok:true, launched:true   -- session transitioned to running; an agent
+ *                               process is alive and session_id is set.
+ *
+ *   ok:true, launched:false  -- dispatch completed intentionally WITHOUT
+ *                               launching an agent (action stage,
+ *                               fork-parent, for_each parent, already-
+ *                               running noop, hosted-mode handoff, empty
+ *                               for_each list). `reason` names the case.
+ *
+ *   ok:false                 -- dispatch failed; caller marks the session
+ *                               failed. No `launched` field -- the failure
+ *                               is unambiguous.
+ */
+export type DispatchResult =
+  | { ok: true; launched: true; message: string }
+  | { ok: true; launched: false; reason: string; message: string }
+  | { ok: false; message: string };
