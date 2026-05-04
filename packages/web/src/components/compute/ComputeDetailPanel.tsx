@@ -63,7 +63,22 @@ export function ComputeDetailPanel({
   // host never get attributed. Until that gap is fixed on the server,
   // render them here rather than silently drop them, but don't pretend
   // they belong to any specific provider.
-  const computeSessions = sessions.filter((s) => s.compute_name === computeName || s.compute_name == null);
+  // Show only sessions that are actually live on this compute. Filter on:
+  // 1. compute_name matches the panel's compute (or local computes pick up
+  //    sessions with no compute_name set).
+  // 2. Status is non-terminal AND the session has dispatched. Sessions in
+  //    `pending` / `ready` / orphaned-`running` rows that never got a
+  //    session_id (e.g. dispatch_failed, agent stuck before launch-agent)
+  //    show up as empty Session rows in the UI -- which is the bug the
+  //    screenshot caught. Requiring `session_id` is the durable test for
+  //    "this session is actually running on a worker."
+  const TERMINAL_STATUSES = new Set(["completed", "failed", "stopped", "archived", "killed"]);
+  const computeSessions = sessions.filter((s) => {
+    if (s.compute_name !== computeName && s.compute_name != null) return false;
+    if (TERMINAL_STATUSES.has(s.status)) return false;
+    if (!s.session_id) return false;
+    return true;
+  });
 
   const isTemplate = !!compute.is_template;
 
@@ -269,11 +284,11 @@ export function ComputeDetailPanel({
               <tbody>
                 {computeSessions.map((s: any) => (
                   <tr
-                    key={s.session_id}
+                    key={s.id}
                     className="border-t border-border/50 hover:bg-accent/30 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]"
                   >
                     <td className="px-3 py-1.5 text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
-                      {s.session_id}
+                      {s.id}
                     </td>
                     <td className="px-3 py-1.5 text-foreground truncate max-w-[250px]">{s.summary || "-"}</td>
                     <td className="px-3 py-1.5">
