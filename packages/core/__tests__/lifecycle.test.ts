@@ -18,7 +18,7 @@ import { TensorZeroLauncher } from "../infra/tensorzero-launcher.js";
 import { MetricsPoller } from "../infra/metrics-poller.js";
 import { MaintenancePollers } from "../infra/maintenance-pollers.js";
 import { SignalHandlers } from "../infra/signal-handlers.js";
-import { StaleStateDetector } from "../infra/stale-state-detector.js";
+import { BootCleanup } from "../infra/boot-cleanup.js";
 import { ServiceWiring } from "../infra/service-wiring.js";
 import { ComputeProvidersBoot } from "../infra/compute-providers-boot.js";
 import { SessionDrain } from "../infra/session-drain.js";
@@ -48,7 +48,7 @@ describe("Lifecycle orchestrator", async () => {
     expect(cradle.arkdLauncher).toBeInstanceOf(ArkdLauncher);
     expect(cradle.metricsPoller).toBeInstanceOf(MetricsPoller);
     expect(cradle.maintenancePollers).toBeInstanceOf(MaintenancePollers);
-    expect(cradle.staleStateDetector).toBeInstanceOf(StaleStateDetector);
+    expect(cradle.bootCleanup).toBeInstanceOf(BootCleanup);
     expect(cradle.signalHandlers).toBeInstanceOf(SignalHandlers);
     expect(cradle.sessionDrain).toBeInstanceOf(SessionDrain);
   });
@@ -231,9 +231,10 @@ describe("Infra launchers honor enablement", async () => {
     expect(launcher.url).toBeNull();
   });
 
-  it("StaleStateDetector runs without throwing even on empty DB", () => {
-    const d = app2.container.cradle.staleStateDetector;
-    // orphanedSessions is always an array (possibly empty)
-    expect(Array.isArray(d.orphanedSessions)).toBe(true);
+  it("BootCleanup is registered and start() is callable on empty cwd", async () => {
+    const d = app2.container.cradle.bootCleanup;
+    expect(d).toBeInstanceOf(BootCleanup);
+    // start() runs the file-cleanup sweeps; no .claude/.mcp.json in test cwd, so it's a no-op.
+    await expect(d.start()).resolves.toBeUndefined();
   });
 });

@@ -90,6 +90,9 @@ export interface ResolveNextStageCb {
 export interface EvaluateGateCb {
   (flowName: string, stage: string, session: Session): { canProceed: boolean; reason: string };
 }
+export interface StopStatusPollerCb {
+  (sessionId: string): void;
+}
 
 // ── Deps ────────────────────────────────────────────────────────────────────
 
@@ -136,6 +139,12 @@ export interface StageAdvanceDeps {
   getStageAction: GetStageActionCb;
   resolveNextStage: ResolveNextStageCb;
   evaluateGate: EvaluateGateCb;
+
+  // Optional: stop the previous stage's status poller before clearing
+  // session_id on the session row. Without this the old poller keeps
+  // polling a stale handle until its mismatch guard self-terminates it.
+  // Wired in di/services.ts to app.statusPollers.stop.
+  stopStatusPoller?: StopStatusPollerCb;
 }
 
 // ── Public result shapes (stable; re-exported from the barrel) ──────────────
