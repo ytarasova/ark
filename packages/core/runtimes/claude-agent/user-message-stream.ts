@@ -78,11 +78,20 @@ export function subscribeUserMessages(opts: UserMessageStreamOpts & { client?: A
         })) {
           // Channel is global; ignore envelopes destined for other sessions.
           if (env.session !== sessionName) continue;
+          // Observability: every received user-input envelope. Without this
+          // there is no way to tell if the conductor's publish reached the
+          // agent's subscriber when a steer appears to be lost mid-flight.
+          // Goes to stderr so it lands in the agent's stdio.log.
+          console.error(
+            `[user-input] received: bytes=${env.content?.length ?? 0} ` +
+              `control=${env.control ?? "none"} session=${env.session}`,
+          );
           if (typeof env.content === "string" && env.content.length > 0) {
             onMessage(env.content);
           }
           if (env.control === "interrupt" && onInterrupt) {
             // Fire after onMessage so the correction is in the queue before abort.
+            console.error("[user-input] firing interrupt to preempt the current SDK turn");
             onInterrupt();
           }
           // Successful read -- reset backoff so a long-lived stream that
