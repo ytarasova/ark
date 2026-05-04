@@ -44,7 +44,7 @@ describe("session/inject", () => {
       workdir: app.config.dirs.ark,
       flow: "bare",
     });
-    await app.sessions.update(session.id, { status: "running" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
     // Ensure sessionDir exists (normally created at dispatch; we do it here for the test).
     const sessionDir = join(app.config.dirs.tracks, session.id);
@@ -113,7 +113,7 @@ describe("session/inject", () => {
       workdir: app.config.dirs.ark,
       flow: "bare",
     });
-    await app.sessions.update(session.id, { status: "running" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
     const sessionDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(sessionDir, { recursive: true });
@@ -141,6 +141,7 @@ describe("session/interrupt", () => {
       flow: "bare",
     });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       config: { launch_executor: "claude-agent" },
     } as any);
@@ -173,6 +174,7 @@ describe("session/interrupt", () => {
       flow: "bare",
     });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       config: { launch_executor: "claude-agent" },
     } as any);

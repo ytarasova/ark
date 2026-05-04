@@ -588,3 +588,4 @@ make desktop   # Launch Electron app
 - **Conductor**: HTTP server for channel relay and hook status
 - **Paste support**: Cmd+V paste in TUI text inputs
 - **Install script**: `make install` with tagged release support
+

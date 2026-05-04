@@ -14,7 +14,12 @@ afterAll(async () => {
 describe("fan-out compute inheritance", async () => {
   test("children inherit parent compute_name", async () => {
     const parent = await app.sessions.create({ summary: "Parent on EC2", flow: "bare" });
-    await app.sessions.update(parent.id, { status: "running", stage: "implement", compute_name: "my-ec2" });
+    await app.sessions.update(parent.id, {
+      session_id: `ark-s-${parent.id}`,
+      status: "running",
+      stage: "implement",
+      compute_name: "my-ec2",
+    });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Child A" }, { summary: "Child B" }],
@@ -30,6 +35,7 @@ describe("fan-out compute inheritance", async () => {
   test("children inherit parent workdir and repo", async () => {
     const parent = await app.sessions.create({ summary: "Parent", flow: "bare" });
     await app.sessions.update(parent.id, {
+      session_id: `ark-s-${parent.id}`,
       status: "running",
       stage: "implement",
       compute_name: "fc-host",

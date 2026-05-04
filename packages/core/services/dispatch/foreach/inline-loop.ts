@@ -237,6 +237,8 @@ export async function dispatchForEachInline(
   }
   return {
     ok: true,
+    launched: false,
+    reason: "for_each_inline_complete",
     message: `for_each inline: ${items.length} iterations complete`,
   };
 }

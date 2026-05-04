@@ -277,6 +277,7 @@ describe("for_each checkpoint -- spawn mode -- resume restarts in-flight iterati
       config: { for_each_parent: parentId, for_each_index: 1 },
     });
     await app.sessions.update(child1.id, {
+      session_id: `ark-s-${child1.id}`,
       parent_id: parentId,
       status: "running", // not completed -- should be retried
     });
@@ -389,7 +390,7 @@ describe("for_each checkpoint -- boot reconciliation dispatches running sessions
       flow: "bare",
       config: { inputs: { repos: JSON.stringify(items) } },
     });
-    await app.sessions.update(session.id, { stage: "per_repo", status: "running" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, stage: "per_repo", status: "running" });
 
     // Write a checkpoint as if iteration 2 was in progress and iterations 0-1 done.
     const child0 = await app.sessions.create({
