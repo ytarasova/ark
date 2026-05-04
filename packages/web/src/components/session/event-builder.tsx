@@ -221,6 +221,30 @@ export function buildRichTimelineEvent(ev: any, i: number): TimelineEvent {
       </span>
     );
     color = "blue";
+  } else if (evType === "message_delivered") {
+    // Paired with the preceding `message_sent`. `delivered=false` means arkd
+    // buffered the envelope because no subscriber was parked; the message
+    // still reaches the agent on the next subscribe drain but the UI should
+    // signal "queued" rather than "delivered" so a stuck agent is visible.
+    const delivered = data.delivered;
+    const elapsed = data.elapsedMs;
+    const state = delivered === false ? "queued" : "delivered";
+    label = (
+      <span>
+        Message {state}
+        {typeof elapsed === "number" && <span className="text-[var(--fg-muted)]"> ({elapsed}ms)</span>}
+      </span>
+    );
+    color = delivered === false ? "amber" : "blue";
+  } else if (evType === "message_delivery_failed") {
+    const reason = data.reason || "";
+    label = (
+      <span>
+        <strong className="text-[var(--failed)]">Message delivery failed</strong>
+        {reason && <span className="text-[var(--fg-muted)]">: {reason}</span>}
+      </span>
+    );
+    color = "red";
   } else if (evType === "session_dispatched") {
     label = (
       <span>

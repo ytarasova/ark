@@ -63,7 +63,9 @@ export async function send(
     logDebug("session", "skip prompt guard on error");
   }
 
-  // Audit: log user message sent
+  // Audit: log user message sent (pre-delivery). Paired with `message_delivered`
+  // or `message_delivery_failed` below so the timeline shows the full attempt,
+  // not just the intent.
   await app.events.log(sessionId, "message_sent", {
     actor: "user",
     stage: session.stage ?? undefined,
@@ -87,11 +89,19 @@ export async function send(
   }
   const { getExecutor } = await import("../executor.js");
   const executor = getExecutor(launchExecutor);
+  const tSend = Date.now();
   if (executor?.sendUserMessage) {
     try {
-      return await executor.sendUserMessage({ app, session, message });
+      const result = await executor.sendUserMessage({ app, session, message });
+      await logSendOutcome(app, sessionId, session.stage ?? undefined, message, launchExecutor, tSend, result);
+      return result;
     } catch (e: any) {
-      return { ok: false, message: `executor send failed: ${e?.message ?? e}` };
+      const msg = `executor send failed: ${e?.message ?? e}`;
+      await logSendOutcome(app, sessionId, session.stage ?? undefined, message, launchExecutor, tSend, {
+        ok: false,
+        message: msg,
+      });
+      return { ok: false, message: msg };
     }
   }
 
@@ -101,5 +111,57 @@ export async function send(
   // family.
   const { sendReliable } = await import("../send-reliable.js");
   const result = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });
-  return { ok: result.ok, message: result.message };
+  const normalized = { ok: result.ok, message: result.message };
+  await logSendOutcome(app, sessionId, session.stage ?? undefined, message, launchExecutor, tSend, normalized);
+  return normalized;
+}
+
+/**
+ * Emit the paired outcome event for a user-message send attempt. Called from
+ * both the executor-polymorphic path and the legacy sendReliable fallback so
+ * every `message_sent` audit row is followed by either `message_delivered`
+ * (ok=true) or `message_delivery_failed` (ok=false). Failures never throw --
+ * the session is healthier without an observability entry than crashed by one.
+ */
+async function logSendOutcome(
+  app: AppContext,
+  sessionId: string,
+  stage: string | undefined,
+  message: string,
+  executor: string,
+  tStart: number,
+  result: { ok: boolean; message: string; delivered?: boolean },
+): Promise<void> {
+  try {
+    if (result.ok) {
+      await app.events.log(sessionId, "message_delivered", {
+        actor: "system",
+        stage,
+        data: {
+          length: message.length,
+          executor,
+          // `delivered` comes from arkd's publish response for wire-based
+          // runtimes (claude-agent). Undefined for tmux-based runtimes where
+          // the concept doesn't map -- the UI can fall back to "delivered"
+          // for those.
+          delivered: result.delivered,
+          elapsedMs: Date.now() - tStart,
+        },
+      });
+    } else {
+      await app.events.log(sessionId, "message_delivery_failed", {
+        actor: "system",
+        stage,
+        data: {
+          length: message.length,
+          executor,
+          reason: result.message,
+          elapsedMs: Date.now() - tStart,
+        },
+      });
+    }
+  } catch {
+    // Swallow: a failed audit-event write must not mask the actual send result.
+    logDebug("session", "logSendOutcome: event write failed");
+  }
 }

@@ -245,6 +245,24 @@ export async function handleChannelRoutes(req: Request, path: string, _ctx: Rout
       return json({ error: "`envelope` must be a JSON object" }, 400);
     }
     const delivered = enqueue(name, env as Envelope);
+    // Observability: user-input is the channel where a "lost steer" matters
+    // most -- the user thinks their message reached the agent, but if
+    // delivered=false nobody was parked to receive it. Log at info so the
+    // signal shows up in ark.jsonl without needing debug. Other channels
+    // (hooks) get debug only; they are high-volume and already have their
+    // own per-event traces on the conductor side.
+    if (name === "user-input") {
+      const envObj = env as Record<string, unknown>;
+      logInfo("compute", "arkd channels: user-input published", {
+        channel: name,
+        session: typeof envObj.session === "string" ? envObj.session : null,
+        bytes: typeof envObj.content === "string" ? envObj.content.length : 0,
+        control: typeof envObj.control === "string" ? envObj.control : null,
+        delivered,
+      });
+    } else {
+      logDebug("compute", `arkd channels: publish channel=${name} delivered=${delivered}`);
+    }
     return json({ ok: true, delivered });
   }
 

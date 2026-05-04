@@ -98,6 +98,20 @@ export interface SendUserMessageResult {
   ok: boolean;
   /** Human-readable status -- shown in the UI when ok=false. */
   message: string;
+  /**
+   * True when the transport handed the message directly to a live subscriber
+   * (the agent was parked and consumed it immediately); false when it was
+   * buffered for a not-yet-attached subscriber. Surfaces from arkd's channel
+   * publish response for wire-based runtimes (claude-agent). Undefined for
+   * runtimes where the concept doesn't apply (tmux send-keys to a pane is
+   * always "delivered" in the sense that matters).
+   *
+   * Observability: this flag is the difference between "message reached the
+   * agent" and "message is queued; will be picked up when the subscriber
+   * reconnects". Steers that appear lost usually fall in the second bucket,
+   * and that is exactly the signal the UI and logs need to distinguish.
+   */
+  delivered?: boolean;
 }
 
 /**

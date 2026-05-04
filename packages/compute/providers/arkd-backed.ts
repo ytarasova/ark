@@ -9,6 +9,7 @@
 
 import { ArkdClient } from "../../arkd/client.js";
 import type { AppContext } from "../../core/app.js";
+import { logInfo, logError } from "../../core/observability/structured-log.js";
 import type {
   ComputeProvider,
   ProvisionOpts,
@@ -170,12 +171,40 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
     // This is the documented abort+resume pattern from the SDK:
     //   - sdk.d.ts:1090-1094  AbortController in query options
     //   - sdk.d.ts:1470-1472  resume parameter to restart with history
-    const res = await client.publishToChannel("user-input", {
-      session: session.session_id,
-      content,
-      control: "interrupt",
-    });
-    return { delivered: res.delivered };
+    const t0 = Date.now();
+    try {
+      const res = await client.publishToChannel("user-input", {
+        session: session.session_id,
+        content,
+        control: "interrupt",
+      });
+      // Observability: every wire-level publish. `delivered=false` means the
+      // envelope was buffered on arkd's ring because no subscriber was parked
+      // at publish time -- the user message will still reach the agent on
+      // the next subscribe drain, but a persistent false here points to a
+      // broken subscriber (agent crashed, WS torn down, etc.).
+      logInfo("compute", "arkd-backed.sendUserMessage: published", {
+        provider: this.name,
+        computeName: compute.name,
+        sessionId: session.id,
+        agentHandle: session.session_id,
+        bytes: content.length,
+        delivered: res.delivered,
+        elapsedMs: Date.now() - t0,
+      });
+      return { delivered: res.delivered };
+    } catch (err: any) {
+      logError("compute", "arkd-backed.sendUserMessage: publish failed", {
+        provider: this.name,
+        computeName: compute.name,
+        sessionId: session.id,
+        agentHandle: session.session_id,
+        bytes: content.length,
+        elapsedMs: Date.now() - t0,
+        error: err?.message ?? String(err),
+      });
+      throw err;
+    }
   }
 
   async checkSession(compute: Compute, tmuxSessionId: string, session?: Session): Promise<boolean> {

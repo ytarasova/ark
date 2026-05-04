@@ -354,14 +354,19 @@ export const claudeAgentExecutor: Executor = {
     }
     try {
       const t0 = Date.now();
-      await provider.sendUserMessage(compute, session, message);
+      const res = await provider.sendUserMessage(compute, session, message);
       logInfo("session", "claude-agent.sendUserMessage: published to user-input channel", {
         sessionId: session.id,
         provider: provider.name,
         bytes: message.length,
+        delivered: res.delivered,
         elapsedMs: Date.now() - t0,
       });
-      return { ok: true, message: "Delivered" };
+      return {
+        ok: true,
+        message: res.delivered ? "Delivered" : "Queued (no subscriber parked)",
+        delivered: res.delivered,
+      };
     } catch (e: any) {
       logError("session", `claude-agent.sendUserMessage: publish failed: ${e?.message ?? e}`, {
         sessionId: session.id,
