@@ -369,7 +369,12 @@ describe("complete() with verification", async () => {
   it("blocks completion when verify scripts fail", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
     const session = await app.sessions.create({ summary: "complete block test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "implement",
+      workdir,
+    });
 
     const result = await app.stageAdvance.complete(session.id);
 
@@ -383,7 +388,7 @@ describe("complete() with verification", async () => {
 
   it("blocks completion when todos are pending", async () => {
     const session = await app.sessions.create({ summary: "complete todo block", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
     await app.todos.add(session.id, "Must complete this first");
 
     const result = await app.stageAdvance.complete(session.id);
@@ -396,7 +401,12 @@ describe("complete() with verification", async () => {
   it("force flag bypasses verification", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
     const session = await app.sessions.create({ summary: "force complete test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "implement",
+      workdir,
+    });
     await app.todos.add(session.id, "Pending todo");
 
     const result = await app.stageAdvance.complete(session.id, { force: true });
@@ -411,7 +421,12 @@ describe("complete() with verification", async () => {
   it("allows completion when verification passes", async () => {
     const workdir = createWorkdirWithVerifyScripts(["true"]);
     const session = await app.sessions.create({ summary: "complete pass test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "implement",
+      workdir,
+    });
 
     const result = await app.stageAdvance.complete(session.id);
 
@@ -424,7 +439,7 @@ describe("complete() with verification", async () => {
 
   it("logs stage_completed event on success", async () => {
     const session = await app.sessions.create({ summary: "complete event test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     await app.stageAdvance.complete(session.id);
 
@@ -551,7 +566,7 @@ describe("conductor HTTP integration with stage validation", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
     const session = await app.sessions.create({ summary: "conductor todo block", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
     await app.todos.add(session.id, "Must fix before advancing");
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
@@ -585,7 +600,12 @@ describe("conductor HTTP integration with stage validation", async () => {
 
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
     const session = await app.sessions.create({ summary: "conductor script block", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "implement",
+      workdir,
+    });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -612,7 +632,12 @@ describe("conductor HTTP integration with stage validation", async () => {
 
     const workdir = createWorkdirWithVerifyScripts(["true"]);
     const session = await app.sessions.create({ summary: "conductor verify pass", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "implement",
+      workdir,
+    });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -649,7 +674,7 @@ describe("conductor HTTP integration with stage validation", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
     const session = await app.sessions.create({ summary: "conductor todo resolve", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
     const todo = await app.todos.add(session.id, "Blocking todo");
 
     // First attempt: blocked by todo
@@ -670,7 +695,11 @@ describe("conductor HTTP integration with stage validation", async () => {
 
     // Resolve the todo and reset status
     await app.todos.toggle(todo.id);
-    await app.sessions.update(session.id, { status: "running", breakpoint_reason: null });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      breakpoint_reason: null,
+    });
 
     // Second attempt: should advance
     await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {

@@ -103,7 +103,7 @@ describe("CLI: compute lifecycle", async () => {
     const name = `test-running-${Date.now()}`;
     testComputes.push(name);
     await app.computeService.create({ name, provider: "docker" });
-    await app.computes.update(name, { status: "running" });
+    await app.computes.update(name, { session_id: `ark-s-${name}`, status: "running" });
     // Attempting to destroy a running compute goes through provider.destroy()
     // first; the repo-level delete is unguarded and we only assert status here.
     const compute = await app.computes.get(name);

@@ -35,7 +35,7 @@ describe("applyHookStatus stage attribution (#435)", () => {
     // really still on "verify" and stamps that on its payload. The
     // event row must be tagged "verify", NOT "merge".
     const session = await app.sessions.create({ summary: "stage attribution test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "merge" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "merge" });
 
     const fresh = await app.sessions.get(session.id);
     const result = await app.sessionHooks.applyHookStatus(fresh!, "Stop", {
@@ -56,7 +56,7 @@ describe("applyHookStatus stage attribution (#435)", () => {
     // -- this is the same as the old behaviour, so existing flows are
     // unaffected.
     const session = await app.sessions.create({ summary: "fallback test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const fresh = await app.sessions.get(session.id);
     const result = await app.sessionHooks.applyHookStatus(fresh!, "Stop", {
@@ -73,7 +73,7 @@ describe("applyHookStatus stage attribution (#435)", () => {
     // Empty payload.stage means "I am the legacy launcher and don't know
     // my stage" -- treated as absent.
     const session = await app.sessions.create({ summary: "empty stage test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const fresh = await app.sessions.get(session.id);
     const result = await app.sessionHooks.applyHookStatus(fresh!, "Stop", {

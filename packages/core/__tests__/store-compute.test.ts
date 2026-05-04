@@ -58,7 +58,7 @@ describe("compute CRUD", () => {
   it("filters by status", async () => {
     await getApp().computeService.create({ name: "a", provider: "ec2" }); // ec2 defaults to stopped
     await getApp().computeService.create({ name: "b", provider: "ec2" });
-    await getApp().computes.update("b", { status: "running" });
+    await getApp().computes.update("b", { session_id: `ark-s-${"b"}`, status: "running" });
     const running = await getApp().computes.list({ status: "running" });
     // "local" is auto-created as running + "b" was set to running
     expect(running.length).toBe(2);
@@ -68,6 +68,7 @@ describe("compute CRUD", () => {
   it("updates compute fields including config as JSON", async () => {
     await getApp().computeService.create({ name: "up", provider: "docker" });
     const updated = await getApp().computes.update("up", {
+      session_id: `ark-s-${"up"}`,
       status: "running",
       config: { port: 3000 },
     });
@@ -92,13 +93,17 @@ describe("compute CRUD", () => {
   });
 
   it("returns null when updating a non-existent compute", async () => {
-    const result = await getApp().computes.update("nonexistent", { status: "running" });
+    const result = await getApp().computes.update("nonexistent", {
+      session_id: `ark-s-${"nonexistent"}`,
+      status: "running",
+    });
     expect(result).toBeNull();
   });
 
   it("silently ignores updates to name and created_at", async () => {
     await getApp().computeService.create({ name: "immut", provider: "docker" });
     const updated = await getApp().computes.update("immut", {
+      session_id: `ark-s-${"immut"}`,
       name: "renamed" as unknown,
       created_at: "2000-01-01T00:00:00.000Z",
       status: "running",
@@ -131,7 +136,7 @@ describe("compute CRUD", () => {
     await getApp().computeService.create({ name: "a", provider: "ec2" });
     await getApp().computeService.create({ name: "b", provider: "ec2" });
     await getApp().computeService.create({ name: "c", provider: "docker" });
-    await getApp().computes.update("b", { status: "running" });
+    await getApp().computes.update("b", { session_id: `ark-s-${"b"}`, status: "running" });
 
     const results = await getApp().computes.list({ provider: "ec2", status: "running" });
     expect(results.length).toBe(1);
@@ -148,7 +153,10 @@ describe("compute CRUD", () => {
       /* busy-wait for timestamp to differ */
     }
 
-    const updated = await getApp().computes.update("ts-check", { status: "running" });
+    const updated = await getApp().computes.update("ts-check", {
+      session_id: `ark-s-${"ts-check"}`,
+      status: "running",
+    });
     expect(updated).not.toBeNull();
     expect(updated!.created_at).toBe(originalCreatedAt);
     expect(updated!.updated_at >= originalUpdatedAt).toBe(true);

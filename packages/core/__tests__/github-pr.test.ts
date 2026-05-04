@@ -180,7 +180,7 @@ describe("handleGitHubWebhook", () => {
   it("returns approve for approved reviews with matching session", async () => {
     const prUrl = "https://github.com/org/repo/pull/10";
     const session = await getApp().sessions.create({ summary: "webhook test" });
-    await getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, pr_url: prUrl, status: "running" });
 
     const result = await handleGitHubWebhook(
       getApp(),
@@ -223,7 +223,7 @@ describe("handleGitHubWebhook", () => {
   it("returns steer for pull_request_review_comment", async () => {
     const prUrl = "https://github.com/org/repo/pull/30";
     const session = await getApp().sessions.create({ summary: "comment test" });
-    await getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, pr_url: prUrl, status: "running" });
 
     const result = await handleGitHubWebhook(
       getApp(),

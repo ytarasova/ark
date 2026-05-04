@@ -57,7 +57,12 @@ describe("finishWorktree with options", async () => {
 
   it("finishWorktree stops running session before finishing", async () => {
     const s = await getApp().sessions.create({ summary: "running-finish", repo: "/tmp/fake-repo" });
-    await getApp().sessions.update(s.id, { workdir: "/tmp/fake-workdir", branch: "feature-y", status: "running" });
+    await getApp().sessions.update(s.id, {
+      session_id: `ark-s-${s.id}`,
+      workdir: "/tmp/fake-workdir",
+      branch: "feature-y",
+      status: "running",
+    });
 
     const { finishWorktree } = await import("../services/worktree/index.js");
     // stop(getApp()) will be called first, then merge (which fails), which aborts

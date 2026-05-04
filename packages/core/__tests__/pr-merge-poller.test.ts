@@ -28,6 +28,7 @@ async function createMergeSession(
     flow: "autonomous-sdlc",
   });
   await getApp().sessions.update(session.id, {
+    session_id: `ark-s-${session.id}`,
     pr_url: opts.pr_url ?? "https://github.com/org/repo/pull/42",
     status: opts.status ?? "waiting",
     stage: opts.stage ?? "merge",

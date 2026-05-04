@@ -38,7 +38,7 @@ async function post(sessionId: string, payload: Record<string, unknown>): Promis
 describe("Conductor /hooks/status type=question passthrough", async () => {
   it("agent-sdk ask_user shape sets session waiting with breakpoint_reason", async () => {
     const session = await getApp().sessions.create({ summary: "ask_user test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
     const resp = await post(session.id, {
       type: "question",
@@ -61,7 +61,7 @@ describe("Conductor /hooks/status type=question passthrough", async () => {
 
   it("logs agent_question event and emits to the event audit trail", async () => {
     const session = await getApp().sessions.create({ summary: "audit test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
     await post(session.id, {
       type: "question",
@@ -80,7 +80,7 @@ describe("Conductor /hooks/status type=question passthrough", async () => {
 
   it("appends an agent chat message so the UI renders the question", async () => {
     const session = await getApp().sessions.create({ summary: "chat test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
     await post(session.id, {
       type: "question",
@@ -101,7 +101,7 @@ describe("Conductor /hooks/status type=question passthrough", async () => {
     // but the passthrough here should also accept the same `question` field name for
     // forward-compat with any source that prefers it over `message`.
     const session = await getApp().sessions.create({ summary: "parity test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
     const resp = await post(session.id, {
       type: "question",
@@ -118,7 +118,9 @@ describe("Conductor /hooks/status type=question passthrough", async () => {
 
   it("hook_event_name payloads still take the legacy hook path", async () => {
     const session = await getApp().sessions.create({ summary: "regression test" });
-    await getApp().sessions.update(session.id, { status: "ready" });
+    // pre-populate session_id so the hook-driven transition to "running"
+    // satisfies the invariant (post-launch.ts does this in production).
+    await getApp().sessions.update(session.id, { status: "ready", session_id: `ark-s-${session.id}` });
 
     const resp = await post(session.id, { hook_event_name: "SessionStart" });
     expect(resp.status).toBe(200);

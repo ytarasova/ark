@@ -95,7 +95,7 @@ describe("SessionDispatchListeners post-condition check", () => {
     app.container.register({
       dispatchService: asValue({
         dispatch: async (id: string) => {
-          await app.sessions.update(id, { status: "running" });
+          await app.sessions.update(id, { session_id: `ark-s-${id}`, status: "running" });
           return { ok: true, launched: true, message: "ark-s-real-launch" };
         },
       }),

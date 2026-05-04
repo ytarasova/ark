@@ -79,7 +79,7 @@ describe("waitForCompletion", async () => {
   it("times out when session stays running", async () => {
     const session = await getApp().sessions.create({ summary: "wfc-timeout" });
     sessionIds.push(session.id);
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const { session: final, timedOut } = await app.sessionLifecycle.waitForCompletion(session.id, {
       timeoutMs: 150,
@@ -92,7 +92,7 @@ describe("waitForCompletion", async () => {
   it("calls onStatus during polling", async () => {
     const session = await getApp().sessions.create({ summary: "wfc-status-cb" });
     sessionIds.push(session.id);
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const statuses: string[] = [];
 
