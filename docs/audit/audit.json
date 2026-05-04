@@ -2453,6 +2453,7 @@
         "packages/cli/commands/daemon.ts",
         "packages/cli/commands/misc/arkd.ts",
         "packages/cli/services/web-probe.ts",
+        "packages/core/conductor/arkd-events-consumer.ts",
         "packages/core/executors/claude-agent.ts",
         "packages/core/runtimes/claude-agent/user-message-stream.ts"
       ]
@@ -3635,7 +3636,8 @@
       "imports": [
         "packages/compute/core/types.ts",
         "packages/compute/providers/local-placement-ctx.ts",
-        "packages/core/app.ts"
+        "packages/core/app.ts",
+        "packages/core/conductor/arkd-events-consumer.ts"
       ],
       "importedBy": [
         "packages/compute/adapters/legacy.ts",
@@ -5704,6 +5706,7 @@
     {
       "path": "packages/core/conductor/arkd-events-consumer.ts",
       "imports": [
+        "packages/arkd/index.ts",
         "packages/core/app.ts",
         "packages/core/conductor/channel-types.ts",
         "packages/core/conductor/deliver-to-channel.ts",
@@ -5714,6 +5717,7 @@
       ],
       "importedBy": [
         "packages/compute/core/ec2.ts",
+        "packages/compute/core/local.ts",
         "packages/compute/providers/remote-arkd.ts",
         "packages/core/app.ts"
       ]
@@ -9481,6 +9485,13 @@
       ]
     },
     {
+      "path": "packages/core/services/github/rest.ts",
+      "imports": [],
+      "importedBy": [
+        "packages/core/services/worktree/pr.ts"
+      ]
+    },
+    {
       "path": "packages/core/services/history.ts",
       "imports": [
         "packages/core/database/index.ts"
@@ -9987,6 +9998,7 @@
         "packages/core/compute-resolver.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/repo-config.ts",
+        "packages/core/services/github/rest.ts",
         "packages/core/services/worktree/git-ops.ts",
         "packages/types/index.ts"
       ],

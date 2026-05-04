@@ -2,7 +2,7 @@
 
 > generated: 1970-01-01T00:00:00.000Z  -  regenerate with `make audit`.
 
-Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types.  Total modules: **998**.
+Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types.  Total modules: **999**.
 
 ## Fan-in leaderboard (top 20)
 
@@ -135,7 +135,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ## Full graph
 
-<details><summary>998 modules</summary>
+<details><summary>999 modules</summary>
 
 ### `packages/arkd/client.ts`
 
@@ -146,7 +146,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/arkd/index.ts`
 
-- fan-in: 5
+- fan-in: 6
 - fan-out: 0
 
 ### `packages/arkd/internal.ts`
@@ -1028,11 +1028,12 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/compute/core/local.ts`
 
 - fan-in: 2
-- fan-out: 3
+- fan-out: 4
 - imports:
   - `packages/compute/core/types.ts`
   - `packages/compute/providers/local-placement-ctx.ts`
   - `packages/core/app.ts`
+  - `packages/core/conductor/arkd-events-consumer.ts`
 
 ### `packages/compute/core/pool/local-firecracker-pool.ts`
 
@@ -2435,9 +2436,10 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/conductor/arkd-events-consumer.ts`
 
-- fan-in: 3
-- fan-out: 7
+- fan-in: 4
+- fan-out: 8
 - imports:
+  - `packages/arkd/index.ts`
   - `packages/core/app.ts`
   - `packages/core/conductor/channel-types.ts`
   - `packages/core/conductor/deliver-to-channel.ts`
@@ -4979,6 +4981,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/services/session-dispatch-listeners.ts`
   - `packages/core/state/flow.ts`
 
+### `packages/core/services/github/rest.ts`
+
+- fan-in: 1
+- fan-out: 0
+
 ### `packages/core/services/history.ts`
 
 - fan-in: 1
@@ -5360,7 +5367,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/services/worktree/pr.ts`
 
 - fan-in: 1
-- fan-out: 8
+- fan-out: 9
 - imports:
   - `packages/arkd/client.ts`
   - `packages/compute/types.ts`
@@ -5368,6 +5375,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/compute-resolver.ts`
   - `packages/core/observability/structured-log.ts`
   - `packages/core/repo-config.ts`
+  - `packages/core/services/github/rest.ts`
   - `packages/core/services/worktree/git-ops.ts`
   - `packages/types/index.ts`
 
