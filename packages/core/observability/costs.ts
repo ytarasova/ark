@@ -11,6 +11,8 @@ import type { TokenUsage } from "./pricing.js";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 import { PricingRegistry } from "./pricing.js";
+import { resolveSessionExecutor } from "../executors/resolve.js";
+import { logWarn } from "./structured-log.js";
 
 const DEFAULT_MODEL = "sonnet";
 
@@ -145,7 +147,12 @@ export async function syncCosts(app: AppContext): Promise<{ synced: number; skip
     }
 
     // Resolve the runtime + parser
-    const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
+    const runtimeName = await resolveSessionExecutor(app, session);
+    if (!runtimeName) {
+      logWarn("session", `syncCosts: no runtime resolvable for session ${session.id} -- skipping`);
+      skipped++;
+      continue;
+    }
     const runtime = app.runtimes.get(runtimeName);
     const kind = runtime?.billing?.transcript_parser ?? "claude";
     const parser = app.transcriptParsers.get(kind);
