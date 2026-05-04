@@ -113,3 +113,15 @@ export class FileAgentStore implements AgentStore {
     return false;
   }
 }
+
+/**
+ * Validate that an agent definition carries a resolvable runtime field.
+ * Dispatch paths MUST call this before using the agent definition.
+ * Returns null on success, or an error message string on failure.
+ */
+export function validateAgentRuntime(agent: AgentDefinition): string | null {
+  if (!agent.runtime || agent.runtime.trim() === "") {
+    return `Agent '${agent.name}' has no runtime field -- every dispatched agent must declare a runtime`;
+  }
+  return null;
+}

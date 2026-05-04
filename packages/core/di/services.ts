@@ -291,6 +291,10 @@ export function registerServices(
           getStageAction: (flowName, stageName) => flow.getStageAction(c.app, flowName, stageName),
           resolveNextStage: (flowName, stage, outcome) => flow.resolveNextStage(c.app, flowName, stage, outcome),
           evaluateGate: (flowName, stage, session) => flow.evaluateGate(c.app, flowName, stage, session),
+          // Stop the previous stage's poller before sessions.update clears
+          // session_id. Closes the stale-handle race documented at
+          // executors/status-poller.ts#L205.
+          stopStatusPoller: (sessionId) => c.app.statusPollers.stop(sessionId),
         }),
       { lifetime },
     ),

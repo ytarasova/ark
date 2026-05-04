@@ -76,7 +76,7 @@ describe("for_each spawn -- parent transitions to running", () => {
 
   it("doesn't redundantly write status=running if already running", async () => {
     const { id: parentId, vars } = await makeParentWithList([{ val: "b" }]);
-    await app.sessions.update(parentId, { status: "running" });
+    await app.sessions.update(parentId, { session_id: `ark-s-${parentId}`, status: "running" });
     const before = await app.sessions.get(parentId);
     const beforeUpdatedAt = before?.updated_at;
 

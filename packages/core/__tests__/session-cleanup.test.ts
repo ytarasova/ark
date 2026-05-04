@@ -167,6 +167,7 @@ test("session/kill RPC marks running session as failed with reason killed", asyn
   });
   // Put it in running state with no real executor process (handle not in registry).
   await app.sessions.update(session.id, {
+    session_id: `ark-s-${session.id}`,
     status: "running",
     config: { launch_executor: "claude-agent" },
   } as any);

@@ -2,27 +2,27 @@
 
 > generated: 1970-01-01T00:00:00.000Z  -  regenerate with `make audit`.
 
-Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types.  Total modules: **993**.
+Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types.  Total modules: **998**.
 
 ## Fan-in leaderboard (top 20)
 
 | module | fan-in |
 | --- | --- |
-| `packages/core/observability/structured-log.ts` | 171 |
-| `packages/core/app.ts` | 148 |
-| `packages/types/index.ts` | 107 |
-| `packages/web/src/lib/utils.ts` | 94 |
-| `packages/core/database/index.ts` | 73 |
+| `packages/core/observability/structured-log.ts` | 174 |
+| `packages/core/app.ts` | 152 |
+| `packages/types/index.ts` | 103 |
+| `packages/web/src/lib/utils.ts` | 95 |
+| `packages/core/database/index.ts` | 72 |
 | `packages/web/src/hooks/useApi.ts` | 43 |
-| `packages/cli/app-client.ts` | 39 |
+| `packages/cli/app-client.ts` | 40 |
 | `packages/server/router.ts` | 37 |
 | `packages/web/src/components/ui/button.tsx` | 35 |
 | `packages/protocol/types.ts` | 32 |
 | `packages/core/state/flow.ts` | 31 |
 | `packages/server/validate.ts` | 29 |
-| `packages/core/config.ts` | 27 |
+| `packages/core/config.ts` | 28 |
 | `packages/core/constants.ts` | 24 |
-| `packages/core/services/dispatch/types.ts` | 21 |
+| `packages/core/services/dispatch/types.ts` | 22 |
 | `packages/core/tickets/types.ts` | 21 |
 | `packages/compute/core/types.ts` | 20 |
 | `packages/core/index.ts` | 20 |
@@ -46,7 +46,6 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - `packages/compute/providers/ec2/queue.ts`
 - `packages/compute/providers/ec2/remote-setup.ts`
 - `packages/core/acp.ts`
-- `packages/core/adapters/control-plane/index.ts`
 - `packages/core/adapters/local/index.ts`
 - `packages/core/adapters/test/index.ts`
 - `packages/core/agent/index.ts`
@@ -88,6 +87,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - `packages/core/resolution/index.ts`
 - `packages/core/resolution/resolve-stage.ts`
 - `packages/core/review.ts`
+- `packages/core/runtimes/claude-agent/format.ts`
 - `packages/core/sandbox.ts`
 - `packages/core/search/index.ts`
 - `packages/core/services/stage-orchestrator.ts`
@@ -135,7 +135,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ## Full graph
 
-<details><summary>993 modules</summary>
+<details><summary>998 modules</summary>
 
 ### `packages/arkd/client.ts`
 
@@ -146,12 +146,12 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/arkd/index.ts`
 
-- fan-in: 3
+- fan-in: 5
 - fan-out: 0
 
 ### `packages/arkd/internal.ts`
 
-- fan-in: 9
+- fan-in: 10
 - fan-out: 0
 
 ### `packages/arkd/routes/agent.ts`
@@ -177,11 +177,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - fan-out: 4
 - imports:
   - `packages/arkd/internal.ts`
-  - `packages/arkd/routes/events.ts`
+  - `packages/arkd/routes/channels.ts`
   - `packages/arkd/types.ts`
   - `packages/core/constants.ts`
 
-### `packages/arkd/routes/events.ts`
+### `packages/arkd/routes/channels.ts`
 
 - fan-in: 2
 - fan-out: 2
@@ -223,31 +223,41 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/arkd/internal.ts`
   - `packages/arkd/types.ts`
 
+### `packages/arkd/routes/process.ts`
+
+- fan-in: 1
+- fan-out: 3
+- imports:
+  - `packages/arkd/internal.ts`
+  - `packages/arkd/types.ts`
+  - `packages/core/observability/structured-log.ts`
+
 ### `packages/arkd/server.ts`
 
 - fan-in: 1
-- fan-out: 11
+- fan-out: 12
 - imports:
   - `packages/arkd/internal.ts`
   - `packages/arkd/routes/agent.ts`
   - `packages/arkd/routes/attach.ts`
   - `packages/arkd/routes/channel.ts`
-  - `packages/arkd/routes/events.ts`
+  - `packages/arkd/routes/channels.ts`
   - `packages/arkd/routes/exec.ts`
   - `packages/arkd/routes/file.ts`
   - `packages/arkd/routes/metrics-snapshot.ts`
   - `packages/arkd/routes/misc.ts`
+  - `packages/arkd/routes/process.ts`
   - `packages/arkd/types.ts`
   - `packages/core/observability/structured-log.ts`
 
 ### `packages/arkd/types.ts`
 
-- fan-in: 9
+- fan-in: 10
 - fan-out: 0
 
 ### `packages/cli/app-client.ts`
 
-- fan-in: 39
+- fan-in: 40
 - fan-out: 6
 - imports:
   - `packages/cli/helpers.ts`
@@ -545,7 +555,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - fan-in: 1
 - fan-out: 1
 - imports:
-  - `packages/core/runtimes/agent-sdk/launch.ts`
+  - `packages/core/runtimes/claude-agent/launch.ts`
 
 ### `packages/cli/commands/misc/watch.ts`
 
@@ -745,6 +755,14 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/cli/app-client.ts`
   - `packages/cli/commands/_shared.ts`
 
+### `packages/cli/commands/token.ts`
+
+- fan-in: 1
+- fan-out: 2
+- imports:
+  - `packages/cli/app-client.ts`
+  - `packages/core/config.ts`
+
 ### `packages/cli/commands/trigger.ts`
 
 - fan-in: 1
@@ -798,7 +816,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/cli/index.ts`
 
 - fan-in: 1
-- fan-out: 36
+- fan-out: 37
 - imports:
   - `packages/cli/app-client.ts`
   - `packages/cli/commands/agent.ts`
@@ -830,6 +848,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/cli/commands/team.ts`
   - `packages/cli/commands/tenant-config.ts`
   - `packages/cli/commands/tenant.ts`
+  - `packages/cli/commands/token.ts`
   - `packages/cli/commands/trigger.ts`
   - `packages/cli/commands/user.ts`
   - `packages/cli/commands/workspace.ts`
@@ -886,7 +905,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/compute/adapters/provider-map.ts`
 
-- fan-in: 16
+- fan-in: 17
 - fan-out: 1
 - imports:
   - `packages/compute/core/types.ts`
@@ -1113,7 +1132,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/compute/index.ts`
 
-- fan-in: 8
+- fan-in: 9
 - fan-out: 5
 - imports:
   - `packages/compute/providers/k8s.ts`
@@ -1417,99 +1436,6 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/app.ts`
   - `packages/core/services/session-output.ts`
 
-### `packages/core/adapters/control-plane/clock.ts`
-
-- fan-in: 1
-- fan-out: 1
-- imports:
-  - `packages/core/ports/clock.ts`
-
-### `packages/core/adapters/control-plane/compute-store.ts`
-
-- fan-in: 1
-- fan-out: 2
-- imports:
-  - `packages/core/ports/compute-store.ts`
-  - `packages/types/index.ts`
-
-### `packages/core/adapters/control-plane/event-bus.ts`
-
-- fan-in: 1
-- fan-out: 1
-- imports:
-  - `packages/core/ports/event-bus.ts`
-
-### `packages/core/adapters/control-plane/event-store.ts`
-
-- fan-in: 1
-- fan-out: 4
-- imports:
-  - `packages/core/database/index.ts`
-  - `packages/core/ports/event-store.ts`
-  - `packages/core/repositories/event.ts`
-  - `packages/types/index.ts`
-
-### `packages/core/adapters/control-plane/index.ts`
-
-- fan-in: 0
-- fan-out: 11
-- imports:
-  - `packages/core/adapters/control-plane/clock.ts`
-  - `packages/core/adapters/control-plane/compute-store.ts`
-  - `packages/core/adapters/control-plane/event-bus.ts`
-  - `packages/core/adapters/control-plane/event-store.ts`
-  - `packages/core/adapters/control-plane/logger.ts`
-  - `packages/core/adapters/control-plane/process-runner.ts`
-  - `packages/core/adapters/control-plane/secret-store.ts`
-  - `packages/core/adapters/control-plane/session-store.ts`
-  - `packages/core/adapters/control-plane/tracer.ts`
-  - `packages/core/adapters/control-plane/workspace.ts`
-  - `packages/core/ports/index.ts`
-
-### `packages/core/adapters/control-plane/logger.ts`
-
-- fan-in: 1
-- fan-out: 1
-- imports:
-  - `packages/core/ports/logger.ts`
-
-### `packages/core/adapters/control-plane/process-runner.ts`
-
-- fan-in: 1
-- fan-out: 1
-- imports:
-  - `packages/core/ports/process-runner.ts`
-
-### `packages/core/adapters/control-plane/secret-store.ts`
-
-- fan-in: 1
-- fan-out: 1
-- imports:
-  - `packages/core/ports/secret-store.ts`
-
-### `packages/core/adapters/control-plane/session-store.ts`
-
-- fan-in: 1
-- fan-out: 2
-- imports:
-  - `packages/core/ports/session-store.ts`
-  - `packages/types/index.ts`
-
-### `packages/core/adapters/control-plane/tracer.ts`
-
-- fan-in: 1
-- fan-out: 1
-- imports:
-  - `packages/core/ports/tracer.ts`
-
-### `packages/core/adapters/control-plane/workspace.ts`
-
-- fan-in: 1
-- fan-out: 2
-- imports:
-  - `packages/core/ports/workspace.ts`
-  - `packages/types/index.ts`
-
 ### `packages/core/adapters/local/clock.ts`
 
 - fan-in: 1
@@ -1732,8 +1658,8 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/app.ts`
 
-- fan-in: 148
-- fan-out: 43
+- fan-in: 152
+- fan-out: 46
 - imports:
   - `packages/compute/core/pool/types.ts`
   - `packages/compute/core/snapshot-store.ts`
@@ -1746,6 +1672,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/code-intel/store.ts`
   - `packages/core/compute-registries.ts`
   - `packages/core/compute-resolver.ts`
+  - `packages/core/conductor/arkd-events-consumer.ts`
   - `packages/core/config.ts`
   - `packages/core/container.ts`
   - `packages/core/database/index.ts`
@@ -1754,6 +1681,8 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/di/seed-builtins.ts`
   - `packages/core/drizzle/index.ts`
   - `packages/core/executors/noop.ts`
+  - `packages/core/executors/resolve.ts`
+  - `packages/core/executors/status-poller.ts`
   - `packages/core/hooks.ts`
   - `packages/core/hosted/scheduler.ts`
   - `packages/core/hosted/worker-registry.ts`
@@ -1790,7 +1719,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/auth/context.ts`
 
-- fan-in: 9
+- fan-in: 12
 - fan-out: 3
 - imports:
   - `packages/core/auth/api-keys.ts`
@@ -1860,7 +1789,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/claude/args.ts`
 
-- fan-in: 1
+- fan-in: 2
 - fan-out: 1
 - imports:
   - `packages/core/claude/model.ts`
@@ -2480,7 +2409,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/compute-resolver.ts`
 
-- fan-in: 2
+- fan-in: 3
 - fan-out: 6
 - imports:
   - `packages/compute/adapters/provider-map.ts`
@@ -2506,7 +2435,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/conductor/arkd-events-consumer.ts`
 
-- fan-in: 2
+- fan-in: 3
 - fan-out: 7
 - imports:
   - `packages/core/app.ts`
@@ -2667,7 +2596,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/config.ts`
 
-- fan-in: 27
+- fan-in: 28
 - fan-out: 7
 - imports:
   - `packages/core/auth/index.ts`
@@ -2807,6 +2736,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/hosted/scheduler.ts`
   - `packages/core/hosted/worker-registry.ts`
   - `packages/core/infra/arkd-launcher.ts`
+  - `packages/core/infra/boot-cleanup.ts`
   - `packages/core/infra/compute-providers-boot.ts`
   - `packages/core/infra/conductor-launcher.ts`
   - `packages/core/infra/maintenance-pollers.ts`
@@ -2815,7 +2745,6 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/infra/service-wiring.ts`
   - `packages/core/infra/session-drain.ts`
   - `packages/core/infra/signal-handlers.ts`
-  - `packages/core/infra/stale-state-detector.ts`
   - `packages/core/infra/tensorzero-launcher.ts`
   - `packages/core/knowledge/store.ts`
   - `packages/core/lifecycle.ts`
@@ -2852,7 +2781,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/database/index.ts`
 
-- fan-in: 73
+- fan-in: 72
 - fan-out: 0
 
 ### `packages/core/database/postgres.ts`
@@ -2943,6 +2872,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/database/index.ts`
   - `packages/core/executors/status-poller.ts`
   - `packages/core/infra/arkd-launcher.ts`
+  - `packages/core/infra/boot-cleanup.ts`
   - `packages/core/infra/compute-providers-boot.ts`
   - `packages/core/infra/conductor-launcher.ts`
   - `packages/core/infra/maintenance-pollers.ts`
@@ -2951,7 +2881,6 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/infra/service-wiring.ts`
   - `packages/core/infra/session-drain.ts`
   - `packages/core/infra/signal-handlers.ts`
-  - `packages/core/infra/stale-state-detector.ts`
   - `packages/core/infra/tensorzero-launcher.ts`
   - `packages/core/lifecycle.ts`
   - `packages/core/mcp-pool.ts`
@@ -2960,7 +2889,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/observability/usage.ts`
   - `packages/core/plugins/registry.ts`
   - `packages/core/repositories/session.ts`
-  - `packages/core/runtimes/agent-sdk/parser.ts`
+  - `packages/core/runtimes/claude-agent/parser.ts`
   - `packages/core/runtimes/claude/parser.ts`
   - `packages/core/runtimes/codex/parser.ts`
   - `packages/core/runtimes/gemini/parser.ts`
@@ -3082,23 +3011,26 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/executor.ts`
 
-- fan-in: 14
+- fan-in: 16
 - fan-out: 0
 
-### `packages/core/executors/agent-sdk.ts`
+### `packages/core/executors/claude-agent.ts`
 
 - fan-in: 1
-- fan-out: 4
+- fan-out: 7
 - imports:
+  - `packages/arkd/index.ts`
+  - `packages/core/claude/args.ts`
   - `packages/core/executor.ts`
-  - `packages/core/install-paths.ts`
-  - `packages/core/runtimes/agent-sdk/format.ts`
+  - `packages/core/observability/structured-log.ts`
+  - `packages/core/services/dispatch/target-lifecycle.ts`
+  - `packages/core/services/dispatch/target-resolver.ts`
   - `packages/core/services/worktree/index.ts`
 
 ### `packages/core/executors/claude-code.ts`
 
 - fan-in: 1
-- fan-out: 13
+- fan-out: 14
 - imports:
   - `packages/compute/arc-json.ts`
   - `packages/core/claude/claude.ts`
@@ -3110,6 +3042,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/install-paths.ts`
   - `packages/core/observability/structured-log.ts`
   - `packages/core/recordings.ts`
+  - `packages/core/send-reliable.ts`
   - `packages/core/services/dispatch/target-lifecycle.ts`
   - `packages/core/services/dispatch/target-resolver.ts`
   - `packages/core/services/worktree/index.ts`
@@ -3147,7 +3080,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - fan-out: 6
 - imports:
   - `packages/core/executor.ts`
-  - `packages/core/executors/agent-sdk.ts`
+  - `packages/core/executors/claude-agent.ts`
   - `packages/core/executors/claude-code.ts`
   - `packages/core/executors/cli-agent.ts`
   - `packages/core/executors/goose.ts`
@@ -3169,6 +3102,14 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/infra/tmux.ts`
   - `packages/core/observability/structured-log.ts`
 
+### `packages/core/executors/resolve.ts`
+
+- fan-in: 3
+- fan-out: 2
+- imports:
+  - `packages/core/app.ts`
+  - `packages/types/index.ts`
+
 ### `packages/core/executors/router-env.ts`
 
 - fan-in: 3
@@ -3179,10 +3120,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/executors/status-poller.ts`
 
-- fan-in: 5
-- fan-out: 5
+- fan-in: 6
+- fan-out: 6
 - imports:
   - `packages/core/app.ts`
+  - `packages/core/compute-resolver.ts`
   - `packages/core/executor.ts`
   - `packages/core/executors/process-tree.ts`
   - `packages/core/notify.ts`
@@ -3310,6 +3252,16 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/config.ts`
   - `packages/core/safe.ts`
 
+### `packages/core/infra/boot-cleanup.ts`
+
+- fan-in: 2
+- fan-out: 4
+- imports:
+  - `packages/core/app.ts`
+  - `packages/core/claude/claude.ts`
+  - `packages/core/observability/structured-log.ts`
+  - `packages/core/safe.ts`
+
 ### `packages/core/infra/compute-providers-boot.ts`
 
 - fan-in: 2
@@ -3424,19 +3376,6 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/app.ts`
   - `packages/core/observability/structured-log.ts`
 
-### `packages/core/infra/stale-state-detector.ts`
-
-- fan-in: 2
-- fan-out: 7
-- imports:
-  - `packages/core/app.ts`
-  - `packages/core/claude/claude.ts`
-  - `packages/core/infra/tmux.ts`
-  - `packages/core/observability/structured-log.ts`
-  - `packages/core/safe.ts`
-  - `packages/core/session/checkpoint.ts`
-  - `packages/types/index.ts`
-
 ### `packages/core/infra/tensorzero-launcher.ts`
 
 - fan-in: 3
@@ -3458,7 +3397,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/infra/tmux.ts`
 
-- fan-in: 16
+- fan-in: 14
 - fan-out: 1
 - imports:
   - `packages/core/observability/structured-log.ts`
@@ -3472,7 +3411,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/install-paths.ts`
 
-- fan-in: 11
+- fan-in: 10
 - fan-out: 1
 - imports:
   - `packages/core/observability/structured-log.ts`
@@ -4076,10 +4015,12 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/observability/costs.ts`
 
 - fan-in: 4
-- fan-out: 3
+- fan-out: 5
 - imports:
   - `packages/core/app.ts`
+  - `packages/core/executors/resolve.ts`
   - `packages/core/observability/pricing.ts`
+  - `packages/core/observability/structured-log.ts`
   - `packages/types/index.ts`
 
 ### `packages/core/observability/index.ts`
@@ -4107,16 +4048,9 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - fan-in: 7
 - fan-out: 0
 
-### `packages/core/observability/status-detect.ts`
-
-- fan-in: 1
-- fan-out: 1
-- imports:
-  - `packages/core/infra/tmux.ts`
-
 ### `packages/core/observability/structured-log.ts`
 
-- fan-in: 171
+- fan-in: 174
 - fan-out: 0
 
 ### `packages/core/observability/telemetry.ts`
@@ -4148,63 +4082,63 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/ports/clock.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 0
 
 ### `packages/core/ports/compute-store.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 1
 - imports:
   - `packages/types/index.ts`
 
 ### `packages/core/ports/event-bus.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 0
 
 ### `packages/core/ports/event-store.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 1
 - imports:
   - `packages/types/index.ts`
 
 ### `packages/core/ports/index.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 0
 
 ### `packages/core/ports/logger.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 0
 
 ### `packages/core/ports/process-runner.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 0
 
 ### `packages/core/ports/secret-store.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 0
 
 ### `packages/core/ports/session-store.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 1
 - imports:
   - `packages/types/index.ts`
 
 ### `packages/core/ports/tracer.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 0
 
 ### `packages/core/ports/workspace.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 1
 - imports:
   - `packages/types/index.ts`
@@ -4269,7 +4203,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/repositories/event.ts`
 
-- fan-in: 11
+- fan-in: 10
 - fan-out: 5
 - imports:
   - `packages/core/database/index.ts`
@@ -4450,36 +4384,50 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/observability/structured-log.ts`
   - `packages/core/router/tensorzero-config.ts`
 
-### `packages/core/runtimes/agent-sdk/format.ts`
+### `packages/core/runtimes/claude-agent/format.ts`
+
+- fan-in: 0
+- fan-out: 0
+
+### `packages/core/runtimes/claude-agent/intervention-tail.ts`
 
 - fan-in: 1
 - fan-out: 0
 
-### `packages/core/runtimes/agent-sdk/intervention-tail.ts`
+### `packages/core/runtimes/claude-agent/launch.ts`
 
 - fan-in: 1
-- fan-out: 0
-
-### `packages/core/runtimes/agent-sdk/launch.ts`
-
-- fan-in: 1
-- fan-out: 2
+- fan-out: 4
 - imports:
-  - `packages/core/runtimes/agent-sdk/intervention-tail.ts`
-  - `packages/core/runtimes/agent-sdk/mcp-ask-user.ts`
+  - `packages/core/runtimes/claude-agent/intervention-tail.ts`
+  - `packages/core/runtimes/claude-agent/mcp-ask-user.ts`
+  - `packages/core/runtimes/claude-agent/mcp-stage-control.ts`
+  - `packages/core/runtimes/claude-agent/user-message-stream.ts`
 
-### `packages/core/runtimes/agent-sdk/mcp-ask-user.ts`
+### `packages/core/runtimes/claude-agent/mcp-ask-user.ts`
 
 - fan-in: 1
 - fan-out: 0
 
-### `packages/core/runtimes/agent-sdk/parser.ts`
+### `packages/core/runtimes/claude-agent/mcp-stage-control.ts`
+
+- fan-in: 1
+- fan-out: 0
+
+### `packages/core/runtimes/claude-agent/parser.ts`
 
 - fan-in: 1
 - fan-out: 2
 - imports:
   - `packages/core/observability/structured-log.ts`
   - `packages/core/runtimes/transcript-parser.ts`
+
+### `packages/core/runtimes/claude-agent/user-message-stream.ts`
+
+- fan-in: 1
+- fan-out: 1
+- imports:
+  - `packages/arkd/index.ts`
 
 ### `packages/core/runtimes/claude/parser.ts`
 
@@ -4638,7 +4586,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/send-reliable.ts`
 
-- fan-in: 1
+- fan-in: 2
 - fan-out: 2
 - imports:
   - `packages/core/infra/tmux.ts`
@@ -4970,7 +4918,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/services/dispatch/target-lifecycle.ts`
 
-- fan-in: 1
+- fan-in: 2
 - fan-out: 5
 - imports:
   - `packages/compute/core/compute-target.ts`
@@ -4981,7 +4929,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/services/dispatch/target-resolver.ts`
 
-- fan-in: 1
+- fan-in: 2
 - fan-out: 6
 - imports:
   - `packages/compute/core/compute-target.ts`
@@ -5001,7 +4949,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/services/dispatch/types.ts`
 
-- fan-in: 21
+- fan-in: 22
 - fan-out: 16
 - imports:
   - `packages/core/config.ts`
@@ -5078,11 +5026,12 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/services/session-dispatch-listeners.ts`
 
 - fan-in: 5
-- fan-out: 4
+- fan-out: 5
 - imports:
   - `packages/core/observability/structured-log.ts`
   - `packages/core/repositories/event.ts`
   - `packages/core/repositories/session.ts`
+  - `packages/core/services/dispatch/types.ts`
   - `packages/types/index.ts`
 
 ### `packages/core/services/session-forensic.ts`
@@ -5104,10 +5053,9 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/services/session-hooks/hook-status.ts`
 
 - fan-in: 1
-- fan-out: 6
+- fan-out: 5
 - imports:
   - `packages/core/handoff.ts`
-  - `packages/core/observability/status-detect.ts`
   - `packages/core/observability/structured-log.ts`
   - `packages/core/services/session-hooks/types.ts`
   - `packages/core/termination.ts`
@@ -5153,9 +5101,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/core/services/session-output.ts`
 
 - fan-in: 3
-- fan-out: 5
+- fan-out: 7
 - imports:
   - `packages/core/app.ts`
+  - `packages/core/executor.ts`
+  - `packages/core/executors/resolve.ts`
   - `packages/core/observability/structured-log.ts`
   - `packages/core/recordings.ts`
   - `packages/core/send-reliable.ts`
@@ -5193,7 +5143,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/services/session/cleanup.ts`
 
-- fan-in: 2
+- fan-in: 3
 - fan-out: 4
 - imports:
   - `packages/core/app.ts`
@@ -5436,7 +5386,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/session/checkpoint.ts`
 
-- fan-in: 3
+- fan-in: 2
 - fan-out: 4
 - imports:
   - `packages/core/infra/tmux.ts`
@@ -6034,7 +5984,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/core/version.ts`
 
-- fan-in: 3
+- fan-in: 4
 - fan-out: 0
 
 ### `packages/core/workspace/manifest.ts`
@@ -6829,7 +6779,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/server/index.ts`
 
 - fan-in: 2
-- fan-out: 8
+- fan-out: 9
 - imports:
   - `packages/arkd/client.ts`
   - `packages/compute/adapters/provider-map.ts`
@@ -6838,7 +6788,110 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/core/observability/structured-log.ts`
   - `packages/protocol/transport.ts`
   - `packages/protocol/types.ts`
+  - `packages/server/mcp/index.ts`
   - `packages/server/router.ts`
+
+### `packages/server/mcp/index.ts`
+
+- fan-in: 1
+- fan-out: 7
+- imports:
+  - `packages/server/mcp/tools/agent.ts`
+  - `packages/server/mcp/tools/compute.ts`
+  - `packages/server/mcp/tools/flow.ts`
+  - `packages/server/mcp/tools/recipe.ts`
+  - `packages/server/mcp/tools/secrets.ts`
+  - `packages/server/mcp/tools/session.ts`
+  - `packages/server/mcp/tools/skill.ts`
+
+### `packages/server/mcp/registry.ts`
+
+- fan-in: 9
+- fan-out: 2
+- imports:
+  - `packages/core/app.ts`
+  - `packages/core/auth/context.ts`
+
+### `packages/server/mcp/server.ts`
+
+- fan-in: 1
+- fan-out: 4
+- imports:
+  - `packages/core/app.ts`
+  - `packages/core/auth/context.ts`
+  - `packages/core/version.ts`
+  - `packages/server/mcp/registry.ts`
+
+### `packages/server/mcp/tools/agent.ts`
+
+- fan-in: 1
+- fan-out: 2
+- imports:
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/transport.ts`
+
+### `packages/server/mcp/tools/compute.ts`
+
+- fan-in: 1
+- fan-out: 4
+- imports:
+  - `packages/compute/adapters/provider-map.ts`
+  - `packages/compute/index.ts`
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/transport.ts`
+
+### `packages/server/mcp/tools/flow.ts`
+
+- fan-in: 1
+- fan-out: 2
+- imports:
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/transport.ts`
+
+### `packages/server/mcp/tools/recipe.ts`
+
+- fan-in: 1
+- fan-out: 2
+- imports:
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/transport.ts`
+
+### `packages/server/mcp/tools/secrets.ts`
+
+- fan-in: 1
+- fan-out: 2
+- imports:
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/transport.ts`
+
+### `packages/server/mcp/tools/session.ts`
+
+- fan-in: 1
+- fan-out: 5
+- imports:
+  - `packages/core/executor.ts`
+  - `packages/core/services/session/cleanup.ts`
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/transport.ts`
+  - `packages/types/session.ts`
+
+### `packages/server/mcp/tools/skill.ts`
+
+- fan-in: 1
+- fan-out: 2
+- imports:
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/transport.ts`
+
+### `packages/server/mcp/transport.ts`
+
+- fan-in: 7
+- fan-out: 4
+- imports:
+  - `packages/core/app.ts`
+  - `packages/core/auth/context.ts`
+  - `packages/server/mcp/registry.ts`
+  - `packages/server/mcp/server.ts`
 
 ### `packages/server/register.ts`
 
@@ -6939,7 +6992,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/types/index.ts`
 
-- fan-in: 107
+- fan-in: 103
 - fan-out: 0
 
 ### `packages/types/message.ts`
@@ -6967,7 +7020,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/types/session.ts`
 
-- fan-in: 5
+- fan-in: 6
 - fan-out: 0
 
 ### `packages/types/tenant.ts`
@@ -7838,6 +7891,14 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/web/src/hooks/useApi.ts`
   - `packages/web/src/lib/utils.ts`
 
+### `packages/web/src/components/session/StageGroupHeader.tsx`
+
+- fan-in: 1
+- fan-out: 2
+- imports:
+  - `packages/web/src/components/session/timeline-builder.ts`
+  - `packages/web/src/lib/utils.ts`
+
 ### `packages/web/src/components/session/TabFooter.tsx`
 
 - fan-in: 1
@@ -7919,9 +7980,10 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/components/session/tabs/ConversationTab.tsx`
 
 - fan-in: 1
-- fan-out: 14
+- fan-out: 15
 - imports:
   - `packages/web/src/components/session/AttachedFiles.tsx`
+  - `packages/web/src/components/session/StageGroupHeader.tsx`
   - `packages/web/src/components/session/event-builder.tsx`
   - `packages/web/src/components/session/timeline-builder.ts`
   - `packages/web/src/components/session/tool-block/index.tsx`
@@ -7993,7 +8055,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/web/src/components/session/timeline-builder.ts`
 
-- fan-in: 5
+- fan-in: 6
 - fan-out: 4
 - imports:
   - `packages/web/src/components/ui/DiffViewer.tsx`
@@ -8608,7 +8670,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/web/src/lib/utils.ts`
 
-- fan-in: 94
+- fan-in: 95
 - fan-out: 0
 
 ### `packages/web/src/pages/AdminPage.tsx`
