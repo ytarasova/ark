@@ -278,15 +278,6 @@ export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./inf
 // Global search
 export { searchAllConversations, type GlobalSearchResult } from "./search/global-search.js";
 
-// Tmux content-based status detection
-export {
-  detectStatusFromContent,
-  detectSessionStatus,
-  stripAnsi,
-  parseAgentProgress,
-  type DetectedStatus,
-} from "./observability/status-detect.js";
-
 // Multi-instance coordination
 export { registerInstance, activeInstanceCount } from "./infra/instance-lock.js";
 

@@ -1117,7 +1117,7 @@
     {
       "method": "input/read",
       "file": "packages/server/handlers/session.ts",
-      "line": 63,
+      "line": 81,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1128,7 +1128,7 @@
     {
       "method": "input/upload",
       "file": "packages/server/handlers/session.ts",
-      "line": 52,
+      "line": 70,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1684,7 +1684,7 @@
     {
       "method": "session/advance",
       "file": "packages/server/handlers/session.ts",
-      "line": 90,
+      "line": 108,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1695,7 +1695,7 @@
     {
       "method": "session/archive",
       "file": "packages/server/handlers/session.ts",
-      "line": 535,
+      "line": 554,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1706,21 +1706,21 @@
     {
       "method": "session/artifacts/list",
       "file": "packages/server/handlers/session.ts",
-      "line": 704,
+      "line": 723,
       "hasZodSchema": false,
       "callerFiles": []
     },
     {
       "method": "session/artifacts/query",
       "file": "packages/server/handlers/session.ts",
-      "line": 711,
+      "line": 730,
       "hasZodSchema": false,
       "callerFiles": []
     },
     {
       "method": "session/attach-command",
       "file": "packages/server/handlers/session.ts",
-      "line": 561,
+      "line": 580,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1731,7 +1731,7 @@
     {
       "method": "session/clone",
       "file": "packages/server/handlers/session.ts",
-      "line": 150,
+      "line": 168,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1742,7 +1742,7 @@
     {
       "method": "session/complete",
       "file": "packages/server/handlers/session.ts",
-      "line": 105,
+      "line": 123,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1753,7 +1753,7 @@
     {
       "method": "session/conversation",
       "file": "packages/server/handlers/session.ts",
-      "line": 251,
+      "line": 269,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1764,7 +1764,7 @@
     {
       "method": "session/delete",
       "file": "packages/server/handlers/session.ts",
-      "line": 118,
+      "line": 136,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1775,7 +1775,7 @@
     {
       "method": "session/events",
       "file": "packages/server/handlers/session.ts",
-      "line": 230,
+      "line": 248,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1786,7 +1786,7 @@
     {
       "method": "session/export",
       "file": "packages/server/handlers/session.ts",
-      "line": 689,
+      "line": 708,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1805,7 +1805,7 @@
     {
       "method": "session/fan-out",
       "file": "packages/server/handlers/session.ts",
-      "line": 349,
+      "line": 367,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1814,7 +1814,7 @@
     {
       "method": "session/flowStages",
       "file": "packages/server/handlers/session.ts",
-      "line": 399,
+      "line": 417,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/web/src/hooks/useApi.ts"
@@ -1823,7 +1823,7 @@
     {
       "method": "session/fork",
       "file": "packages/server/handlers/session.ts",
-      "line": 135,
+      "line": 153,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1834,7 +1834,7 @@
     {
       "method": "session/handoff",
       "file": "packages/server/handlers/session.ts",
-      "line": 317,
+      "line": 335,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1853,7 +1853,7 @@
     {
       "method": "session/inject",
       "file": "packages/server/handlers/session.ts",
-      "line": 737,
+      "line": 756,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts"
@@ -1862,7 +1862,7 @@
     {
       "method": "session/interrupt",
       "file": "packages/server/handlers/session.ts",
-      "line": 441,
+      "line": 459,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1873,7 +1873,7 @@
     {
       "method": "session/join",
       "file": "packages/server/handlers/session.ts",
-      "line": 326,
+      "line": 344,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1882,7 +1882,7 @@
     {
       "method": "session/kill",
       "file": "packages/server/handlers/session.ts",
-      "line": 482,
+      "line": 501,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts"
@@ -1891,7 +1891,7 @@
     {
       "method": "session/list",
       "file": "packages/server/handlers/session.ts",
-      "line": 175,
+      "line": 193,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1903,7 +1903,7 @@
     {
       "method": "session/list_children",
       "file": "packages/server/handlers/session.ts",
-      "line": 188,
+      "line": 206,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/web/src/hooks/useApi.ts"
@@ -1912,7 +1912,7 @@
     {
       "method": "session/messages",
       "file": "packages/server/handlers/session.ts",
-      "line": 237,
+      "line": 255,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1923,7 +1923,7 @@
     {
       "method": "session/output",
       "file": "packages/server/handlers/session.ts",
-      "line": 265,
+      "line": 283,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1934,7 +1934,7 @@
     {
       "method": "session/pause",
       "file": "packages/server/handlers/session.ts",
-      "line": 414,
+      "line": 432,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1945,7 +1945,7 @@
     {
       "method": "session/read",
       "file": "packages/server/handlers/session.ts",
-      "line": 211,
+      "line": 229,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1956,7 +1956,7 @@
     {
       "method": "session/recording",
       "file": "packages/server/handlers/session.ts",
-      "line": 309,
+      "line": 327,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1966,7 +1966,7 @@
     {
       "method": "session/replay",
       "file": "packages/server/handlers/session.ts",
-      "line": 720,
+      "line": 739,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1975,7 +1975,7 @@
     {
       "method": "session/restore",
       "file": "packages/server/handlers/session.ts",
-      "line": 543,
+      "line": 562,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1986,7 +1986,7 @@
     {
       "method": "session/resume",
       "file": "packages/server/handlers/session.ts",
-      "line": 366,
+      "line": 384,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1997,7 +1997,7 @@
     {
       "method": "session/search",
       "file": "packages/server/handlers/session.ts",
-      "line": 244,
+      "line": 262,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session.ts"
@@ -2006,7 +2006,7 @@
     {
       "method": "session/search-conversation",
       "file": "packages/server/handlers/session.ts",
-      "line": 258,
+      "line": 276,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session.ts"
@@ -2015,7 +2015,7 @@
     {
       "method": "session/spawn",
       "file": "packages/server/handlers/session.ts",
-      "line": 333,
+      "line": 351,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2037,7 +2037,7 @@
     {
       "method": "session/stdio",
       "file": "packages/server/handlers/session.ts",
-      "line": 278,
+      "line": 296,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -2047,7 +2047,7 @@
     {
       "method": "session/stop",
       "file": "packages/server/handlers/session.ts",
-      "line": 80,
+      "line": 98,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2058,7 +2058,7 @@
     {
       "method": "session/transcript",
       "file": "packages/server/handlers/session.ts",
-      "line": 296,
+      "line": 314,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -2068,7 +2068,7 @@
     {
       "method": "session/tree",
       "file": "packages/server/handlers/session.ts",
-      "line": 195,
+      "line": 213,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/web/src/hooks/useApi.ts"
@@ -2077,7 +2077,7 @@
     {
       "method": "session/undelete",
       "file": "packages/server/handlers/session.ts",
-      "line": 126,
+      "line": 144,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2098,7 +2098,7 @@
     {
       "method": "session/update",
       "file": "packages/server/handlers/session.ts",
-      "line": 162,
+      "line": 180,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session.ts"
@@ -2159,7 +2159,7 @@
     {
       "method": "todo/add",
       "file": "packages/server/handlers/session.ts",
-      "line": 660,
+      "line": 679,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2170,7 +2170,7 @@
     {
       "method": "todo/delete",
       "file": "packages/server/handlers/session.ts",
-      "line": 673,
+      "line": 692,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2181,7 +2181,7 @@
     {
       "method": "todo/list",
       "file": "packages/server/handlers/session.ts",
-      "line": 654,
+      "line": 673,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2192,7 +2192,7 @@
     {
       "method": "todo/toggle",
       "file": "packages/server/handlers/session.ts",
-      "line": 666,
+      "line": 685,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2301,7 +2301,7 @@
     {
       "method": "verify/run",
       "file": "packages/server/handlers/session.ts",
-      "line": 681,
+      "line": 700,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2385,7 +2385,7 @@
     {
       "method": "worktree/create-pr",
       "file": "packages/server/handlers/session.ts",
-      "line": 627,
+      "line": 646,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2396,7 +2396,7 @@
     {
       "method": "worktree/diff",
       "file": "packages/server/handlers/session.ts",
-      "line": 621,
+      "line": 640,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2407,7 +2407,7 @@
     {
       "method": "worktree/finish",
       "file": "packages/server/handlers/session.ts",
-      "line": 642,
+      "line": 661,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2452,7 +2452,9 @@
       "importedBy": [
         "packages/cli/commands/daemon.ts",
         "packages/cli/commands/misc/arkd.ts",
-        "packages/cli/services/web-probe.ts"
+        "packages/cli/services/web-probe.ts",
+        "packages/core/executors/claude-agent.ts",
+        "packages/core/runtimes/claude-agent/user-message-stream.ts"
       ]
     },
     {
@@ -2462,11 +2464,12 @@
         "packages/arkd/routes/agent.ts",
         "packages/arkd/routes/attach.ts",
         "packages/arkd/routes/channel.ts",
-        "packages/arkd/routes/events.ts",
+        "packages/arkd/routes/channels.ts",
         "packages/arkd/routes/exec.ts",
         "packages/arkd/routes/file.ts",
         "packages/arkd/routes/metrics-snapshot.ts",
         "packages/arkd/routes/misc.ts",
+        "packages/arkd/routes/process.ts",
         "packages/arkd/server.ts"
       ]
     },
@@ -2495,7 +2498,7 @@
       "path": "packages/arkd/routes/channel.ts",
       "imports": [
         "packages/arkd/internal.ts",
-        "packages/arkd/routes/events.ts",
+        "packages/arkd/routes/channels.ts",
         "packages/arkd/types.ts",
         "packages/core/constants.ts"
       ],
@@ -2504,7 +2507,7 @@
       ]
     },
     {
-      "path": "packages/arkd/routes/events.ts",
+      "path": "packages/arkd/routes/channels.ts",
       "imports": [
         "packages/arkd/internal.ts",
         "packages/core/observability/structured-log.ts"
@@ -2557,17 +2560,29 @@
       ]
     },
     {
+      "path": "packages/arkd/routes/process.ts",
+      "imports": [
+        "packages/arkd/internal.ts",
+        "packages/arkd/types.ts",
+        "packages/core/observability/structured-log.ts"
+      ],
+      "importedBy": [
+        "packages/arkd/server.ts"
+      ]
+    },
+    {
       "path": "packages/arkd/server.ts",
       "imports": [
         "packages/arkd/internal.ts",
         "packages/arkd/routes/agent.ts",
         "packages/arkd/routes/attach.ts",
         "packages/arkd/routes/channel.ts",
-        "packages/arkd/routes/events.ts",
+        "packages/arkd/routes/channels.ts",
         "packages/arkd/routes/exec.ts",
         "packages/arkd/routes/file.ts",
         "packages/arkd/routes/metrics-snapshot.ts",
         "packages/arkd/routes/misc.ts",
+        "packages/arkd/routes/process.ts",
         "packages/arkd/types.ts",
         "packages/core/observability/structured-log.ts"
       ],
@@ -2587,6 +2602,7 @@
         "packages/arkd/routes/file.ts",
         "packages/arkd/routes/metrics-snapshot.ts",
         "packages/arkd/routes/misc.ts",
+        "packages/arkd/routes/process.ts",
         "packages/arkd/server.ts"
       ]
     },
@@ -2636,6 +2652,7 @@
         "packages/cli/commands/team.ts",
         "packages/cli/commands/tenant-config.ts",
         "packages/cli/commands/tenant.ts",
+        "packages/cli/commands/token.ts",
         "packages/cli/commands/user.ts",
         "packages/cli/commands/workspace.ts",
         "packages/cli/commands/worktree.ts",
@@ -3010,7 +3027,7 @@
     {
       "path": "packages/cli/commands/misc/run-agent-sdk.ts",
       "imports": [
-        "packages/core/runtimes/agent-sdk/launch.ts"
+        "packages/core/runtimes/claude-agent/launch.ts"
       ],
       "importedBy": [
         "packages/cli/commands/misc/index.ts"
@@ -3259,6 +3276,16 @@
       ]
     },
     {
+      "path": "packages/cli/commands/token.ts",
+      "imports": [
+        "packages/cli/app-client.ts",
+        "packages/core/config.ts"
+      ],
+      "importedBy": [
+        "packages/cli/index.ts"
+      ]
+    },
+    {
       "path": "packages/cli/commands/trigger.ts",
       "imports": [
         "packages/cli/commands/_shared.ts"
@@ -3362,6 +3389,7 @@
         "packages/cli/commands/team.ts",
         "packages/cli/commands/tenant-config.ts",
         "packages/cli/commands/tenant.ts",
+        "packages/cli/commands/token.ts",
         "packages/cli/commands/trigger.ts",
         "packages/cli/commands/user.ts",
         "packages/cli/commands/workspace.ts",
@@ -3445,7 +3473,8 @@
         "packages/server/handlers/metrics.ts",
         "packages/server/handlers/resource-compute.ts",
         "packages/server/handlers/session.ts",
-        "packages/server/index.ts"
+        "packages/server/index.ts",
+        "packages/server/mcp/tools/compute.ts"
       ]
     },
     {
@@ -3780,7 +3809,8 @@
         "packages/core/infra/metrics-poller.ts",
         "packages/core/services/compute-lifecycle.ts",
         "packages/server/handlers/metrics.ts",
-        "packages/server/handlers/resource-compute.ts"
+        "packages/server/handlers/resource-compute.ts",
+        "packages/server/mcp/tools/compute.ts"
       ]
     },
     {
@@ -4186,119 +4216,6 @@
       "importedBy": []
     },
     {
-      "path": "packages/core/adapters/control-plane/clock.ts",
-      "imports": [
-        "packages/core/ports/clock.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/compute-store.ts",
-      "imports": [
-        "packages/core/ports/compute-store.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/event-bus.ts",
-      "imports": [
-        "packages/core/ports/event-bus.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/event-store.ts",
-      "imports": [
-        "packages/core/database/index.ts",
-        "packages/core/ports/event-store.ts",
-        "packages/core/repositories/event.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/index.ts",
-      "imports": [
-        "packages/core/adapters/control-plane/clock.ts",
-        "packages/core/adapters/control-plane/compute-store.ts",
-        "packages/core/adapters/control-plane/event-bus.ts",
-        "packages/core/adapters/control-plane/event-store.ts",
-        "packages/core/adapters/control-plane/logger.ts",
-        "packages/core/adapters/control-plane/process-runner.ts",
-        "packages/core/adapters/control-plane/secret-store.ts",
-        "packages/core/adapters/control-plane/session-store.ts",
-        "packages/core/adapters/control-plane/tracer.ts",
-        "packages/core/adapters/control-plane/workspace.ts",
-        "packages/core/ports/index.ts"
-      ],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/adapters/control-plane/logger.ts",
-      "imports": [
-        "packages/core/ports/logger.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/process-runner.ts",
-      "imports": [
-        "packages/core/ports/process-runner.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/secret-store.ts",
-      "imports": [
-        "packages/core/ports/secret-store.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/session-store.ts",
-      "imports": [
-        "packages/core/ports/session-store.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/tracer.ts",
-      "imports": [
-        "packages/core/ports/tracer.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/control-plane/workspace.ts",
-      "imports": [
-        "packages/core/ports/workspace.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/control-plane/index.ts"
-      ]
-    },
-    {
       "path": "packages/core/adapters/local/clock.ts",
       "imports": [
         "packages/core/ports/clock.ts"
@@ -4590,6 +4507,7 @@
         "packages/core/code-intel/store.ts",
         "packages/core/compute-registries.ts",
         "packages/core/compute-resolver.ts",
+        "packages/core/conductor/arkd-events-consumer.ts",
         "packages/core/config.ts",
         "packages/core/container.ts",
         "packages/core/database/index.ts",
@@ -4598,6 +4516,8 @@
         "packages/core/di/seed-builtins.ts",
         "packages/core/drizzle/index.ts",
         "packages/core/executors/noop.ts",
+        "packages/core/executors/resolve.ts",
+        "packages/core/executors/status-poller.ts",
         "packages/core/hooks.ts",
         "packages/core/hosted/scheduler.ts",
         "packages/core/hosted/worker-registry.ts",
@@ -4673,10 +4593,12 @@
         "packages/core/di/runtime.ts",
         "packages/core/di/seed-builtins.ts",
         "packages/core/di/services.ts",
+        "packages/core/executors/resolve.ts",
         "packages/core/executors/status-poller.ts",
         "packages/core/hosted/scheduler.ts",
         "packages/core/hosted/server.ts",
         "packages/core/hosted/web.ts",
+        "packages/core/infra/boot-cleanup.ts",
         "packages/core/infra/compute-providers-boot.ts",
         "packages/core/infra/conductor-launcher.ts",
         "packages/core/infra/instance-lock.ts",
@@ -4686,7 +4608,6 @@
         "packages/core/infra/service-wiring.ts",
         "packages/core/infra/session-drain.ts",
         "packages/core/infra/signal-handlers.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/infra/tmux-notify.ts",
         "packages/core/integrations/bridge.ts",
         "packages/core/integrations/github-pr.ts",
@@ -4771,6 +4692,9 @@
         "packages/server/handlers/web.ts",
         "packages/server/handlers/webhooks.ts",
         "packages/server/handlers/workspace.ts",
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/server.ts",
+        "packages/server/mcp/transport.ts",
         "packages/server/register.ts"
       ]
     },
@@ -4802,6 +4726,9 @@
         "packages/server/handlers/scope-helpers.ts",
         "packages/server/handlers/tenant-auth.ts",
         "packages/server/index.ts",
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/server.ts",
+        "packages/server/mcp/transport.ts",
         "packages/server/router.ts"
       ]
     },
@@ -4888,7 +4815,8 @@
         "packages/core/claude/model.ts"
       ],
       "importedBy": [
-        "packages/core/claude/launcher.ts"
+        "packages/core/claude/launcher.ts",
+        "packages/core/executors/claude-agent.ts"
       ]
     },
     {
@@ -4908,7 +4836,7 @@
         "packages/core/agent/agent.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/goose.ts",
-        "packages/core/infra/stale-state-detector.ts",
+        "packages/core/infra/boot-cleanup.ts",
         "packages/core/services/session/terminate.ts",
         "packages/core/services/worktree/setup.ts",
         "packages/core/tools/claude-driver.ts",
@@ -5752,6 +5680,7 @@
       ],
       "importedBy": [
         "packages/core/app.ts",
+        "packages/core/executors/status-poller.ts",
         "packages/core/services/worktree/pr.ts"
       ]
     },
@@ -5785,7 +5714,8 @@
       ],
       "importedBy": [
         "packages/compute/core/ec2.ts",
-        "packages/compute/providers/remote-arkd.ts"
+        "packages/compute/providers/remote-arkd.ts",
+        "packages/core/app.ts"
       ]
     },
     {
@@ -5994,6 +5924,7 @@
         "packages/cli/commands/server-daemon.ts",
         "packages/cli/commands/server.ts",
         "packages/cli/commands/session/view.ts",
+        "packages/cli/commands/token.ts",
         "packages/cli/commands/workspace.ts",
         "packages/core/app.ts",
         "packages/core/container.ts",
@@ -6220,6 +6151,7 @@
         "packages/core/hosted/scheduler.ts",
         "packages/core/hosted/worker-registry.ts",
         "packages/core/infra/arkd-launcher.ts",
+        "packages/core/infra/boot-cleanup.ts",
         "packages/core/infra/compute-providers-boot.ts",
         "packages/core/infra/conductor-launcher.ts",
         "packages/core/infra/maintenance-pollers.ts",
@@ -6228,7 +6160,6 @@
         "packages/core/infra/service-wiring.ts",
         "packages/core/infra/session-drain.ts",
         "packages/core/infra/signal-handlers.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/infra/tensorzero-launcher.ts",
         "packages/core/knowledge/store.ts",
         "packages/core/lifecycle.ts",
@@ -6280,7 +6211,6 @@
       "path": "packages/core/database/index.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/event-store.ts",
         "packages/core/adapters/local/event-store.ts",
         "packages/core/app.ts",
         "packages/core/auth/api-keys.ts",
@@ -6457,6 +6387,7 @@
         "packages/core/database/index.ts",
         "packages/core/executors/status-poller.ts",
         "packages/core/infra/arkd-launcher.ts",
+        "packages/core/infra/boot-cleanup.ts",
         "packages/core/infra/compute-providers-boot.ts",
         "packages/core/infra/conductor-launcher.ts",
         "packages/core/infra/maintenance-pollers.ts",
@@ -6465,7 +6396,6 @@
         "packages/core/infra/service-wiring.ts",
         "packages/core/infra/session-drain.ts",
         "packages/core/infra/signal-handlers.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/infra/tensorzero-launcher.ts",
         "packages/core/lifecycle.ts",
         "packages/core/mcp-pool.ts",
@@ -6474,7 +6404,7 @@
         "packages/core/observability/usage.ts",
         "packages/core/plugins/registry.ts",
         "packages/core/repositories/session.ts",
-        "packages/core/runtimes/agent-sdk/parser.ts",
+        "packages/core/runtimes/claude-agent/parser.ts",
         "packages/core/runtimes/claude/parser.ts",
         "packages/core/runtimes/codex/parser.ts",
         "packages/core/runtimes/gemini/parser.ts",
@@ -6642,7 +6572,7 @@
       "imports": [],
       "importedBy": [
         "packages/core/di/services.ts",
-        "packages/core/executors/agent-sdk.ts",
+        "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/cli-agent.ts",
         "packages/core/executors/goose.ts",
@@ -6654,15 +6584,20 @@
         "packages/core/infra/service-wiring.ts",
         "packages/core/plugins/registry.ts",
         "packages/core/services/dispatch/launch.ts",
-        "packages/server/handlers/session.ts"
+        "packages/core/services/session-output.ts",
+        "packages/server/handlers/session.ts",
+        "packages/server/mcp/tools/session.ts"
       ]
     },
     {
-      "path": "packages/core/executors/agent-sdk.ts",
+      "path": "packages/core/executors/claude-agent.ts",
       "imports": [
+        "packages/arkd/index.ts",
+        "packages/core/claude/args.ts",
         "packages/core/executor.ts",
-        "packages/core/install-paths.ts",
-        "packages/core/runtimes/agent-sdk/format.ts",
+        "packages/core/observability/structured-log.ts",
+        "packages/core/services/dispatch/target-lifecycle.ts",
+        "packages/core/services/dispatch/target-resolver.ts",
         "packages/core/services/worktree/index.ts"
       ],
       "importedBy": [
@@ -6682,6 +6617,7 @@
         "packages/core/install-paths.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/recordings.ts",
+        "packages/core/send-reliable.ts",
         "packages/core/services/dispatch/target-lifecycle.ts",
         "packages/core/services/dispatch/target-resolver.ts",
         "packages/core/services/worktree/index.ts"
@@ -6725,7 +6661,7 @@
       "path": "packages/core/executors/index.ts",
       "imports": [
         "packages/core/executor.ts",
-        "packages/core/executors/agent-sdk.ts",
+        "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/cli-agent.ts",
         "packages/core/executors/goose.ts",
@@ -6757,6 +6693,18 @@
       ]
     },
     {
+      "path": "packages/core/executors/resolve.ts",
+      "imports": [
+        "packages/core/app.ts",
+        "packages/types/index.ts"
+      ],
+      "importedBy": [
+        "packages/core/app.ts",
+        "packages/core/observability/costs.ts",
+        "packages/core/services/session-output.ts"
+      ]
+    },
+    {
       "path": "packages/core/executors/router-env.ts",
       "imports": [
         "packages/core/config.ts",
@@ -6772,12 +6720,14 @@
       "path": "packages/core/executors/status-poller.ts",
       "imports": [
         "packages/core/app.ts",
+        "packages/core/compute-resolver.ts",
         "packages/core/executor.ts",
         "packages/core/executors/process-tree.ts",
         "packages/core/notify.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
+        "packages/core/app.ts",
         "packages/core/container.ts",
         "packages/core/di/runtime.ts",
         "packages/core/di/services.ts",
@@ -6967,6 +6917,19 @@
       ]
     },
     {
+      "path": "packages/core/infra/boot-cleanup.ts",
+      "imports": [
+        "packages/core/app.ts",
+        "packages/core/claude/claude.ts",
+        "packages/core/observability/structured-log.ts",
+        "packages/core/safe.ts"
+      ],
+      "importedBy": [
+        "packages/core/container.ts",
+        "packages/core/di/runtime.ts"
+      ]
+    },
+    {
       "path": "packages/core/infra/compute-providers-boot.ts",
       "imports": [
         "packages/compute/core/ec2.ts",
@@ -7107,22 +7070,6 @@
       ]
     },
     {
-      "path": "packages/core/infra/stale-state-detector.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/claude/claude.ts",
-        "packages/core/infra/tmux.ts",
-        "packages/core/observability/structured-log.ts",
-        "packages/core/safe.ts",
-        "packages/core/session/checkpoint.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/container.ts",
-        "packages/core/di/runtime.ts"
-      ]
-    },
-    {
       "path": "packages/core/infra/tensorzero-launcher.ts",
       "imports": [
         "packages/core/config.ts",
@@ -7159,9 +7106,7 @@
         "packages/core/executors/cli-agent.ts",
         "packages/core/executors/goose.ts",
         "packages/core/executors/process-tree.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/infra/tmux-notify.ts",
-        "packages/core/observability/status-detect.ts",
         "packages/core/prereqs.ts",
         "packages/core/send-reliable.ts",
         "packages/core/services/session/suspend.ts",
@@ -7188,7 +7133,6 @@
         "packages/core/claude/mcp-config.ts",
         "packages/core/di/persistence.ts",
         "packages/core/di/seed-builtins.ts",
-        "packages/core/executors/agent-sdk.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/hosted/web-proxy.ts",
         "packages/core/hosted/web.ts",
@@ -7980,7 +7924,9 @@
       "path": "packages/core/observability/costs.ts",
       "imports": [
         "packages/core/app.ts",
+        "packages/core/executors/resolve.ts",
         "packages/core/observability/pricing.ts",
+        "packages/core/observability/structured-log.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -8032,22 +7978,14 @@
       ]
     },
     {
-      "path": "packages/core/observability/status-detect.ts",
-      "imports": [
-        "packages/core/infra/tmux.ts"
-      ],
-      "importedBy": [
-        "packages/core/services/session-hooks/hook-status.ts"
-      ]
-    },
-    {
       "path": "packages/core/observability/structured-log.ts",
       "imports": [],
       "importedBy": [
         "packages/arkd/routes/attach.ts",
-        "packages/arkd/routes/events.ts",
+        "packages/arkd/routes/channels.ts",
         "packages/arkd/routes/file.ts",
         "packages/arkd/routes/metrics-snapshot.ts",
+        "packages/arkd/routes/process.ts",
         "packages/arkd/server.ts",
         "packages/cli/app-client.ts",
         "packages/cli/commands/compute/lifecycle.ts",
@@ -8100,6 +8038,7 @@
         "packages/core/di/runtime.ts",
         "packages/core/di/seed-builtins.ts",
         "packages/core/di/services.ts",
+        "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/cli-agent.ts",
         "packages/core/executors/process-tree.ts",
@@ -8109,13 +8048,13 @@
         "packages/core/hosted/sse-bus.ts",
         "packages/core/hosted/sse-redis.ts",
         "packages/core/hosted/web.ts",
+        "packages/core/infra/boot-cleanup.ts",
         "packages/core/infra/compute-providers-boot.ts",
         "packages/core/infra/instance-lock.ts",
         "packages/core/infra/maintenance-pollers.ts",
         "packages/core/infra/service-wiring.ts",
         "packages/core/infra/session-drain.ts",
         "packages/core/infra/signal-handlers.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/infra/tensorzero-launcher.ts",
         "packages/core/infra/tmux-notify.ts",
         "packages/core/infra/tmux.ts",
@@ -8148,6 +8087,7 @@
         "packages/core/migrations/012_isolation_kind_rename_sqlite.ts",
         "packages/core/modes/local-app-mode.ts",
         "packages/core/notify.ts",
+        "packages/core/observability/costs.ts",
         "packages/core/observability/log-manager.ts",
         "packages/core/observability/otlp.ts",
         "packages/core/observability/telemetry.ts",
@@ -8156,7 +8096,7 @@
         "packages/core/repositories/schema-postgres.ts",
         "packages/core/repositories/schema.ts",
         "packages/core/router/tensorzero.ts",
-        "packages/core/runtimes/agent-sdk/parser.ts",
+        "packages/core/runtimes/claude-agent/parser.ts",
         "packages/core/runtimes/claude/parser.ts",
         "packages/core/runtimes/codex/parser.ts",
         "packages/core/runtimes/gemini/parser.ts",
@@ -8272,7 +8212,6 @@
       "path": "packages/core/ports/clock.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/clock.ts",
         "packages/core/adapters/local/clock.ts",
         "packages/core/adapters/test/clock.ts"
       ]
@@ -8283,7 +8222,6 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/adapters/control-plane/compute-store.ts",
         "packages/core/adapters/local/compute-store.ts",
         "packages/core/adapters/test/compute-store.ts"
       ]
@@ -8292,7 +8230,6 @@
       "path": "packages/core/ports/event-bus.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/event-bus.ts",
         "packages/core/adapters/local/event-bus.ts",
         "packages/core/adapters/test/event-bus.ts"
       ]
@@ -8303,7 +8240,6 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/adapters/control-plane/event-store.ts",
         "packages/core/adapters/local/event-store.ts",
         "packages/core/adapters/test/event-store.ts"
       ]
@@ -8312,7 +8248,6 @@
       "path": "packages/core/ports/index.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/index.ts",
         "packages/core/adapters/local/index.ts",
         "packages/core/adapters/test/index.ts"
       ]
@@ -8321,7 +8256,6 @@
       "path": "packages/core/ports/logger.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/logger.ts",
         "packages/core/adapters/local/logger.ts",
         "packages/core/adapters/test/logger.ts"
       ]
@@ -8330,7 +8264,6 @@
       "path": "packages/core/ports/process-runner.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/process-runner.ts",
         "packages/core/adapters/local/process-runner.ts",
         "packages/core/adapters/test/process-runner.ts"
       ]
@@ -8339,7 +8272,6 @@
       "path": "packages/core/ports/secret-store.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/secret-store.ts",
         "packages/core/adapters/local/secret-store.ts",
         "packages/core/adapters/test/secret-store.ts"
       ]
@@ -8350,7 +8282,6 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/adapters/control-plane/session-store.ts",
         "packages/core/adapters/local/session-store.ts",
         "packages/core/adapters/test/session-store.ts"
       ]
@@ -8359,7 +8290,6 @@
       "path": "packages/core/ports/tracer.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/control-plane/tracer.ts",
         "packages/core/adapters/local/tracer.ts",
         "packages/core/adapters/test/tracer.ts"
       ]
@@ -8370,7 +8300,6 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/adapters/control-plane/workspace.ts",
         "packages/core/adapters/local/workspace.ts",
         "packages/core/adapters/test/workspace.ts"
       ]
@@ -8477,7 +8406,6 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/adapters/control-plane/event-store.ts",
         "packages/core/adapters/local/event-store.ts",
         "packages/core/container.ts",
         "packages/core/di/services.ts",
@@ -8727,44 +8655,60 @@
       ]
     },
     {
-      "path": "packages/core/runtimes/agent-sdk/format.ts",
+      "path": "packages/core/runtimes/claude-agent/format.ts",
+      "imports": [],
+      "importedBy": []
+    },
+    {
+      "path": "packages/core/runtimes/claude-agent/intervention-tail.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/executors/agent-sdk.ts"
+        "packages/core/runtimes/claude-agent/launch.ts"
       ]
     },
     {
-      "path": "packages/core/runtimes/agent-sdk/intervention-tail.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/runtimes/agent-sdk/launch.ts"
-      ]
-    },
-    {
-      "path": "packages/core/runtimes/agent-sdk/launch.ts",
+      "path": "packages/core/runtimes/claude-agent/launch.ts",
       "imports": [
-        "packages/core/runtimes/agent-sdk/intervention-tail.ts",
-        "packages/core/runtimes/agent-sdk/mcp-ask-user.ts"
+        "packages/core/runtimes/claude-agent/intervention-tail.ts",
+        "packages/core/runtimes/claude-agent/mcp-ask-user.ts",
+        "packages/core/runtimes/claude-agent/mcp-stage-control.ts",
+        "packages/core/runtimes/claude-agent/user-message-stream.ts"
       ],
       "importedBy": [
         "packages/cli/commands/misc/run-agent-sdk.ts"
       ]
     },
     {
-      "path": "packages/core/runtimes/agent-sdk/mcp-ask-user.ts",
+      "path": "packages/core/runtimes/claude-agent/mcp-ask-user.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/runtimes/agent-sdk/launch.ts"
+        "packages/core/runtimes/claude-agent/launch.ts"
       ]
     },
     {
-      "path": "packages/core/runtimes/agent-sdk/parser.ts",
+      "path": "packages/core/runtimes/claude-agent/mcp-stage-control.ts",
+      "imports": [],
+      "importedBy": [
+        "packages/core/runtimes/claude-agent/launch.ts"
+      ]
+    },
+    {
+      "path": "packages/core/runtimes/claude-agent/parser.ts",
       "imports": [
         "packages/core/observability/structured-log.ts",
         "packages/core/runtimes/transcript-parser.ts"
       ],
       "importedBy": [
         "packages/core/di/runtime.ts"
+      ]
+    },
+    {
+      "path": "packages/core/runtimes/claude-agent/user-message-stream.ts",
+      "imports": [
+        "packages/arkd/index.ts"
+      ],
+      "importedBy": [
+        "packages/core/runtimes/claude-agent/launch.ts"
       ]
     },
     {
@@ -8807,7 +8751,7 @@
         "packages/core/container.ts",
         "packages/core/di/runtime.ts",
         "packages/core/di/services.ts",
-        "packages/core/runtimes/agent-sdk/parser.ts",
+        "packages/core/runtimes/claude-agent/parser.ts",
         "packages/core/runtimes/claude/parser.ts",
         "packages/core/runtimes/codex/parser.ts",
         "packages/core/runtimes/gemini/parser.ts",
@@ -8829,12 +8773,12 @@
         "packages/core/conductor/pollers.ts",
         "packages/core/conductor/report-pipeline.ts",
         "packages/core/infra/arkd-launcher.ts",
+        "packages/core/infra/boot-cleanup.ts",
         "packages/core/infra/compute-providers-boot.ts",
         "packages/core/infra/conductor-launcher.ts",
         "packages/core/infra/maintenance-pollers.ts",
         "packages/core/infra/metrics-poller.ts",
         "packages/core/infra/router-launcher.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/infra/tensorzero-launcher.ts",
         "packages/core/integrations/github-pr.ts",
         "packages/core/integrations/issue-poller.ts",
@@ -9027,6 +8971,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
+        "packages/core/executors/claude-code.ts",
         "packages/core/services/session-output.ts"
       ]
     },
@@ -9448,6 +9393,7 @@
         "packages/core/services/provisioning-steps.ts"
       ],
       "importedBy": [
+        "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts"
       ]
     },
@@ -9462,6 +9408,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
+        "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts"
       ]
     },
@@ -9515,6 +9462,7 @@
         "packages/core/services/dispatch/post-launch.ts",
         "packages/core/services/dispatch/secrets-resolve.ts",
         "packages/core/services/dispatch/task-assembly.ts",
+        "packages/core/services/session-dispatch-listeners.ts",
         "packages/core/services/session-hooks/handoff.ts",
         "packages/core/services/session-hooks/types.ts"
       ]
@@ -9604,6 +9552,7 @@
         "packages/core/observability/structured-log.ts",
         "packages/core/repositories/event.ts",
         "packages/core/repositories/session.ts",
+        "packages/core/services/dispatch/types.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -9639,7 +9588,6 @@
       "path": "packages/core/services/session-hooks/hook-status.ts",
       "imports": [
         "packages/core/handoff.ts",
-        "packages/core/observability/status-detect.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/services/session-hooks/types.ts",
         "packages/core/termination.ts",
@@ -9701,6 +9649,8 @@
       "path": "packages/core/services/session-output.ts",
       "imports": [
         "packages/core/app.ts",
+        "packages/core/executor.ts",
+        "packages/core/executors/resolve.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/recordings.ts",
         "packages/core/send-reliable.ts",
@@ -9756,7 +9706,8 @@
       ],
       "importedBy": [
         "packages/core/conductor/hook-status-handler.ts",
-        "packages/server/handlers/session.ts"
+        "packages/server/handlers/session.ts",
+        "packages/server/mcp/tools/session.ts"
       ]
     },
     {
@@ -10016,7 +9967,7 @@
         "packages/cli/commands/worktree.ts",
         "packages/core/conductor/report-pipeline.ts",
         "packages/core/di/services.ts",
-        "packages/core/executors/agent-sdk.ts",
+        "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/cli-agent.ts",
         "packages/core/executors/goose.ts",
@@ -10068,7 +10019,6 @@
       ],
       "importedBy": [
         "packages/core/di/services.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/services/session/terminate.ts"
       ]
     },
@@ -10940,7 +10890,8 @@
       "importedBy": [
         "packages/cli/index.ts",
         "packages/core/hosted/web.ts",
-        "packages/core/infra/update-check.ts"
+        "packages/core/infra/update-check.ts",
+        "packages/server/mcp/server.ts"
       ]
     },
     {
@@ -11985,11 +11936,150 @@
         "packages/core/observability/structured-log.ts",
         "packages/protocol/transport.ts",
         "packages/protocol/types.ts",
+        "packages/server/mcp/index.ts",
         "packages/server/router.ts"
       ],
       "importedBy": [
         "packages/cli/commands/server-daemon.ts",
         "packages/cli/commands/server.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/index.ts",
+      "imports": [
+        "packages/server/mcp/tools/agent.ts",
+        "packages/server/mcp/tools/compute.ts",
+        "packages/server/mcp/tools/flow.ts",
+        "packages/server/mcp/tools/recipe.ts",
+        "packages/server/mcp/tools/secrets.ts",
+        "packages/server/mcp/tools/session.ts",
+        "packages/server/mcp/tools/skill.ts"
+      ],
+      "importedBy": [
+        "packages/server/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/registry.ts",
+      "imports": [
+        "packages/core/app.ts",
+        "packages/core/auth/context.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/server.ts",
+        "packages/server/mcp/tools/agent.ts",
+        "packages/server/mcp/tools/compute.ts",
+        "packages/server/mcp/tools/flow.ts",
+        "packages/server/mcp/tools/recipe.ts",
+        "packages/server/mcp/tools/secrets.ts",
+        "packages/server/mcp/tools/session.ts",
+        "packages/server/mcp/tools/skill.ts",
+        "packages/server/mcp/transport.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/server.ts",
+      "imports": [
+        "packages/core/app.ts",
+        "packages/core/auth/context.ts",
+        "packages/core/version.ts",
+        "packages/server/mcp/registry.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/transport.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/tools/agent.ts",
+      "imports": [
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/transport.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/tools/compute.ts",
+      "imports": [
+        "packages/compute/adapters/provider-map.ts",
+        "packages/compute/index.ts",
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/transport.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/tools/flow.ts",
+      "imports": [
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/transport.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/tools/recipe.ts",
+      "imports": [
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/transport.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/tools/secrets.ts",
+      "imports": [
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/transport.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/tools/session.ts",
+      "imports": [
+        "packages/core/executor.ts",
+        "packages/core/services/session/cleanup.ts",
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/transport.ts",
+        "packages/types/session.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/tools/skill.ts",
+      "imports": [
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/transport.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/index.ts"
+      ]
+    },
+    {
+      "path": "packages/server/mcp/transport.ts",
+      "imports": [
+        "packages/core/app.ts",
+        "packages/core/auth/context.ts",
+        "packages/server/mcp/registry.ts",
+        "packages/server/mcp/server.ts"
+      ],
+      "importedBy": [
+        "packages/server/mcp/tools/agent.ts",
+        "packages/server/mcp/tools/compute.ts",
+        "packages/server/mcp/tools/flow.ts",
+        "packages/server/mcp/tools/recipe.ts",
+        "packages/server/mcp/tools/secrets.ts",
+        "packages/server/mcp/tools/session.ts",
+        "packages/server/mcp/tools/skill.ts"
       ]
     },
     {
@@ -12184,10 +12274,6 @@
         "packages/cli/commands/compute/template.ts",
         "packages/cli/commands/session/view.ts",
         "packages/compute/types.ts",
-        "packages/core/adapters/control-plane/compute-store.ts",
-        "packages/core/adapters/control-plane/event-store.ts",
-        "packages/core/adapters/control-plane/session-store.ts",
-        "packages/core/adapters/control-plane/workspace.ts",
         "packages/core/adapters/local/compute-store.ts",
         "packages/core/adapters/local/event-store.ts",
         "packages/core/adapters/local/session-store.ts",
@@ -12207,9 +12293,9 @@
         "packages/core/conductor/conductor.ts",
         "packages/core/conductor/deliver-to-channel.ts",
         "packages/core/connectors/resolve.ts",
+        "packages/core/executors/resolve.ts",
         "packages/core/hosted/scheduler.ts",
         "packages/core/hosted/web.ts",
-        "packages/core/infra/stale-state-detector.ts",
         "packages/core/integrations/bridge.ts",
         "packages/core/integrations/github-pr.ts",
         "packages/core/integrations/issue-poller.ts",
@@ -12329,6 +12415,7 @@
         "packages/compute/core/ec2.ts",
         "packages/compute/core/firecracker/compute.ts",
         "packages/compute/core/k8s.ts",
+        "packages/server/mcp/tools/session.ts",
         "packages/types/flow-progress.ts",
         "packages/types/rpc.ts"
       ]
@@ -13436,6 +13523,16 @@
       "importedBy": []
     },
     {
+      "path": "packages/web/src/components/session/StageGroupHeader.tsx",
+      "imports": [
+        "packages/web/src/components/session/timeline-builder.ts",
+        "packages/web/src/lib/utils.ts"
+      ],
+      "importedBy": [
+        "packages/web/src/components/session/tabs/ConversationTab.tsx"
+      ]
+    },
+    {
       "path": "packages/web/src/components/session/TabFooter.tsx",
       "imports": [],
       "importedBy": [
@@ -13540,6 +13637,7 @@
       "path": "packages/web/src/components/session/tabs/ConversationTab.tsx",
       "imports": [
         "packages/web/src/components/session/AttachedFiles.tsx",
+        "packages/web/src/components/session/StageGroupHeader.tsx",
         "packages/web/src/components/session/event-builder.tsx",
         "packages/web/src/components/session/timeline-builder.ts",
         "packages/web/src/components/session/tool-block/index.tsx",
@@ -13637,6 +13735,7 @@
       ],
       "importedBy": [
         "packages/web/src/components/SessionDetail.tsx",
+        "packages/web/src/components/session/StageGroupHeader.tsx",
         "packages/web/src/components/session/event-builder.tsx",
         "packages/web/src/components/session/tabs/ConversationTab.tsx",
         "packages/web/src/components/session/tabs/ErrorsTab.tsx",
@@ -14614,6 +14713,7 @@
         "packages/web/src/components/session/RestartDialog.tsx",
         "packages/web/src/components/session/ResumeBanner.tsx",
         "packages/web/src/components/session/SdkTranscriptPanel.tsx",
+        "packages/web/src/components/session/StageGroupHeader.tsx",
         "packages/web/src/components/session/TabPanels.tsx",
         "packages/web/src/components/session/new/ComputeDropdown.tsx",
         "packages/web/src/components/session/new/FlowDropdown.tsx",

@@ -42,7 +42,7 @@ import { ArkdLauncher } from "../infra/arkd-launcher.js";
 import { MetricsPoller } from "../infra/metrics-poller.js";
 import { MaintenancePollers } from "../infra/maintenance-pollers.js";
 import { SignalHandlers } from "../infra/signal-handlers.js";
-import { StaleStateDetector } from "../infra/stale-state-detector.js";
+import { BootCleanup } from "../infra/boot-cleanup.js";
 import { SessionDrain } from "../infra/session-drain.js";
 import { StatusPollerRegistry } from "../executors/status-poller.js";
 import { TicketProviderRegistry } from "../tickets/registry.js";
@@ -221,7 +221,7 @@ export function registerRuntime(container: AppContainer): void {
       dispose: (s) => s.stop(),
     }),
 
-    staleStateDetector: asFunction((c: { app: AppContext }) => new StaleStateDetector(c.app), {
+    bootCleanup: asFunction((c: { app: AppContext }) => new BootCleanup(c.app), {
       lifetime: Lifetime.SINGLETON,
       // no-op stop (one-shot scan)
     }),

@@ -52,6 +52,7 @@ ark doctor            # check prerequisites (bun, tmux, git, gh, claude)
 ark --version
 ark agent list        # shows 12 builtin agents
 ark flow list         # shows 14 builtin flows
+ark runtime list      # shows 6 builtin runtimes
 
 # 3. Start a session from a recipe and dispatch it
 ark session start \
@@ -307,15 +308,18 @@ env: {}
 
 Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
 
-### Runtimes (5)
+### Runtimes (6)
 
-| Name         | Tool                        | Billing                     | Transcript parser                  |
-| ------------ | --------------------------- | --------------------------- | ---------------------------------- |
-| `claude`     | Claude Code CLI             | api (per token)             | claude                             |
-| `claude-max` | Claude Code (Max sub)       | subscription ($200/mo flat) | claude                             |
-| `codex`      | OpenAI Codex CLI            | api                         | codex (default model: gpt-5-codex) |
-| `gemini`     | Google Gemini CLI           | api                         | gemini                             |
-| `goose`      | Goose CLI (Block / LF AAIF) | api                         | goose                              |
+| Name           | Tool                             | Billing                     | Transcript parser                  |
+| -------------- | -------------------------------- | --------------------------- | ---------------------------------- |
+| `claude`       | Claude Code CLI                  | api (per token)             | claude                             |
+| `claude-max`   | Claude Code (Max sub)            | subscription ($200/mo flat) | claude                             |
+| `claude-agent` | Anthropic Agent SDK (in-process) | api                         | agent-sdk                          |
+| `codex`        | OpenAI Codex CLI                 | api                         | codex (default model: gpt-5-codex) |
+| `gemini`       | Google Gemini CLI                | api                         | gemini                             |
+| `goose`        | Goose CLI (Block / LF AAIF)      | api                         | goose                              |
+
+The `claude-agent` runtime runs the Anthropic Agent SDK in-process (no CLI subprocess). It streams hooks to the conductor via arkd and supports direct Anthropic API or gateway-routed deployments (e.g. TrueFoundry/Bedrock via the bundled compat mode).
 
 ```bash
 ark runtime list
@@ -331,6 +335,10 @@ ark session start --repo . --summary "UI polish" \
 # Use Goose runtime
 ark session start --repo . --summary "Add logging" \
   --agent worker --runtime goose --dispatch
+
+# Use the Anthropic Agent SDK (in-process, no CLI subprocess)
+ark session start --repo . --summary "Small tweak" \
+  --agent implementer --runtime claude-agent --dispatch
 
 # Use Max subscription (zero per-token cost tracked, tokens still recorded)
 ark session start --repo . --summary "Big refactor" \
@@ -1243,4 +1251,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 6 runtimes (Claude, Claude Max, Claude Agent SDK, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.

@@ -30,7 +30,7 @@ describe("tmux-notify", async () => {
     const s2 = getApp().sessions.create({ summary: "blocked-session" });
     getApp().sessions.update(s2.id, { status: "blocked" });
     const s3 = getApp().sessions.create({ summary: "running-session" });
-    getApp().sessions.update(s3.id, { status: "running" });
+    getApp().sessions.update(s3.id, { session_id: `ark-s-${s3.id}`, status: "running" });
 
     // Even with waiting sessions, should not throw (tmux just won't be available)
     expect(() => updateTmuxStatusBar()).not.toThrow();

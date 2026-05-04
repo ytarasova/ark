@@ -129,6 +129,15 @@ export interface RunAgentSdkLaunchOpts {
    */
   hookEndpoint?: string;
   /**
+   * Stage name this runtime instance was launched for. Stamped onto every
+   * forwarded hook so the conductor's event log carries authoritative
+   * per-stage attribution. Read from `ARK_STAGE` in `main()` -- the
+   * launcher writes it from the dispatch context. Empty / missing value
+   * is harmless (the conductor falls back to session.stage at log time)
+   * but means historical events can be re-stamped if session.stage flaps.
+   */
+  stage?: string;
+  /**
    * Optional bearer token for the conductor's Authorization header.
    * When set, every hook POST includes "Authorization: Bearer <token>".
    * In production, read from ARK_API_TOKEN env var.
@@ -171,9 +180,22 @@ export interface RunAgentSdkLaunchResult {
  * has no `claude_session_id`, so the guard's middle clause short-circuits and
  * all our hooks pass through.
  */
-export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string, unknown>> {
+export function messageToHooks(
+  msg: unknown,
+  arkSessionId: string,
+  stage?: string | null,
+): Array<Record<string, unknown>> {
   const m = msg as Record<string, unknown>;
   const type = m.type as string | undefined;
+  // Each runtime stamps its own stage label on every hook it emits. The
+  // conductor uses this as the source of truth instead of reading
+  // session.stage at log time -- the latter flaps when the state machine
+  // advances mid-flight (e.g. status-poller -> mediate -> stage advance
+  // while this same agent is still running) and would re-stamp the
+  // agent's hooks with whichever stage happens to be current at write
+  // time. Empty string means "I am the legacy launcher and don't know my
+  // stage" -- the conductor treats absent and empty the same.
+  const stageField: Record<string, unknown> = stage ? { stage } : {};
 
   if (type === "system" && (m.subtype as string | undefined) === "init") {
     return [
@@ -185,6 +207,7 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
         model: m.model,
         mcp_servers: m.mcp_servers,
         permissionMode: m.permissionMode,
+        ...stageField,
       },
     ];
   }
@@ -202,6 +225,7 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
           tool_name: block.name,
           tool_input: block.input,
           tool_use_id: block.id,
+          ...stageField,
         });
       } else if (blockType === "text") {
         // The model's narration between tool calls. Without this hook the
@@ -216,6 +240,7 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
             hook_event_name: "AgentMessage",
             session_id: arkSessionId,
             text,
+            ...stageField,
           });
         }
       } else if (blockType === "thinking") {
@@ -229,6 +254,7 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
             session_id: arkSessionId,
             text,
             thinking: true,
+            ...stageField,
           });
         }
       }
@@ -251,6 +277,7 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
           tool_use_id: block.tool_use_id,
           tool_result_content: toolResultContent,
           is_error: block.is_error ?? false,
+          ...stageField,
         });
       }
     }
@@ -265,6 +292,7 @@ export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record
       num_turns: m.num_turns,
       duration_ms: m.duration_ms,
       stop_reason: m.stop_reason,
+      ...stageField,
     };
 
     const stop: Record<string, unknown> = { hook_event_name: "Stop", ...costFields };
@@ -320,6 +348,11 @@ interface ForwardDeps {
    */
   hookEndpoint: string | undefined;
   arkSessionId: string;
+  /** Stage name this runtime instance was launched for. Stamped onto every
+   *  forwarded hook so the conductor's event log carries authoritative
+   *  per-stage attribution instead of re-deriving it from session.stage at
+   *  log time (#435 root cause #3). */
+  stage?: string | null;
   authToken?: string;
   fetchFn?: typeof fetch;
 }
@@ -348,7 +381,7 @@ interface ForwardDeps {
  */
 async function forwardToConductor(message: unknown, deps: ForwardDeps): Promise<void> {
   if (!deps.hookEndpoint) return;
-  const hooks = messageToHooks(message, deps.arkSessionId);
+  const hooks = messageToHooks(message, deps.arkSessionId, deps.stage ?? null);
   const doFetch = deps.fetchFn ?? fetch;
   // Detect the arkd channel-publish path so we wrap the hook body in the
   // generic envelope. Any other URL (e.g. the legacy conductor /hooks/status)
@@ -545,6 +578,7 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   const forwardDeps: ForwardDeps = {
     hookEndpoint: opts.hookEndpoint,
     arkSessionId: sessionId,
+    stage: opts.stage ?? null,
     authToken: opts.authToken,
     fetchFn: opts.fetchFn,
   };
@@ -1038,6 +1072,15 @@ async function main(): Promise<void> {
   }
   const authToken = process.env.ARK_API_TOKEN;
 
+  // Stage label is baked into the runtime at provisioning time. The
+  // conductor's launcher writes ARK_STAGE from session.stage in the
+  // dispatch context; once the agent process is up, this label is
+  // immutable for the lifetime of the runtime and is stamped onto every
+  // hook the agent emits. The conductor's event log uses this as the
+  // source of truth instead of re-reading session.stage at log time
+  // (which flaps when the state machine advances mid-flight).
+  const stage = process.env.ARK_STAGE;
+
   const result = await runAgentSdkLaunch({
     sessionId,
     sessionDir,
@@ -1048,6 +1091,7 @@ async function main(): Promise<void> {
     maxBudgetUsd,
     systemAppend,
     hookEndpoint,
+    stage,
     // Pass the conductor URL through unchanged for the ask-user MCP path.
     // That feature requires a direct conductor reach for inbound RPCs and
     // doesn't have a "via arkd" route yet -- when only ARK_ARKD_URL is set

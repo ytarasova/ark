@@ -103,7 +103,7 @@ describe("fan-out lifecycle integration", async () => {
     const r1 = await fanOut(app, parent.id, { tasks: [{ summary: "A" }] });
     const fg1 = (await app.sessions.get(parent.id))!.fork_group;
 
-    await app.sessions.update(parent.id, { status: "running", fork_group: null });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, status: "running", fork_group: null });
     const r2 = await fanOut(app, parent.id, { tasks: [{ summary: "B" }] });
     const fg2 = (await app.sessions.get(parent.id))!.fork_group;
 
@@ -115,7 +115,7 @@ describe("fan-out lifecycle integration", async () => {
   it("auto-join advances parent through flow stages", async () => {
     const app = getApp();
     const parent = await app.sessions.create({ summary: "Auto-advance", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Only child" }],
@@ -133,7 +133,7 @@ describe("fan-out lifecycle integration", async () => {
   it("checkAutoJoin with mix of completed and failed children still joins", async () => {
     const app = getApp();
     const parent = await app.sessions.create({ summary: "Mixed results", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Good" }, { summary: "Bad" }, { summary: "Also good" }],
@@ -161,7 +161,7 @@ describe("fan-out lifecycle integration", async () => {
   it("joinFork clears fork_group and logs fork_joined event", async () => {
     const app = getApp();
     const parent = await app.sessions.create({ summary: "Join test", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
@@ -247,7 +247,7 @@ describe("fan-out lifecycle integration", async () => {
     });
 
     const parentChildId = parentResult.childIds![0];
-    await app.sessions.update(parentChildId, { status: "running" });
+    await app.sessions.update(parentChildId, { session_id: `ark-s-${parentChildId}`, status: "running" });
 
     await fanOut(app, parentChildId, {
       tasks: [{ summary: "Grandchild" }],

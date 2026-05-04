@@ -77,7 +77,7 @@ async function makeTerminalSession(): Promise<string> {
 
 async function makeActiveSession(): Promise<string> {
   const s = await app.sessions.create({ summary: "active", flow: "quick" });
-  await app.sessions.update(s.id, { status: "running" });
+  await app.sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
   return s.id;
 }
 
