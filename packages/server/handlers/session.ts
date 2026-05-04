@@ -5,7 +5,6 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { searchSessions, getSessionConversation, searchSessionConversation } from "../../core/search/search.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
 import { resolveTenantApp } from "./scope-helpers.js";
 import type {
   SessionIdParams,
@@ -608,32 +607,34 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       };
     }
 
-    // Provider-aware path: ask the compute's provider for the attach command.
-    // Local sessions (no compute_name) or providers that don't override get
-    // the plain `tmux attach -t <name>`.
-    let command = "";
-    let displayHint = "Paste this into a terminal on the host running ark:";
-    if (session.compute_name) {
-      const compute = await scoped.computes.get(session.compute_name);
-      if (compute) {
-        // Provider registry is process-wide (not per-tenant), so resolve on
-        // the root app. The `compute` row itself was fetched tenant-scoped.
-        const provider = app.getProvider(providerOf(compute));
-        try {
-          const parts = provider?.getAttachCommand?.(compute, session) ?? [];
-          if (parts.length > 0) {
-            command = parts.join(" ");
-            displayHint = "Paste this into a terminal to attach to the remote compute:";
-          }
-        } catch {
-          /* fall through to the local fallback */
-        }
-      }
+    // Runtime-aware attach guidance.
+    //
+    // claude-agent runs as a plain process via arkd /process/spawn; there
+    // is NO tmux pane and NO interactive PTY to attach to. Live output is
+    // already streamed to the Conversation / Logs tabs via the hook
+    // pipeline. Attaching to a non-existent pane just errors with
+    // "session not found" and the UI shows the dreaded "Reconnecting 3/4
+    // ..." loop. Surface the right guidance instead.
+    //
+    // Tmux-based runtimes (claude-code, codex, gemini, goose) DO have a
+    // pane. For those we surface the ark-native `ark session attach`
+    // command -- never the raw transport (`aws ssm start-session`,
+    // `kubectl exec`, `tmux attach`). Whether the pane is on local tmux,
+    // EC2 via SSM, or k8s via kubectl is an implementation detail ark
+    // already encapsulates inside `ark session attach`.
+    const executorName = (session.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
+    if (executorName === "claude-agent" || executorName === "agent-sdk") {
+      return {
+        command: "",
+        displayHint: "",
+        attachable: false,
+        reason:
+          "This agent runs as a plain process (no interactive terminal). " +
+          "Live output appears in the Conversation and Logs tabs.",
+      };
     }
-    if (!command) {
-      const { attachCommand } = await import("../../core/infra/tmux.js");
-      command = attachCommand(session.session_id);
-    }
+    const command = `ark session attach ${session.id}`;
+    const displayHint = "Run this on the host where ark is installed:";
     return { command, displayHint, attachable: true };
   });
 

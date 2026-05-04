@@ -41,14 +41,22 @@ async function createSession(fields: Record<string, unknown>): Promise<string> {
 }
 
 describe("session/attach-command", () => {
-  it("returns attachable:true + a tmux attach command for a dispatched session", async () => {
+  it("returns attachable:true + an ark session attach command for a dispatched tmux-runtime session", async () => {
+    // Tmux-based runtimes (no launch_executor field, or claude-code /
+    // codex / gemini / goose) get the ark-native attach command. The
+    // raw transport (`tmux attach`, `aws ssm start-session`, `kubectl
+    // exec`) is intentionally NOT surfaced -- that's an ark-internal
+    // detail, not user-facing.
     const id = await createSession({ session_id: "ark-foo-bar-1234", status: "running" });
     const res = (await dispatch("session/attach-command", { sessionId: id })) as JsonRpcResponse;
     expect("error" in res).toBe(false);
     const result = (res as any).result;
     expect(result.attachable).toBe(true);
-    expect(result.command).toBe("tmux attach -t ark-foo-bar-1234");
-    expect(result.displayHint).toContain("terminal");
+    expect(result.command).toBe(`ark session attach ${id}`);
+    expect(result.command).not.toContain("tmux");
+    expect(result.command).not.toContain("aws ssm");
+    expect(result.command).not.toContain("kubectl");
+    expect(result.displayHint).toContain("ark");
     expect(result.reason).toBeUndefined();
   });
 
@@ -86,18 +94,33 @@ describe("session/attach-command", () => {
     expect(result.reason).toContain("archived");
   });
 
+  it("returns attachable:false for claude-agent (no interactive PTY)", async () => {
+    // claude-agent / agent-sdk runtimes spawn a plain process via arkd
+    // /process/spawn. There is no tmux pane and no PTY; attaching just
+    // reconnect-loops. Surface the right empty-state instead.
+    const id = await createSession({
+      session_id: "ark-process-1",
+      status: "running",
+      config: { launch_executor: "claude-agent" },
+    });
+    const res = (await dispatch("session/attach-command", { sessionId: id })) as JsonRpcResponse;
+    const result = (res as any).result;
+    expect(result.attachable).toBe(false);
+    expect(result.command).toBe("");
+    expect(result.reason).toMatch(/no interactive terminal|plain process/i);
+  });
+
   it("returns an RPC error for an unknown sessionId", async () => {
     const res = (await dispatch("session/attach-command", { sessionId: "s-does-not-exist" })) as JsonRpcError;
     expect(res.error?.code).toBe(ErrorCodes.SESSION_NOT_FOUND);
   });
 
-  it("delegates to provider.getAttachCommand when the session has a compute", async () => {
-    // Register a fake provider that returns an SSH-prefixed command so we can
-    // assert the handler delegates to it rather than the plain local path.
-    // The provider name must match what `providerOf({compute_kind, isolation_kind})`
-    // will return for the inserted compute row -- the registry is keyed by
-    // the legacy provider name, derived from the two-axis kinds. For
-    // {compute_kind:"ec2", isolation_kind:"direct"} that's "ec2".
+  it("returns the ark-native command for remote compute (no transport leak)", async () => {
+    // Pre-existing design surfaced raw `aws ssm start-session ...` /
+    // `kubectl exec ...` strings, which forced users to install AWS CLI
+    // / kubectl just to attach and leaked instance ids + document names
+    // to the UI. The new design always returns `ark session attach <id>`
+    // and lets ark do the SSM / kubectl tunneling internally.
     class FakeRemoteProvider {
       readonly name = "ec2";
       readonly singleton = false;
@@ -162,9 +185,14 @@ describe("session/attach-command", () => {
     const res = (await dispatch("session/attach-command", { sessionId: id })) as JsonRpcResponse;
     const result = (res as any).result;
     expect(result.attachable).toBe(true);
-    expect(result.command).toContain("ssh");
-    expect(result.command).toContain("ubuntu@1.2.3.4");
-    expect(result.command).toContain("tmux attach -t ark-remote-1");
-    expect(result.displayHint).toContain("remote compute");
+    // ark-native command -- never the raw transport. The provider's
+    // `getAttachCommand` is used by `ark session attach` internally;
+    // we don't surface it to the UI any more.
+    expect(result.command).toBe(`ark session attach ${id}`);
+    expect(result.command).not.toContain("ssh");
+    expect(result.command).not.toContain("aws ssm");
+    expect(result.command).not.toContain("kubectl");
+    expect(result.command).not.toContain("ubuntu@");
+    expect(result.displayHint).toContain("ark");
   });
 });
