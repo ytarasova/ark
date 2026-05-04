@@ -234,7 +234,12 @@ async function dispatchFrame(app: AppContext, line: string): Promise<void> {
     return;
   }
   if (!frame || typeof (frame as { kind?: unknown }).kind !== "string") {
-    logWarn("conductor", `arkd-events: untyped frame; ignoring`);
+    // Server keepalive frames are `{}` -- they exist to keep the HTTP/1.1
+    // connection from idle-closing on the SSM tunnel / intermediate proxies.
+    // Don't warn on them; only warn on genuinely-malformed frames.
+    if (frame && Object.keys(frame as object).length > 0) {
+      logWarn("conductor", `arkd-events: untyped frame; ignoring`);
+    }
     return;
   }
   if (frame.kind === "hook") {

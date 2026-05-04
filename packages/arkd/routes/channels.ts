@@ -176,6 +176,25 @@ export async function handleChannelRoutes(req: Request, path: string, _ctx: Rout
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         logInfo("compute", `arkd channels: subscriber attached channel=${name}`);
+        // Keepalive: emit a benign frame every 30s so HTTP/1.1 idle
+        // timers (Bun runtime, intermediate proxies, the SSM tunnel)
+        // see the connection as live and don't tear it down. The frame
+        // is `{}` -- consumers (subscribeUserMessages, the conductor's
+        // arkd-events-consumer) treat envelopes without their expected
+        // fields as no-ops and discard them. Without this, mid-session
+        // user steers landed in arkd's ring buffer with no parked
+        // subscriber to receive them, then waited up to 5 minutes for
+        // the next reconnect.
+        const KEEPALIVE_INTERVAL_MS = 30_000;
+        const keepalive = setInterval(() => {
+          if (ac.signal.aborted) return;
+          try {
+            controller.enqueue(ndjsonLine({} as Envelope));
+          } catch {
+            /* stream closed */
+          }
+        }, KEEPALIVE_INTERVAL_MS);
+        keepalive.unref?.();
         void (async () => {
           try {
             while (!ac.signal.aborted) {
@@ -189,6 +208,7 @@ export async function handleChannelRoutes(req: Request, path: string, _ctx: Rout
               }
             }
           } finally {
+            clearInterval(keepalive);
             try {
               controller.close();
             } catch {
