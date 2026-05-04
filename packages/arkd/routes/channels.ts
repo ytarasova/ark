@@ -36,6 +36,19 @@
  * answers with pong, and every layer sees periodic traffic. No
  * application-level keepalive plumbing needed.
  *
+ * Why WebSocket for subscribers: previously this used HTTP/1.1 long-poll
+ * (NDJSON over fetch+ReadableStream). That works in steady state but
+ * silently breaks when traffic goes idle for >~5min: client fetch keep-
+ * alive, server idle timers, and intermediate proxies (SSM tunnel) can
+ * each tear the connection down independently of the application. A user
+ * steer published in that gap sat in arkd's ring buffer with no parked
+ * subscriber, delivered up to 5min late on the next reattach.
+ *
+ * WebSocket fixes this at the protocol level: Bun's WS server sends
+ * automatic ping frames (`sendPings: true` is the default), the client
+ * answers with pong, and every layer sees periodic traffic. No
+ * application-level keepalive plumbing needed.
+ *
  * Channels are GLOBAL (shared across all sessions on this arkd instance).
  * Subscribers see every envelope on the channel; per-session filtering is
  * the consumer's responsibility, carried in the envelope.

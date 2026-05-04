@@ -398,7 +398,6 @@ describe("/channel/{name}/publish + /ws/channel/{name}", () => {
     expect(env).toEqual({ probe: true });
     ws.close();
   }, 45_000);
-
   test("user-input broadcasts to every open subscriber", async () => {
     // user-input is broadcast-mode: each agent subscriber filters by its
     // own session id, so every open subscriber must receive a copy.
