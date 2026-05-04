@@ -400,9 +400,54 @@ export async function createWorktreePR(
   const localPushDir = existsSync(wtDir) ? wtDir : repo;
 
   try {
+    // For remote-dispatch push to github over HTTPS the worker has no
+    // git credential helper -- `git push https://github.com/...` then
+    // hangs prompting for a username. Inject GITHUB_TOKEN into the
+    // origin URL before push so HTTPS basic-auth carries the token.
+    // Idempotent: only runs on remote+github+https; the cleanup at the
+    // end restores the original URL so we don't leak the token into the
+    // worker's git config.
+    let originalOriginUrl: string | null = null;
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (routing.remote && githubToken) {
+      const probe = await readOriginUrl(app, session);
+      if (probe && probe.startsWith("https://github.com/")) {
+        originalOriginUrl = probe;
+        const authedUrl = probe.replace("https://", `https://x-access-token:${githubToken}@`);
+        try {
+          await runGit(app, session, ["remote", "set-url", "origin", authedUrl], { timeout: 15_000 });
+        } catch (err: any) {
+          logWarn("session", `createWorktreePR: failed to set authed origin url: ${err?.message ?? err}`);
+        }
+      }
+    }
+
     // 1. Push branch. For remote sessions this dispatches over arkd; for
     //    local it execs git directly.
-    const pushArgs = ["push", "-u", "origin", branch];
+    //
+    // `ark-s-<sessionId>` branches are owned by exactly one session --
+    // no concurrent writers ever exist. Agents routinely rewrite history
+    // mid-flow (`git commit --amend`, rebase, lint-fix squash) and push
+    // it themselves via Bash; if they then make further local commits
+    // and our `git push` attempts to write the new local state, the
+    // remote is ahead of our last fetched view and lease/non-fast-forward
+    // fails.
+    //
+    // For session-owned branches we use plain `--force`: the branch is
+    // exclusively ours, no other process or human writes it, and "what
+    // we have locally at the end of the session" is by definition the
+    // intended end-state for the branch. --force-with-lease was the
+    // first try but it refuses when the remote ref is unknown locally
+    // (which happens every time the agent self-pushes mid-flow without
+    // our worktree fetching). Plain force is the right tool here.
+    //
+    // Non-session branches (a human-named branch the agent was told to
+    // work on, e.g. via `--branch my-fix`) keep the safe default --
+    // those CAN have concurrent writers.
+    const isSessionOwnedBranch = branch === `ark-s-${sessionId}`;
+    const pushArgs = isSessionOwnedBranch
+      ? ["push", "-u", "--force", "origin", branch]
+      : ["push", "-u", "origin", branch];
     let pushStdout = "";
     let pushStderr = "";
     try {
@@ -414,8 +459,21 @@ export async function createWorktreePR(
       pushStderr = r.stderr;
     } catch (e: any) {
       // Surface stderr if the dispatcher attached it (remote path).
-      const reason = e?.stderr || e?.message || String(e);
+      // Strip the embedded token from the error text before surfacing.
+      let reason = e?.stderr || e?.message || String(e);
+      if (githubToken) reason = reason.replaceAll(githubToken, "***");
       return { ok: false, message: `git push failed: ${reason}` };
+    } finally {
+      // Always restore the original origin URL so the token doesn't
+      // persist in the worker's git config. Best-effort: a failure
+      // here doesn't fail the action.
+      if (originalOriginUrl) {
+        try {
+          await runGit(app, session, ["remote", "set-url", "origin", originalOriginUrl], { timeout: 15_000 });
+        } catch (err: any) {
+          logWarn("session", `createWorktreePR: failed to restore origin url: ${err?.message ?? err}`);
+        }
+      }
     }
 
     // 2. Decide host. For remote we read origin from the remote workdir;
