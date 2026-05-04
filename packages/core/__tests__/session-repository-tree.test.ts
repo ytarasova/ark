@@ -38,7 +38,7 @@ describe("SessionRepository tree methods", async () => {
     const c1 = await repo.create({ summary: "c1" });
     const c2 = await repo.create({ summary: "c2" });
     const c3 = await repo.create({ summary: "c3" });
-    await repo.update(c1.id, { parent_id: root.id, status: "running" });
+    await repo.update(c1.id, { session_id: `ark-s-${c1.id}`, parent_id: root.id, status: "running" });
     await repo.update(c2.id, { parent_id: root.id, status: "completed" });
     await repo.update(c3.id, { parent_id: root.id, status: "failed" });
     const grandchild = await repo.create({ summary: "gc1" });
@@ -78,7 +78,7 @@ describe("SessionRepository tree methods", async () => {
     await repo.update(c2.id, { parent_id: root.id });
 
     const gc = await repo.create({ summary: "gc" });
-    await repo.update(gc.id, { parent_id: c1.id, status: "running" });
+    await repo.update(gc.id, { session_id: `ark-s-${gc.id}`, parent_id: c1.id, status: "running" });
 
     const children = await repo.listChildren(root.id);
     expect(children.map((c) => c.id).sort()).toEqual([c1.id, c2.id].sort());

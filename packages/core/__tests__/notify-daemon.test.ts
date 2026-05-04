@@ -66,7 +66,7 @@ describe("NotifyDaemon", async () => {
     });
 
     const s1 = await getApp().sessions.create({ summary: "running-test" });
-    await getApp().sessions.update(s1.id, { status: "running" });
+    await getApp().sessions.update(s1.id, { session_id: `ark-s-${s1.id}`, status: "running" });
     const s2 = await getApp().sessions.create({ summary: "waiting-test" });
     await getApp().sessions.update(s2.id, { status: "waiting" });
 
@@ -93,7 +93,7 @@ describe("NotifyDaemon", async () => {
     });
 
     const s = await getApp().sessions.create({ summary: "transition-test" });
-    await getApp().sessions.update(s.id, { status: "running" });
+    await getApp().sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
 
     daemon.start();
     // Wait for the baseline poll to land

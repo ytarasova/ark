@@ -17,7 +17,7 @@ describe("fan-out E2E", async () => {
   test("full lifecycle: create parent, fan-out, complete children, auto-join", async () => {
     // 1. Create parent
     const parent = await app.sessions.create({ summary: "E2E fan-out test", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     // 2. Fan out into 3 children
     const result = await fanOut(app, parent.id, {
@@ -57,7 +57,7 @@ describe("fan-out E2E", async () => {
 
   test("spawn creates child with correct parent linkage", async () => {
     const parent = await app.sessions.create({ summary: "Spawn test", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await spawnSubagent(app, parent.id, { task: "Child task" });
     expect(result.ok).toBe(true);
@@ -105,7 +105,7 @@ describe("fan-out E2E", async () => {
 
   test("partial failure: parent gets notified when some children fail", async () => {
     const parent = await app.sessions.create({ summary: "Partial fail", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Will pass" }, { summary: "Will fail" }],

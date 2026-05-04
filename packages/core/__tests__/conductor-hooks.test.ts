@@ -36,10 +36,31 @@ async function postHook(sessionId: string, payload: Record<string, unknown>): Pr
   });
 }
 
+/**
+ * Production parity: post-launch.ts always writes `launch_executor` to
+ * session.config and atomically sets `session_id` when transitioning a
+ * session to `running`. The hook tests need both:
+ *   - `launch_executor` so the cost-recording path can resolve the
+ *     runtime (`resolveSessionExecutor` -- otherwise recordUsage skips).
+ *   - `session_id` so the SessionRepository running-invariant assertion
+ *     accepts the status transition.
+ */
+async function makeRunningSession(summary: string): Promise<{ id: string }> {
+  const session = await getApp().sessions.create({ summary });
+  await getApp().sessions.mergeConfig(session.id, { launch_executor: "claude-code" });
+  await getApp().sessions.update(session.id, {
+    status: "running",
+    session_id: `ark-s-${session.id}`,
+  });
+  return session;
+}
+
 describe("Conductor /hooks/status endpoint", async () => {
   it("UserPromptSubmit maps to status running", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "ready" });
+    // session_id must be set in advance; the hook transition to "running"
+    // requires it by invariant (post-launch.ts sets it atomically in prod).
+    await getApp().sessions.update(session.id, { status: "ready", session_id: `ark-s-${session.id}` });
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
@@ -51,8 +72,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("Stop does not change status (agent idle between turns)", async () => {
-    const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("hook test");
 
     const resp = await postHook(session.id, { hook_event_name: "Stop" });
     expect(resp.status).toBe(200);
@@ -63,8 +83,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("StopFailure maps to status failed with error field", async () => {
-    const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("hook test");
 
     const resp = await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -80,8 +99,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("SessionEnd maps to status completed", async () => {
-    const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("hook test");
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
@@ -93,8 +111,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("Notification with permission_prompt maps to status waiting", async () => {
-    const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("hook test");
 
     const resp = await postHook(session.id, {
       hook_event_name: "Notification",
@@ -110,6 +127,7 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("SessionStart maps to status running", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}` });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionStart" });
     expect(resp.status).toBe(200);
@@ -128,8 +146,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("unknown event returns 200 with no-op, status unchanged", async () => {
-    const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("hook test");
 
     const resp = await postHook(session.id, { hook_event_name: "SomeUnknownEvent" });
     expect(resp.status).toBe(200);
@@ -142,6 +159,7 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("logs hook event to event audit trail", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}` });
 
     await postHook(session.id, { hook_event_name: "SessionStart", extra: "data" });
 
@@ -154,8 +172,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("PreCompact is logged but does not change status", async () => {
-    const session = await getApp().sessions.create({ summary: "test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("test");
 
     const resp = await postHook(session.id, {
       hook_event_name: "PreCompact",
@@ -166,8 +183,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("PostCompact is logged with compact_summary in event data", async () => {
-    const session = await getApp().sessions.create({ summary: "test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("test");
 
     await postHook(session.id, {
       hook_event_name: "PostCompact",
@@ -179,8 +195,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("StopFailure with max_output_tokens sets failed with specific error", async () => {
-    const session = await getApp().sessions.create({ summary: "test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("test");
 
     await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -194,8 +209,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("Stop with transcript_path records token usage in usage_records", async () => {
-    const session = await getApp().sessions.create({ summary: "test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("test");
 
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
@@ -242,8 +256,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("SessionEnd with transcript_path records final token usage", async () => {
-    const session = await getApp().sessions.create({ summary: "test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("test");
 
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
@@ -268,8 +281,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("hook without transcript_path skips usage tracking", async () => {
-    const session = await getApp().sessions.create({ summary: "test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("test");
 
     await postHook(session.id, { hook_event_name: "Stop" });
 
@@ -307,7 +319,11 @@ describe("Conductor /hooks/status endpoint", async () => {
   it("SessionEnd advances auto-gate session to next stage", async () => {
     // Use default flow with implement stage (gate: auto) -- advance moves to verify
     const session = await getApp().sessions.create({ summary: "hook test", flow: "default" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "implement" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      session_id: `ark-s-${session.id}`,
+    });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
@@ -322,7 +338,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("Stop hook does not index transcript when claude session ID does not match", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "running", claude_session_id: "real-claude-session-abc" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      claude_session_id: "real-claude-session-abc",
+      session_id: `ark-s-${session.id}`,
+    });
 
     // Write a fake transcript file named after a DIFFERENT claude session
     const { writeFileSync: wf } = await import("fs");
@@ -361,7 +381,11 @@ describe("Conductor /hooks/status endpoint", async () => {
   it("StopFailure keeps manual-gate session running", async () => {
     const session = await getApp().sessions.create({ summary: "bare test" });
     await getApp().sessions.update(session.id, { flow: "bare" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "work",
+      session_id: `ark-s-${session.id}`,
+    });
 
     const resp = await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -381,7 +405,11 @@ describe("Conductor /hooks/status endpoint", async () => {
   it("SessionEnd keeps manual-gate session running", async () => {
     const session = await getApp().sessions.create({ summary: "bare test" });
     await getApp().sessions.update(session.id, { flow: "bare" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "work",
+      session_id: `ark-s-${session.id}`,
+    });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
@@ -392,7 +420,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("StopFailure still fails auto-gate sessions", async () => {
     const session = await getApp().sessions.create({ summary: "auto test", flow: "quick" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "verify" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "verify",
+      session_id: `ark-s-${session.id}`,
+    });
 
     await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -405,7 +437,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("SessionEnd advances auto-gate sessions via advance()", async () => {
     const session = await getApp().sessions.create({ summary: "auto test", flow: "default" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "implement" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      session_id: `ark-s-${session.id}`,
+    });
 
     await postHook(session.id, { hook_event_name: "SessionEnd" });
 
@@ -417,7 +453,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("UserPromptSubmit clears breakpoint_reason when resuming from waiting", async () => {
     const session = await getApp().sessions.create({ summary: "breakpoint clear test" });
-    await getApp().sessions.update(session.id, { status: "waiting", breakpoint_reason: "Need a PAT token" });
+    await getApp().sessions.update(session.id, {
+      status: "waiting",
+      breakpoint_reason: "Need a PAT token",
+      session_id: `ark-s-${session.id}`,
+    });
 
     await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
 
@@ -433,8 +473,7 @@ describe("Conductor /hooks/status endpoint", async () => {
     // drops any PostToolUse whose Pre it never saw -- so agent-sdk tool
     // calls disappeared entirely from the Timeline. Every PreToolUse must
     // land in the events table regardless of the guardrail outcome.
-    const session = await getApp().sessions.create({ summary: "pre-tool test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("pre-tool test");
 
     const resp = await postHook(session.id, {
       hook_event_name: "PreToolUse",
@@ -457,8 +496,7 @@ describe("Conductor /hooks/status endpoint", async () => {
     // Without this, agent-sdk sessions only show PreToolUse/PostToolUse
     // events on the Timeline -- no human-readable narration. The user can't
     // tell what the agent is doing or planning between tool calls.
-    const session = await getApp().sessions.create({ summary: "agent-message routing" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("agent-message routing");
 
     const resp = await postHook(session.id, {
       hook_event_name: "AgentMessage",
@@ -478,8 +516,7 @@ describe("Conductor /hooks/status endpoint", async () => {
   });
 
   it("AgentMessage with thinking:true tags the event for the renderer", async () => {
-    const session = await getApp().sessions.create({ summary: "agent-thinking routing" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    const session = await makeRunningSession("agent-thinking routing");
 
     await postHook(session.id, {
       hook_event_name: "AgentMessage",

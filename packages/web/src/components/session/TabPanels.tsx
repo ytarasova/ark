@@ -45,6 +45,12 @@ interface TabPanelsProps {
 
   // Flow widget (Conversation tab right rail)
   stages?: StageProgress[];
+
+  /** Canonical flow stage definitions (from FlowStore via useSessionStream).
+   *  Used by ConversationTab to render the "stage N/M" counter against the
+   *  flow's actual stage list rather than counting the named-stage groups
+   *  that happen to appear in the event stream. */
+  flowStages?: any[];
 }
 
 /**
@@ -74,6 +80,7 @@ export function TabPanels(props: TabPanelsProps) {
     onToggleTodo,
     errorEvents,
     stages,
+    flowStages,
   } = props;
 
   return (
@@ -103,6 +110,7 @@ export function TabPanels(props: TabPanelsProps) {
           agentIsTyping={agentIsTyping}
           bottomRef={bottomRef}
           filesChangedCount={diffFiles.length}
+          flowStages={flowStages}
         />
       )}
       {activeTab === "diff" && (

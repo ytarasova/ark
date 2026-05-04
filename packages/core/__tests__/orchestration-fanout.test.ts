@@ -118,7 +118,7 @@ describe("checkAutoJoin", async () => {
     const parent = await getApp().sessions.create({ summary: "parent" });
     const fan = await fanOut(getApp(), parent.id, { tasks: [{ summary: "a" }] });
     // Move parent out of waiting
-    await getApp().sessions.update(parent.id, { status: "running" });
+    await getApp().sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, status: "running" });
     await getApp().sessions.update(fan.childIds![0], { status: "completed" });
 
     const advanced = await checkAutoJoin(getApp(), fan.childIds![0]);
