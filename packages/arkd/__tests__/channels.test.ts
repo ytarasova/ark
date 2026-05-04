@@ -384,13 +384,10 @@ describe("/channel/{name}/publish + /ws/channel/{name}", () => {
   test("keep-alive: WS connection survives idle period spanning the ping cycle", async () => {
     // Verifies that Bun's automatic ping frames (idleTimeout: 30, sendPings:
     // true in server.ts) keep the connection alive through a quiet period.
-    // Set SKIP_SLOW_TESTS=1 in fast CI to skip the 35s wait.
-    if (process.env.SKIP_SLOW_TESTS === "1") {
-      return;
-    }
-
+    // The 35s wait is the point of the test -- without protocol-level
+    // pings the connection would close on the 30s idle timer and the
+    // post-wait publish would buffer instead of being delivered.
     const { ws, nextMessages } = await subscribedChannel("keepalive-ch", 5000);
-    // Wait past the 30s ping interval.
     await new Promise<void>((resolve) => setTimeout(resolve, 35_000));
 
     // Connection must still be alive: publish should be delivered directly.
