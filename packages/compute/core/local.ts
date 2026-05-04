@@ -68,9 +68,19 @@ export class LocalCompute implements Compute {
     return `http://localhost:${this.app.config.ports.arkd}`;
   }
 
-  async ensureReachable(): Promise<void> {
-    // Local arkd shares a host with the conductor. There's no transport
-    // to set up.
+  async ensureReachable(h: ComputeHandle): Promise<void> {
+    // Local arkd shares a host with the conductor; no transport to set up.
+    // BUT: the conductor's hooks-channel subscriber still needs to attach so
+    // hooks the agent publishes to /channel/hooks/publish are drained and
+    // re-emitted as session events. EC2 wires this via provisionStep
+    // "events-consumer-start"; the local path was silently missing it,
+    // which left every hook-published-locally invisible to the conductor
+    // (no agent_message, no PreToolUse / PostToolUse, no Stop) and broke
+    // every UI feature that depends on the event stream. Idempotent:
+    // startArkdEventsConsumer is a no-op for an already-attached compute.
+    const arkdUrl = this.getArkdUrl(h);
+    const { startArkdEventsConsumer } = await import("../../core/conductor/arkd-events-consumer.js");
+    startArkdEventsConsumer(this.app, h.name, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
   }
 
   // resolveWorkdir intentionally omitted: LocalCompute shares the

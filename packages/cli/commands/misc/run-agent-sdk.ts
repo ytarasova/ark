@@ -76,6 +76,12 @@ export function registerRunAgentSdkCommand(program: Command): void {
         maxBudgetUsd: optionalNumber("ARK_MAX_BUDGET_USD"),
         systemAppend: process.env.ARK_SYSTEM_PROMPT_APPEND,
         hookEndpoint,
+        // Stage is baked in at provisioning time (claude-agent.ts launcher
+        // writes ARK_STAGE from session.stage). Once the agent is up, this
+        // label is immutable for the runtime's lifetime and stamped onto
+        // every hook so the conductor's event log carries authoritative
+        // per-stage attribution (#435 root cause #3).
+        stage: process.env.ARK_STAGE,
         authToken: process.env.ARK_API_TOKEN,
       });
 

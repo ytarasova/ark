@@ -94,7 +94,9 @@ export async function dispatchForEachSpawn(
   // started even when its child is actively working. The post-loop
   // mediateStageHandoff transitions to "completed" (or "failed").
   if (session.status !== "running") {
-    await deps.sessions.update(sessionId, { status: "running" });
+    // Synthetic handle: the foreach parent has no agent of its own to probe,
+    // but the session_id must be non-null to satisfy the running invariant.
+    await deps.sessions.update(sessionId, { status: "running", session_id: `parent-${sessionId}` });
   }
 
   const forkGroup = randomUUID().slice(0, 8);
