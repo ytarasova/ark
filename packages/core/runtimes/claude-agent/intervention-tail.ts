@@ -19,10 +19,11 @@ export interface InterventionTailOpts {
   onMessage: (content: string) => void;
   /**
    * Called when a line with `control: "interrupt"` is detected. The content
-   * is also passed to `onMessage` so the correction reaches the prompt queue.
-   * The callback should abort the current SDK query iteration.
+   * is delivered HERE -- not through `onMessage` -- so the caller can buffer
+   * it for the next SDK query attempt rather than pushing it into a queue
+   * that may have a dying iterator parked on `next()`.
    */
-  onInterrupt?: () => void;
+  onInterrupt?: (content: string) => void;
   onError?: (err: Error) => void;
 }
 
@@ -74,13 +75,11 @@ export function startInterventionTail(opts: InterventionTailOpts): () => void {
       if (!trimmed) continue;
       try {
         const parsed = JSON.parse(trimmed) as { content?: unknown; control?: unknown };
-        if (typeof parsed.content === "string") {
-          onMessage(parsed.content);
-        }
-        // Fire the interrupt callback after pushing the content so the
-        // correction is already in the queue when the abort fires.
-        if (parsed.control === "interrupt" && onInterrupt) {
-          onInterrupt();
+        const content = typeof parsed.content === "string" ? parsed.content : "";
+        if (parsed.control === "interrupt") {
+          if (onInterrupt) onInterrupt(content);
+        } else if (content.length > 0) {
+          onMessage(content);
         }
       } catch (err) {
         if (onError) onError(err instanceof Error ? err : new Error(String(err)));

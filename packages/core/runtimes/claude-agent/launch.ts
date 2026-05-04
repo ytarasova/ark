@@ -72,6 +72,21 @@ class PromptQueue implements AsyncIterable<SDKUserMessage> {
     return this.pending.length;
   }
 
+  /**
+   * Detach all currently parked iterator resolvers by yielding `done: true`
+   * to each one. Called between query attempts: the SDK's iterator from a
+   * previous, now-aborted query may still hold a parked `next()` resolver
+   * here, and any message we push next would be silently delivered to that
+   * dead iterator. Yielding `done` lets it terminate cleanly so the
+   * subsequent push lands in `pending[]` for the next attempt's iterator.
+   * The queue itself remains open for further pushes.
+   */
+  detachIterators(): void {
+    const r = this.resolvers;
+    this.resolvers = [];
+    for (const resolve of r) resolve({ value: undefined as any, done: true });
+  }
+
   close(): void {
     this.closed = true;
     for (const r of this.resolvers) r({ value: undefined as any, done: true });
@@ -489,8 +504,29 @@ async function drainStream(
         sdkSessionId = m.session_id as string | undefined;
       }
 
+      const msg = message as {
+        type?: string;
+        subtype?: string;
+        is_error?: boolean;
+        terminal_reason?: string;
+      };
+
+      // Detect the synthetic result message the SDK emits in response to
+      // query.interrupt(): subtype=error_during_execution + is_error=true
+      // + terminal_reason=aborted_streaming. This is NOT a real failure --
+      // the launcher's outer loop will resume on the next iteration with
+      // the queued user message. Don't propagate it to the conductor as a
+      // failure event (which would trigger session-failure handling and
+      // race the resume).
+      const isInterruptResult =
+        msg.type === "result" &&
+        interruptFlag?.fired === true &&
+        (msg.subtype === "error_during_execution" || msg.terminal_reason === "aborted_streaming");
+
       writeLine(message);
-      await forwardToConductor(message, forwardDeps);
+      if (!isInterruptResult) {
+        await forwardToConductor(message, forwardDeps);
+      }
 
       // Re-feed the original prompt after compaction so the agent stays on task.
       if (m.type === "system" && (m.subtype as string | undefined) === "compact_boundary") {
@@ -503,9 +539,14 @@ async function drainStream(
         }
       }
 
-      const msg = message as { type?: string; is_error?: boolean };
       if (msg.type === "result") {
         sawResult = true;
+        if (isInterruptResult) {
+          // Interrupt-induced: treat as a clean interrupt, not a failure.
+          // Outer loop will see outcome="interrupted" and resume.
+          outcome = "interrupted";
+          return { outcome, sawResult, exitCode: 0, sdkSessionId };
+        }
         if (msg.is_error) exitCode = 1;
         // Streaming-input mode keeps the SDK iterator open after `result`
         // waiting for the next user message in the queue. Break out so the
@@ -607,7 +648,11 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     const stopTail = startInterventionTail({
       path: interventionPath,
       onMessage: (content) => queue.push(content),
-      onInterrupt: () => {
+      onInterrupt: (content) => {
+        // streamFactory test path: inject the steer and abort. Tests use
+        // simple AsyncIterables so the production-path queue-race doesn't
+        // apply -- pushing here is safe.
+        if (content.length > 0) queue.push(content);
         interruptFlag.fired = true;
         abortHolder.ref.abort();
       },
@@ -915,19 +960,58 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     },
   };
 
-  // Mutable abort holder so the intervention tail always sees the current controller.
+  // AbortController is used ONLY for hard process aborts (SIGTERM/SIGINT).
+  // User-initiated mid-turn interrupts go through the SDK's documented
+  // `query.interrupt()` method instead (see currentStream below). Aborting
+  // the controller while the SDK is mid-stream from the gateway leaves the
+  // for-await iterator parked indefinitely on some HTTP/2 transports --
+  // the SDK only honours abort cleanly between turns. interrupt() is the
+  // right primitive: it ends the in-flight turn, yields a final result
+  // message, and we restart with `resume: <sessionId>` to inject the
+  // queued user message as the next turn.
   const abortHolder = { ref: new AbortController() };
   const interruptFlag = { fired: false };
+
+  // Holds the Query object for the current iteration. The user-input
+  // subscriber's onInterrupt closes over this and calls .interrupt() on
+  // whatever is current at the moment the steer arrives.
+  const currentStream: { ref: { interrupt(): Promise<void> } | null } = { ref: null };
+
+  // Steer content arriving on interrupt envelopes is buffered here and
+  // drained into `queue` at the START of the next attempt iteration.
+  // Pushing directly to the queue would race with the dying SDK iterator
+  // -- if it had a `next()` resolver parked, the steer would be delivered
+  // to it and lost when the abort tears the turn down. Buffering ensures
+  // every steer ends up in front of a freshly-spawned iterator.
+  const pendingInterruptSteers: string[] = [];
 
   const onSigterm = () => abortHolder.ref.abort();
   const onSigint = () => abortHolder.ref.abort();
   process.on("SIGTERM", onSigterm);
   process.on("SIGINT", onSigint);
 
+  function fireInterrupt(content: string): void {
+    interruptFlag.fired = true;
+    if (content.length > 0) {
+      pendingInterruptSteers.push(content);
+    }
+    const s = currentStream.ref;
+    if (!s) {
+      console.error("[user-input] interrupt requested but no active SDK stream; steer will run on next turn");
+      return;
+    }
+    // Fire-and-forget: SDK ends the current turn and yields a result
+    // message, drainStream returns "interrupted", outer loop drains the
+    // pending steers into the queue and restarts with `resume`.
+    s.interrupt().catch((err) => {
+      console.error(`[user-input] query.interrupt() rejected: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }
+
   // Mid-session interventions: prefer the arkd wire stream (production path)
   // when ARK_ARKD_URL is reachable; fall back to the legacy file-tail for
-  // dev / test scenarios that run without arkd. The same callbacks fire in
-  // both cases so the prompt-queue / abort wiring downstream stays identical.
+  // dev / test scenarios that run without arkd. Both paths feed the same
+  // queue + interrupt machinery.
   const arkdUrlForStream = process.env.ARK_ARKD_URL;
   // The conductor publishes `session: session.session_id` (the handle,
   // e.g. `ark-s-<id>`) on the user-input channel, NOT the bare session
@@ -941,19 +1025,13 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         sessionName: sessionHandle,
         authToken: process.env.ARK_API_TOKEN,
         onMessage: (content) => queue.push(content),
-        onInterrupt: () => {
-          interruptFlag.fired = true;
-          abortHolder.ref.abort();
-        },
+        onInterrupt: fireInterrupt,
         onError: (err) => console.error(`[agent-sdk launch] intervention stream error: ${err.message}`),
       })
     : startInterventionTail({
         path: join(sessionDir, "interventions.jsonl"),
         onMessage: (content) => queue.push(content),
-        onInterrupt: () => {
-          interruptFlag.fired = true;
-          abortHolder.ref.abort();
-        },
+        onInterrupt: fireInterrupt,
         onError: (err) => console.error(`[agent-sdk launch] intervention tail error: ${err.message}`),
       });
 
@@ -971,7 +1049,30 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         (sdkOptions as Record<string, unknown>).resume = sdkSessionId;
       }
 
+      // Detach any parked iterator from the previous (now aborted) attempt
+      // before pushing fresh content. Without this, the dead iterator's
+      // resolver still sits at the head of the queue's resolver list and
+      // the next push() delivers there -- the message gets eaten by the
+      // dead iteration and never reaches the new query() we are about to
+      // start.
+      queue.detachIterators();
+
+      // Drain steers that arrived on interrupt envelopes during the
+      // previous iteration. They could not be pushed to the queue back
+      // then because the dying SDK iterator might have grabbed them via
+      // its parked `next()` resolver and lost them on abort.
+      while (pendingInterruptSteers.length > 0) {
+        const steer = pendingInterruptSteers.shift()!;
+        queue.push(steer);
+        console.error(`[agent-sdk launch] pushed pending interrupt steer to queue (${steer.length} bytes)`);
+      }
+
+      console.error(
+        `[agent-sdk launch] starting query attempt=${attempt} resume=${sdkSessionId ?? "none"} ` +
+          `queue.pendingCount=${queue.pendingCount()}`,
+      );
       const stream = query({ prompt: queue, options: sdkOptions });
+      currentStream.ref = stream;
       const dr = await drainStream(
         stream,
         writeLine,
@@ -980,6 +1081,11 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         interruptFlag,
         promptText,
         queue,
+      );
+      currentStream.ref = null;
+      console.error(
+        `[agent-sdk launch] query finished attempt=${attempt} outcome=${dr.outcome} ` +
+          `sawResult=${dr.sawResult} interrupted=${interruptFlag.fired}`,
       );
 
       if (dr.sdkSessionId && !sdkSessionId) {
@@ -996,6 +1102,15 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         continue;
       }
 
+      // User-initiated interrupt via query.interrupt(): the SDK ends the
+      // turn cleanly with a result message (outcome="completed"). The user
+      // has more to say -- restart with resume so the queued steer becomes
+      // the next turn. Always loop, even if the agent happened to call
+      // complete_stage in the same final flush.
+      if (interruptFlag.fired && attempt < MAX_INTERRUPTS) {
+        continue;
+      }
+
       // The Stop hook only allows the SDK to actually stop when
       // complete_stage was called AND the queue is empty. So a "completed"
       // outcome here means the agent has finalised its work; close out.
@@ -1009,13 +1124,14 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         } as RunAgentSdkLaunchResult;
       }
 
-      // Defensive: if drainStream returned "completed" but the contract
-      // wasn't met (Stop hook should have blocked, but in tests with a
-      // mock stream the hook never runs), loop back so behaviour matches
-      // the production-hook path. Tests that expect a single-shot exit
-      // should set stageCompleteRequested via injection or call
-      // complete_stage explicitly.
-      if (dr.outcome === "completed") continue;
+      // Defensive: if drainStream returned "completed" with sawResult but
+      // the agent didn't yet call complete_stage, loop back so the Stop
+      // hook can run again on the next turn (the production-hook path).
+      // Skipping when sawResult=false because then the SDK iterator ended
+      // without yielding ANY messages (stream broken / auth failure /
+      // empty resume); looping would just busy-spin re-creating dead
+      // streams. Surface that state to the caller as a clean failure.
+      if (dr.outcome === "completed" && dr.sawResult) continue;
 
       return { exitCode: dr.exitCode, sawResult: dr.sawResult };
     }
