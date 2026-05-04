@@ -242,7 +242,8 @@ Key fields:
 - `depends_on`: list of prior stage names for DAG ordering. Enables parallel execution of stages with no ordering constraint.
 - `action`: replaces `agent` for non-LLM stages. Built-in actions: `create_pr` (push branch + `gh pr create`), `auto_merge` (wait for CI then merge).
 - `edges`: explicit graph edges with `condition` expressions for conditional routing (see the `conditional` flow). Edges support `from`, `to`, `condition`, and `label` fields.
-- `task`: per-stage task prompt override. Template variables (`{summary}`, `{repo}`, `{workdir}`) are substituted at dispatch.
+- `on_outcome`: per-stage outcome routing. Maps outcome labels (reported by the agent via `report`) to target stage names. When the agent completes with a recognised outcome, the flow jumps to the mapped stage instead of the linear next. Unknown outcomes fall back to linear progression. Example: `on_outcome: { approved: deploy, rejected: revise }`.
+- `task`: per-stage task prompt override. Nunjucks template variables (`{{summary}}`, `{{repo}}`, `{{workdir}}`) are substituted at dispatch.
 - Fan-out stages wait for all their spawned children before the parent advances (auto-join on child completion).
 
 ```bash
@@ -290,14 +291,14 @@ ark agent show implementer
 # agents/implementer.yaml
 name: implementer
 description: Implements a plan into working code
-runtime: claude # default runtime; override with --runtime
-model: sonnet # opus | sonnet | haiku (claude models)
+runtime: claude-agent # default runtime; override with --runtime
+model: opus # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
-  You are working on {repo} (branch {branch}).
-  Ticket: {ticket}
-  Task: {summary}
-  Workdir: {workdir}
+  You are working on {{repo}} (branch {{branch}}).
+  Ticket: {{ticket}}
+  Task: {{summary}}
+  Workdir: {{workdir}}
   Write minimal, correct code. Run tests before claiming done.
 skills: [test-writing, self-review, sanity-gate]
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
@@ -305,17 +306,20 @@ permission_mode: bypassPermissions
 env: {}
 ```
 
-Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
+Agent template variables use Nunjucks (Jinja-for-JS) syntax: `{{ticket}}`, `{{summary}}`, `{{repo}}`, `{{branch}}`, `{{workdir}}`. See [docs/templating.md](templating.md) for the full reference.
 
-### Runtimes (5)
+### Runtimes (6)
 
-| Name         | Tool                        | Billing                     | Transcript parser                  |
-| ------------ | --------------------------- | --------------------------- | ---------------------------------- |
-| `claude`     | Claude Code CLI             | api (per token)             | claude                             |
-| `claude-max` | Claude Code (Max sub)       | subscription ($200/mo flat) | claude                             |
-| `codex`      | OpenAI Codex CLI            | api                         | codex (default model: gpt-5-codex) |
-| `gemini`     | Google Gemini CLI           | api                         | gemini                             |
-| `goose`      | Goose CLI (Block / LF AAIF) | api                         | goose                              |
+| Name           | Tool                             | Billing                     | Transcript parser                  |
+| -------------- | -------------------------------- | --------------------------- | ---------------------------------- |
+| `claude-code`  | Claude Code CLI                  | api (per token)             | claude                             |
+| `claude-agent` | Anthropic Agent SDK (in-process) | api                         | agent-sdk                          |
+| `claude-max`   | Claude Code (Max subscription)   | subscription ($200/mo flat) | claude                             |
+| `codex`        | OpenAI Codex CLI                 | api                         | codex (default model: gpt-5-codex) |
+| `gemini`       | Google Gemini CLI                | api                         | gemini                             |
+| `goose`        | Goose CLI (Block / LF AAIF)      | api                         | goose                              |
+
+`claude-code` and `claude-agent` both run Anthropic models but differ operationally: `claude-code` launches the Claude Code CLI in tmux (same runtime end users run locally), while `claude-agent` is the Anthropic Agent SDK running in-process, spawned through the `arkd` daemon's `/process/spawn` endpoint. Use `claude-agent` when you want lower overhead, gateway routing (Bedrock / TrueFoundry), or a headless in-process run.
 
 ```bash
 ark runtime list
@@ -342,12 +346,13 @@ ark session start --repo . --summary "Big refactor" \
 ```yaml
 # runtimes/codex.yaml
 name: codex
-description: OpenAI Codex CLI
-type: cli-agent # claude-code | cli-agent | subprocess
-command: ["codex", "--auto"]
-task_delivery: stdin # stdin | file | arg
-billing_mode: api # api | subscription | free
-transcript_parser: codex # selects CodexTranscriptParser
+description: "OpenAI Codex CLI"
+type: cli-agent # claude-code | claude-agent | cli-agent | goose | subprocess
+command: ["codex", "--approval-mode", "full-auto"]
+task_delivery: arg # stdin | file | arg -- how the task prompt reaches the tool
+billing:
+  mode: api # api | subscription | free
+  transcript_parser: codex # selects CodexTranscriptParser
 models:
   - id: gpt-5-codex
     label: "GPT-5 Codex"
@@ -358,13 +363,16 @@ env:
   OPENAI_API_KEY: "${OPENAI_API_KEY}"
 ```
 
-Three executor types are registered at boot:
+Six executor types are registered at boot:
 
 - `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
-- `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
+- `claude-agent` -- Anthropic Agent SDK spawned in-process through `arkd /process/spawn`; no tmux.
+- `cli-agent` -- any other CLI tool (Codex, Gemini) in tmux, with worktree isolation.
+- `goose` -- Goose CLI with its own task-delivery and transcript conventions.
 - `subprocess` -- generic child process, no tmux.
+- `noop` -- stub used only in tests.
 
-Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture`.
+Each executor implements five methods: `launch`, `kill`, `status`, `send`, `capture`.
 
 ---
 
@@ -1243,4 +1251,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 6 runtimes (Claude Code, Claude Agent SDK, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
