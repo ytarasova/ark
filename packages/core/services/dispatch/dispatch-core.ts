@@ -183,7 +183,13 @@ export class CoreDispatcher {
     // For claude (name=claude, type=claude-code) the secrets resolver did
     // `runtimes.get("claude-code")` -> null -> ANTHROPIC_API_KEY never made
     // it into the launch env even though runtimes/claude.yaml declares it.
-    const runtimeType = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
+    const runtimeType = agent._resolved_runtime_type ?? agent.runtime;
+    if (!runtimeType) {
+      return {
+        ok: false,
+        message: `No runtime resolvable for session ${sessionId} (agent '${agentName}' has no runtime field and no launch_executor)`,
+      };
+    }
     const runtimeName = agent.runtime ?? runtimeType;
     const executor = this.deps.resolveExecutor(runtimeType);
     if (!executor) return { ok: false, message: `Executor '${runtimeType}' not registered` };
