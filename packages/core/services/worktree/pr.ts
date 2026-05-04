@@ -32,8 +32,9 @@ import type { ComputeProvider } from "../../../compute/types.js";
 import { ArkdClient } from "../../../arkd/client.js";
 import { resolveProvider } from "../../compute-resolver.js";
 import { loadRepoConfig } from "../../repo-config.js";
-import { logDebug, logWarn } from "../../observability/structured-log.js";
+import { logDebug, logInfo, logWarn } from "../../observability/structured-log.js";
 import { rebaseOntoBase } from "./git-ops.js";
+import { createPullRequest, mergePullRequest, parseGithubOwnerRepoFromUrl, type GithubDeps } from "../github/rest.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -399,9 +400,54 @@ export async function createWorktreePR(
   const localPushDir = existsSync(wtDir) ? wtDir : repo;
 
   try {
+    // For remote-dispatch push to github over HTTPS the worker has no
+    // git credential helper -- `git push https://github.com/...` then
+    // hangs prompting for a username. Inject GITHUB_TOKEN into the
+    // origin URL before push so HTTPS basic-auth carries the token.
+    // Idempotent: only runs on remote+github+https; the cleanup at the
+    // end restores the original URL so we don't leak the token into the
+    // worker's git config.
+    let originalOriginUrl: string | null = null;
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (routing.remote && githubToken) {
+      const probe = await readOriginUrl(app, session);
+      if (probe && probe.startsWith("https://github.com/")) {
+        originalOriginUrl = probe;
+        const authedUrl = probe.replace("https://", `https://x-access-token:${githubToken}@`);
+        try {
+          await runGit(app, session, ["remote", "set-url", "origin", authedUrl], { timeout: 15_000 });
+        } catch (err: any) {
+          logWarn("session", `createWorktreePR: failed to set authed origin url: ${err?.message ?? err}`);
+        }
+      }
+    }
+
     // 1. Push branch. For remote sessions this dispatches over arkd; for
     //    local it execs git directly.
-    const pushArgs = ["push", "-u", "origin", branch];
+    //
+    // `ark-s-<sessionId>` branches are owned by exactly one session --
+    // no concurrent writers ever exist. Agents routinely rewrite history
+    // mid-flow (`git commit --amend`, rebase, lint-fix squash) and push
+    // it themselves via Bash; if they then make further local commits
+    // and our `git push` attempts to write the new local state, the
+    // remote is ahead of our last fetched view and lease/non-fast-forward
+    // fails.
+    //
+    // For session-owned branches we use plain `--force`: the branch is
+    // exclusively ours, no other process or human writes it, and "what
+    // we have locally at the end of the session" is by definition the
+    // intended end-state for the branch. --force-with-lease was the
+    // first try but it refuses when the remote ref is unknown locally
+    // (which happens every time the agent self-pushes mid-flow without
+    // our worktree fetching). Plain force is the right tool here.
+    //
+    // Non-session branches (a human-named branch the agent was told to
+    // work on, e.g. via `--branch my-fix`) keep the safe default --
+    // those CAN have concurrent writers.
+    const isSessionOwnedBranch = branch === `ark-s-${sessionId}`;
+    const pushArgs = isSessionOwnedBranch
+      ? ["push", "-u", "--force", "origin", branch]
+      : ["push", "-u", "origin", branch];
     let pushStdout = "";
     let pushStderr = "";
     try {
@@ -413,8 +459,21 @@ export async function createWorktreePR(
       pushStderr = r.stderr;
     } catch (e: any) {
       // Surface stderr if the dispatcher attached it (remote path).
-      const reason = e?.stderr || e?.message || String(e);
+      // Strip the embedded token from the error text before surfacing.
+      let reason = e?.stderr || e?.message || String(e);
+      if (githubToken) reason = reason.replaceAll(githubToken, "***");
       return { ok: false, message: `git push failed: ${reason}` };
+    } finally {
+      // Always restore the original origin URL so the token doesn't
+      // persist in the worker's git config. Best-effort: a failure
+      // here doesn't fail the action.
+      if (originalOriginUrl) {
+        try {
+          await runGit(app, session, ["remote", "set-url", "origin", originalOriginUrl], { timeout: 15_000 });
+        } catch (err: any) {
+          logWarn("session", `createWorktreePR: failed to restore origin url: ${err?.message ?? err}`);
+        }
+      }
     }
 
     // 2. Decide host. For remote we read origin from the remote workdir;
@@ -425,10 +484,40 @@ export async function createWorktreePR(
     let prUrl: string | undefined;
 
     if (host === "github") {
-      // GitHub: original `gh pr create` path. Only reachable for local
-      // dispatches today (we don't install `gh` on EC2). For remote-GitHub
-      // sessions, fall through to the parsed/fallback URL behaviour.
-      if (!routing.remote) {
+      // REST-API path FIRST. Works on every dispatch (local + EC2 + k8s)
+      // because it talks to api.github.com over HTTPS instead of shelling
+      // `gh` on the worker. Auth is `GITHUB_TOKEN`; the worker doesn't
+      // need `gh` installed and we don't depend on stdout parsing.
+      const githubToken = process.env.GITHUB_TOKEN;
+      const ownerRepo = parseGithubOwnerRepoFromUrl(originUrl);
+      if (githubToken && ownerRepo) {
+        const restDeps: GithubDeps = { token: githubToken };
+        const result = await createPullRequest(
+          { owner: ownerRepo.owner, repo: ownerRepo.repo, branch, base, title, body, draft: opts?.draft },
+          restDeps,
+        );
+        if (result.ok && result.pr_url) {
+          prUrl = result.pr_url;
+          if (result.existed) {
+            logInfo("session", `createWorktreePR: REST API found existing PR for ${sessionId}: ${prUrl}`);
+          }
+        } else {
+          // REST API failed loudly. Don't degrade silently to a tree URL --
+          // surface the error so the caller marks the action failed and
+          // the operator can fix auth / scopes / branch protection.
+          logWarn(
+            "session",
+            `createWorktreePR: REST createPullRequest failed for ${sessionId}: ${result.message ?? "(no message)"}`,
+          );
+          return {
+            ok: false,
+            message: `create_pr failed via GitHub REST API: ${result.message ?? "unknown error"}`,
+          };
+        }
+      } else if (!routing.remote) {
+        // GITHUB_TOKEN absent + local dispatch: try the legacy `gh` CLI
+        // path. Surfaces the same null-URL issue but is the documented
+        // fallback for environments without GITHUB_TOKEN configured.
         try {
           const ghArgs = buildGhPrCreateArgs({ head: branch, base, title, body, draft: opts?.draft });
           const { stdout } = await execFileAsync("gh", ghArgs, {
@@ -438,13 +527,14 @@ export async function createWorktreePR(
           });
           prUrl = stdout.trim();
         } catch (e: any) {
-          // gh failed (auth missing, repo unrecognized, etc.) -- degrade.
           logWarn("session", `createWorktreePR: gh pr create failed for ${sessionId}, degrading: ${e?.message ?? e}`);
           prUrl = parseCreatePrUrl(pushStderr) ?? fallbackBranchUrl(host, originUrl, branch) ?? undefined;
         }
       } else {
-        // Remote GitHub: `gh` not installed on the box. Push succeeded;
-        // surface the parsed/fallback URL.
+        // Remote GitHub with no GITHUB_TOKEN: `gh` not installed, no REST
+        // path. Push succeeded; surface the parsed/fallback URL but the
+        // null-URL guard at the bottom of the function will refuse to
+        // mark the action successful without a real PR URL.
         prUrl = parseCreatePrUrl(pushStderr) ?? fallbackBranchUrl(host, originUrl, branch) ?? undefined;
       }
     } else {
@@ -470,8 +560,30 @@ export async function createWorktreePR(
       const note = host === "github" ? "" : ` (host=${host}; auto-merge not supported)`;
       return { ok: true, message: `PR created: ${prUrl}${note}`, pr_url: prUrl };
     }
-    // No URL but push succeeded -- treat as ok so callers don't block.
+    // No URL but push succeeded. For non-github hosts (bitbucket / gitlab /
+    // unknown) this is a documented degraded path -- those hosts don't
+    // expose a PR API the action can call from the conductor side, and
+    // the operator opens the PR manually from the branch URL.
+    //
+    // For GitHub, no URL is a HARD FAILURE. The legacy behaviour of
+    // returning `ok:true` with `pr_url:null` was the root cause of every
+    // downstream `auto_merge` "Session has no PR URL" mystery -- the
+    // session looked successful at the create_pr stage, then failed
+    // inscrutably one stage later. Surface the failure here so the
+    // session goes to `failed` with a clear pointer at the actual issue
+    // (no GITHUB_TOKEN, no `gh` on the worker, branch had no commits,
+    // token lacks `pull_requests: write`, etc.).
     void pushStdout;
+    if (host === "github") {
+      return {
+        ok: false,
+        message:
+          `create_pr: branch ${branch} pushed to origin but no PR URL was returned. ` +
+          `Common causes: GITHUB_TOKEN missing or insufficient scope (need pull_requests: write), ` +
+          `branch has no commits ahead of ${base}, or the worker lacks 'gh' CLI on a remote dispatch. ` +
+          `Resolve and re-run, or create the PR manually and set session.pr_url.`,
+      };
+    }
     return {
       ok: true,
       message: `Branch ${branch} pushed to origin (host=${host}); no PR URL surfaced -- create one manually`,
@@ -540,17 +652,43 @@ export async function mergeWorktreePR(
   const method = opts?.method ?? "squash";
   const deleteAfter = opts?.deleteAfter ?? true;
 
+  // REST-API path FIRST. Same rationale as createWorktreePR: works on
+  // every dispatch shape, doesn't depend on `gh` being installed or
+  // authenticated on the worker, surfaces typed errors instead of stdout
+  // soup. Falls back to the legacy `gh pr merge` only when no
+  // GITHUB_TOKEN is available.
+  const githubToken = process.env.GITHUB_TOKEN;
+  if (githubToken) {
+    const result = await mergePullRequest(
+      { pr_url: prUrl, method, delete_branch: deleteAfter },
+      { token: githubToken },
+    );
+    if (result.ok) {
+      await app.events.log(sessionId, "pr_merged", {
+        stage: session.stage ?? undefined,
+        actor: "system",
+        data: {
+          pr_url: prUrl,
+          method,
+          delete_branch: deleteAfter,
+          sha: result.sha,
+          branch_deleted: result.branch_deleted,
+        },
+      });
+      return { ok: true, message: `PR merged via REST API: ${prUrl}` };
+    }
+    return { ok: false, message: `PR merge failed: ${result.message ?? "unknown error"}` };
+  }
+
+  // Legacy gh CLI fallback when GITHUB_TOKEN is not set. Local-only:
+  // remote dispatches without a token have no path that can succeed
+  // (no `gh` on the worker, no REST creds in the conductor).
   try {
     const ghArgs = ["pr", "merge", prUrl, `--${method}`, "--auto"];
     if (deleteAfter) ghArgs.push("--delete-branch");
-    // `gh pr merge <url>` derives the repo from the URL itself -- the cwd
-    // doesn't need to be a git checkout. Older code passed
-    // `session.workdir ?? repo`, but for remote-repo sessions
-    // session.workdir points at a phantom local path
-    // (e.g. /Users/<u>/Projects/<repo>/<repo>) and session.repo is just the
-    // basename ("ark"), so posix_spawn errored with ENOTDIR. Prefer the
-    // local worktree if it exists; otherwise fall back to the conductor's
-    // arkDir (always present).
+    // `gh pr merge <url>` derives the repo from the URL -- the cwd
+    // doesn't need to be a git checkout. Prefer the local worktree if
+    // it exists; otherwise fall back to the conductor's arkDir.
     const wtDir = join(app.config.dirs.worktrees, sessionId);
     const cwd = existsSync(wtDir) ? wtDir : app.config.dirs.ark;
     await execFileAsync("gh", ghArgs, { encoding: "utf-8", timeout: 30_000, cwd });

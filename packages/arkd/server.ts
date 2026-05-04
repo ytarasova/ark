@@ -33,7 +33,12 @@ import { handleExecRoutes } from "./routes/exec.js";
 import { handleAgentRoutes } from "./routes/agent.js";
 import { handleMetricsSnapshotRoutes } from "./routes/metrics-snapshot.js";
 import { handleChannelRoutes } from "./routes/channel.js";
-import { handleChannelRoutes as handleGenericChannelRoutes } from "./routes/channels.js";
+import {
+  channelWebSocketHandler,
+  handleChannelRoutes as handleGenericChannelRoutes,
+  matchWsChannelPath,
+  type ChannelWsData,
+} from "./routes/channels.js";
 import { handleMiscRoutes } from "./routes/misc.js";
 import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "./routes/attach.js";
 import { handleProcessRoutes } from "./routes/process.js";
@@ -94,7 +99,21 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   function checkAuth(req: Request, path: string): Response | null {
     if (!arkdToken || !expectedAuth) return null;
     if (AUTH_EXEMPT_PATHS.has(path)) return null;
-    const authHeader = req.headers.get("Authorization") ?? "";
+    let authHeader = req.headers.get("Authorization") ?? "";
+    // WebSocket upgrade requests can't easily set custom headers from
+    // browsers; allow the bearer token to ride in the
+    // Sec-WebSocket-Protocol subprotocol header as `Bearer.<token>`.
+    // This matches what `ArkdClient.subscribeToChannel` sends. The
+    // value is still constant-time-compared below; subprotocol is
+    // just a transport for the same token.
+    if (!authHeader) {
+      const subproto = req.headers.get("Sec-WebSocket-Protocol") ?? "";
+      const m = subproto
+        .split(",")
+        .map((s) => s.trim())
+        .find((s) => s.startsWith("Bearer."));
+      if (m) authHeader = `Bearer ${m.slice("Bearer.".length)}`;
+    }
     const providedBuf = Buffer.from(authHeader);
     // Mismatched length => definitely wrong; still run a constant-time compare
     // against a fixed-size dummy so the timing does not leak "wrong length".
@@ -163,9 +182,38 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
     // 10s cap, which also covers slow `/snapshot` calls on loaded macOS
     // hosts where top + vm_stat + tmux + docker-stats stack past 10s.
     idleTimeout: 0,
-    async fetch(req) {
+    websocket: {
+      ...channelWebSocketHandler,
+      // Bun sends ping frames every `idleTimeout` seconds when sendPings
+      // is true (default). 30s is short enough that every TCP / proxy /
+      // SSM tunnel layer sees the connection as live and won't tear it
+      // down on idle. The client's WebSocket implementation answers with
+      // pong automatically -- no application-level keepalive needed.
+      idleTimeout: 30,
+      sendPings: true,
+    },
+    async fetch(req, srv) {
       const url = new URL(req.url);
       const path = url.pathname;
+
+      // WebSocket upgrade for /ws/channel/{name}. Auth is required for
+      // upgrades, same as for HTTP requests. The data attached here is
+      // available on `ws.data` in the websocket handlers.
+      if (req.method === "GET" && path.startsWith("/ws/")) {
+        const channelName = matchWsChannelPath(path);
+        if (channelName) {
+          const authErr = checkAuth(req, path);
+          if (authErr) return authErr;
+          const data: ChannelWsData = { channel: channelName };
+          if (srv.upgrade(req, { data })) {
+            // Returning undefined hands the request to the websocket
+            // handler. Bun expects no Response when an upgrade succeeded.
+            return undefined as unknown as Response;
+          }
+          return json({ error: "websocket upgrade failed" }, 400);
+        }
+        return json({ error: "unknown websocket path" }, 404);
+      }
 
       try {
         // ── Health ─────────────────────────────────────────────────────

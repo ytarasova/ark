@@ -236,7 +236,12 @@ export class SessionCreator {
     if (!usage.input_tokens && !usage.output_tokens) return;
     try {
       const d = this.deps;
-      const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
+      const runtimeName =
+        (session.config?.launch_executor as string | undefined) ?? (session.config?.runtime as string | undefined);
+      if (!runtimeName) {
+        logWarn("session", `recordUsage: no runtime resolvable for session ${session.id} -- skipping`);
+        return;
+      }
       const runtime = d.runtimes.get(runtimeName);
       const billingMode = runtime?.billing?.mode ?? "api";
       // Runtime no longer owns a default_model. Fall back to "sonnet" (a

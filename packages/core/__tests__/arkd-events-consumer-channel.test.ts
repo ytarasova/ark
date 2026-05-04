@@ -2,20 +2,25 @@
  * Conductor-side coverage for the SSM channel-report fix.
  *
  * The arkd events consumer (`packages/core/conductor/arkd-events-consumer.ts`)
- * subscribes to arkd's `hooks` channel via the generic pub/sub primitive
- * (`GET /channel/hooks/subscribe`). The channel carries `channel-report` and
- * `channel-relay` envelopes in addition to the existing `hook` envelopes;
- * the consumer must dispatch them through `handleReport` / the relay path
- * so the conductor side-effects (session updates, log events, message
- * persistence, etc.) actually run.
+ * subscribes to arkd's `hooks` channel via WebSocket (`/ws/channel/hooks`).
+ * The channel carries `channel-report` and `channel-relay` envelopes in
+ * addition to hook envelopes; the consumer must dispatch them through
+ * `handleReport` / the relay path so the conductor side-effects (session
+ * updates, log events, message persistence) actually run.
  *
- * This test stubs out a minimal arkd-like server that streams a single
- * `channel-report` envelope, starts the consumer pointed at that stub, and
- * verifies an `agent_progress` event was logged on the target session
- * exactly the way the legacy direct HTTP path used to.
+ * This test stubs out a minimal WS-capable server that:
+ *   1. Accepts the WS upgrade on `/ws/channel/hooks`.
+ *   2. Sends `SUBSCRIBED_ACK` immediately in `open()` so that
+ *      `ArkdClient.subscribeToChannel` resolves its ready Promise.
+ *   3. Sends the queued frames immediately after the ack.
+ *   4. Stays open until the test tears down.
+ *
+ * The consumer reconnects in a loop; we only need one delivery per test
+ * to assert that the dispatch path ran.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import type { ServerWebSocket } from "bun";
 import { AppContext } from "../app.js";
 import {
   startArkdEventsConsumer,
@@ -23,6 +28,7 @@ import {
   _resetArkdEventsConsumers,
 } from "../conductor/arkd-events-consumer.js";
 import { allocatePort } from "../config/port-allocator.js";
+import { SUBSCRIBED_ACK } from "../../arkd/routes/channels.js";
 
 let app: AppContext;
 
@@ -36,50 +42,60 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
+interface StubWsData {
+  frames: string[];
+}
+
 /**
- * Spin up a minimal HTTP server that mimics arkd's
- * `/channel/hooks/subscribe` shape: for each incoming GET it streams the
- * queued NDJSON lines exactly once and then closes the response body. The
- * consumer reconnects in a loop; we only need one delivery to assert the
- * dispatch path ran.
+ * Spin up a minimal Bun WS server that mimics arkd's `/ws/channel/hooks`
+ * subscribe protocol:
+ *   - Sends `SUBSCRIBED_ACK` on `open` so ArkdClient.subscribeToChannel
+ *     resolves its ready promise.
+ *   - Immediately follows with the pre-loaded frames.
+ *   - Stays open (the consumer's reconnect loop will stay parked).
  */
-function startStubArkd(port: number, lines: string[]): { stop(): void } {
-  return Bun.serve({
+function startStubArkd(port: number, frames: string[]): { stop(): void } {
+  return Bun.serve<StubWsData>({
     port,
     hostname: "127.0.0.1",
-    async fetch(req) {
+    websocket: {
+      open(ws: ServerWebSocket<StubWsData>): void {
+        ws.send(SUBSCRIBED_ACK);
+        for (const frame of ws.data.frames) {
+          ws.send(frame);
+        }
+      },
+      message(): void {
+        /* stub ignores incoming messages */
+      },
+      close(): void {
+        /* stub ignores close events */
+      },
+    },
+    fetch(req, srv) {
       const url = new URL(req.url);
-      if (url.pathname !== "/channel/hooks/subscribe") {
-        return new Response("not found", { status: 404 });
+      if (url.pathname === "/ws/channel/hooks") {
+        if (srv.upgrade(req, { data: { frames } })) {
+          return undefined as unknown as Response;
+        }
+        return new Response("upgrade failed", { status: 400 });
       }
-      const enc = new TextEncoder();
-      // Deliver each line then close. The consumer reads the lines, then the
-      // socket closes naturally and the consumer parks in its reconnect
-      // backoff -- which is fine because the test has already observed the
-      // side-effect by then.
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          for (const line of lines) {
-            controller.enqueue(enc.encode(line.endsWith("\n") ? line : line + "\n"));
-          }
-          controller.close();
-        },
-      });
-      return new Response(stream, {
-        status: 200,
-        headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" },
-      });
+      return new Response("not found", { status: 404 });
     },
   });
 }
 
+/**
+ * Poll `app.events.list(sessionId)` until an event with the given type
+ * appears or the deadline passes. Returns the event or null.
+ */
 async function waitForEvent(appCtx: AppContext, sessionId: string, type: string, timeoutMs: number): Promise<unknown> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const events = await appCtx.events.list(sessionId);
     const hit = events.find((e: { type: string }) => e.type === type);
     if (hit) return hit;
-    await Bun.sleep(25);
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
   }
   return null;
 }
@@ -87,7 +103,7 @@ async function waitForEvent(appCtx: AppContext, sessionId: string, type: string,
 describe("arkd-events-consumer: channel-report dispatch", () => {
   test("a channel-report frame on the stream runs handleReport on conductor", async () => {
     const session = await app.sessions.create({ summary: "consumer channel-report test", flow: "bare" });
-    await app.sessions.update(session.id, { stage: "implement", status: "running" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, stage: "implement", status: "running" });
 
     const stubPort = await allocatePort();
     const frame = JSON.stringify({
@@ -107,10 +123,7 @@ describe("arkd-events-consumer: channel-report dispatch", () => {
     try {
       startArkdEventsConsumer(app, "stub-compute-1", `http://127.0.0.1:${stubPort}`, null);
 
-      // handleReport logs `agent_<type>` events via app.events.log -- this is
-      // the same observation point the live HTTP path produces. If the frame
-      // were silently dropped (the bug we just fixed), no event would land.
-      const evt = (await waitForEvent(app, session.id, "agent_progress", 3000)) as {
+      const evt = (await waitForEvent(app, session.id, "agent_progress", 5000)) as {
         data?: { message?: string };
       } | null;
       expect(evt).not.toBeNull();
@@ -123,7 +136,7 @@ describe("arkd-events-consumer: channel-report dispatch", () => {
 
   test("a channel-report with type=error advances the session through handleReport", async () => {
     const session = await app.sessions.create({ summary: "consumer error report test", flow: "bare" });
-    await app.sessions.update(session.id, { stage: "implement", status: "running" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, stage: "implement", status: "running" });
 
     const stubPort = await allocatePort();
     const frame = JSON.stringify({
@@ -143,7 +156,7 @@ describe("arkd-events-consumer: channel-report dispatch", () => {
     try {
       startArkdEventsConsumer(app, "stub-compute-2", `http://127.0.0.1:${stubPort}`, null);
 
-      const evt = (await waitForEvent(app, session.id, "agent_error", 3000)) as { data?: { error?: string } } | null;
+      const evt = (await waitForEvent(app, session.id, "agent_error", 5000)) as { data?: { error?: string } } | null;
       expect(evt).not.toBeNull();
       expect(evt!.data?.error).toBe("synthetic failure");
     } finally {
@@ -158,11 +171,9 @@ describe("arkd-events-consumer: channel-report dispatch", () => {
     const stub = startStubArkd(stubPort, [frame]);
     try {
       startArkdEventsConsumer(app, "stub-compute-3", `http://127.0.0.1:${stubPort}`, null);
-      // Just give the consumer enough time to drain & log-and-ignore. If it
-      // were going to throw, the test would surface that as an unhandled
-      // rejection. We don't have a stronger observable here because by
-      // design unknown frames are silently dropped.
-      await Bun.sleep(150);
+      // Wait long enough for the consumer to connect, receive the frame, and
+      // log-and-ignore. An unhandled rejection would fail the test process.
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
     } finally {
       stopArkdEventsConsumer("stub-compute-3");
       stub.stop();

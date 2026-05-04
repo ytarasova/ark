@@ -57,7 +57,7 @@ describe("applyReport error with on_failure retry", async () => {
     const app = getApp();
     // quick flow has implement stage with on_failure: "retry(3)"
     const session = await app.sessions.create({ summary: "retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const result = await app.sessionHooks.applyReport(session.id, {
       type: "error",
@@ -75,7 +75,7 @@ describe("applyReport error with on_failure retry", async () => {
     const app = getApp();
     // quick flow's verify stage has no on_failure
     const session = await app.sessions.create({ summary: "no retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "verify" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "verify" });
 
     const result = await app.sessionHooks.applyReport(session.id, {
       type: "error",
@@ -92,7 +92,7 @@ describe("applyReport error with on_failure retry", async () => {
     const app = getApp();
     // bare flow has no on_failure at all, but let's test with a session that has no flow
     const session = await app.sessions.create({ summary: "bare test", flow: "bare" });
-    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const result = await app.sessionHooks.applyReport(session.id, {
       type: "error",
@@ -107,7 +107,7 @@ describe("applyReport error with on_failure retry", async () => {
   it("does NOT set shouldRetry for non-error reports", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "progress test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const result = await app.sessionHooks.applyReport(session.id, {
       type: "progress",
@@ -125,7 +125,7 @@ describe("applyHookStatus failure with on_failure retry", async () => {
   it("sets shouldRetry on StopFailure when stage has on_failure: retry(N)", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "hook retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
     const fresh = await app.sessions.get(session.id)!;
 
     const result = await app.sessionHooks.applyHookStatus(fresh, "StopFailure", {
@@ -140,7 +140,7 @@ describe("applyHookStatus failure with on_failure retry", async () => {
   it("does NOT set shouldRetry on StopFailure when stage has no on_failure", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "hook no-retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "verify" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "verify" });
     const fresh = await app.sessions.get(session.id)!;
 
     const result = await app.sessionHooks.applyHookStatus(fresh, "StopFailure", {
@@ -202,7 +202,7 @@ describe("conductor on_failure retry loop", async () => {
   it("error report on retry stage resets to ready and logs retry event", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "conductor retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const resp = await postReport(session.id, {
       type: "error",
@@ -231,7 +231,7 @@ describe("conductor on_failure retry loop", async () => {
   it("error report falls through to failed when max retries exhausted", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "exhausted retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     // Simulate 3 prior retries (quick flow has retry(3))
     for (let i = 0; i < 3; i++) {
@@ -257,7 +257,7 @@ describe("conductor on_failure retry loop", async () => {
   it("error report on non-retry stage stays failed", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "no-retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "verify" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "verify" });
 
     const resp = await postReport(session.id, {
       type: "error",
@@ -279,7 +279,7 @@ describe("conductor on_failure retry loop", async () => {
   it("hook StopFailure on retry stage resets to ready", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "hook retry test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const resp = await postHook(session.id, {
       hook_event_name: "StopFailure",

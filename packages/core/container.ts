@@ -52,7 +52,7 @@ import type { TensorZeroLauncher } from "./infra/tensorzero-launcher.js";
 import type { MetricsPoller } from "./infra/metrics-poller.js";
 import type { MaintenancePollers } from "./infra/maintenance-pollers.js";
 import type { SignalHandlers } from "./infra/signal-handlers.js";
-import type { StaleStateDetector } from "./infra/stale-state-detector.js";
+import type { BootCleanup } from "./infra/boot-cleanup.js";
 import type { ServiceWiring } from "./infra/service-wiring.js";
 import type { ComputeProvidersBoot } from "./infra/compute-providers-boot.js";
 import type { SessionDrain } from "./infra/session-drain.js";
@@ -160,7 +160,7 @@ export interface Cradle {
   arkdLauncher: ArkdLauncher;
   metricsPoller: MetricsPoller;
   maintenancePollers: MaintenancePollers;
-  staleStateDetector: StaleStateDetector;
+  bootCleanup: BootCleanup;
   signalHandlers: SignalHandlers;
   sessionDrain: SessionDrain;
 

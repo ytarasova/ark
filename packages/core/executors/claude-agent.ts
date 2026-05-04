@@ -139,6 +139,12 @@ export const claudeAgentExecutor: Executor = {
       ARK_PROMPT_FILE: workerPromptFile,
       ARK_ARKD_URL: "http://localhost:19300",
     };
+    // Stage is baked in at provision time -- once the runtime is up, this
+    // label is immutable and stamped onto every hook the agent emits.
+    // Resolved from session.stage at launch (the dispatch context that
+    // produced this runtime instance), not from a global session row that
+    // can flap mid-flight (#435 root cause #3).
+    if (session.stage) arkEnv.ARK_STAGE = session.stage;
     if (opts.agent.model) arkEnv.ARK_MODEL = opts.agent.model;
     if (opts.agent.max_turns && opts.agent.max_turns > 0) arkEnv.ARK_MAX_TURNS = String(opts.agent.max_turns);
     const maxBudget = (opts.agent as Record<string, unknown>).max_budget_usd as number | undefined;
@@ -296,6 +302,31 @@ export const claudeAgentExecutor: Executor = {
     // "running" here would be wrong (we have no session context); "idle"
     // signals "ask the provider".
     return { state: "idle" };
+  },
+
+  async probeStatus({ session, handle, compute, provider }) {
+    // claude-agent runs as a Bun process spawned via arkd /process/spawn,
+    // NOT in tmux. The default `provider.checkSession` would query
+    // /agent/status (tmux has-session) and always return false for a
+    // process-based handle, flipping the row to completed within ~3s of
+    // launch (#435). Use /process/status, which kill(pid, 0)s the actual
+    // PID arkd recorded at spawn time.
+    if (!provider.statusProcessByHandle) {
+      // Provider can't tell us about processes -- safest answer is
+      // "still running" so we don't false-positive into completed.
+      return { state: "running" };
+    }
+    const status = await provider.statusProcessByHandle(compute, session, handle);
+    if (status.running) return { state: "running", pid: status.pid };
+    if (typeof status.exitCode === "number") {
+      return status.exitCode === 0
+        ? { state: "completed", exitCode: status.exitCode }
+        : { state: "failed", error: `process exited with code ${status.exitCode}` };
+    }
+    // No record of the handle on arkd at all -- treat as gone, but
+    // distinguish from a clean exit so the poller's "completed -> ready
+    // -> mediate" branch can still fire.
+    return { state: "not_found" };
   },
 
   async send(_handle: string, _message: string): Promise<void> {

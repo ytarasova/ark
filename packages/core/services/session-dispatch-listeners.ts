@@ -10,10 +10,11 @@
 import type { Session, SessionStatus } from "../../types/index.js";
 import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
-import { logWarn } from "../observability/structured-log.js";
+import { logWarn, logError } from "../observability/structured-log.js";
+import type { DispatchResult } from "./dispatch/types.js";
 
 type SessionCreatedListener = (sessionId: string) => void;
-type DispatchFn = (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
+type DispatchFn = (sessionId: string) => Promise<DispatchResult>;
 
 /**
  * Belt-and-braces watchdog: even with timeouts on every ArkdClient fetch
@@ -39,32 +40,6 @@ function readDispatchWatchdogMs(): number {
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_DISPATCH_WATCHDOG_MS;
   return parsed;
-}
-
-/**
- * Allow-list of `dispatch()` success messages where the session is *expected*
- * to remain at status=ready. Without this, a strict post-condition check on
- * `result.ok === true` would mark every legitimate-no-launch path as failed.
- *
- * Concrete cases this covers (from the existing dispatch surface):
- *   - "Already running"        -- duplicate-dispatch noop
- *   - "Executed action 'X'"    -- action stages don't launch a tmux session
- *   - "Forked into N sessions" -- fan-out parent intentionally stays ready
- *   - "Dispatched to worker"   -- hosted-mode handoff to scheduler
- *
- * Anything else returning `ok:true` while the session is still at `ready`
- * indicates a silent-launch-failure: log + flip to failed.
- */
-const ALLOWED_NO_LAUNCH_MESSAGES: ReadonlyArray<string | RegExp> = [
-  "Already running",
-  /^Executed action /,
-  /^Forked into \d+ sessions?$/,
-  /^Dispatched to worker/,
-];
-
-function messageAllowsNoLaunch(msg: string | undefined): boolean {
-  if (!msg) return false;
-  return ALLOWED_NO_LAUNCH_MESSAGES.some((p) => (typeof p === "string" ? p === msg : p.test(msg)));
 }
 
 /**
@@ -247,6 +222,11 @@ export class SessionDispatchListeners {
         // eventually settle (if ever) but its result is ignored -- the
         // session is already marked failed.
         if ((result as { __watchdog?: boolean }).__watchdog) {
+          logError("session", `dispatch watchdog fired -- dispatch hung past ${this.dispatchWatchdogMs}ms`, {
+            sessionId,
+            deadlineMs: this.dispatchWatchdogMs,
+            message: result.message,
+          });
           await markDispatchFailedShared(this.sessions, this.events, sessionId, result.message ?? "dispatch hung");
           return;
         }
@@ -260,21 +240,24 @@ export class SessionDispatchListeners {
           await markDispatchFailedShared(this.sessions, this.events, sessionId, reason);
           return;
         }
-        // Post-condition check on the success branch. dispatch() can legitimately
-        // return `{ok:true}` without launching anything (action stage, hosted-mode
-        // handoff, fan-out parent). For every OTHER ok:true case, a successful
-        // launch flips the session out of `ready` -- typically to `running`.
-        // If the row is still at `ready` AND the message isn't an explicit
-        // "no-launch ok" sentinel, we hit a silent-launch-failure: surface it.
+        // Post-condition check on the success branch.
+        // Typed contract: launched:true MUST mean status moved out of ready.
+        // launched:false is intentional no-launch; reason names the case.
         if (result && result.ok === true) {
-          const refreshed = await this.sessions.get(sessionId);
-          if (refreshed && refreshed.status === "ready" && !messageAllowsNoLaunch(result.message)) {
-            await markDispatchFailedShared(
-              this.sessions,
-              this.events,
-              sessionId,
-              `dispatch returned ok:true but session still at status=ready (message: ${result.message ?? "<no message>"})`,
-            );
+          if (result.launched) {
+            const refreshed = await this.sessions.get(sessionId);
+            if (refreshed && refreshed.status === "ready") {
+              logError("session", `dispatch contract violation: launched:true but session still at status=ready`, {
+                sessionId,
+                message: result.message,
+              });
+              await markDispatchFailedShared(
+                this.sessions,
+                this.events,
+                sessionId,
+                `dispatch returned launched:true but session still at status=ready (message: ${result.message ?? "<no message>"})`,
+              );
+            }
           }
         }
       })

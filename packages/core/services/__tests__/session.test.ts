@@ -87,7 +87,10 @@ describe("SessionService", async () => {
   describe("stop", async () => {
     it("transitions running -> stopped", async () => {
       const s = await svc.start({});
-      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await sessions.update(s.id, {
+        session_id: `ark-s-${s.id}`,
+        status: "running" as SessionStatus,
+      } as Partial<Session>);
       const result = await svc.stop(s.id);
       expect(result.ok).toBe(true);
       const updated = await sessions.get(s.id)!;
@@ -138,7 +141,10 @@ describe("SessionService", async () => {
 
     it("logs session_stopped event", async () => {
       const s = await svc.start({});
-      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await sessions.update(s.id, {
+        session_id: `ark-s-${s.id}`,
+        status: "running" as SessionStatus,
+      } as Partial<Session>);
       await svc.stop(s.id);
       const evts = await events.list(s.id, { type: "session_stopped" });
       expect(evts.length).toBe(1);
@@ -235,7 +241,10 @@ describe("SessionService", async () => {
   describe("pause", async () => {
     it("transitions to blocked with reason", async () => {
       const s = await svc.start({});
-      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await sessions.update(s.id, {
+        session_id: `ark-s-${s.id}`,
+        status: "running" as SessionStatus,
+      } as Partial<Session>);
       const result = await svc.pause(s.id, "Need review");
       expect(result.ok).toBe(true);
       const updated = await sessions.get(s.id)!;
@@ -291,7 +300,10 @@ describe("SessionService", async () => {
   describe("undelete", async () => {
     it("restores a soft-deleted session", async () => {
       const s = await svc.start({});
-      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await sessions.update(s.id, {
+        session_id: `ark-s-${s.id}`,
+        status: "running" as SessionStatus,
+      } as Partial<Session>);
       await svc.delete(s.id);
       const result = await svc.undelete(s.id);
       expect(result.ok).toBe(true);
@@ -403,7 +415,10 @@ describe("SessionService", async () => {
 
     it("list filters by status", async () => {
       const s = await svc.start({});
-      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await sessions.update(s.id, {
+        session_id: `ark-s-${s.id}`,
+        status: "running" as SessionStatus,
+      } as Partial<Session>);
       await svc.start({});
       const running = await svc.list({ status: "running" });
       expect(running.length).toBe(1);
@@ -476,7 +491,10 @@ describe("SessionService", async () => {
 
     it("logs the previous status in event data", async () => {
       const s = await svc.start({});
-      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await sessions.update(s.id, {
+        session_id: `ark-s-${s.id}`,
+        status: "running" as SessionStatus,
+      } as Partial<Session>);
       await svc.pause(s.id, "Need review");
       const evts = await events.list(s.id, { type: "session_paused" });
       expect(evts.length).toBe(1);

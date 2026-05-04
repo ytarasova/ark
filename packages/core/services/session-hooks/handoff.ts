@@ -176,7 +176,13 @@ export class HandoffMediator {
                 source: "action_chain",
               });
             }
-            dispatched = true;
+            // Reflect the chain result honestly: if the recursive mediate
+            // (or anything inside the action) flipped status to failed,
+            // the outer stage_handoff event should record dispatched=false
+            // so observers don't see "dispatched=true" alongside a failed
+            // session (#435).
+            const final = await sessions.get(sessionId);
+            dispatched = final?.status !== "failed";
           }
         }
       }

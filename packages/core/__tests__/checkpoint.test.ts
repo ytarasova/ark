@@ -55,10 +55,14 @@ describe("saveCheckpoint", () => {
 describe("getCheckpoint", () => {
   it("returns latest checkpoint", async () => {
     const session = await getApp().sessions.create({ summary: "multi checkpoint" });
-    await getApp().sessions.update(session.id, { stage: "plan", status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, stage: "plan", status: "running" });
     await saveCheckpoint(getApp(), session.id);
 
-    await getApp().sessions.update(session.id, { stage: "implement", status: "running" });
+    await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      stage: "implement",
+      status: "running",
+    });
     await saveCheckpoint(getApp(), session.id);
 
     const cp = await getCheckpoint(getApp(), session.id);
@@ -77,13 +81,21 @@ describe("listCheckpoints", () => {
   it("returns all checkpoints in order", async () => {
     const session = await getApp().sessions.create({ summary: "list test" });
 
-    await getApp().sessions.update(session.id, { stage: "plan", status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, stage: "plan", status: "running" });
     await saveCheckpoint(getApp(), session.id);
 
-    await getApp().sessions.update(session.id, { stage: "implement", status: "running" });
+    await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      stage: "implement",
+      status: "running",
+    });
     await saveCheckpoint(getApp(), session.id);
 
-    await getApp().sessions.update(session.id, { stage: "review", status: "running" });
+    await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      stage: "review",
+      status: "running",
+    });
     await saveCheckpoint(getApp(), session.id);
 
     const checkpoints = await listCheckpoints(getApp(), session.id);
@@ -100,9 +112,17 @@ describe("listCheckpoints", () => {
 });
 
 describe("findOrphanedSessions", () => {
-  it("finds running sessions with no tmux session_id", async () => {
+  it("finds running sessions whose tmux session no longer exists", async () => {
+    // The running-invariant (session.ts update()) prevents constructing a
+    // running session with session_id=null directly -- that's the whole
+    // point of the fix. To simulate an orphan we point session_id at a
+    // tmux session that doesn't exist, which is the other arm of
+    // findOrphanedSessions's filter.
     const session = await getApp().sessions.create({ summary: "orphan no tmux" });
-    await getApp().sessions.update(session.id, { status: "running", session_id: null });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      session_id: "ark-s-nonexistent-tmux-handle",
+    });
 
     const orphaned = await findOrphanedSessions(getApp());
     expect(orphaned.some((s) => s.id === session.id)).toBe(true);
