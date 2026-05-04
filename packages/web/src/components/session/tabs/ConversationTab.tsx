@@ -172,6 +172,7 @@ export function ConversationTab({
                       status={blockStatus}
                       durationMs={item.durationMs}
                       elapsed={item.duration}
+                      timestamp={item.timestamp}
                     />
                   );
                 }

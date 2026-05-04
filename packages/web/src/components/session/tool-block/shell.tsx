@@ -27,6 +27,12 @@ export interface ToolBlockShellProps {
   status?: ToolStatus;
   statusLabel?: string;
   elapsed?: string;
+  /**
+   * Wall-clock time the tool call started, formatted for display
+   * (e.g. "06:09:46 PM"). Rendered in the header at the far right so
+   * tool blocks line up with the agent-message timestamp above them.
+   */
+  timestamp?: string;
   body: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
@@ -42,6 +48,7 @@ export function ToolBlockShell({
   status = "ok",
   statusLabel,
   elapsed,
+  timestamp,
   body,
   footer,
   className,
@@ -115,6 +122,11 @@ export function ToolBlockShell({
         {elapsed && (
           <span className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--fg-faint)] shrink-0">
             {elapsed}
+          </span>
+        )}
+        {timestamp && (
+          <span className="font-[family-name:var(--font-mono)] text-[10px] text-[var(--fg-faint)] shrink-0 tabular-nums">
+            {timestamp}
           </span>
         )}
       </button>

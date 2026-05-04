@@ -13,11 +13,12 @@ export interface BashToolBlockProps {
   output?: string;
   status?: ToolStatus;
   elapsed?: string;
+  timestamp?: string;
   pid?: string | number;
   cwd?: string;
 }
 
-export function BashToolBlock({ command, output, status = "ok", elapsed, pid, cwd }: BashToolBlockProps) {
+export function BashToolBlock({ command, output, status = "ok", elapsed, timestamp, pid, cwd }: BashToolBlockProps) {
   // Colorize basic ✓/✗ markers at the start of lines
   const lines = (output || "").split("\n").slice(-20);
   return (
@@ -37,6 +38,7 @@ export function BashToolBlock({ command, output, status = "ok", elapsed, pid, cw
         status === "running" ? "running" : status === "err" ? "failed" : status === "incomplete" ? "incomplete" : "done"
       }
       elapsed={elapsed}
+      timestamp={timestamp}
       bodyClassName="whitespace-pre"
       body={
         lines.length ? (
@@ -86,6 +88,7 @@ export interface EditToolBlockProps {
   rows?: Array<{ kind?: "ctx" | "add" | "rm"; ln?: number | string; rn?: number | string; code: string }>;
   status?: ToolStatus;
   elapsed?: string;
+  timestamp?: string;
   lineRange?: string;
   charPlus?: number;
   charMinus?: number;
@@ -100,6 +103,7 @@ export function EditToolBlock({
   rows,
   status = "ok",
   elapsed,
+  timestamp,
   lineRange,
   charPlus,
   charMinus,
@@ -124,6 +128,7 @@ export function EditToolBlock({
         status === "running" ? "editing" : status === "err" ? "failed" : status === "incomplete" ? "incomplete" : "ok"
       }
       elapsed={elapsed}
+      timestamp={timestamp}
       plainBody
       body={
         <div className="bg-[var(--bg-code)] font-[family-name:var(--font-mono)] text-[12px] leading-[1.55]">
@@ -188,11 +193,21 @@ export interface ReadToolBlockProps {
   preview?: string;
   status?: ToolStatus;
   elapsed?: string;
+  timestamp?: string;
   size?: string;
   onOpen?: () => void;
 }
 
-export function ReadToolBlock({ path, lines, preview, status = "ok", elapsed, size, onOpen }: ReadToolBlockProps) {
+export function ReadToolBlock({
+  path,
+  lines,
+  preview,
+  status = "ok",
+  elapsed,
+  timestamp,
+  size,
+  onOpen,
+}: ReadToolBlockProps) {
   const rows = (preview || "").split("\n").slice(0, 12);
   return (
     <ToolBlockShell
@@ -207,6 +222,7 @@ export function ReadToolBlock({ path, lines, preview, status = "ok", elapsed, si
       status={status}
       statusLabel="read"
       elapsed={elapsed}
+      timestamp={timestamp}
       bodyClassName="whitespace-pre"
       body={
         rows.length ? (
@@ -244,6 +260,7 @@ export interface WebFetchToolBlockProps {
   body?: string;
   status?: ToolStatus;
   elapsed?: string;
+  timestamp?: string;
 }
 
 export function WebFetchToolBlock({
@@ -255,6 +272,7 @@ export function WebFetchToolBlock({
   body,
   status,
   elapsed,
+  timestamp,
 }: WebFetchToolBlockProps) {
   const derived: ToolStatus = status ?? (statusCode == null ? "running" : statusCode >= 400 ? "err" : "ok");
   const prot = url?.match(/^([a-z]+:\/\/)/i)?.[1] ?? "";
@@ -266,6 +284,7 @@ export function WebFetchToolBlock({
       status={derived}
       statusLabel={statusCode != null ? String(statusCode) : derived}
       elapsed={elapsed}
+      timestamp={timestamp}
       plainBody
       body={
         <div className="bg-[var(--bg-code)]">
@@ -331,9 +350,10 @@ export interface GenericToolBlockProps {
   output?: string;
   status?: ToolStatus;
   elapsed?: string;
+  timestamp?: string;
 }
 
-export function GenericToolBlock({ name, arg, output, status = "ok", elapsed }: GenericToolBlockProps) {
+export function GenericToolBlock({ name, arg, output, status = "ok", elapsed, timestamp }: GenericToolBlockProps) {
   const icon = {
     Grep: <GrepIcon />,
     grep: <GrepIcon />,
@@ -352,6 +372,7 @@ export function GenericToolBlock({ name, arg, output, status = "ok", elapsed }: 
       arg={arg ? <span className="text-[var(--fg-muted)]">{arg}</span> : undefined}
       status={status}
       elapsed={elapsed}
+      timestamp={timestamp}
       body={
         output ? (
           <div className="whitespace-pre-wrap text-[var(--fg-muted)]">{output.slice(0, 600)}</div>
@@ -372,6 +393,14 @@ export interface ToolBlockProps {
   status?: ToolStatus;
   elapsed?: string;
   durationMs?: number;
+  /**
+   * Wall-clock time the tool call started, formatted for display
+   * (e.g. "06:09:46 PM"). Rendered in the tool-block header at the far
+   * right so it lines up with the agent-message timestamp above the
+   * tool. Sourced from the matching PreToolUse event's `created_at` in
+   * the timeline builder.
+   */
+  timestamp?: string;
 }
 
 function fmtDuration(ms?: number): string | undefined {
@@ -382,7 +411,7 @@ function fmtDuration(ms?: number): string | undefined {
 }
 
 /** Routes tool by name to the right block. */
-export function ToolBlock({ name, input, output, status, elapsed, durationMs }: ToolBlockProps) {
+export function ToolBlock({ name, input, output, status, elapsed, durationMs, timestamp }: ToolBlockProps) {
   const e = elapsed ?? fmtDuration(durationMs);
   if (name === "Bash" || name === "bash") {
     return (
@@ -391,6 +420,7 @@ export function ToolBlock({ name, input, output, status, elapsed, durationMs }: 
         output={typeof output === "string" ? output : output?.stdout || output?.output}
         status={status}
         elapsed={e}
+        timestamp={timestamp}
         pid={output?.pid}
         cwd={input?.cwd}
       />
@@ -398,7 +428,7 @@ export function ToolBlock({ name, input, output, status, elapsed, durationMs }: 
   }
   if (name === "Edit" || name === "Write" || name === "MultiEdit" || name === "write_file") {
     const path = input?.file_path || input?.path || (typeof input === "string" ? input : undefined);
-    return <EditToolBlock path={path} status={status} elapsed={e} />;
+    return <EditToolBlock path={path} status={status} elapsed={e} timestamp={timestamp} />;
   }
   if (name === "Read" || name === "read_file") {
     const path = input?.file_path || input?.path || (typeof input === "string" ? input : undefined);
@@ -411,6 +441,7 @@ export function ToolBlock({ name, input, output, status, elapsed, durationMs }: 
         preview={typeof output === "string" ? output : output?.content}
         status={status}
         elapsed={e}
+        timestamp={timestamp}
       />
     );
   }
@@ -423,6 +454,7 @@ export function ToolBlock({ name, input, output, status, elapsed, durationMs }: 
         statusText={output?.statusText}
         status={status}
         elapsed={e}
+        timestamp={timestamp}
       />
     );
   }
@@ -437,6 +469,7 @@ export function ToolBlock({ name, input, output, status, elapsed, durationMs }: 
       output={typeof output === "string" ? output : output ? JSON.stringify(output).slice(0, 600) : undefined}
       status={status}
       elapsed={e}
+      timestamp={timestamp}
     />
   );
 }
