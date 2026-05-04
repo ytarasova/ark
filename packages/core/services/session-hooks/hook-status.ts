@@ -114,6 +114,28 @@ export class HookStatusApplier {
       if (hasNewCommits) {
         result.shouldAdvance = true;
         result.shouldAutoDispatch = true;
+      } else if (
+        session.config?.stage_complete_signaled &&
+        session.config.stage_complete_signaled.stage === (hookStage || session.stage || "")
+      ) {
+        // Agent explicitly called `complete_stage` for this stage and just
+        // had nothing to commit (e.g. a user steer that asked for a reply
+        // with no code change, or a verify/review stage whose outcome is a
+        // pass/fail decision rather than a diff). Trust the signal --
+        // advance the flow instead of failing on the commit heuristic.
+        result.shouldAdvance = true;
+        result.shouldAutoDispatch = true;
+        result.events!.push({
+          type: "stage_complete_no_commits",
+          opts: {
+            stage: hookStage,
+            actor: "agent",
+            data: {
+              reason: session.config.stage_complete_signaled.reason ?? "complete_stage signaled with no commits",
+              signaled_at: session.config.stage_complete_signaled.ts,
+            },
+          },
+        });
       } else {
         newStatus = "failed" as any;
         if (!result.updates) result.updates = {};
