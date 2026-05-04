@@ -48,7 +48,9 @@ export async function assembleTask(
     log(`Appended rework prompt (rejection #${session.rejection_count ?? 0})`);
   }
 
-  // Log the fully assembled prompt for audit trail
+  // Log a preview + length for audit trail. The full prompt lives on the
+  // session row (session.summary / input store) -- duplicating it here
+  // bloated the events table and broke the timeline drawer (#417).
   await deps.events.log(session.id, "prompt_sent", {
     stage,
     actor: "orchestrator",
@@ -56,7 +58,6 @@ export async function assembleTask(
       agent: agentName,
       task_preview: task.slice(0, 500),
       task_length: task.length,
-      task_full: task,
     },
   });
 

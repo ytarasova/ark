@@ -140,7 +140,6 @@ export async function dispatchInlineSubStage(
       sub_stage: subStage.name,
       task_preview: task.slice(0, 500),
       task_length: task.length,
-      task_full: task,
     },
   });
 
