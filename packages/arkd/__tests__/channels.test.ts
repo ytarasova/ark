@@ -398,4 +398,64 @@ describe("/channel/{name}/publish + /ws/channel/{name}", () => {
     expect(env).toEqual({ probe: true });
     ws.close();
   }, 45_000);
+
+  test("multiple subscribers: each envelope delivered to first-attached only (not broadcast)", async () => {
+    // Fan-out semantics (see channels.ts): with multiple subscribers on a
+    // single channel, each envelope goes to exactly ONE subscriber -- the
+    // first-attached in insertion order. This is deliberate single-reader
+    // behavior because `hooks` has one conductor per arkd and `user-input`
+    // is read by exactly one agent. Regression guard against accidental
+    // broadcast-to-all.
+    const sub1 = await subscribedChannel("fanout-ch");
+    const sub2 = await subscribedChannel("fanout-ch");
+
+    await publish("fanout-ch", { seq: 1 });
+    await publish("fanout-ch", { seq: 2 });
+    await publish("fanout-ch", { seq: 3 });
+
+    const gotSub1 = (await sub1.nextMessages(3)) as Array<Record<string, unknown>>;
+    expect(gotSub1).toEqual([{ seq: 1 }, { seq: 2 }, { seq: 3 }]);
+
+    // sub2 received nothing. Prove via a short silence window -- if a stray
+    // frame arrived it would already be in sub2's buffered queue and
+    // nextMessages(1) would resolve immediately.
+    const sub2Result = await Promise.race([
+      sub2.nextMessages(1).then(() => "received"),
+      new Promise<"silent">((resolve) => setTimeout(() => resolve("silent"), 250)),
+    ]);
+    expect(sub2Result).toBe("silent");
+
+    sub1.ws.close();
+    sub2.ws.close();
+  });
+
+  test("multiple subscribers: fail-over to next-attached when first closes", async () => {
+    // Complements the fan-out test: once the first-attached subscriber goes
+    // away, new publishes must flow to the next-attached subscriber rather
+    // than buffering. Poll-retry (same pattern as "subscriber close cleanly
+    // removes...") to absorb the async server-side close handler.
+    const sub1 = await subscribedChannel("failover-ch");
+    const sub2 = await subscribedChannel("failover-ch");
+    sub1.ws.close();
+
+    const deadline = Date.now() + 2000;
+    let seq = 1;
+    let got: Record<string, unknown> | null = null;
+    while (Date.now() < deadline) {
+      await publish("failover-ch", { seq });
+      const msg = await Promise.race([
+        sub2.nextMessages(1),
+        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 100)),
+      ]);
+      if (msg !== "timeout") {
+        const frames = msg as Array<Record<string, unknown>>;
+        got = frames[0];
+        break;
+      }
+      seq++;
+    }
+    expect(got).not.toBeNull();
+    expect(got).toEqual({ seq });
+    sub2.ws.close();
+  });
 });
