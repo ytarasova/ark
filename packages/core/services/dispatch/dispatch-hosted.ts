@@ -39,7 +39,11 @@ export class HostedDispatcher {
         script,
         workdir: session.workdir ?? session.repo ?? ".",
       });
-      await this.deps.sessions.update(sessionId, { status: "running", compute_name: worker.compute_name });
+      await this.deps.sessions.update(sessionId, {
+        status: "running",
+        session_id: sessionName,
+        compute_name: worker.compute_name,
+      });
       await this.deps.events.log(sessionId, "dispatched_to_worker", {
         actor: "scheduler",
         data: { worker_id: worker.id, worker_url: worker.url, tenant_id: tenantId },

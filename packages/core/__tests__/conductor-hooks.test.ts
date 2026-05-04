@@ -58,7 +58,9 @@ async function makeRunningSession(summary: string): Promise<{ id: string }> {
 describe("Conductor /hooks/status endpoint", async () => {
   it("UserPromptSubmit maps to status running", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "ready" });
+    // session_id must be set in advance; the hook transition to "running"
+    // requires it by invariant (post-launch.ts sets it atomically in prod).
+    await getApp().sessions.update(session.id, { status: "ready", session_id: `ark-s-${session.id}` });
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
@@ -125,6 +127,7 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("SessionStart maps to status running", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}` });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionStart" });
     expect(resp.status).toBe(200);
@@ -156,6 +159,7 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("logs hook event to event audit trail", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}` });
 
     await postHook(session.id, { hook_event_name: "SessionStart", extra: "data" });
 
@@ -315,7 +319,11 @@ describe("Conductor /hooks/status endpoint", async () => {
   it("SessionEnd advances auto-gate session to next stage", async () => {
     // Use default flow with implement stage (gate: auto) -- advance moves to verify
     const session = await getApp().sessions.create({ summary: "hook test", flow: "default" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "implement" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      session_id: `ark-s-${session.id}`,
+    });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
@@ -330,7 +338,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("Stop hook does not index transcript when claude session ID does not match", async () => {
     const session = await getApp().sessions.create({ summary: "hook test" });
-    await getApp().sessions.update(session.id, { status: "running", claude_session_id: "real-claude-session-abc" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      claude_session_id: "real-claude-session-abc",
+      session_id: `ark-s-${session.id}`,
+    });
 
     // Write a fake transcript file named after a DIFFERENT claude session
     const { writeFileSync: wf } = await import("fs");
@@ -369,7 +381,11 @@ describe("Conductor /hooks/status endpoint", async () => {
   it("StopFailure keeps manual-gate session running", async () => {
     const session = await getApp().sessions.create({ summary: "bare test" });
     await getApp().sessions.update(session.id, { flow: "bare" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "work",
+      session_id: `ark-s-${session.id}`,
+    });
 
     const resp = await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -389,7 +405,11 @@ describe("Conductor /hooks/status endpoint", async () => {
   it("SessionEnd keeps manual-gate session running", async () => {
     const session = await getApp().sessions.create({ summary: "bare test" });
     await getApp().sessions.update(session.id, { flow: "bare" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "work",
+      session_id: `ark-s-${session.id}`,
+    });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
@@ -400,7 +420,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("StopFailure still fails auto-gate sessions", async () => {
     const session = await getApp().sessions.create({ summary: "auto test", flow: "quick" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "verify" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "verify",
+      session_id: `ark-s-${session.id}`,
+    });
 
     await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -413,7 +437,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("SessionEnd advances auto-gate sessions via advance()", async () => {
     const session = await getApp().sessions.create({ summary: "auto test", flow: "default" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "implement" });
+    await getApp().sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      session_id: `ark-s-${session.id}`,
+    });
 
     await postHook(session.id, { hook_event_name: "SessionEnd" });
 
@@ -425,7 +453,11 @@ describe("Conductor /hooks/status endpoint", async () => {
 
   it("UserPromptSubmit clears breakpoint_reason when resuming from waiting", async () => {
     const session = await getApp().sessions.create({ summary: "breakpoint clear test" });
-    await getApp().sessions.update(session.id, { status: "waiting", breakpoint_reason: "Need a PAT token" });
+    await getApp().sessions.update(session.id, {
+      status: "waiting",
+      breakpoint_reason: "Need a PAT token",
+      session_id: `ark-s-${session.id}`,
+    });
 
     await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
 
