@@ -17,15 +17,6 @@ import { parseOnFailure } from "./types.js";
 export class HookStatusApplier {
   constructor(private readonly deps: SessionHooksDeps) {}
 
-  /** Detect session status from tmux content (fallback when hooks don't fire). */
-  async detectStatus(sessionId: string): Promise<string | null> {
-    const session = await this.deps.sessions.get(sessionId);
-    if (!session?.session_id) return null;
-    const { detectSessionStatus } = await import("../../observability/status-detect.js");
-    const detected = await detectSessionStatus(session.session_id);
-    return detected === "unknown" ? null : detected;
-  }
-
   /**
    * Business logic for processing a hook status event.
    * Determines status transitions, events to log, and side effects.
