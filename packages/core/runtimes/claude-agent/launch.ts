@@ -929,10 +929,16 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   // dev / test scenarios that run without arkd. The same callbacks fire in
   // both cases so the prompt-queue / abort wiring downstream stays identical.
   const arkdUrlForStream = process.env.ARK_ARKD_URL;
+  // The conductor publishes `session: session.session_id` (the handle,
+  // e.g. `ark-s-<id>`) on the user-input channel, NOT the bare session
+  // id. Filter by the same value here. The launcher exports the handle
+  // as ARK_SESSION_HANDLE; fall back to deriving it from sessionId for
+  // older binaries that didn't set the env var.
+  const sessionHandle = process.env.ARK_SESSION_HANDLE ?? `ark-${sessionId}`;
   const stopTail: () => void = arkdUrlForStream
     ? subscribeUserMessages({
         arkdUrl: arkdUrlForStream,
-        sessionName: sessionId,
+        sessionName: sessionHandle,
         authToken: process.env.ARK_API_TOKEN,
         onMessage: (content) => queue.push(content),
         onInterrupt: () => {

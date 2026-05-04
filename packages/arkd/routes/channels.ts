@@ -90,17 +90,39 @@ function stateFor(name: string): ChannelState {
 
 function enqueue(name: string, envelope: Envelope): boolean {
   const s = stateFor(name);
-  // Fan-out to the first open subscriber. Iteration order = insertion order,
-  // so the first-attached subscriber gets each envelope. If delivery throws
-  // (socket half-closed mid-send), drop that subscriber and try the next.
+  const payload = JSON.stringify(envelope);
+  // BROADCAST to every OPEN subscriber. The previous fan-out-to-first
+  // semantics had a brittle dependency on the close handler firing
+  // reliably: when a session ended without WebSocket close (process kill,
+  // SSM tunnel break) its subscriber stayed in `s.subscribers` with
+  // readyState=1 (Bun reports "open" until the next ping fails). The
+  // first-match send went to that zombie and the message was silently
+  // lost; the real subscriber for the new session never saw it.
+  //
+  // Broadcast is correct for our use case: each subscriber filters
+  // envelopes by `envelope.session === ARK_SESSION_ID`, so the channel
+  // is logically per-session even though the wire is global. Sending to
+  // all open subscribers means stale ones see the envelope, ignore it
+  // (different session id), and we still hit the live one.
+  //
+  // Zombie cleanup: subscribers whose send fails (ret <= 0) or whose
+  // readyState is not OPEN get evicted in this same pass.
+  const dead: Array<ServerWebSocket<ChannelWsData>> = [];
+  let deliveredAny = false;
   for (const ws of s.subscribers) {
-    try {
-      ws.send(JSON.stringify(envelope));
-      return true;
-    } catch {
-      s.subscribers.delete(ws);
+    if (ws.readyState !== 1 /* OPEN */) {
+      dead.push(ws);
+      continue;
+    }
+    const written = ws.send(payload);
+    if (written > 0) {
+      deliveredAny = true;
+    } else {
+      dead.push(ws);
     }
   }
+  for (const ws of dead) s.subscribers.delete(ws);
+  if (deliveredAny) return true;
   // No live subscriber -- buffer for the next connect.
   s.ring.push(envelope);
   return false;

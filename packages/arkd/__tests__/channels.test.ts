@@ -398,4 +398,24 @@ describe("/channel/{name}/publish + /ws/channel/{name}", () => {
     expect(env).toEqual({ probe: true });
     ws.close();
   }, 45_000);
+
+  test("publish broadcasts to every open subscriber (not fan-out-to-first)", async () => {
+    // Each consumer filters by `envelope.session` -- the channel is
+    // logically per-session even though the wire is global. Server must
+    // broadcast so a stale-but-readyState=OPEN subscriber from a dead
+    // session can't silently absorb the only copy of the envelope.
+    const a = await subscribedChannel("broadcast-ch", 5000);
+    const b = await subscribedChannel("broadcast-ch", 5000);
+
+    const r = await publish("broadcast-ch", { hello: "world" });
+    expect(((await r.json()) as { delivered: boolean }).delivered).toBe(true);
+
+    const [aMsg] = (await a.nextMessages(1)) as Array<Record<string, unknown>>;
+    const [bMsg] = (await b.nextMessages(1)) as Array<Record<string, unknown>>;
+    expect(aMsg).toEqual({ hello: "world" });
+    expect(bMsg).toEqual({ hello: "world" });
+
+    a.ws.close();
+    b.ws.close();
+  });
 });

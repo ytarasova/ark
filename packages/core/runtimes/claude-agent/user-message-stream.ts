@@ -69,19 +69,26 @@ export function subscribeUserMessages(opts: UserMessageStreamOpts & { client?: A
   const ac = new AbortController();
   const client = opts.client ?? new ArkdClient(arkdUrl, { token: authToken });
 
+  console.error(`[user-input] starting subscriber arkdUrl=${arkdUrl} session=${sessionName}`);
+
   void (async () => {
     let backoffMs = 250;
     while (!stopped) {
       try {
-        for await (const env of await client.subscribeToChannel<UserMessageEnvelope>("user-input", {
+        console.error(`[user-input] connecting to channel...`);
+        const iter = await client.subscribeToChannel<UserMessageEnvelope>("user-input", {
           signal: ac.signal,
-        })) {
+        });
+        console.error(`[user-input] subscribed (ack received), waiting for envelopes`);
+        for await (const env of iter) {
+          // Log every raw envelope BEFORE filtering, so we see same-session
+          // and other-session traffic equally.
+          console.error(
+            `[user-input] raw frame: session=${env.session} bytes=${env.content?.length ?? 0} ` +
+              `control=${env.control ?? "none"}`,
+          );
           // Channel is global; ignore envelopes destined for other sessions.
           if (env.session !== sessionName) continue;
-          // Observability: every received user-input envelope. Without this
-          // there is no way to tell if the conductor's publish reached the
-          // agent's subscriber when a steer appears to be lost mid-flight.
-          // Goes to stderr so it lands in the agent's stdio.log.
           console.error(
             `[user-input] received: bytes=${env.content?.length ?? 0} ` +
               `control=${env.control ?? "none"} session=${env.session}`,
