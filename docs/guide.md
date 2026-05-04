@@ -224,6 +224,10 @@ stages:
     agent: reviewer
     depends_on: [implement]
     gate: auto
+    on_outcome: # outcome-based routing: agent reports an outcome label, flow jumps to that stage
+      approved: document
+      needs_changes: implement
+      rejected: close
   - name: document
     agent: documenter
     depends_on: [review]
@@ -239,10 +243,11 @@ Key fields:
 - `gate`: `manual` blocks until `ark session advance`, `auto` moves on when the agent reports completion, `condition` uses a predicate expression.
 - `verify`: list of shell commands that must exit 0 before completion. Agents that report done while verify fails are steered back to fix it. Use `ark session complete --force` to bypass.
 - `on_failure: retry(N)`: fail-loopback. Re-dispatches the stage with the failure context injected, up to N retries.
+- `on_outcome`: map of outcome label to target stage name. When the agent completes with an `outcome` field (e.g. `approved`, `needs_changes`, `rejected`), the flow jumps to the mapped stage instead of the linear next. Unknown outcomes fall back to linear progression. Targets must reference real stages -- validated at flow load.
 - `depends_on`: list of prior stage names for DAG ordering. Enables parallel execution of stages with no ordering constraint.
 - `action`: replaces `agent` for non-LLM stages. Built-in actions: `create_pr` (push branch + `gh pr create`), `auto_merge` (wait for CI then merge).
-- `edges`: explicit graph edges with `condition` expressions for conditional routing (see the `conditional` flow). Edges support `from`, `to`, `condition`, and `label` fields.
-- `task`: per-stage task prompt override. Template variables (`{summary}`, `{repo}`, `{workdir}`) are substituted at dispatch.
+- `edges`: explicit graph edges with `condition` expressions for conditional routing (see the `conditional` flow). Edges support `from`, `to`, `condition`, and `label` fields. Use `edges` when routing depends on session state; use `on_outcome` when the branching decision is a label the agent emits.
+- `task`: per-stage task prompt override. Nunjucks template variables (`{{summary}}`, `{{repo}}`, `{{workdir}}`) are substituted at dispatch.
 - Fan-out stages wait for all their spawned children before the parent advances (auto-join on child completion).
 
 ```bash
@@ -289,15 +294,15 @@ ark agent show implementer
 ```yaml
 # agents/implementer.yaml
 name: implementer
-description: Implements a plan into working code
-runtime: claude # default runtime; override with --runtime
-model: sonnet # opus | sonnet | haiku (claude models)
+description: "Implements a plan into working code"
+runtime: claude-agent # default runtime; override with --runtime
+model: opus # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
-  You are working on {repo} (branch {branch}).
-  Ticket: {ticket}
-  Task: {summary}
-  Workdir: {workdir}
+  You are working on {{repo}} (branch {{branch}}).
+  Ticket: {{ticket}}
+  Task: {{summary}}
+  Workdir: {{workdir}}
   Write minimal, correct code. Run tests before claiming done.
 skills: [test-writing, self-review, sanity-gate]
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
@@ -305,17 +310,20 @@ permission_mode: bypassPermissions
 env: {}
 ```
 
-Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
+Template variables are Nunjucks (`{{var}}` double braces). Substituted at dispatch time: `{{ticket}}`, `{{summary}}`, `{{repo}}`, `{{branch}}`, `{{workdir}}`. Single-brace `{var}` is no longer recognized -- see [docs/templating.md](templating.md).
 
-### Runtimes (5)
+### Runtimes (6)
 
-| Name         | Tool                        | Billing                     | Transcript parser                  |
-| ------------ | --------------------------- | --------------------------- | ---------------------------------- |
-| `claude`     | Claude Code CLI             | api (per token)             | claude                             |
-| `claude-max` | Claude Code (Max sub)       | subscription ($200/mo flat) | claude                             |
-| `codex`      | OpenAI Codex CLI            | api                         | codex (default model: gpt-5-codex) |
-| `gemini`     | Google Gemini CLI           | api                         | gemini                             |
-| `goose`      | Goose CLI (Block / LF AAIF) | api                         | goose                              |
+| Name           | Tool                                                       | Billing                     | Transcript parser                  |
+| -------------- | ---------------------------------------------------------- | --------------------------- | ---------------------------------- |
+| `claude-agent` | Anthropic Agent SDK (in-process, direct or gateway-routed) | api                         | claude                             |
+| `claude-code`  | Claude Code CLI                                            | api (per token)             | claude                             |
+| `claude-max`   | Claude Code (Max sub)                                      | subscription ($200/mo flat) | claude                             |
+| `codex`        | OpenAI Codex CLI                                           | api                         | codex (default model: gpt-5-codex) |
+| `gemini`       | Google Gemini CLI                                          | api                         | gemini                             |
+| `goose`        | Goose CLI (Block / LF AAIF)                                | api                         | goose                              |
+
+`claude-agent` runs the Anthropic Agent SDK in-process (no tmux or external CLI), which is the recommended path for remote EC2/arkd dispatches. `claude-code` spawns the Claude Code CLI in tmux with full MCP hook pipeline.
 
 ```bash
 ark runtime list
@@ -342,26 +350,25 @@ ark session start --repo . --summary "Big refactor" \
 ```yaml
 # runtimes/codex.yaml
 name: codex
-description: OpenAI Codex CLI
-type: cli-agent # claude-code | cli-agent | subprocess
-command: ["codex", "--auto"]
-task_delivery: stdin # stdin | file | arg
-billing_mode: api # api | subscription | free
-transcript_parser: codex # selects CodexTranscriptParser
-models:
-  - id: gpt-5-codex
-    label: "GPT-5 Codex"
-  - id: gpt-5
-    label: "GPT-5"
-default_model: gpt-5-codex
-env:
-  OPENAI_API_KEY: "${OPENAI_API_KEY}"
+description: "OpenAI Codex CLI"
+type: cli-agent # claude-agent | claude-code | cli-agent | subprocess
+command: ["codex", "--approval-mode", "full-auto"]
+task_delivery: arg # stdin | file | arg
+billing:
+  mode: api # api | subscription | free
+  transcript_parser: codex # selects CodexTranscriptParser
+task_prompt: |
+  When you finish, stop with a final assistant message that summarizes what you
+  accomplished (files changed, tests added, key decisions). The UI picks up that
+  summary automatically.
 ```
 
-Three executor types are registered at boot:
+Five executor types are registered at boot:
 
-- `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
+- `claude-agent` -- Anthropic Agent SDK running in-process (no tmux, no external CLI). Preferred for remote EC2/arkd dispatch.
+- `claude-code` -- launches the Claude Code CLI in tmux with hooks and an MCP channel.
 - `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
+- `goose` -- Goose CLI with its own launcher (not routed through `cli-agent`).
 - `subprocess` -- generic child process, no tmux.
 
 Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture`.
@@ -399,7 +406,7 @@ A project-level skill with the same name overrides a global or builtin one.
 ```yaml
 # agents/reviewer.yaml
 name: reviewer
-runtime: claude
+runtime: claude-agent
 skills: [code-review, security-scan, self-review]
 ```
 
@@ -1243,4 +1250,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 6 runtimes (Claude Agent SDK, Claude Code, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
