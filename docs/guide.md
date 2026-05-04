@@ -50,7 +50,7 @@ make install          # requires Bun + tmux pre-installed
 # 2. Verify
 ark doctor            # check prerequisites (bun, tmux, git, gh, claude)
 ark --version
-ark agent list        # shows 12 builtin agents
+ark agent list        # shows 13 builtin agents
 ark flow list         # shows 14 builtin flows
 
 # 3. Start a session from a recipe and dispatch it
@@ -262,22 +262,23 @@ Ark cleanly separates the role of an agent from the tool that runs it.
 
 At dispatch, agent config and runtime config are merged. Agent-level values take precedence over runtime defaults. You can override the runtime on the CLI with `--runtime`.
 
-### Agents (12 builtin roles)
+### Agents (13 builtin roles)
 
-| Role               | Purpose                                     |
-| ------------------ | ------------------------------------------- |
-| `ticket-intake`    | Parse tickets, extract requirements.        |
-| `spec-planner`     | Write the spec/plan.                        |
-| `plan-auditor`     | Audit a plan before implementation.         |
-| `planner`          | General planning role.                      |
-| `implementer`      | Write code for a spec.                      |
-| `task-implementer` | Implement a single task (fan-out child).    |
-| `verifier`         | Run and interpret verification.             |
-| `reviewer`         | Structured code review (P0-P3 JSON output). |
-| `documenter`       | Update docs.                                |
-| `closer`           | Final checks, PR/merge.                     |
-| `retro`            | Post-session retrospective and learnings.   |
-| `worker`           | Generic task runner (fan-out child).        |
+| Role                  | Purpose                                                       |
+| --------------------- | ------------------------------------------------------------- |
+| `ticket-intake`       | Parse tickets, extract requirements.                          |
+| `spec-planner`        | Write the spec/plan.                                          |
+| `plan-auditor`        | Audit a plan before implementation.                           |
+| `planner`             | General planning role.                                        |
+| `implementer`         | Write code for a spec.                                        |
+| `task-implementer`    | Implement a single task (fan-out child).                      |
+| `verifier`            | Run and interpret verification.                               |
+| `reviewer`            | Structured code review (P0-P3 JSON output).                   |
+| `documenter`          | Update docs.                                                  |
+| `closer`              | Final checks, PR/merge.                                       |
+| `retro`               | Post-session retrospective and learnings.                     |
+| `worker`              | Generic task runner (fan-out child).                          |
+| `goose-recipe-runner` | Runs a Goose recipe file passed via session inputs (goose-*). |
 
 ```bash
 ark agent list
@@ -290,7 +291,7 @@ ark agent show implementer
 # agents/implementer.yaml
 name: implementer
 description: Implements a plan into working code
-runtime: claude # default runtime; override with --runtime
+runtime: claude-code # default runtime; override with --runtime
 model: sonnet # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
@@ -307,15 +308,20 @@ env: {}
 
 Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
 
-### Runtimes (5)
+### Runtimes (6)
 
-| Name         | Tool                        | Billing                     | Transcript parser                  |
-| ------------ | --------------------------- | --------------------------- | ---------------------------------- |
-| `claude`     | Claude Code CLI             | api (per token)             | claude                             |
-| `claude-max` | Claude Code (Max sub)       | subscription ($200/mo flat) | claude                             |
-| `codex`      | OpenAI Codex CLI            | api                         | codex (default model: gpt-5-codex) |
-| `gemini`     | Google Gemini CLI           | api                         | gemini                             |
-| `goose`      | Goose CLI (Block / LF AAIF) | api                         | goose                              |
+| Name           | Tool                             | Billing                     | Transcript parser                  |
+| -------------- | -------------------------------- | --------------------------- | ---------------------------------- |
+| `claude-code`  | Claude Code CLI                  | api (per token)             | claude                             |
+| `claude-agent` | Anthropic Agent SDK (in-process) | api (per token)             | agent-sdk                          |
+| `claude-max`   | Claude Code (Max subscription)   | subscription ($200/mo flat) | claude                             |
+| `codex`        | OpenAI Codex CLI                 | api                         | codex (default model: gpt-5-codex) |
+| `gemini`       | Google Gemini CLI                | api                         | gemini                             |
+| `goose`        | Goose CLI (Block / LF AAIF)      | api                         | goose                              |
+
+`claude-code` launches the Claude Code CLI in tmux. `claude-agent` runs the
+Anthropic Agent SDK in-process (no CLI, no tmux) and is the runtime used on
+`ec2`/`ec2-*` computes where streaming hooks go through `arkd`.
 
 ```bash
 ark runtime list
@@ -327,6 +333,10 @@ ark session start --repo . --summary "Port module" \
 
 ark session start --repo . --summary "UI polish" \
   --agent worker --runtime gemini --dispatch
+
+# Use the in-process Agent SDK runtime (required on EC2 today)
+ark session start --repo . --summary "Remote fix" \
+  --agent implementer --runtime claude-agent --compute ec2 --dispatch
 
 # Use Goose runtime
 ark session start --repo . --summary "Add logging" \
@@ -358,10 +368,12 @@ env:
   OPENAI_API_KEY: "${OPENAI_API_KEY}"
 ```
 
-Three executor types are registered at boot:
+Five executor types are registered at boot:
 
 - `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
+- `claude-agent` -- runs the Anthropic Agent SDK in-process (no tmux); streams hooks to the conductor directly (local) or via arkd's `/hooks/forward` on remote computes.
 - `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
+- `goose` -- Goose CLI executor; uses `goose run` with the recipe/instructions passed as args.
 - `subprocess` -- generic child process, no tmux.
 
 Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture`.
@@ -399,7 +411,7 @@ A project-level skill with the same name overrides a global or builtin one.
 ```yaml
 # agents/reviewer.yaml
 name: reviewer
-runtime: claude
+runtime: claude-code
 skills: [code-review, security-scan, self-review]
 ```
 
@@ -1243,4 +1255,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 13 agents, 6 runtimes (Claude Code, Claude Agent SDK, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
