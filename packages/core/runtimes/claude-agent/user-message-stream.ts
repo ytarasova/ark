@@ -73,7 +73,7 @@ export function subscribeUserMessages(opts: UserMessageStreamOpts & { client?: A
     let backoffMs = 250;
     while (!stopped) {
       try {
-        for await (const env of client.subscribeToChannel<UserMessageEnvelope>("user-input", {
+        for await (const env of await client.subscribeToChannel<UserMessageEnvelope>("user-input", {
           signal: ac.signal,
         })) {
           // Channel is global; ignore envelopes destined for other sessions.

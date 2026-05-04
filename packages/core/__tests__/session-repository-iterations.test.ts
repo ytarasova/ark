@@ -39,7 +39,7 @@ describe("SessionRepository.listRoots / listChildren -- child_iterations", () =>
     const c0 = await repo.create({ summary: "c0", config: { for_each_index: 0 } });
     const c1 = await repo.create({ summary: "c1", config: { for_each_index: 1 } });
     await repo.update(c0.id, { parent_id: root.id, status: "completed" });
-    await repo.update(c1.id, { parent_id: root.id, status: "running" });
+    await repo.update(c1.id, { session_id: `ark-s-${c1.id}`, parent_id: root.id, status: "running" });
     await repo.update(c2.id, { parent_id: root.id, status: "failed" });
 
     const roots = await repo.listRoots();
@@ -69,12 +69,12 @@ describe("SessionRepository.listRoots / listChildren -- child_iterations", () =>
     // Level 2: g0, g1 (grand-children of c0)
     const root = await repo.create({ summary: "root" });
     const c0 = await repo.create({ summary: "c0", config: { for_each_index: 0 } });
-    await repo.update(c0.id, { parent_id: root.id, status: "running" });
+    await repo.update(c0.id, { session_id: `ark-s-${c0.id}`, parent_id: root.id, status: "running" });
 
     const g0 = await repo.create({ summary: "g0", config: { for_each_index: 0 } });
     const g1 = await repo.create({ summary: "g1", config: { for_each_index: 1 } });
     await repo.update(g0.id, { parent_id: c0.id, status: "completed" });
-    await repo.update(g1.id, { parent_id: c0.id, status: "running" });
+    await repo.update(g1.id, { session_id: `ark-s-${g1.id}`, parent_id: c0.id, status: "running" });
 
     // Root row sees its level-1 child but NOT the level-2 grandchildren.
     const [r] = await repo.listRoots();

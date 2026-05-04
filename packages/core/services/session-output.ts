@@ -73,31 +73,12 @@ export async function send(
   // Persist user message to conversation history before sending to agent
   await app.messages.send(sessionId, "user", message, "text");
 
-  // Runtime polymorphism: each executor owns its own send strategy. The
-  // dispatcher writes session.config.launch_executor when it resolves the
-  // runtime for launch (post-launch.ts). claude-agent posts to arkd's user-
-  // message queue; claude-code uses tmux send-keys; goose / cli-agent / etc.
-  // implement whatever transport their runtime exposes.
-  //
-  // We deliberately delegate via the registry rather than branching here so
-  // adding a new runtime (e.g. opencode, codex) is purely an executor change
-  // -- session-output stays runtime-agnostic.
-  //
-  // Fallback when launch_executor is absent (legacy sessions dispatched before
-  // post-launch started writing it): consult the resolved agent definition
-  // and use its `runtime` field. Defaulting to "claude-code" was wrong --
-  // it sent every steer through tmux paste-buffer, which is a no-op for
-  // claude-agent + breaks for any remote dispatch.
-  let launchExecutor = (session.config?.launch_executor as string | undefined) ?? "";
-  if (!launchExecutor && session.agent) {
-    try {
-      const agentDef = await app.agents.get(session.agent);
-      const runtime = (agentDef as { runtime?: string } | undefined)?.runtime;
-      if (typeof runtime === "string" && runtime.length > 0) launchExecutor = runtime;
-    } catch {
-      // Agent missing from store -- fall through to the explicit error below.
-    }
-  }
+  // Runtime polymorphism: each executor owns its own send strategy. We
+  // delegate via the registry rather than branching here so adding a new
+  // runtime (e.g. opencode, codex) is purely an executor change --
+  // session-output stays runtime-agnostic.
+  const { resolveSessionExecutor } = await import("../executors/resolve.js");
+  const launchExecutor = await resolveSessionExecutor(app, session);
   if (!launchExecutor) {
     return {
       ok: false,

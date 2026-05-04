@@ -209,8 +209,14 @@ describe("Conductor E2E -- report pipeline", async () => {
 
   it("progress report resets waiting status to running and clears breakpoint", async () => {
     const session = await getApp().sessions.create({ summary: "waiting → running" });
-    // Simulate: question report set waiting + breakpoint_reason
-    await getApp().sessions.update(session.id, { status: "waiting", breakpoint_reason: "Should I proceed?" });
+    // Simulate: question report set waiting + breakpoint_reason. session_id
+    // must be set so the subsequent waiting->running transition satisfies
+    // the repo invariant (in prod, post-launch.ts seeds it at dispatch time).
+    await getApp().sessions.update(session.id, {
+      status: "waiting",
+      breakpoint_reason: "Should I proceed?",
+      session_id: `ark-s-${session.id}`,
+    });
 
     await postReport(session.id, {
       type: "progress",
@@ -244,7 +250,7 @@ describe("Conductor E2E -- report pipeline", async () => {
 
     // running -- should stay running (no-op)
     const s2 = await getApp().sessions.create({ summary: "running session" });
-    await getApp().sessions.update(s2.id, { status: "running" });
+    await getApp().sessions.update(s2.id, { session_id: `ark-s-${s2.id}`, status: "running" });
 
     await postReport(s2.id, {
       type: "progress",

@@ -46,7 +46,7 @@ interface RemoteConfig {
    * Set this on the compute row when arkd needs a real callback path
    * (e.g. legacy in-VPC dispatch where there's no SSM port-forward
    * tunnelling /events back). The pure-SSM dispatch model preferred by
-   * the conductor doesn't need this set: arkd serves long-poll events
+   * the conductor doesn't need this set: arkd serves WebSocket events
    * over the same forward tunnel and never initiates a callback.
    */
   conductor_url?: string;
@@ -234,7 +234,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       // breaks under the SSM-only model, where the conductor is
       // unreachable from the instance unless explicitly threaded
       // through. For the pure-SSM dispatch model the operator can
-      // leave this unset and arkd uses long-poll over the
+      // leave this unset and arkd serves WebSocket events over the
       // forward tunnel rather than initiating a callback. Audit
       // finding F4. Mirrors the pattern `EC2Compute.provision` already
       // uses (`cfg.conductorUrl` -> buildUserData).

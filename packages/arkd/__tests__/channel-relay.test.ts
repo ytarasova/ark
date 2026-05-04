@@ -106,32 +106,81 @@ describe("/config", async () => {
   });
 });
 
-async function readFirstFrame(arkdPort: number): Promise<Record<string, unknown>> {
-  const abort = new AbortController();
-  const stream = await fetch(`http://localhost:${arkdPort}/channel/hooks/subscribe`, { signal: abort.signal });
-  expect(stream.status).toBe(200);
-  const reader = stream.body!.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  let frame: Record<string, unknown> | null = null;
-  while (frame === null) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const nl = buf.indexOf("\n");
-    if (nl >= 0) {
-      const line = buf.slice(0, nl).trim();
-      if (line) frame = JSON.parse(line) as Record<string, unknown>;
+/**
+ * Open a WS subscriber on `/ws/channel/hooks` and resolve with the first
+ * envelope frame after the server's `{ type: "subscribed" }` ack. Times out
+ * after 2s so a stuck test fails fast instead of hanging.
+ *
+ * The ack is sent from inside the server's `open()` handler -- after the
+ * subscriber is registered AND after the ring buffer is drained -- so any
+ * pre-buffered envelope arrives at the client BEFORE the ack. This helper
+ * uses a single message listener that buffers envelope frames into a queue
+ * and resolves the ack promise on the control frame; that way no buffered
+ * envelope is dropped between ack-wait and reading.
+ */
+async function readFirstFrame(arkdPort: number, timeoutMs = 2000): Promise<Record<string, unknown>> {
+  const ws = new WebSocket(`ws://localhost:${arkdPort}/ws/channel/hooks`);
+  const buffered: Record<string, unknown>[] = [];
+  let waker: (() => void) | null = null;
+  const wake = (): void => {
+    const w = waker;
+    waker = null;
+    if (w) w();
+  };
+  let ackResolve!: () => void;
+  let ackReject!: (err: Error) => void;
+  const ackPromise = new Promise<void>((resolve, reject) => {
+    ackResolve = resolve;
+    ackReject = reject;
+  });
+
+  ws.addEventListener("message", (ev) => {
+    try {
+      const frame = JSON.parse(String(ev.data)) as Record<string, unknown>;
+      if (frame.type === "subscribed") {
+        ackResolve();
+        return;
+      }
+      if (typeof frame.type === "string") return; // skip other control frames
+      buffered.push(frame);
+      wake();
+    } catch {
+      /* malformed -- skip */
+    }
+  });
+  ws.addEventListener("error", () => ackReject(new Error("ws error before ack")), { once: true });
+  ws.addEventListener("close", () => {
+    ackReject(new Error("ws closed before ack"));
+    wake();
+  });
+
+  try {
+    await Promise.race([
+      ackPromise,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("subscribed ack timeout")), timeoutMs)),
+    ]);
+
+    const frame = await Promise.race([
+      new Promise<Record<string, unknown>>((resolve) => {
+        const tryDrain = (): void => {
+          if (buffered.length > 0) {
+            resolve(buffered.shift()!);
+            return;
+          }
+          waker = tryDrain;
+        };
+        tryDrain();
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("first frame timeout")), timeoutMs)),
+    ]);
+    return frame;
+  } finally {
+    try {
+      ws.close();
+    } catch {
+      /* already closed */
     }
   }
-  abort.abort();
-  try {
-    await reader.cancel();
-  } catch {
-    /* already cancelled */
-  }
-  if (!frame) throw new Error("no frame received before stream closed");
-  return frame;
 }
 
 // ── Channel report enqueue (no direct POST to conductor) ───────────────────

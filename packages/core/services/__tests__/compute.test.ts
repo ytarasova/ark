@@ -109,7 +109,7 @@ describe("ComputeService", async () => {
 
   it("update changes fields", async () => {
     await svc.create({ name: "upd", provider: "docker" });
-    const updated = await svc.update("upd", { status: "running" as ComputeStatus });
+    const updated = await svc.update("upd", { session_id: `ark-s-${"upd"}`, status: "running" as ComputeStatus });
     expect(updated!.status).toBe("running");
   });
 

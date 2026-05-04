@@ -27,7 +27,7 @@ afterAll(async () => {
 describe("session stop preserves claude_session_id", async () => {
   it("stop(app) sets status to stopped", async () => {
     const session = await getApp().sessions.create({ summary: "stop-status-test" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const result = await app.sessionLifecycle.stop(session.id);
     expect(result.ok).toBe(true);
@@ -89,6 +89,7 @@ describe("session stop preserves claude_session_id", async () => {
     const claudeId = "persistent-uuid";
     const session = await getApp().sessions.create({ summary: "multi-stop-test" });
     await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "work",
       claude_session_id: claudeId,
@@ -114,6 +115,7 @@ describe("session stop preserves claude_session_id", async () => {
   it("stop(app) nulls error field", async () => {
     const session = await getApp().sessions.create({ summary: "stop-clears-error" });
     await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "work",
       error: "some transient error",
@@ -128,6 +130,7 @@ describe("session stop preserves claude_session_id", async () => {
   it("stop(app) preserves stage and agent fields", async () => {
     const session = await getApp().sessions.create({ summary: "stop-preserves-agent" });
     await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "review",
       agent: "reviewer",

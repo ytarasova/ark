@@ -11,7 +11,7 @@
  *   H7 -- `di/runtime.snapshotStore` rejects FS backend in hosted mode
  *
  *   M1 -- `claude/sessions.refreshClaudeSessionsCache` returns 0 in hosted
- *   M2 -- `infra/stale-state-detector` skips cwd sweeps in hosted mode
+ *   M2 -- `infra/boot-cleanup` skips cwd sweeps in hosted mode
  *   M3 -- `services/dispatch/guards.cloneRemoteRepoIfNeeded` skips in hosted
  *   M5 -- `modes/hosted-app-mode` plumbs config through (file backend opt-in)
  *   M6 -- `di/seed-builtins` throws when nothing seeds + nothing exists
@@ -267,9 +267,9 @@ describe("M1 -- refreshClaudeSessionsCache returns 0 in hosted mode", () => {
   });
 });
 
-// ── M2 ─ stale-state-detector cwd sweeps ────────────────────────────────────
+// ── M2 ─ boot-cleanup cwd sweeps ────────────────────────────────────────────
 
-describe("M2 -- StaleStateDetector skips cwd sweeps in hosted mode", () => {
+describe("M2 -- BootCleanup skips cwd sweeps in hosted mode", () => {
   it("does not probe process.cwd()/.claude or process.cwd()/.mcp.json in hosted mode", async () => {
     // Boot a fully-hosted ctx so the sessions repo + DB are wired (the
     // sessions sweep below uses them).
@@ -278,8 +278,8 @@ describe("M2 -- StaleStateDetector skips cwd sweeps in hosted mode", () => {
 
     const existsSpy = spyOn(fsModule, "existsSync");
     try {
-      const { StaleStateDetector } = await import("../infra/stale-state-detector.js");
-      const det = new StaleStateDetector(ctx);
+      const { BootCleanup } = await import("../infra/boot-cleanup.js");
+      const det = new BootCleanup(ctx);
       await det.start();
       const probedCwdFiles = existsSpy.mock.calls
         .map((c) => String(c[0]))
