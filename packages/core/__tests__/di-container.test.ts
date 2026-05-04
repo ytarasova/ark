@@ -165,7 +165,7 @@ describe("service dependency injection", async () => {
 
     const svc = app.sessionService;
     const session = await svc.start({});
-    await app.sessions.update(session.id, { status: "running" } as any);
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" } as any);
 
     const result = await svc.stop(session.id);
     expect(result.ok).toBe(true);

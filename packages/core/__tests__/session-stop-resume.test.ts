@@ -23,7 +23,7 @@ afterEach(async () => {
 describe("session stop", async () => {
   it("sets status to 'stopped' (not 'failed')", async () => {
     const session = await getApp().sessions.create({ summary: "stop-test" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const result = await app.sessionLifecycle.stop(session.id);
     expect(result.ok).toBe(true);
@@ -36,6 +36,7 @@ describe("session stop", async () => {
   it("preserves claude_session_id for resume", async () => {
     const session = await getApp().sessions.create({ summary: "stop-claude" });
     await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "work",
       claude_session_id: "uuid-to-preserve",
@@ -64,6 +65,7 @@ describe("session stop", async () => {
   it("sets error to null", async () => {
     const session = await getApp().sessions.create({ summary: "stop-error-clear" });
     await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "work",
       error: "some previous error",
@@ -77,7 +79,7 @@ describe("session stop", async () => {
 
   it("returns ok: true with message", async () => {
     const session = await getApp().sessions.create({ summary: "stop-msg" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const result = await app.sessionLifecycle.stop(session.id);
     expect(result.ok).toBe(true);
@@ -115,6 +117,7 @@ describe("session stop", async () => {
   it("preserves other session fields after stop", async () => {
     const session = await getApp().sessions.create({ summary: "preserve-fields", repo: "/my/repo" });
     await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "work",
       agent: "coder",
@@ -177,7 +180,7 @@ describe("session resume", async () => {
 
   it("stopped session can transition to ready via updateSession", async () => {
     const session = await getApp().sessions.create({ summary: "resume-ready" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
     await app.sessionLifecycle.stop(session.id);
 
     // Simulate what resume does (without dispatch)
@@ -197,7 +200,11 @@ describe("session resume", async () => {
 
   it("stop then ready transition preserves stage", async () => {
     const session = await getApp().sessions.create({ summary: "stage-preserve" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "deploy" });
+    await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "deploy",
+    });
     await app.sessionLifecycle.stop(session.id);
 
     await getApp().sessions.update(session.id, { status: "ready" });

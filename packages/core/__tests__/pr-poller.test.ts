@@ -55,6 +55,7 @@ async function createReviewSession(
     flow: opts.flow ?? "review-flow",
   });
   await getApp().sessions.update(session.id, {
+    session_id: `ark-s-${session.id}`,
     pr_url: opts.pr_url ?? "https://github.com/org/repo/pull/42",
     status: opts.status ?? "running",
     stage: opts.stage ?? "review",
@@ -92,7 +93,11 @@ beforeEach(() => {
 describe("pollPRReviews", async () => {
   it("skips sessions without pr_url", async () => {
     const session = await getApp().sessions.create({ summary: "no pr", flow: "review-flow" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "review" });
+    await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "review",
+    });
     // No pr_url set
 
     await pollPRReviews(getApp());
@@ -106,6 +111,7 @@ describe("pollPRReviews", async () => {
   it("skips sessions not in review-gated stage", async () => {
     const session = await getApp().sessions.create({ summary: "wrong stage", flow: "review-flow" });
     await getApp().sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       pr_url: "https://github.com/org/repo/pull/99",
       status: "running",
       stage: "implement", // auto gate, not review

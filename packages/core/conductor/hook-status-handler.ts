@@ -66,6 +66,13 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
     return Response.json({ status: "ok", mapped: "ignored_stale" });
   }
 
+  // Each runtime stamps the stage it was provisioned for onto every hook.
+  // Prefer the payload's stage over `session.stage` -- the latter flaps
+  // when the state machine advances mid-flight (#435: status-poller
+  // false-positive advanced session.stage while the agent kept running),
+  // which would re-stamp historical events with the wrong stage.
+  const hookStage = (typeof payload.stage === "string" && payload.stage) || s.stage || undefined;
+
   // Agent narration / extended-thinking text blocks. These are not hooks in
   // the conductor state-machine sense -- they don't transition status, they
   // don't pair with anything, they're just human-readable progress for the
@@ -74,7 +81,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
   // pairing path.
   if (event === "AgentMessage") {
     await scoped.events.log(sessionId, "agent_message", {
-      stage: s.stage ?? undefined,
+      stage: hookStage,
       actor: "agent",
       data: {
         text: payload.text,
@@ -110,7 +117,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
     // session state, so we don't route it through applyHookStatus. Shape
     // matches what applyHookStatus writes: { event: hookEventName, ...rest }.
     await scoped.events.log(sessionId, "hook_status", {
-      stage: s.stage ?? undefined,
+      stage: hookStage,
       actor: "hook",
       data: { event, ...payload },
     });

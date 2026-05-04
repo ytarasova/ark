@@ -4,7 +4,7 @@ import { BunSqliteAdapter } from "../../database/sqlite.js";
 import type { DatabaseAdapter } from "../../database.js";
 import { SessionRepository } from "../session.js";
 import { initSchema } from "../schema.js";
-import type { SessionStatus, SessionConfig } from "../../../types/index.js";
+import type { Session, SessionStatus, SessionConfig } from "../../../types/index.js";
 import { SESSION_STATUSES } from "../../../types/index.js";
 
 let db: DatabaseAdapter;
@@ -102,7 +102,7 @@ describe("SessionRepository", async () => {
   it("list filters by status", async () => {
     const s1 = await repo.create({});
     await repo.create({});
-    await repo.update(s1.id, { status: "running" as SessionStatus });
+    await repo.update(s1.id, { session_id: `ark-s-${s1.id}`, status: "running" as SessionStatus });
     const running = await repo.list({ status: "running" });
     expect(running.length).toBe(1);
     expect(running[0].id).toBe(s1.id);
@@ -111,7 +111,11 @@ describe("SessionRepository", async () => {
   it("list filters by each user-facing status", async () => {
     for (const status of SESSION_STATUSES) {
       const s = await repo.create({});
-      await repo.update(s.id, { status: status as SessionStatus });
+      // status="running" requires session_id by invariant; pre-populate
+      // when we're about to write that status.
+      const delta: Partial<Session> = { status: status as SessionStatus };
+      if (status === "running") delta.session_id = `ark-s-${s.id}`;
+      await repo.update(s.id, delta);
       const filtered = await repo.list({ status: status as SessionStatus });
       expect(filtered.some((r) => r.id === s.id)).toBe(true);
     }
@@ -198,7 +202,7 @@ describe("SessionRepository", async () => {
   it("list combines multiple filters", async () => {
     await repo.create({ repo: "my/repo", group_name: "team-a" });
     const match = await repo.create({ repo: "my/repo", group_name: "team-b" });
-    await repo.update(match.id, { status: "running" as SessionStatus });
+    await repo.update(match.id, { session_id: `ark-s-${match.id}`, status: "running" as SessionStatus });
     await repo.create({ repo: "other/repo", group_name: "team-b" });
     const result = await repo.list({ repo: "my/repo", status: "running" as SessionStatus });
     expect(result.length).toBe(1);
@@ -207,7 +211,7 @@ describe("SessionRepository", async () => {
 
   it("list returns sessions ordered by created_at descending", async () => {
     const s1 = await repo.create({ summary: "first" });
-    await repo.update(s1.id, { status: "running" as SessionStatus });
+    await repo.update(s1.id, { session_id: `ark-s-${s1.id}`, status: "running" as SessionStatus });
     (await db.prepare("UPDATE sessions SET created_at = '2024-01-01T00:00:00.000Z' WHERE id = ?")).run(s1.id);
     const s2 = await repo.create({ summary: "second" });
     (await db.prepare("UPDATE sessions SET created_at = '2024-01-02T00:00:00.000Z' WHERE id = ?")).run(s2.id);
@@ -227,7 +231,11 @@ describe("SessionRepository", async () => {
 
   it("update changes fields and returns updated session", async () => {
     const s = await repo.create({});
-    const updated = await repo.update(s.id, { status: "running" as SessionStatus, stage: "plan" });
+    const updated = await repo.update(s.id, {
+      session_id: `ark-s-${s.id}`,
+      status: "running" as SessionStatus,
+      stage: "plan",
+    });
     expect(updated!.status).toBe("running");
     expect(updated!.stage).toBe("plan");
     // updated_at is refreshed (may be same ms in fast tests, so just check it exists)
@@ -256,7 +264,10 @@ describe("SessionRepository", async () => {
 
   it("update returns null for nonexistent id", async () => {
     // update always tries to return get(id) which will be null
-    const result = await repo.update("s-ffffff", { status: "running" as SessionStatus });
+    const result = await repo.update("s-ffffff", {
+      session_id: `ark-s-${"s-ffffff"}`,
+      status: "running" as SessionStatus,
+    });
     expect(result).toBeNull();
   });
 
@@ -287,7 +298,7 @@ describe("SessionRepository", async () => {
 
   it("softDelete sets status to deleting and stores previous status", async () => {
     const s = await repo.create({});
-    await repo.update(s.id, { status: "running" as SessionStatus });
+    await repo.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" as SessionStatus });
     expect(await repo.softDelete(s.id)).toBe(true);
     const deleted = await repo.get(s.id);
     expect(deleted!.status).toBe("deleting");
@@ -301,7 +312,7 @@ describe("SessionRepository", async () => {
 
   it("undelete restores previous status", async () => {
     const s = await repo.create({});
-    await repo.update(s.id, { status: "running" as SessionStatus });
+    await repo.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" as SessionStatus });
     await repo.softDelete(s.id);
     const restored = await repo.undelete(s.id);
     expect(restored!.status).toBe("running");
@@ -526,14 +537,14 @@ describe("SessionRepository", async () => {
 
   it("isChannelPortAvailable returns false when port is in use by running session", async () => {
     const s = await repo.create({});
-    await repo.update(s.id, { status: "running" as SessionStatus });
+    await repo.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" as SessionStatus });
     const port = repo.channelPort(s.id);
     expect(await repo.isChannelPortAvailable(port)).toBe(false);
   });
 
   it("isChannelPortAvailable excludes specified session from conflict check", async () => {
     const s = await repo.create({});
-    await repo.update(s.id, { status: "running" as SessionStatus });
+    await repo.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" as SessionStatus });
     const port = repo.channelPort(s.id);
     expect(await repo.isChannelPortAvailable(port, s.id)).toBe(true);
   });
