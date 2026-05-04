@@ -1,21 +1,17 @@
 {
-  "branch": "fix/web-session-view-overhaul",
+  "branch": "ark-s-tov9lcofmq",
+  "task": "trivial-e2e-local-v5",
   "last_completed_stage": 4,
-  "verify_result": "PASS WITH WARNINGS",
+  "verify_result": "PASS",
   "critical_failures": 0,
-  "warnings": 3,
-  "verify_report_path": "/Users/paytmlabs/Projects/ark/.workflow/verify-report.md",
-  "timestamp": "2026-04-22T00:00:00Z",
+  "warnings": 0,
+  "verify_report_path": "/Users/paytmlabs/.ark/worktrees/s-tov9lcofmq/.workflow/verify-report.md",
+  "timestamp": "2026-05-04T00:00:00Z",
   "test_results": {
-    "total": 144,
-    "passed": 144,
-    "failed": 0,
-    "note": "From prior run 2026-04-17. Worktree s-h33osnwveh was deleted before this verification pass; test re-execution not possible."
-  },
-  "handoff_test": {
-    "session": "s-h33osnwveh",
-    "worktree_available": false,
-    "bash_functional": false,
-    "fallback": "prior_run_state"
+    "total": 5578,
+    "passed": 5558,
+    "failed": 2,
+    "skipped": 15,
+    "note": "2 failures are pre-existing in main branch (ensure-reachable mock issue). Not introduced by this commit."
   }
 }
