@@ -110,6 +110,27 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
       });
     }
 
+    // Persist the agent's explicit stage-completion signal. Without this,
+    // SessionEnd's commit-verifier cannot distinguish "agent deliberately
+    // ended the stage with nothing to commit" from "agent drifted and
+    // exited" -- it falls back to no-commits=failure and incorrectly fails
+    // sessions where complete_stage was the right outcome (e.g. the user
+    // steered "answer this question and stop").
+    if (toolName === "mcp__ark-stage-control__complete_stage") {
+      const reason = typeof toolInput.reason === "string" ? toolInput.reason : undefined;
+      const stageForSignal = (typeof hookStage === "string" && hookStage) || s.stage || "";
+      await scoped.sessions.update(sessionId, {
+        config: {
+          ...s.config,
+          stage_complete_signaled: {
+            stage: stageForSignal,
+            ...(reason ? { reason } : {}),
+            ts: new Date().toISOString(),
+          },
+        },
+      });
+    }
+
     // Log the PreToolUse hook itself so the timeline can render the tool
     // call as soon as it's invoked (not just after PostToolUse lands).
     // Without this, every Pre is dropped and the matching Post becomes an

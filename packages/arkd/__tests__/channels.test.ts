@@ -398,4 +398,50 @@ describe("/channel/{name}/publish + /ws/channel/{name}", () => {
     expect(env).toEqual({ probe: true });
     ws.close();
   }, 45_000);
+  test("user-input broadcasts to every open subscriber", async () => {
+    // user-input is broadcast-mode: each agent subscriber filters by its
+    // own session id, so every open subscriber must receive a copy.
+    // Stale-but-readyState=OPEN subscribers from dead sessions ignore
+    // envelopes whose session field doesn't match -- but they must not
+    // silently absorb the only copy intended for the live subscriber.
+    const a = await subscribedChannel("user-input", 5000);
+    const b = await subscribedChannel("user-input", 5000);
+
+    const r = await publish("user-input", { hello: "world" });
+    expect(((await r.json()) as { delivered: boolean }).delivered).toBe(true);
+
+    const [aMsg] = (await a.nextMessages(1)) as Array<Record<string, unknown>>;
+    const [bMsg] = (await b.nextMessages(1)) as Array<Record<string, unknown>>;
+    expect(aMsg).toEqual({ hello: "world" });
+    expect(bMsg).toEqual({ hello: "world" });
+
+    a.ws.close();
+    b.ws.close();
+  });
+
+  test("hooks fans out to first subscriber only (single-reader semantics)", async () => {
+    // hooks is fan-out: there is exactly one conductor per arkd, and
+    // broadcasting would deliver every event to N readers and double-
+    // process every hook. Verify the second subscriber receives nothing
+    // when the first is alive.
+    const a = await subscribedChannel("hooks", 5000);
+    const b = await subscribedChannel("hooks", 5000);
+
+    const r = await publish("hooks", { event: "test" });
+    expect(((await r.json()) as { delivered: boolean }).delivered).toBe(true);
+
+    const [aMsg] = (await a.nextMessages(1)) as Array<Record<string, unknown>>;
+    expect(aMsg).toEqual({ event: "test" });
+
+    // b should NOT receive the envelope -- it was delivered to the first
+    // open subscriber (a). Race a short timeout against the second read.
+    const bGot = await Promise.race([
+      b.nextMessages(1).then(() => "received"),
+      new Promise<string>((r) => setTimeout(() => r("nothing"), 500)),
+    ]);
+    expect(bGot).toBe("nothing");
+
+    a.ws.close();
+    b.ws.close();
+  });
 });

@@ -45,6 +45,25 @@ export interface SessionConfig {
    */
   arkd_local_forward_port?: number;
   // Lifecycle
+  /**
+   * Last stage for which the agent explicitly called the
+   * `mcp__ark-stage-control__complete_stage` tool. Set by the hook-status
+   * handler when it observes the corresponding `PreToolUse` event. The
+   * SessionEnd commit-verifier consults this to distinguish "agent
+   * deliberately ended the stage with nothing to commit" (legitimate --
+   * e.g. after a user steer asking for a no-op reply) from "agent drifted
+   * off-task and exited" (the failure case the verifier was designed for).
+   *
+   * Without this signal the verifier conflates the two and incorrectly
+   * fails sessions where the agent's complete_stage call was the right
+   * outcome but no files needed editing.
+   */
+  stage_complete_signaled?: {
+    stage: string;
+    reason?: string;
+    /** ISO8601 timestamp of the agent's tool call. */
+    ts: string;
+  };
   _pre_delete_status?: string;
   _deleted_at?: string;
   _pending_handoff?: { agent: string; instructions?: string };

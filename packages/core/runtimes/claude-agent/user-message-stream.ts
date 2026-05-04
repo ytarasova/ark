@@ -42,13 +42,23 @@ export interface UserMessageStreamOpts {
   arkdUrl: string;
   sessionName: string;
   authToken?: string;
+  /**
+   * Called for non-interrupt envelopes. Caller pushes `content` to the
+   * SDK prompt queue; the SDK consumes it between turns.
+   */
   onMessage: (content: string) => void;
   /**
-   * Called for `control: "interrupt"` envelopes. The content is also passed
-   * through `onMessage` first so the correction is already in the prompt
-   * queue when abort fires.
+   * Called for `control: "interrupt"` envelopes. The content is delivered
+   * here -- NOT through `onMessage` -- so the caller can buffer it for the
+   * next query attempt rather than pushing it into a queue that may have a
+   * dying iterator parked on `next()`. The caller should:
+   *   1. Buffer `content` for the next attempt
+   *   2. Call query.interrupt() to end the current turn
+   *   3. After the abort settles, push the buffered content into the queue
+   *      so the resumed SDK consumes it as the first message of the new
+   *      turn.
    */
-  onInterrupt?: () => void;
+  onInterrupt?: (content: string) => void;
   onError?: (err: Error) => void;
 }
 
@@ -69,30 +79,46 @@ export function subscribeUserMessages(opts: UserMessageStreamOpts & { client?: A
   const ac = new AbortController();
   const client = opts.client ?? new ArkdClient(arkdUrl, { token: authToken });
 
+  console.error(`[user-input] starting subscriber arkdUrl=${arkdUrl} session=${sessionName}`);
+
   void (async () => {
     let backoffMs = 250;
     while (!stopped) {
       try {
-        for await (const env of await client.subscribeToChannel<UserMessageEnvelope>("user-input", {
+        console.error(`[user-input] connecting to channel...`);
+        const iter = await client.subscribeToChannel<UserMessageEnvelope>("user-input", {
           signal: ac.signal,
-        })) {
+        });
+        console.error(`[user-input] subscribed (ack received), waiting for envelopes`);
+        for await (const env of iter) {
+          // Log every raw envelope BEFORE filtering, so we see same-session
+          // and other-session traffic equally.
+          console.error(
+            `[user-input] raw frame: session=${env.session} bytes=${env.content?.length ?? 0} ` +
+              `control=${env.control ?? "none"}`,
+          );
           // Channel is global; ignore envelopes destined for other sessions.
           if (env.session !== sessionName) continue;
-          // Observability: every received user-input envelope. Without this
-          // there is no way to tell if the conductor's publish reached the
-          // agent's subscriber when a steer appears to be lost mid-flight.
-          // Goes to stderr so it lands in the agent's stdio.log.
           console.error(
             `[user-input] received: bytes=${env.content?.length ?? 0} ` +
               `control=${env.control ?? "none"} session=${env.session}`,
           );
-          if (typeof env.content === "string" && env.content.length > 0) {
-            onMessage(env.content);
-          }
-          if (env.control === "interrupt" && onInterrupt) {
-            // Fire after onMessage so the correction is in the queue before abort.
-            console.error("[user-input] firing interrupt to preempt the current SDK turn");
-            onInterrupt();
+          const content = typeof env.content === "string" ? env.content : "";
+          if (env.control === "interrupt") {
+            // Interrupt envelope: route the content through onInterrupt so
+            // the launcher buffers it and pushes it onto the queue only
+            // AFTER the current turn aborts. Pushing here would race with
+            // the still-running SDK iterator -- it can grab the message
+            // via its parked `next()` resolver and lose it when the abort
+            // tears the turn down.
+            if (onInterrupt) {
+              console.error("[user-input] firing interrupt to preempt the current SDK turn");
+              onInterrupt(content);
+            }
+          } else if (content.length > 0) {
+            // Non-interrupt envelope: push to the queue; SDK consumes
+            // between turns.
+            onMessage(content);
           }
           // Successful read -- reset backoff so a long-lived stream that
           // briefly drops and reconnects doesn't keep escalating.

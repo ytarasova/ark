@@ -134,6 +134,12 @@ export const claudeAgentExecutor: Executor = {
     // own arkd, with the SSM tunnel handling the conductor side.
     const arkEnv: Record<string, string> = {
       ARK_SESSION_ID: session.id,
+      // The handle the conductor uses to address this agent on the
+      // user-input channel (`ark-s-<id>`). Without this the agent's
+      // user-input subscriber filters envelopes by the bare session id
+      // and the conductor's publishes (which carry the handle) get
+      // rejected silently as "not for me".
+      ARK_SESSION_HANDLE: handle,
       ARK_SESSION_DIR: workerSessionDir,
       ARK_WORKTREE: workerWorkdir ?? session.workdir ?? session.repo ?? "",
       ARK_PROMPT_FILE: workerPromptFile,

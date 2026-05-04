@@ -10,10 +10,31 @@
  *   - `hooks` channel: agent -> conductor. Carries hook events,
  *     channel-report frames, and channel-relay frames. Each envelope carries
  *     its own `kind` so the conductor's `arkd-events-consumer` can dispatch.
+ *     SINGLE-READER: there is exactly one conductor per arkd, so each
+ *     envelope is delivered to exactly one subscriber (the conductor).
+ *     Multiple readers would double-process every event.
  *
  *   - `user-input` channel: conductor -> agent. Carries `{ session, content,
  *     control? }` envelopes; the agent's user-message stream consumer
  *     filters by `envelope.session === ARK_SESSION_ID`.
+ *     BROADCAST: the channel is global (one wire, many sessions); each
+ *     subscriber filters by its own session id. Broadcasting means a
+ *     stale-but-readyState=OPEN subscriber from a dead session can't
+ *     silently absorb the only copy of an envelope intended for the live
+ *     subscriber of the new session.
+ *
+ * Why WebSocket for subscribers: previously this used HTTP/1.1 long-poll
+ * (NDJSON over fetch+ReadableStream). That works in steady state but
+ * silently breaks when traffic goes idle for >~5min: client fetch keep-
+ * alive, server idle timers, and intermediate proxies (SSM tunnel) can
+ * each tear the connection down independently of the application. A user
+ * steer published in that gap sat in arkd's ring buffer with no parked
+ * subscriber, delivered up to 5min late on the next reattach.
+ *
+ * WebSocket fixes this at the protocol level: Bun's WS server sends
+ * automatic ping frames (`sendPings: true` is the default), the client
+ * answers with pong, and every layer sees periodic traffic. No
+ * application-level keepalive plumbing needed.
  *
  * Why WebSocket for subscribers: previously this used HTTP/1.1 long-poll
  * (NDJSON over fetch+ReadableStream). That works in steady state but
@@ -32,11 +53,19 @@
  * Subscribers see every envelope on the channel; per-session filtering is
  * the consumer's responsibility, carried in the envelope.
  *
- * Fan-out semantics: each envelope goes to the FIRST open subscriber in
- * insertion order. This is deliberate: `hooks` is single-reader (one
- * conductor per arkd) and `user-input` is read by exactly one agent. If a
- * future channel needs true broadcast, add a `broadcast: true` flag to the
- * subscribe handshake; the extension point is obvious.
+ * Delivery semantics are per-channel:
+ *   - `user-input`: BROADCAST -- each subscriber filters by session id, so
+ *     every open subscriber gets a copy. Stale subscribers (dead sessions)
+ *     ignore non-matching envelopes; the live one consumes its own.
+ *   - everything else (including `hooks`): FAN-OUT-TO-FIRST -- the
+ *     envelope goes to the first OPEN subscriber in insertion order. Used
+ *     when there is exactly one logical reader (the conductor for hooks);
+ *     broadcasting would deliver each envelope to N readers and double-
+ *     process every event.
+ *
+ * Both modes evict zombies (readyState !== OPEN, or send returns <= 0) in
+ * the same pass that delivers, so a half-closed socket doesn't keep
+ * absorbing envelopes silently.
  *
  * Subscribe handshake: the server sends `{ "type": "subscribed" }` as the
  * very first frame on every new WS connection, from inside the `open()`
@@ -88,19 +117,44 @@ function stateFor(name: string): ChannelState {
   return s;
 }
 
+/**
+ * Channels with broadcast delivery semantics. Other channels fan out to
+ * the first open subscriber. See the file header for the per-channel
+ * rationale -- the short version: broadcast is for channels where every
+ * subscriber filters by some discriminator (e.g. session id) and we don't
+ * want stale subscribers to silently absorb the only copy of an envelope.
+ */
+const BROADCAST_CHANNELS = new Set(["user-input"]);
+
 function enqueue(name: string, envelope: Envelope): boolean {
   const s = stateFor(name);
-  // Fan-out to the first open subscriber. Iteration order = insertion order,
-  // so the first-attached subscriber gets each envelope. If delivery throws
-  // (socket half-closed mid-send), drop that subscriber and try the next.
+  const payload = JSON.stringify(envelope);
+  const broadcast = BROADCAST_CHANNELS.has(name);
+
+  // Walk subscribers, evicting zombies (readyState !== OPEN, or send
+  // returns 0 which Bun uses to signal "socket closed/closing"). Bun's
+  // ws.send() does NOT throw on a half-closed socket -- it returns the
+  // byte count, with <=0 meaning the frame was not delivered. The
+  // previous try/catch pattern silently dropped envelopes in that case.
+  const dead: Array<ServerWebSocket<ChannelWsData>> = [];
+  let deliveredAny = false;
   for (const ws of s.subscribers) {
-    try {
-      ws.send(JSON.stringify(envelope));
-      return true;
-    } catch {
-      s.subscribers.delete(ws);
+    if (ws.readyState !== 1 /* OPEN */) {
+      dead.push(ws);
+      continue;
+    }
+    const written = ws.send(payload);
+    if (written > 0) {
+      deliveredAny = true;
+      // Fan-out: stop at the first successful delivery. Broadcast: keep
+      // going so every live subscriber receives a copy.
+      if (!broadcast) break;
+    } else {
+      dead.push(ws);
     }
   }
+  for (const ws of dead) s.subscribers.delete(ws);
+  if (deliveredAny) return true;
   // No live subscriber -- buffer for the next connect.
   s.ring.push(envelope);
   return false;
