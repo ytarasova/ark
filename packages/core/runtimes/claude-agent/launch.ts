@@ -50,7 +50,7 @@ export type SDKUserMessage = {
 // push() enqueues a message; close() signals the end of the sequence.
 // ---------------------------------------------------------------------------
 
-class PromptQueue implements AsyncIterable<SDKUserMessage> {
+export class PromptQueue implements AsyncIterable<SDKUserMessage> {
   private pending: SDKUserMessage[] = [];
   private resolvers: Array<(msg: IteratorResult<SDKUserMessage>) => void> = [];
   private closed = false;
@@ -144,6 +144,13 @@ export interface RunAgentSdkLaunchOpts {
    */
   authToken?: string;
   /**
+   * Conductor base URL, e.g. `http://localhost:19100`. When set, the
+   * launcher mounts the `ark-ask-user` MCP server so the agent can push
+   * structured questions to the UI. Unset on pure remote-dispatch paths
+   * where only arkd is reachable.
+   */
+  conductorUrl?: string;
+  /**
    * Fetch implementation. Defaults to the global fetch. Injected in tests
    * so no real HTTP connections are made.
    */
@@ -158,6 +165,42 @@ export interface RunAgentSdkLaunchResult {
    * Surfaces in conductor events so the UI can show "Stage complete: <why>".
    */
   stageCompleteReason?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Stop-hook gate
+// ---------------------------------------------------------------------------
+
+/**
+ * Result returned by the SDK Stop hook. Either an empty object (SDK may
+ * actually stop) or a `{ decision: "block", reason }` pair (SDK feeds the
+ * reason back as a user turn and continues).
+ */
+export type StopHookDecision = Record<string, never> | { decision: "block"; reason: string };
+
+/**
+ * Pure gate used by the SDK Stop hook. The SDK is allowed to exit only when
+ *   1. the agent explicitly called `complete_stage` (says "I'm done"), AND
+ *   2. the user-input PromptQueue has no pending messages.
+ *
+ * Anything else returns `{ decision: "block", reason }`. The SDK feeds the
+ * reason back as a user turn and the agent keeps working. Exported for unit
+ * tests -- production wiring lives on `sdkOptions.hooks.Stop` in
+ * `runAgentSdkLaunch`.
+ */
+export function decideStopHook(params: {
+  stageCompleteRequested: boolean;
+  queuePendingCount: number;
+}): StopHookDecision {
+  const queueHasPending = params.queuePendingCount > 0;
+  if (params.stageCompleteRequested && !queueHasPending) return {};
+  const reason = !params.stageCompleteRequested
+    ? "end_turn fired but `complete_stage` has not been called. Either continue working " +
+      "on the stage's task, or call `mcp__ark-stage-control__complete_stage` if the work " +
+      "the user asked for in this stage is finished."
+    : "A new user message arrived after you signaled completion. Read it from the next " +
+      "user turn and respond before stopping.";
+  return { decision: "block", reason };
 }
 
 // ---------------------------------------------------------------------------
@@ -896,19 +939,11 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
       Stop: [
         {
           hooks: [
-            async () => {
-              const queueHasPending = queue.pendingCount() > 0;
-              if (stageCompleteRequested && !queueHasPending) {
-                return {};
-              }
-              const reason = !stageCompleteRequested
-                ? "end_turn fired but `complete_stage` has not been called. Either continue working " +
-                  "on the stage's task, or call `mcp__ark-stage-control__complete_stage` if the work " +
-                  "the user asked for in this stage is finished."
-                : "A new user message arrived after you signaled completion. Read it from the next " +
-                  "user turn and respond before stopping.";
-              return { decision: "block" as const, reason };
-            },
+            async () =>
+              decideStopHook({
+                stageCompleteRequested,
+                queuePendingCount: queue.pendingCount(),
+              }),
           ],
         },
       ],

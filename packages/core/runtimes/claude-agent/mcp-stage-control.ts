@@ -44,6 +44,33 @@ export interface StageControlResult {
 }
 
 /**
+ * Pure handler for the `complete_stage` tool. Exported for unit tests so they
+ * can exercise the callback + response shape without reaching into the SDK's
+ * MCP transport.
+ */
+export async function completeStageHandler(
+  args: { reason?: string },
+  opts: StageControlOpts,
+): Promise<StageControlResult> {
+  try {
+    opts.onCompleteStage(args.reason);
+  } catch {
+    // Callback is local to launcher; failure here is non-recoverable
+    // anyway. Surface it but don't crash the tool call.
+  }
+  return {
+    content: [
+      {
+        type: "text",
+        text:
+          "Stage marked complete. The runtime will exit once any pending user messages are processed; " +
+          "if no further input arrives, the conductor will advance to the next stage shortly.",
+      },
+    ],
+  };
+}
+
+/**
  * Build the `ark-stage-control` MCP server. Returned object is compatible
  * with the SDK's `mcpServers` option (`McpSdkServerConfigWithInstance`).
  */
@@ -65,24 +92,7 @@ export function createStageControlMcpServer(opts: StageControlOpts): McpSdkServe
         .optional()
         .describe("Brief summary of what was accomplished in this stage. Surfaced in conductor events for UI display."),
     },
-    async (args): Promise<StageControlResult> => {
-      try {
-        opts.onCompleteStage(args.reason);
-      } catch {
-        // Callback is local to launcher; failure here is non-recoverable
-        // anyway. Surface it but don't crash the tool call.
-      }
-      return {
-        content: [
-          {
-            type: "text",
-            text:
-              "Stage marked complete. The runtime will exit once any pending user messages are processed; " +
-              "if no further input arrives, the conductor will advance to the next stage shortly.",
-          },
-        ],
-      };
-    },
+    (args) => completeStageHandler(args, opts),
   );
 
   return createSdkMcpServer({
