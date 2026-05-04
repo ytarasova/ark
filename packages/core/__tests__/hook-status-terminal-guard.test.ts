@@ -88,7 +88,7 @@ describe("applyHookStatus terminal-status guard (#435)", () => {
     // (or proceed through the auto-commit branch). We just confirm
     // the guard didn't suppress the transition.
     const session = await app.sessions.create({ summary: "happy-path", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const fresh = await app.sessions.get(session.id);
     const result = await app.sessionHooks.applyHookStatus(fresh!, "SessionEnd", {});

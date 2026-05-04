@@ -221,14 +221,14 @@ describe("checkAutoJoin", async () => {
 
   it("returns false when parent is not waiting", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "child" }],
     });
 
     // Manually set parent back to running (not waiting)
-    await app.sessions.update(parent.id, { status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, status: "running" });
     await app.sessions.update(result.childIds![0], { status: "completed" });
 
     const joined = await checkAutoJoin(app, result.childIds![0]);
@@ -237,7 +237,7 @@ describe("checkAutoJoin", async () => {
 
   it("returns false when some children still running", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
@@ -256,7 +256,7 @@ describe("checkAutoJoin", async () => {
 
   it("joins when all children completed", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
@@ -275,7 +275,7 @@ describe("checkAutoJoin", async () => {
 
   it("joins when all children failed", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }],
@@ -289,7 +289,7 @@ describe("checkAutoJoin", async () => {
 
   it("logs auto_join event on parent", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }],
@@ -307,7 +307,7 @@ describe("checkAutoJoin", async () => {
 
   it("logs partial failure when some children failed", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "pass" }, { summary: "fail" }],
@@ -334,7 +334,7 @@ describe("checkAutoJoin", async () => {
 describe("joinFork", async () => {
   it("joins when all children completed", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
@@ -349,7 +349,7 @@ describe("joinFork", async () => {
 
   it("fails when children not done and no force", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
@@ -365,7 +365,7 @@ describe("joinFork", async () => {
 
   it("force join succeeds with incomplete children", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
@@ -386,7 +386,7 @@ describe("joinFork", async () => {
 
   it("blocks when children failed without force", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
@@ -403,7 +403,7 @@ describe("joinFork", async () => {
 
   it("force join succeeds with failed children", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }],
@@ -417,7 +417,7 @@ describe("joinFork", async () => {
 
   it("clears fork_group on parent after join", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }],
@@ -439,7 +439,7 @@ describe("joinFork", async () => {
 describe("spawnSubagent", async () => {
   it("creates child linked to parent", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await spawnSubagent(app, parent.id, { task: "Do subtask" });
     expect(result.ok).toBe(true);
@@ -453,6 +453,7 @@ describe("spawnSubagent", async () => {
   it("inherits parent compute and workdir", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
     await app.sessions.update(parent.id, {
+      session_id: `ark-s-${parent.id}`,
       status: "running",
       compute_name: "ec2-box",
       workdir: "/home/ubuntu/repo",
@@ -565,7 +566,7 @@ describe("spawnSubagent", async () => {
 describe("spawnParallelSubagents", async () => {
   it("spawns multiple subagents", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await spawnParallelSubagents(app, parent.id, [
       { task: "Task 1" },
@@ -584,7 +585,12 @@ describe("spawnParallelSubagents", async () => {
 
   it("each subagent can pick a different agent", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running", agent: "implementer" });
+    await app.sessions.update(parent.id, {
+      session_id: `ark-s-${parent.id}`,
+      stage: "implement",
+      status: "running",
+      agent: "implementer",
+    });
 
     const r1 = await spawnSubagent(app, parent.id, { task: "Review", agent: "reviewer" });
     const r2 = await spawnSubagent(app, parent.id, { task: "Docs" });

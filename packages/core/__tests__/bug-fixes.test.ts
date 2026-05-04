@@ -26,7 +26,7 @@ describe("applyReport", () => {
 
   test("still works correctly for existing session", async () => {
     const session = await getApp().sessions.create({ summary: "test session" });
-    await getApp().sessions.update(session.id, { status: "running", stage: "plan" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "plan" });
     const report = { type: "progress", stage: "plan", message: "working..." } as unknown as OutboundMessage;
     const result = await getApp().sessionHooks.applyReport(session.id, report);
     // Should have log events and bus events

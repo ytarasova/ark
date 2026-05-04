@@ -99,7 +99,12 @@ describe("pauseWithSnapshot", async () => {
   it("returns notSupported when compute lacks snapshot capability", async () => {
     const session = await app.sessions.create({ summary: "pause-no-snap" });
     await ensureComputeRow("local-test", "docker", "local");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "local-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "local-test",
+    });
     app.registerCompute(makeNoSnapshotCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
@@ -111,7 +116,12 @@ describe("pauseWithSnapshot", async () => {
   it("pauses a running session with snapshot-capable compute", async () => {
     const session = await app.sessions.create({ summary: "pause-ok" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
@@ -124,7 +134,12 @@ describe("pauseWithSnapshot", async () => {
   it("sets session status to blocked with breakpoint_reason", async () => {
     const session = await app.sessions.create({ summary: "pause-status" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     await pauseWithSnapshot(app, session.id, { reason: "manual pause" });
@@ -137,7 +152,12 @@ describe("pauseWithSnapshot", async () => {
   it("uses default reason when none provided", async () => {
     const session = await app.sessions.create({ summary: "pause-default-reason" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     await pauseWithSnapshot(app, session.id);
@@ -149,7 +169,12 @@ describe("pauseWithSnapshot", async () => {
   it("stores last_snapshot_id in session config", async () => {
     const session = await app.sessions.create({ summary: "pause-config" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
@@ -162,7 +187,12 @@ describe("pauseWithSnapshot", async () => {
 
   it("returns ok: false when session has no resolvable compute", async () => {
     const session = await app.sessions.create({ summary: "pause-no-compute" });
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "unknown-xyz" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "unknown-xyz",
+    });
 
     const result = await pauseWithSnapshot(app, session.id);
     expect(result.ok).toBe(false);
@@ -171,7 +201,12 @@ describe("pauseWithSnapshot", async () => {
   it("persists snapshot bytes to the store", async () => {
     const session = await app.sessions.create({ summary: "pause-persist" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
@@ -203,7 +238,12 @@ describe("resumeFromSnapshot", async () => {
   it("resumes from the latest snapshot when snapshotId is omitted", async () => {
     const session = await app.sessions.create({ summary: "resume-latest" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const pauseResult = await pauseWithSnapshot(app, session.id);
@@ -217,7 +257,12 @@ describe("resumeFromSnapshot", async () => {
   it("sets session status to ready after resume", async () => {
     const session = await app.sessions.create({ summary: "resume-status" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     await pauseWithSnapshot(app, session.id, { reason: "test pause" });
@@ -233,7 +278,12 @@ describe("resumeFromSnapshot", async () => {
   it("resumes using explicit snapshotId", async () => {
     const session = await app.sessions.create({ summary: "resume-explicit" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
-    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "work",
+      compute_name: "firecracker-test",
+    });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const pauseResult = await pauseWithSnapshot(app, session.id);
@@ -278,6 +328,7 @@ describe("resumeFromSnapshot", async () => {
     const session = await app.sessions.create({ summary: "round-trip", repo: "/my/repo" });
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "work",
       agent: "coder",

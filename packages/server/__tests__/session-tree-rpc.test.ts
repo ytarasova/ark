@@ -45,7 +45,7 @@ async function seedFamily(): Promise<{ root: string; c1: string; c2: string; gc:
   const c2 = await app.sessions.create({ summary: "c2" });
   const gc = await app.sessions.create({ summary: "gc" });
   await app.sessions.update(c1.id, { parent_id: root.id });
-  await app.sessions.update(c2.id, { parent_id: root.id, status: "running" });
+  await app.sessions.update(c2.id, { session_id: `ark-s-${c2.id}`, parent_id: root.id, status: "running" });
   await app.sessions.update(gc.id, { parent_id: c1.id });
   return { root: root.id, c1: c1.id, c2: c2.id, gc: gc.id };
 }

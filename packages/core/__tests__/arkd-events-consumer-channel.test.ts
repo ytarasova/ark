@@ -87,7 +87,7 @@ async function waitForEvent(appCtx: AppContext, sessionId: string, type: string,
 describe("arkd-events-consumer: channel-report dispatch", () => {
   test("a channel-report frame on the stream runs handleReport on conductor", async () => {
     const session = await app.sessions.create({ summary: "consumer channel-report test", flow: "bare" });
-    await app.sessions.update(session.id, { stage: "implement", status: "running" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, stage: "implement", status: "running" });
 
     const stubPort = await allocatePort();
     const frame = JSON.stringify({
@@ -123,7 +123,7 @@ describe("arkd-events-consumer: channel-report dispatch", () => {
 
   test("a channel-report with type=error advances the session through handleReport", async () => {
     const session = await app.sessions.create({ summary: "consumer error report test", flow: "bare" });
-    await app.sessions.update(session.id, { stage: "implement", status: "running" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, stage: "implement", status: "running" });
 
     const stubPort = await allocatePort();
     const frame = JSON.stringify({
