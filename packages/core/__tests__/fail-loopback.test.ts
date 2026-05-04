@@ -45,7 +45,7 @@ describe("fail-loopback", () => {
 
   it("rejects non-failed sessions", async () => {
     const s = await getApp().sessions.create({ summary: "test", flow: "bare" });
-    await getApp().sessions.update(s.id, { status: "running" });
+    await getApp().sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
 
     const result = await getApp().sessionHooks.retryWithContext(s.id);
     expect(result.ok).toBe(false);

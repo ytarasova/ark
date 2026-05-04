@@ -77,7 +77,12 @@ export async function emitEmptyListComplete(
     data: { total: 0, succeeded: 0, failed: 0, note: "empty list -- no iterations" },
   });
   await clearCheckpoint(deps.sessions, sessionId);
-  return { ok: true, message: "for_each: empty list -- stage complete" };
+  return {
+    ok: true,
+    launched: false,
+    reason: "for_each_empty_list",
+    message: "for_each: empty list -- stage complete",
+  };
 }
 
 /**

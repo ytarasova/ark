@@ -152,11 +152,28 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
       throw new Error("session has no active agent (session_id is null)");
     }
     const client = this.getClient(compute, session);
-    // Publish on the global `user-input` channel; the agent subscribes on
-    // the same channel and filters envelopes by `session === session_id`.
+    // Publish on the global `user-input` channel with `control: "interrupt"`.
+    //
+    // The Anthropic Agent SDK only calls `next()` on its AsyncIterable
+    // prompt BETWEEN turns -- a mid-turn user message would otherwise sit
+    // in the PromptQueue silently until the current tool call finishes,
+    // which can be minutes. The user expects their message to take
+    // precedence over the in-flight work.
+    //
+    // The agent's user-message-stream consumer fires `onMessage(content)`
+    // (pushes content into the prompt queue) and then `onInterrupt()`
+    // (aborts the active query). The SDK's resume loop in launch.ts then
+    // starts a fresh query with `resume: <sessionId>` so prior context is
+    // preserved, and the new user message is at the head of the queue
+    // ready to be consumed on the first `next()` of the new query.
+    //
+    // This is the documented abort+resume pattern from the SDK:
+    //   - sdk.d.ts:1090-1094  AbortController in query options
+    //   - sdk.d.ts:1470-1472  resume parameter to restart with history
     const res = await client.publishToChannel("user-input", {
       session: session.session_id,
       content,
+      control: "interrupt",
     });
     return { delivered: res.delivered };
   }

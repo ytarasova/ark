@@ -638,6 +638,29 @@ export class SessionRepository {
   }
 
   async update(id: string, fields: Partial<Session>): Promise<Session | null> {
+    // Invariant: status="running" MUST imply session_id is set. Without
+    // a handle the status-poller has nothing to probe and the session
+    // sits stuck at "running" forever. This was the root cause of the
+    // "orphan session" class of bugs (#435). Every dispatcher that
+    // flips status to running must pass session_id in the same delta or
+    // have already set it on the row.
+    if (fields.status === "running" || "session_id" in fields) {
+      const existing = await this.get(id);
+      if (existing) {
+        const postStatus = "status" in fields ? fields.status : existing.status;
+        const postSessionId = "session_id" in fields ? fields.session_id : existing.session_id;
+        if (
+          postStatus === "running" &&
+          (postSessionId === null || postSessionId === undefined || postSessionId === "")
+        ) {
+          throw new Error(
+            `[SessionRepository.update] invariant violated: status="running" requires session_id to be set, ` +
+              `but the post-update state for session ${id} would have session_id=${JSON.stringify(postSessionId)}. ` +
+              `Pass session_id in the same update delta or set it before transitioning to running.`,
+          );
+        }
+      }
+    }
     const d = this.d();
     const s = d.schema.sessions;
     const set = buildDrizzleSet(fields, d.schema);

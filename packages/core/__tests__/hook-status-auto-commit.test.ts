@@ -49,6 +49,7 @@ describe("hook-status auto-commit rescue", () => {
 
     const session = await app.sessions.create({ summary: "uncommitted rescue", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -78,6 +79,7 @@ describe("hook-status auto-commit rescue", () => {
 
     const session = await app.sessions.create({ summary: "no work done", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,

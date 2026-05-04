@@ -40,7 +40,7 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
       });
 
       const parent = await app.sessions.create({ summary: "fork ok:false test", flow: "bare" });
-      await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+      await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
       const result = await fork(app, parent.id, "child task", { dispatch: true });
 
@@ -73,7 +73,7 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
       });
 
       const parent = await app.sessions.create({ summary: "fork throw test", flow: "bare" });
-      await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+      await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
       const result = await fork(app, parent.id, "child task", { dispatch: true });
       expect(result.ok).toBe(false);
@@ -98,7 +98,7 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
       });
 
       const parent = await app.sessions.create({ summary: "subagent ok:false test", flow: "quick" });
-      await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+      await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
       const result = await spawnParallelSubagents(app, parent.id, [{ task: "task A" }, { task: "task B" }]);
 
@@ -127,7 +127,7 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
       });
 
       const parent = await app.sessions.create({ summary: "subagent throw test", flow: "quick" });
-      await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+      await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
       const result = await spawnParallelSubagents(app, parent.id, [{ task: "task A" }]);
       expect(result.ok).toBe(true);
@@ -150,7 +150,11 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
       });
 
       const session = await app.sessions.create({ summary: "retry ok:false test", flow: "quick" });
-      await app.sessions.update(session.id, { stage: "implement", status: "running" });
+      await app.sessions.update(session.id, {
+        session_id: `ark-s-${session.id}`,
+        stage: "implement",
+        status: "running",
+      });
 
       // Drive the retry path directly via the existing handleReport helper.
       // applyReport for a `error` report flags shouldRetry on the on_failure
@@ -216,7 +220,11 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
       });
 
       const session = await app.sessions.create({ summary: "retry throw test", flow: "quick" });
-      await app.sessions.update(session.id, { stage: "implement", status: "running" });
+      await app.sessions.update(session.id, {
+        session_id: `ark-s-${session.id}`,
+        stage: "implement",
+        status: "running",
+      });
 
       const { handleReport } = await import("../conductor/report-pipeline.js");
       await handleReport(app, session.id, {

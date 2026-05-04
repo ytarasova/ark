@@ -35,6 +35,7 @@ import { handleReport } from "./report-pipeline.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { deliverToChannel } from "./deliver-to-channel.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
+import { ArkdClient } from "../../arkd/index.js";
 
 interface ConsumerEntry {
   computeName: string;
@@ -156,8 +157,15 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Open the channel subscribe stream once and pump until end / error /
- * abort.
+ * Open the hooks channel subscribe stream once and pump until end / error /
+ * abort. Delegates to `ArkdClient.subscribeToChannel` so there is exactly
+ * one WS client implementation in the codebase.
+ *
+ * The Promise returned by `subscribeToChannel` resolves only after the
+ * server's "subscribed" ack -- at which point the subscriber is registered
+ * server-side. This gives the reconnect loop a clean signal: if the loop
+ * exits the `for await` cleanly (socket closed by peer), it reconnects
+ * after backoff; if it throws (error, abort), the outer loop handles it.
  */
 async function readHooksChannelOnce(
   app: AppContext,
@@ -165,42 +173,16 @@ async function readHooksChannelOnce(
   arkdUrl: string,
   arkdToken: string | null,
 ): Promise<void> {
-  const url = `${arkdUrl.replace(/\/+$/, "")}/channel/hooks/subscribe`;
-  const headers: Record<string, string> = {
-    // Force a dedicated TCP socket for the long-poll stream so it never
-    // enters Bun's keep-alive pool. Without this, every short-lived
-    // dispatch fetch (`/exec`, `/file/*`) to the same `localhost:<port>`
-    // origin can land on the half-streaming long-poll socket and surface
-    // as "The socket connection was closed unexpectedly" mid-clone.
-    Connection: "close",
-  };
-  if (arkdToken) headers.Authorization = `Bearer ${arkdToken}`;
+  const client = new ArkdClient(arkdUrl, { token: arkdToken ?? undefined });
 
-  const resp = await fetch(url, { headers, signal: entry.abort.signal, keepalive: false });
-  if (!resp.ok) {
-    throw new Error(`arkd /channel/hooks/subscribe returned ${resp.status}`);
-  }
-  if (!resp.body) {
-    throw new Error("arkd /channel/hooks/subscribe returned no body");
-  }
-  logInfo("conductor", `arkd-events: stream connected compute=${entry.computeName}`);
+  const iterable = await client.subscribeToChannel("hooks", { signal: entry.abort.signal });
+  logInfo("conductor", `arkd-events: ws connected compute=${entry.computeName}`);
 
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  while (!entry.stopped) {
-    const { value, done } = await reader.read();
-    if (done) return;
-    buf += decoder.decode(value, { stream: true });
-    let nl = buf.indexOf("\n");
-    while (nl >= 0) {
-      const line = buf.slice(0, nl);
-      buf = buf.slice(nl + 1);
-      if (line.length > 0) {
-        await dispatchFrame(app, line);
-      }
-      nl = buf.indexOf("\n");
-    }
+  for await (const frame of iterable) {
+    if (entry.stopped) return;
+    // dispatchFrame is async; we don't await so frames are independent and
+    // don't back-pressure the WS reader. Errors are caught inside.
+    void dispatchFrame(app, JSON.stringify(frame));
   }
 }
 
@@ -234,7 +216,12 @@ async function dispatchFrame(app: AppContext, line: string): Promise<void> {
     return;
   }
   if (!frame || typeof (frame as { kind?: unknown }).kind !== "string") {
-    logWarn("conductor", `arkd-events: untyped frame; ignoring`);
+    // Server keepalive frames are `{}` -- they exist to keep the HTTP/1.1
+    // connection from idle-closing on the SSM tunnel / intermediate proxies.
+    // Don't warn on them; only warn on genuinely-malformed frames.
+    if (frame && Object.keys(frame as object).length > 0) {
+      logWarn("conductor", `arkd-events: untyped frame; ignoring`);
+    }
     return;
   }
   if (frame.kind === "hook") {
