@@ -127,6 +127,10 @@ export class StageAdvancer {
       if (graphIsolation === "fresh") {
         graphSessionUpdates.claude_session_id = null;
       }
+      // Stop the previous stage's status poller before clearing session_id.
+      // Without this the old poller polls a stale handle until it
+      // self-terminates on the mismatch guard. Explicit stop closes the race.
+      deps.stopStatusPoller?.(sessionId);
       await deps.sessions.update(sessionId, graphSessionUpdates);
       await deps.events.log(sessionId, "stage_ready", {
         actor: "system",
@@ -237,6 +241,10 @@ export class StageAdvancer {
     if (isolation === "fresh") {
       sessionUpdates.claude_session_id = null;
     }
+    // Stop the previous stage's status poller before clearing session_id.
+    // Without this the old poller polls a stale handle until it
+    // self-terminates on the mismatch guard. Explicit stop closes the race.
+    deps.stopStatusPoller?.(sessionId);
     await deps.sessions.update(sessionId, sessionUpdates);
 
     await deps.events.log(sessionId, "stage_ready", {
