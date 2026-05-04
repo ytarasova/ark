@@ -821,16 +821,6 @@ export class AppContext {
 
   // ── Infra launcher accessors (container-managed internal state) ──────
 
-  /** Orphaned sessions detected during boot (running but tmux dead). */
-  get orphanedSessions(): Session[] {
-    if (this.phase !== "ready") return [];
-    try {
-      return this._container.cradle.staleStateDetector.orphanedSessions;
-    } catch {
-      return [];
-    }
-  }
-
   /** Legacy compat: expose the conductor handle (null when skipConductor). */
   get conductor(): { stop(): void } | null {
     if (this.phase !== "ready") return null;

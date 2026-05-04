@@ -200,9 +200,9 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         const session = await app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
 
-        // Guard: verify the session's current tmux handle still matches the one
-        // we are polling. After a stage handoff, the session gets a new agent
-        // with a different handle. If they don't match, this poller is stale.
+        // Defensive guard: with explicit stopStatusPoller calls in stage-advance,
+        // this branch should never fire on a healthy stage handoff. Kept as a
+        // safety net for direct sessions.update() calls that bypass StageAdvancer.
         if (session.session_id && session.session_id !== handle) return;
 
         // "not_found" means the tmux session exited (process finished) -- treat as completed
