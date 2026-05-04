@@ -149,6 +149,12 @@ export interface EC2ComputeHelpers {
   }) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
   /** SSM connectivity check via DescribeInstanceInformation. */
   ssmCheckInstance: (opts: { instanceId: string; region?: string; awsProfile?: string }) => Promise<boolean>;
+  /**
+   * SSM connectivity poll: waits up to 150s for the SSM agent to come online.
+   * Production wraps the real `ssmWaitForReady`; tests stub it to return
+   * instantly so the connectivity-check step doesn't block the suite.
+   */
+  ssmWaitForReady: (opts: { instanceId: string; region?: string; awsProfile?: string }) => Promise<boolean>;
   /** Build the cloud-init user-data bundle. */
   buildUserData: (opts: {
     idleMinutes?: number;
@@ -232,11 +238,11 @@ async function defaultStartInstance(opts: {
   awsProfile?: string;
 }): Promise<{ publicIp: string | null; privateIp: string | null }> {
   const { EC2Client, StartInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
-  const { fromIni } = await import("@aws-sdk/credential-providers");
+  const { awsCredentialsForProfile } = await import("../providers/ec2/aws-creds.js");
   const { poll } = await import("../util.js");
   const client = new EC2Client({
     region: opts.region,
-    ...(opts.awsProfile ? { credentials: fromIni({ profile: opts.awsProfile }) } : {}),
+    credentials: awsCredentialsForProfile({ profile: opts.awsProfile }),
   });
   await client.send(new StartInstancesCommand({ InstanceIds: [opts.instanceId] }));
   let publicIp: string | null = null;
@@ -256,10 +262,10 @@ async function defaultStartInstance(opts: {
 
 async function defaultStopInstance(opts: { instanceId: string; region: string; awsProfile?: string }): Promise<void> {
   const { EC2Client, StopInstancesCommand } = await import("@aws-sdk/client-ec2");
-  const { fromIni } = await import("@aws-sdk/credential-providers");
+  const { awsCredentialsForProfile } = await import("../providers/ec2/aws-creds.js");
   const client = new EC2Client({
     region: opts.region,
-    ...(opts.awsProfile ? { credentials: fromIni({ profile: opts.awsProfile }) } : {}),
+    credentials: awsCredentialsForProfile({ profile: opts.awsProfile }),
   });
   await client.send(new StopInstancesCommand({ InstanceIds: [opts.instanceId] }));
 }
@@ -270,10 +276,10 @@ async function defaultDescribeInstance(opts: {
   awsProfile?: string;
 }): Promise<{ publicIp: string | null; privateIp: string | null }> {
   const { EC2Client, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
-  const { fromIni } = await import("@aws-sdk/credential-providers");
+  const { awsCredentialsForProfile } = await import("../providers/ec2/aws-creds.js");
   const client = new EC2Client({
     region: opts.region,
-    ...(opts.awsProfile ? { credentials: fromIni({ profile: opts.awsProfile }) } : {}),
+    credentials: awsCredentialsForProfile({ profile: opts.awsProfile }),
   });
   const desc = await client.send(new DescribeInstancesCommand({ InstanceIds: [opts.instanceId] }));
   const inst = desc.Reservations?.[0]?.Instances?.[0];
@@ -292,6 +298,10 @@ const DEFAULT_HELPERS: EC2ComputeHelpers = {
     const { ssmCheckInstance } = await import("../providers/ec2/ssm.js");
     return ssmCheckInstance(opts);
   }) as EC2ComputeHelpers["ssmCheckInstance"],
+  ssmWaitForReady: (async (opts) => {
+    const { ssmWaitForReady } = await import("../providers/ec2/ssm.js");
+    return ssmWaitForReady(opts);
+  }) as EC2ComputeHelpers["ssmWaitForReady"],
   buildUserData: (async (opts) => {
     const { buildUserData } = await import("../providers/ec2/cloud-init.js");
     return buildUserData(opts);
@@ -567,8 +577,7 @@ export class EC2Compute implements Compute {
         opts.sessionId!,
         "connectivity-check",
         async () => {
-          const { ssmWaitForReady } = await import("../providers/ec2/ssm.js");
-          const online = await ssmWaitForReady({
+          const online = await this.helpers.ssmWaitForReady({
             instanceId: meta.instanceId,
             region: meta.region,
             awsProfile: meta.awsProfile,

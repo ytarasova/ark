@@ -76,6 +76,10 @@ function makeHelpers(opts: StubOpts = {}): { helpers: EC2ComputeHelpers; calls: 
       record("ssmCheckInstance")(checkOpts);
       return opts.ssmOnline !== false;
     },
+    ssmWaitForReady: async (waitOpts) => {
+      record("ssmWaitForReady")(waitOpts);
+      return opts.ssmOnline !== false;
+    },
     buildUserData: async (o) => {
       record("buildUserData")(o);
       return "#cloud-config\n# fake\n";
@@ -451,6 +455,7 @@ describe("EC2Compute", async () => {
       const helpers: EC2ComputeHelpers = {
         ssmExec: async () => ({ stdout: "ok", stderr: "", exitCode: 0 }),
         ssmCheckInstance: async () => true,
+        ssmWaitForReady: async () => true,
         buildUserData: async () => "",
         provisionStack: async () => ({ ip: null, instance_id: "i", stack_name: "s" }),
         destroyStack: async () => {},

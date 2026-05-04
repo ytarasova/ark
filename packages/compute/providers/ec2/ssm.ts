@@ -39,6 +39,7 @@ import * as fs from "fs";
 import type { SSMClient } from "@aws-sdk/client-ssm";
 import { shellEscape } from "./shell-escape.js";
 import { logDebug, logWarn } from "../../../core/observability/structured-log.js";
+import { awsCredentialsForProfile, withAwsRetry } from "./aws-creds.js";
 
 // AWS SDK error names that indicate the local credentials/profile is unusable
 // (expired, missing, malformed, or not authorized). These must NOT be conflated
@@ -103,7 +104,6 @@ interface SdkRefs {
   DescribeInstanceInformationCommand: typeof import("@aws-sdk/client-ssm").DescribeInstanceInformationCommand;
   SendCommandCommand: typeof import("@aws-sdk/client-ssm").SendCommandCommand;
   GetCommandInvocationCommand: typeof import("@aws-sdk/client-ssm").GetCommandInvocationCommand;
-  fromIni: typeof import("@aws-sdk/credential-providers").fromIni;
 }
 
 let _sdk: SdkRefs | null = null;
@@ -111,23 +111,43 @@ let _sdk: SdkRefs | null = null;
 async function loadSdk(): Promise<SdkRefs> {
   if (_sdk) return _sdk;
   const ssm = await import("@aws-sdk/client-ssm");
-  const cred = await import("@aws-sdk/credential-providers");
   _sdk = {
     SSMClient: ssm.SSMClient,
     DescribeInstanceInformationCommand: ssm.DescribeInstanceInformationCommand,
     SendCommandCommand: ssm.SendCommandCommand,
     GetCommandInvocationCommand: ssm.GetCommandInvocationCommand,
-    fromIni: cred.fromIni,
   };
   return _sdk;
 }
 
-async function buildClient(opts: { region: string; awsProfile?: string; client?: SSMClient }): Promise<SSMClient> {
-  if (opts.client) return opts.client;
+/**
+ * Build an SSMClient. Credential refresh + retry on expiry are both
+ * handled by the shared aws-creds.ts helpers; this function just wires
+ * the self-refreshing provider into a fresh SSMClient.
+ *
+ * Callers shouldn't invoke this directly -- use `withSsmRetry` so the
+ * post-expiry rebuild path runs.
+ */
+async function buildClient(opts: { region: string; awsProfile?: string }): Promise<SSMClient> {
   const sdk = await loadSdk();
   return new sdk.SSMClient({
     region: opts.region,
-    ...(opts.awsProfile ? { credentials: sdk.fromIni({ profile: opts.awsProfile }) } : {}),
+    credentials: awsCredentialsForProfile({ profile: opts.awsProfile }),
+  });
+}
+
+/**
+ * Run an SSM SDK call with transparent credential-refresh retry on
+ * expiry. Thin wrapper around the shared `withAwsRetry` -- exists so
+ * call sites in this file don't have to know about `buildClient`.
+ */
+async function withSsmRetry<T>(
+  opts: { region: string; awsProfile?: string; client?: SSMClient },
+  op: (client: SSMClient) => Promise<T>,
+): Promise<T> {
+  return await withAwsRetry(() => buildClient({ region: opts.region, awsProfile: opts.awsProfile }), op, {
+    pinnedClient: opts.client,
+    label: "SSM",
   });
 }
 
@@ -152,11 +172,12 @@ export async function ssmCheckInstance(opts: {
   const region = opts.region ?? DEFAULT_REGION;
   try {
     const sdk = await loadSdk();
-    const client = await buildClient({ region, awsProfile: opts.awsProfile, client: opts.client });
-    const out = await client.send(
-      new sdk.DescribeInstanceInformationCommand({
-        Filters: [{ Key: "InstanceIds", Values: [opts.instanceId] }],
-      }),
+    const out = await withSsmRetry({ region, awsProfile: opts.awsProfile, client: opts.client }, (client) =>
+      client.send(
+        new sdk.DescribeInstanceInformationCommand({
+          Filters: [{ Key: "InstanceIds", Values: [opts.instanceId] }],
+        }),
+      ),
     );
     const list = out.InstanceInformationList ?? [];
     if (list.length === 0) return false;
@@ -203,26 +224,28 @@ export async function ssmExec(opts: {
   // SSM execution timeout is in seconds and must be a positive integer.
   const execSeconds = Math.max(1, Math.ceil(timeoutMs / 1000));
 
-  let client: SSMClient;
   let sdk: SdkRefs;
   try {
     sdk = await loadSdk();
-    client = await buildClient({ region, awsProfile: opts.awsProfile, client: opts.client });
   } catch (err) {
     return { stdout: "", stderr: err instanceof Error ? err.message : String(err), exitCode: 1 };
   }
 
+  const ctx = { region, awsProfile: opts.awsProfile, client: opts.client };
+
   let commandId: string | undefined;
   try {
-    const send = await client.send(
-      new sdk.SendCommandCommand({
-        DocumentName: "AWS-RunShellScript",
-        InstanceIds: [opts.instanceId],
-        Parameters: {
-          commands: [opts.command],
-          executionTimeout: [String(execSeconds)],
-        },
-      }),
+    const send = await withSsmRetry(ctx, (client) =>
+      client.send(
+        new sdk.SendCommandCommand({
+          DocumentName: "AWS-RunShellScript",
+          InstanceIds: [opts.instanceId],
+          Parameters: {
+            commands: [opts.command],
+            executionTimeout: [String(execSeconds)],
+          },
+        }),
+      ),
     );
     commandId = send.Command?.CommandId;
   } catch (err) {
@@ -242,11 +265,13 @@ export async function ssmExec(opts: {
     delay = Math.min(2_000, Math.floor(delay * 1.6));
     let inv: import("@aws-sdk/client-ssm").GetCommandInvocationCommandOutput;
     try {
-      inv = await client.send(
-        new sdk.GetCommandInvocationCommand({
-          CommandId: commandId,
-          InstanceId: opts.instanceId,
-        }),
+      inv = await withSsmRetry(ctx, (client) =>
+        client.send(
+          new sdk.GetCommandInvocationCommand({
+            CommandId: commandId,
+            InstanceId: opts.instanceId,
+          }),
+        ),
       );
     } catch (err: any) {
       const code = err?.name ?? err?.Code ?? "";

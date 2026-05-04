@@ -18,7 +18,7 @@ import {
   CreateTagsCommand,
   waitUntilInstanceRunning,
 } from "@aws-sdk/client-ec2";
-import { fromIni } from "@aws-sdk/credential-providers";
+import { awsCredentialsForProfile } from "./aws-creds.js";
 
 /**
  * Default IAM instance profile that grants the EC2 instance permission to
@@ -120,7 +120,7 @@ export interface DestroyStackOpts {
 function createClient(region: string, awsProfile?: string): EC2Client {
   return new EC2Client({
     region,
-    ...(awsProfile ? { credentials: fromIni({ profile: awsProfile }) } : {}),
+    credentials: awsCredentialsForProfile({ profile: awsProfile }),
   });
 }
 

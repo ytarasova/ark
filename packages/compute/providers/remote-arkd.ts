@@ -398,12 +398,12 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const region = cfg.region ?? "us-east-1";
     const awsProfile = cfg.aws_profile;
     const { EC2Client, StartInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
-    const { fromIni } = await import("@aws-sdk/credential-providers");
+    const { awsCredentialsForProfile } = await import("./ec2/aws-creds.js");
     const { poll } = await import("../util.js");
 
     const ec2 = new EC2Client({
       region,
-      ...(awsProfile ? { credentials: fromIni({ profile: awsProfile }) } : {}),
+      credentials: awsCredentialsForProfile({ profile: awsProfile }),
     });
 
     await ec2.send(new StartInstancesCommand({ InstanceIds: [cfg.instance_id] }));
@@ -471,11 +471,11 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     }
 
     const { EC2Client, StopInstancesCommand } = await import("@aws-sdk/client-ec2");
-    const { fromIni } = await import("@aws-sdk/credential-providers");
+    const { awsCredentialsForProfile } = await import("./ec2/aws-creds.js");
 
     const ec2 = new EC2Client({
       region: cfg.region ?? "us-east-1",
-      ...(cfg.aws_profile ? { credentials: fromIni({ profile: cfg.aws_profile }) } : {}),
+      credentials: awsCredentialsForProfile({ profile: cfg.aws_profile }),
     });
 
     await ec2.send(new StopInstancesCommand({ InstanceIds: [cfg.instance_id] }));
