@@ -242,7 +242,7 @@ Key fields:
 - `depends_on`: list of prior stage names for DAG ordering. Enables parallel execution of stages with no ordering constraint.
 - `action`: replaces `agent` for non-LLM stages. Built-in actions: `create_pr` (push branch + `gh pr create`), `auto_merge` (wait for CI then merge).
 - `edges`: explicit graph edges with `condition` expressions for conditional routing (see the `conditional` flow). Edges support `from`, `to`, `condition`, and `label` fields.
-- `task`: per-stage task prompt override. Template variables (`{summary}`, `{repo}`, `{workdir}`) are substituted at dispatch.
+- `task`: per-stage task prompt override. Nunjucks template variables (`{{summary}}`, `{{repo}}`, `{{workdir}}`) are substituted at dispatch.
 - Fan-out stages wait for all their spawned children before the parent advances (auto-join on child completion).
 
 ```bash
@@ -290,14 +290,14 @@ ark agent show implementer
 # agents/implementer.yaml
 name: implementer
 description: Implements a plan into working code
-runtime: claude # default runtime; override with --runtime
-model: sonnet # opus | sonnet | haiku (claude models)
+runtime: claude-agent # default runtime; override with --runtime
+model: opus # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
-  You are working on {repo} (branch {branch}).
-  Ticket: {ticket}
-  Task: {summary}
-  Workdir: {workdir}
+  You are working on {{repo}} (branch {{branch}}).
+  Ticket: {{ticket}}
+  Task: {{summary}}
+  Workdir: {{workdir}}
   Write minimal, correct code. Run tests before claiming done.
 skills: [test-writing, self-review, sanity-gate]
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
@@ -305,17 +305,20 @@ permission_mode: bypassPermissions
 env: {}
 ```
 
-Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
+Agent / runtime YAML is rendered with Nunjucks -- use `{{var}}` double braces. Template variables substituted at dispatch time: `{{ticket}}`, `{{summary}}`, `{{repo}}`, `{{branch}}`, `{{workdir}}`. See [docs/templating.md](templating.md) for the full reference.
 
-### Runtimes (5)
+### Runtimes (6)
 
-| Name         | Tool                        | Billing                     | Transcript parser                  |
-| ------------ | --------------------------- | --------------------------- | ---------------------------------- |
-| `claude`     | Claude Code CLI             | api (per token)             | claude                             |
-| `claude-max` | Claude Code (Max sub)       | subscription ($200/mo flat) | claude                             |
-| `codex`      | OpenAI Codex CLI            | api                         | codex (default model: gpt-5-codex) |
-| `gemini`     | Google Gemini CLI           | api                         | gemini                             |
-| `goose`      | Goose CLI (Block / LF AAIF) | api                         | goose                              |
+| Name           | Tool                             | Billing                     | Transcript parser                  |
+| -------------- | -------------------------------- | --------------------------- | ---------------------------------- |
+| `claude-agent` | Anthropic Agent SDK (in-process) | api                         | agent-sdk                          |
+| `claude-code`  | Claude Code CLI                  | api (per token)             | claude                             |
+| `claude-max`   | Claude Code (Max subscription)   | subscription ($200/mo flat) | claude                             |
+| `codex`        | OpenAI Codex CLI                 | api                         | codex (default model: gpt-5-codex) |
+| `gemini`       | Google Gemini CLI                | api                         | gemini                             |
+| `goose`        | Goose CLI (Block / LF AAIF)      | api                         | goose                              |
+
+`claude-agent` runs the Anthropic Agent SDK directly in the Ark process -- no separate CLI binary, no tmux. It is the default for builtin agents. `claude-code` shells out to the Claude Code CLI in a tmux pane (useful when you want to tail/attach the raw agent terminal).
 
 ```bash
 ark runtime list
@@ -358,10 +361,12 @@ env:
   OPENAI_API_KEY: "${OPENAI_API_KEY}"
 ```
 
-Three executor types are registered at boot:
+Five executor types are registered at boot:
 
+- `claude-agent` -- runs the Anthropic Agent SDK in-process (no tmux, no CLI binary).
 - `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
-- `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
+- `cli-agent` -- any other CLI tool in tmux (codex, gemini), with worktree isolation.
+- `goose` -- launches Goose in tmux using a recipe file.
 - `subprocess` -- generic child process, no tmux.
 
 Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture`.
@@ -1056,21 +1061,31 @@ helm install ark .infra/helm/ark \
 
 ## 21. Daemon Architecture
 
-Ark uses a daemon-client architecture. The server daemon runs on port 19400 and manages all state. The web dashboard and desktop app connect as thin WebSocket clients -- they do not run an in-process AppContext.
+Ark has two daemons and one in-process server. The server daemon (`ark server daemon`, port 19400) is the WebSocket entry point for the web dashboard and desktop app -- it hosts an AppContext plus the conductor and arkd in-process. The agent daemon (`ark daemon`, port 19300) is the **arkd** universal agent daemon that runs on every compute target (local or remote) and handles agent lifecycle, file ops, and channel relay. Clients never own state -- all state lives in the server daemon.
 
-### Managing the daemon
+### Managing the server daemon
 
 ```bash
-ark daemon start        # start the server daemon (port 19400)
-ark daemon stop         # stop a running daemon
-ark daemon status       # check if the daemon is running
+ark server daemon start        # start the server daemon (port 19400)
+ark server daemon stop         # stop a running server daemon
+ark server daemon status       # check if the server daemon is running
 ```
+
+### Managing the arkd agent daemon
+
+```bash
+ark daemon start               # start arkd (port 19300) on the local machine
+ark daemon stop
+ark daemon status
+```
+
+On remote compute targets (ec2-\*, k8s, e2b), arkd is launched automatically on the remote host -- you only run `ark daemon` locally when you want to host arkd on the local machine without the full server.
 
 ### Auto-start with web and desktop
 
 `ark web --with-daemon` starts the conductor (:19100) and arkd (:19300) in-process alongside the web server. The desktop app does this by default, so launching Ark Desktop gives you a fully working instance with no manual daemon management.
 
-If the daemon is already running on those ports, both `ark web` and the desktop app detect it via a `/health` probe and reuse it instead of starting a second instance.
+If the daemons are already running on those ports, both `ark web` and the desktop app detect them via a `/health` probe and reuse them instead of starting duplicate instances.
 
 ### Port summary
 
@@ -1085,7 +1100,7 @@ If the daemon is already running on those ports, both `ark web` and the desktop 
 
 ## 22. Messaging Bridges
 
-Ark can send notifications to Telegram, Slack, and Discord when session events occur (stage completion, failures, etc.).
+Ark can send conductor notifications to Slack (incoming webhook) and email (SMTP) when session status transitions occur. Both channels are outbound-only today -- neither is bidirectional.
 
 ### Configuration
 
@@ -1093,20 +1108,24 @@ Create `~/.ark/bridge.json`:
 
 ```json
 {
-  "telegram": {
-    "botToken": "123456:ABC-DEF...",
-    "chatId": "-1001234567890"
-  },
   "slack": {
     "webhookUrl": "https://hooks.slack.com/services/T.../B.../..."
   },
-  "discord": {
-    "webhookUrl": "https://discord.com/api/webhooks/..."
+  "email": {
+    "host": "smtp.gmail.com",
+    "port": 465,
+    "secure": true,
+    "auth": {
+      "user": "ark-bot@example.com",
+      "pass": "app-password"
+    },
+    "from": "ark-bot@example.com",
+    "to": ["oncall@example.com"]
   }
 }
 ```
 
-You can configure one, two, or all three. Notifications fire on stage completion, session errors, and other lifecycle events.
+Either or both blocks are optional. The email block is backed by nodemailer -- any STARTTLS or implicit-TLS SMTP server works. Notifications include per-session status transitions and periodic status summaries; the first line of each message is used as the email subject.
 
 ---
 
@@ -1132,7 +1151,7 @@ Schedules let you run sessions on a cron schedule -- recurring tasks like nightl
 # Create a recurring schedule
 ark schedule add \
   --cron "0 9 * * *" \
-  --recipe quick-fix \
+  --flow quick \
   --repo /path/to/repo \
   --summary "Daily lint check"
 
@@ -1178,7 +1197,7 @@ Additional CLI commands for diagnostics, initialization, and programmatic access
 | `~/.ark/runtimes/`              | Global user runtimes.                                                    |
 | `~/.ark/config.yaml`            | User config (router, knowledge, tensorzero, compute templates, budgets). |
 | `~/.ark/profiles.json`          | Profile definitions.                                                     |
-| `~/.ark/bridge.json`            | Messaging bridge config (Telegram/Slack/Discord).                        |
+| `~/.ark/bridge.json`            | Messaging bridge config (Slack webhook + SMTP email).                    |
 | `~/.ark/logs/`                  | Structured JSONL logs.                                                   |
 | `.ark/`                         | Per-repo project config, skills, recipes, flows, agents, runtimes.       |
 | `.ark.yaml`                     | Per-repo config (auto_pr, default verify scripts).                       |
@@ -1222,12 +1241,12 @@ ark session start --repo . --summary "Add logging" \
 ark session start --repo . --summary "Long refactor" \
   --agent implementer --runtime claude-max --dispatch
 
-# Start/stop the daemon
-ark daemon start
-ark daemon status
+# Start/stop the server daemon (what the web/desktop connect to)
+ark server daemon start
+ark server daemon status
 
 # Schedule a recurring session
-ark schedule add --cron "0 9 * * *" --recipe quick-fix \
+ark schedule add --cron "0 9 * * *" --flow quick \
   --repo . --summary "Daily lint check"
 
 # Inspect costs
@@ -1243,4 +1262,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 6 runtimes (Claude Agent SDK, Claude Code, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Slack webhook + SMTP email), profiles, schedules, and CLI utilities.
