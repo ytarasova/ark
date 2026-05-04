@@ -252,6 +252,26 @@ export interface FlowReadResult {
   flow: FlowDefinition;
 }
 
+/**
+ * `flow/validate` -- dry-run validation for a flow payload (#403). Runs the
+ * same Zod + DAG + requires_repo + declared-inputs checks that `session/start`
+ * would apply, without creating a session or registering the flow on the
+ * ephemeral overlay. See `server/handlers/resource.ts`.
+ */
+export interface FlowValidateParams {
+  /** Named flow (resolved via FlowStore) OR a literal inline flow definition. */
+  flow: string | { name?: string; stages: Array<{ name: string; [k: string]: unknown }>; [k: string]: unknown };
+  /** Session inputs to validate against the flow's declared contract. */
+  inputs?: Record<string, unknown>;
+  /** Optional repo; when unset, `requires_repo: true` flows report a problem. */
+  repo?: string;
+}
+export interface FlowValidateResult {
+  ok: boolean;
+  problems: string[];
+  flow?: { name: string; stages: string[] };
+}
+
 export interface SkillListResult {
   skills: SkillDefinition[];
 }

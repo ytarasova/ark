@@ -6,7 +6,13 @@
  * don't grow.
  */
 
-import type { FlowDefinition, FlowListResult, FlowReadResult } from "../../types/index.js";
+import type {
+  FlowDefinition,
+  FlowListResult,
+  FlowReadResult,
+  FlowValidateParams,
+  FlowValidateResult,
+} from "../../types/index.js";
 import type { RpcFn } from "./rpc.js";
 
 export class FlowClient {
@@ -36,5 +42,14 @@ export class FlowClient {
 
   async flowDelete(name: string, scope?: "global" | "project"): Promise<{ ok: boolean }> {
     return this.rpc("flow/delete", { name, scope });
+  }
+
+  /**
+   * Dry-run validation for an inline or named flow payload (#403). Never
+   * creates a session; returns `{ ok, problems, flow? }` so the caller can
+   * render the problem list without a follow-up session/start round-trip.
+   */
+  async flowValidate(opts: FlowValidateParams): Promise<FlowValidateResult> {
+    return this.rpc<FlowValidateResult>("flow/validate", opts as unknown as Record<string, unknown>);
   }
 }

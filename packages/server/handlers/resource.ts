@@ -151,6 +151,66 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     return { ok };
   });
 
+  /**
+   * Dry-run validation for an inline or named flow payload (#403). Runs the
+   * same Zod + DAG + requires_repo + declared-inputs checks that session/start
+   * would apply, but never creates a session or registers the flow on the
+   * ephemeral overlay. Called by `ark session start --dry-run`, `ark flow
+   * validate`, and the web Create Flow form so problems surface in one
+   * round-trip instead of as a half-dispatched failed session.
+   *
+   * Named flows are resolved through `app.flows.get(name)`; inline flows are
+   * used verbatim. A missing named flow lands in `problems` rather than
+   * throwing, so the CLI/web can render it in the same list.
+   */
+  router.handle("flow/validate", async (p) => {
+    const params = extract<{
+      flow: string | Record<string, unknown>;
+      inputs?: Record<string, unknown>;
+      repo?: string;
+    }>(p, ["flow"]);
+
+    const { validateFlowPayload } = await import("../../core/state/flow.js");
+    let flowDef: FlowDefinition | null = null;
+    let echoName: string | undefined;
+
+    if (typeof params.flow === "string") {
+      // Named flow: resolve through the FlowStore. `get` may return a
+      // Promise on the hosted DB store -- await-normalize.
+      const result = app.flows.get(params.flow);
+      flowDef = (
+        result && typeof (result as { then?: unknown }).then === "function"
+          ? await (result as Promise<FlowDefinition | null>)
+          : (result as FlowDefinition | null)
+      ) as FlowDefinition | null;
+      echoName = params.flow;
+    } else {
+      // Inline object. Cast through unknown because the protocol type and
+      // the runtime FlowDefinition are structurally compatible but not the
+      // same identity (same shim pattern used by flow/create above).
+      flowDef = params.flow as unknown as FlowDefinition;
+      echoName = flowDef?.name;
+    }
+
+    const problems = validateFlowPayload({
+      flow: flowDef,
+      inputs: params.inputs,
+      repo: params.repo,
+    });
+
+    const response: { ok: boolean; problems: string[]; flow?: { name: string; stages: string[] } } = {
+      ok: problems.length === 0,
+      problems,
+    };
+    if (flowDef && Array.isArray(flowDef.stages)) {
+      response.flow = {
+        name: flowDef.name ?? echoName ?? "inline",
+        stages: flowDef.stages.map((s) => s.name),
+      };
+    }
+    return response;
+  });
+
   router.handle("skill/list", async () => ({ skills: await app.skills.list() }));
   router.handle("skill/read", async (p) => {
     const { name } = extract<SkillReadParams>(p, ["name"]);

@@ -263,10 +263,18 @@ export interface FlowParamInput {
   pattern?: string;
 }
 
-export interface FlowInputsSchema {
-  files?: Record<string, FlowFileInput>;
-  params?: Record<string, FlowParamInput>;
-}
+/**
+ * Declarative inputs contract for a flow. Accepts two shapes for back-compat:
+ *
+ * 1. Flat bag (preferred): `{ <key>: { type, required, default, pattern } | <bare-default> }`.
+ * 2. Legacy nested: `{ files: Record<string, FlowFileInput>, params: Record<string, FlowParamInput> }`.
+ *
+ * `validateFlowPayload` accepts either shape. `types/flow.ts:FlowInputsSchema`
+ * mirrors this declaration for callers that depend on the public types.
+ */
+export type FlowInputsSchema =
+  | { files?: Record<string, FlowFileInput>; params?: Record<string, FlowParamInput> }
+  | Record<string, unknown>;
 
 export interface FlowDefinition {
   name: string;
@@ -280,6 +288,12 @@ export interface FlowDefinition {
    * at dispatch time into MCP server entries + optional context prefills.
    */
   connectors?: string[];
+  /**
+   * When true, dispatch refuses sessions that don't pin a `repo`. Mirrors
+   * the protocol-level flag in `types/flow.ts`; read by `session/start` and
+   * the dry-run `validateFlowPayload` helper.
+   */
+  requires_repo?: boolean;
 }
 
 // ── Stage navigation ────────────────────────────────────────────────────────
@@ -514,6 +528,132 @@ export function validateDAG(stages: StageDefinition[]): void {
   if (visited !== stages.length) {
     throw new Error("Flow stages contain a dependency cycle");
   }
+}
+
+// ── Payload validation (dry-run) ────────────────────────────────────────────
+
+/**
+ * Validate an inline + session-inputs payload the way `session/start` would,
+ * but without creating a session or registering anything on the ephemeral
+ * overlay. Composes the existing structural checks (stages present, at least
+ * one stage), `validateDAG` semantic check (cycles, unknown depends_on /
+ * on_outcome refs, for_each consistency), the `requires_repo` gate, and the
+ * declared-inputs contract (legacy `{files, params}` + flat-bag shape).
+ *
+ * Returns the flat list of problems (empty = ok). Never throws on invalid
+ * input -- malformed flows land in `problems` so the caller can render them.
+ * Shaped this way so both the `flow/validate` RPC handler and the CLI
+ * `--dry-run` path reach the same verdict without a round-trip.
+ */
+export function validateFlowPayload(params: {
+  flow: FlowDefinition | null | undefined;
+  inputs?: Record<string, unknown>;
+  repo?: string;
+}): string[] {
+  const problems: string[] = [];
+  const { flow, inputs, repo } = params;
+
+  if (!flow) {
+    problems.push("flow not found");
+    return problems;
+  }
+
+  const stages = Array.isArray(flow.stages) ? flow.stages : [];
+  if (stages.length === 0) {
+    problems.push("flow must have at least one stage");
+    return problems;
+  }
+
+  try {
+    validateDAG(stages);
+  } catch (err: any) {
+    problems.push(err?.message ?? String(err));
+  }
+
+  if (flow.requires_repo && !repo) {
+    problems.push(`flow '${flow.name}' requires a repo (pass repo: <git-url-or-local-path>)`);
+  }
+
+  problems.push(...validateDeclaredInputs(flow.inputs, inputs ?? {}));
+
+  return problems;
+}
+
+/**
+ * Check session inputs against a flow's declared inputs contract. Handles
+ * both the legacy nested shape (`{ files: {...}, params: {...} }`) and the
+ * flat-bag shape (`{ <key>: { type, required, default, pattern } }`), with
+ * a bare value treated as a default-only declaration.
+ */
+function validateDeclaredInputs(
+  declared: FlowInputsSchema | null | undefined,
+  inputs: Record<string, unknown>,
+): string[] {
+  const problems: string[] = [];
+  if (!declared || typeof declared !== "object") return problems;
+
+  const seenLegacy =
+    ("files" in declared && isPlainObject((declared as Record<string, unknown>).files)) ||
+    ("params" in declared && isPlainObject((declared as Record<string, unknown>).params));
+
+  if (seenLegacy) {
+    // Legacy nested shape: files + params sub-buckets. Session inputs may
+    // arrive either as flat-bag top-level keys (new shape) or under
+    // `inputs.files.<role>` / `inputs.params.<key>` (legacy). Accept both.
+    const legacy = declared as { files?: Record<string, FlowFileInput>; params?: Record<string, FlowParamInput> };
+    const files: Record<string, unknown> = {
+      ...(isPlainObject(inputs.files) ? (inputs.files as Record<string, unknown>) : {}),
+    };
+    const params: Record<string, unknown> = {
+      ...(isPlainObject(inputs.params) ? (inputs.params as Record<string, unknown>) : {}),
+    };
+    for (const [role, def] of Object.entries(legacy.files ?? {})) {
+      const hit = files[role] !== undefined || inputs[role] !== undefined;
+      if (def?.required && !hit) problems.push(`missing required file input: ${role}`);
+    }
+    for (const [key, def] of Object.entries(legacy.params ?? {})) {
+      const raw = params[key] !== undefined ? params[key] : inputs[key];
+      let value = raw;
+      if (value === undefined && def?.default !== undefined) value = def.default;
+      if (value === undefined) {
+        if (def?.required) problems.push(`missing required param input: ${key}`);
+        continue;
+      }
+      problems.push(...checkPattern(key, value, def?.pattern));
+    }
+    return problems;
+  }
+
+  // Flat-bag shape: each top-level key is its own input.
+  for (const [key, rawDef] of Object.entries(declared as Record<string, unknown>)) {
+    // Bare-default shape (e.g. `k: "value"`): nothing to validate.
+    if (!isPlainObject(rawDef)) continue;
+    const def = rawDef as { required?: boolean; default?: unknown; pattern?: string };
+    let value = inputs[key];
+    if (value === undefined && def.default !== undefined) value = def.default;
+    if (value === undefined) {
+      if (def.required) problems.push(`missing required input: ${key}`);
+      continue;
+    }
+    problems.push(...checkPattern(key, value, def.pattern));
+  }
+  return problems;
+}
+
+function checkPattern(key: string, value: unknown, pattern: string | undefined): string[] {
+  if (!pattern) return [];
+  if (typeof value !== "string") return [];
+  let re: RegExp;
+  try {
+    re = new RegExp(pattern);
+  } catch {
+    return [`input ${key} declared pattern is not a valid regex: ${pattern}`];
+  }
+  return re.test(value) ? [] : [`input ${key}=${value} does not match pattern ${pattern}`];
+}
+
+function isPlainObject(v: unknown): boolean {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 // ── DAG resolution ─────────────────────────────────────────────────────────
