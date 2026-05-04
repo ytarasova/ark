@@ -50,7 +50,7 @@ make install          # requires Bun + tmux pre-installed
 # 2. Verify
 ark doctor            # check prerequisites (bun, tmux, git, gh, claude)
 ark --version
-ark agent list        # shows 12 builtin agents
+ark agent list        # shows 13 builtin agents
 ark flow list         # shows 14 builtin flows
 
 # 3. Start a session from a recipe and dispatch it
@@ -275,22 +275,23 @@ Ark cleanly separates the role of an agent from the tool that runs it.
 
 At dispatch, agent config and runtime config are merged. Agent-level values take precedence over runtime defaults. You can override the runtime on the CLI with `--runtime`.
 
-### Agents (12 builtin roles)
+### Agents (13 builtin roles)
 
-| Role               | Purpose                                     |
-| ------------------ | ------------------------------------------- |
-| `ticket-intake`    | Parse tickets, extract requirements.        |
-| `spec-planner`     | Write the spec/plan.                        |
-| `plan-auditor`     | Audit a plan before implementation.         |
-| `planner`          | General planning role.                      |
-| `implementer`      | Write code for a spec.                      |
-| `task-implementer` | Implement a single task (fan-out child).    |
-| `verifier`         | Run and interpret verification.             |
-| `reviewer`         | Structured code review (P0-P3 JSON output). |
-| `documenter`       | Update docs.                                |
-| `closer`           | Final checks, PR/merge.                     |
-| `retro`            | Post-session retrospective and learnings.   |
-| `worker`           | Generic task runner (fan-out child).        |
+| Role                  | Purpose                                                |
+| --------------------- | ------------------------------------------------------ |
+| `ticket-intake`       | Parse tickets, extract requirements.                   |
+| `spec-planner`        | Write the spec/plan.                                   |
+| `plan-auditor`        | Audit a plan before implementation.                    |
+| `planner`             | General planning role.                                 |
+| `implementer`         | Write code for a spec.                                 |
+| `task-implementer`    | Implement a single task (fan-out child).               |
+| `verifier`            | Run and interpret verification.                        |
+| `reviewer`            | Structured code review (P0-P3 JSON output).            |
+| `documenter`          | Update docs.                                           |
+| `closer`              | Final checks, PR/merge.                                |
+| `retro`               | Post-session retrospective and learnings.              |
+| `worker`              | Generic task runner (fan-out child).                   |
+| `goose-recipe-runner` | Goose-runtime agent that executes a recipe file as-is. |
 
 ```bash
 ark agent list
@@ -303,8 +304,8 @@ ark agent show implementer
 # agents/implementer.yaml
 name: implementer
 description: Implements a plan into working code
-runtime: claude-code # default runtime; override with --runtime
-model: sonnet # opus | sonnet | haiku (claude models)
+runtime: claude-agent # default runtime; override with --runtime
+model: opus # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
   You are working on {repo} (branch {branch}).
@@ -420,7 +421,7 @@ A project-level skill with the same name overrides a global or builtin one.
 ```yaml
 # agents/reviewer.yaml
 name: reviewer
-runtime: claude-code
+runtime: claude-agent
 skills: [code-review, security-scan, self-review]
 ```
 
