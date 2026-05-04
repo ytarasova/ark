@@ -35,8 +35,12 @@ export class SessionService {
     private messages: MessageRepository,
     private readonly _app: AppContext | null = null,
   ) {
+    // The default dispatcher routes through DispatchService.dispatch (typed
+    // DispatchResult) rather than the SessionService.dispatch wrapper which
+    // returns the looser SessionOpResult shape. The listener relies on the
+    // typed `launched:boolean` discriminator.
     this.dispatchListeners = new SessionDispatchListeners(this.sessions, this.events, (sessionId) =>
-      this.dispatch(sessionId),
+      this.app.dispatchService.dispatch(sessionId),
     );
   }
 
