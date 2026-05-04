@@ -43,7 +43,8 @@ async function postHook(sessionId: string, payload: Record<string, unknown>): Pr
 describe("agent-sdk Stop/SessionEnd cost recording", () => {
   it("Stop hook with embedded usage records cost ledger entries", async () => {
     const session = await getApp().sessions.create({ summary: "agent-sdk cost test" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.mergeConfig(session.id, { launch_executor: "claude-agent" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: `ark-s-${session.id}` });
 
     // Shape mirrors what messageToHooks produces from the SDK `result` line.
     const resp = await postHook(session.id, {
@@ -74,7 +75,8 @@ describe("agent-sdk Stop/SessionEnd cost recording", () => {
 
   it("Stop hook with no usage payload leaves the ledger untouched", async () => {
     const session = await getApp().sessions.create({ summary: "agent-sdk no-usage" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.mergeConfig(session.id, { launch_executor: "claude-agent" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: `ark-s-${session.id}` });
 
     await postHook(session.id, {
       hook_event_name: "Stop",
@@ -89,7 +91,8 @@ describe("agent-sdk Stop/SessionEnd cost recording", () => {
     // The launch script emits Stop + SessionEnd back-to-back with identical
     // usage payloads. Recording on both doubled every cost ledger entry.
     const session = await getApp().sessions.create({ summary: "no double record" });
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.mergeConfig(session.id, { launch_executor: "claude-agent" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: `ark-s-${session.id}` });
 
     await postHook(session.id, {
       hook_event_name: "Stop",
