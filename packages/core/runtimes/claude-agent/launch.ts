@@ -895,6 +895,16 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   let stageCompleteRequested = false;
   let stageCompleteReason: string | undefined;
 
+  // True between an interrupt envelope arriving and the agent's first Stop
+  // hook after consuming it. Used to (a) reject any `complete_stage` tool
+  // call landing in this window -- a user steer is a side message, not a
+  // stage-completion directive, so the agent must NOT terminate the stage
+  // in response to it -- and (b) reframe the Stop hook prompt to tell the
+  // agent to resume the original task instead of dangling complete_stage
+  // as an option. Cleared on the first Stop hook firing after the steer
+  // reply lands. The user-input subscriber sets it; the Stop hook clears it.
+  let postSteerWindow = false;
+
   const mcpServers: Record<string, ReturnType<typeof createAskUserMcpServer>> = {};
   if (opts.conductorUrl) {
     mcpServers["ark-ask-user"] = createAskUserMcpServer({
@@ -906,8 +916,18 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   }
   mcpServers["ark-stage-control"] = createStageControlMcpServer({
     onCompleteStage: (reason) => {
+      // Reject the tool call when it lands inside the post-steer window.
+      // Stage completion is the agent's signal that the STAGE'S work is
+      // done, not a reaction to user side-message phrasing like "stop now"
+      // or "we're done". Returning false short-circuits the tool result
+      // with an error string so the agent reads it as "no, you're not done
+      // -- keep working on the original task."
+      if (postSteerWindow) {
+        return false;
+      }
       stageCompleteRequested = true;
       stageCompleteReason = reason;
+      return true;
     },
   });
 
@@ -945,6 +965,24 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
               const queueHasPending = queue.pendingCount() > 0;
               if (stageCompleteRequested && !queueHasPending) {
                 return {};
+              }
+              // Post-steer end_turn: the agent just answered a user side
+              // message. Don't dangle complete_stage as an option (the
+              // tool also rejects in this window). Tell the agent to
+              // resume the original task. Clear the window so subsequent
+              // end_turns get the normal complete_stage / continue prompt
+              // once the agent is back to actual stage work.
+              if (postSteerWindow) {
+                postSteerWindow = false;
+                return {
+                  decision: "block" as const,
+                  reason:
+                    "You just answered a user side message (steer). Resume the original task you " +
+                    "were working on before this interruption. A steer is a side conversation, not a " +
+                    "stage-completion request -- do not call `mcp__ark-stage-control__complete_stage` " +
+                    "in response to the user's words; only call it when the stage's actual work is " +
+                    "finished.",
+                };
               }
               const reason = !stageCompleteRequested
                 ? "end_turn fired but `complete_stage` has not been called. Either continue working " +
@@ -992,6 +1030,11 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
   function fireInterrupt(content: string): void {
     interruptFlag.fired = true;
+    // Open the post-steer window. The flag stays set through the agent's
+    // first end_turn after consuming the steer. While open: the
+    // complete_stage tool rejects, and the Stop hook tells the agent to
+    // resume the original task. The Stop hook clears the flag.
+    postSteerWindow = true;
     if (content.length > 0) {
       pendingInterruptSteers.push(content);
     }

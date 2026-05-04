@@ -34,8 +34,14 @@ export interface StageControlOpts {
    * flip a flag the Stop hook reads. The optional `reason` text is the
    * agent's own summary of what it accomplished -- exposed back to the user
    * via the conductor's normal hook stream.
+   *
+   * Return `true` to accept the completion (normal path), or `false` to
+   * REJECT it -- the tool returns an error string and the agent's
+   * `stageCompleteRequested` flag stays unset. Used by the launcher to
+   * block stage completion while a user steer is being processed: a steer
+   * is a side message, not a stage-completion directive.
    */
-  onCompleteStage: (reason?: string) => void;
+  onCompleteStage: (reason?: string) => boolean;
 }
 
 export interface StageControlResult {
@@ -66,11 +72,33 @@ export function createStageControlMcpServer(opts: StageControlOpts): McpSdkServe
         .describe("Brief summary of what was accomplished in this stage. Surfaced in conductor events for UI display."),
     },
     async (args): Promise<StageControlResult> => {
+      let accepted = false;
       try {
-        opts.onCompleteStage(args.reason);
+        accepted = opts.onCompleteStage(args.reason);
       } catch {
         // Callback is local to launcher; failure here is non-recoverable
         // anyway. Surface it but don't crash the tool call.
+      }
+      if (!accepted) {
+        // Rejected -- the launcher decided this completion should not
+        // terminate the stage (most commonly: the call arrived inside the
+        // post-steer window where a user side-message was just answered).
+        // Surface a clear error so the model treats this as "no, keep
+        // working" rather than "ambiguous, exit anyway."
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text:
+                "complete_stage rejected: the user just sent a side message (steer). A steer asks " +
+                "you to clarify, pause, or answer something -- it is not a directive to end the stage. " +
+                "Resume the original task you were working on before the steer arrived. Only call " +
+                "complete_stage when the stage's actual work is finished, not in reaction to phrasing " +
+                "in the user's side message.",
+            },
+          ],
+        };
       }
       return {
         content: [
