@@ -142,7 +142,7 @@ const sessionKill: ToolDef = {
     const s = await app.sessions.get(parsed.sessionId);
     if (!s) throw new Error(`Session not found: ${parsed.sessionId}`);
 
-    const terminalStatuses = ["completed", "failed", "archived", "stopped"];
+    const terminalStatuses = ["completed", "failed", "killed", "archived", "stopped"];
     if (terminalStatuses.includes(s.status)) {
       return { ok: false, message: `session already terminal (status=${s.status})` };
     }
@@ -158,9 +158,11 @@ const sessionKill: ToolDef = {
       }
     }
 
+    // Mark session "killed" (distinct from "failed") so operators can tell a
+    // deliberate kill apart from a real crash. See #419.
     await app.sessions.update(parsed.sessionId, {
-      status: "failed",
-      error: "killed",
+      status: "killed",
+      error: null,
       session_id: null,
     } as Partial<Session>);
 

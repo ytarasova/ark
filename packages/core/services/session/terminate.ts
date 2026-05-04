@@ -54,7 +54,7 @@ export class SessionTerminator {
     const session = await d.sessions.get(sessionId);
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-    if (!opts?.force && ["stopped", "completed", "failed"].includes(session.status) && !session.session_id) {
+    if (!opts?.force && ["stopped", "completed", "failed", "killed"].includes(session.status) && !session.session_id) {
       return { ok: true, message: "Already stopped" };
     }
 

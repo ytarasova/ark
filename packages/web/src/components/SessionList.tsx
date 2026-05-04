@@ -53,7 +53,7 @@ interface SessionListProps {
 
 /** Map raw session status to a valid SessionStatus type. */
 function normalizeStatus(status: string): SessionStatus {
-  const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "stopped", "pending"];
+  const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "killed", "stopped", "pending"];
   if (valid.includes(status as SessionStatus)) return status as SessionStatus;
   if (status === "blocked" || status === "ready") return "pending";
   if (status === "archived" || status === "deleting") return "stopped";
@@ -63,7 +63,7 @@ function normalizeStatus(status: string): SessionStatus {
 /** Compute progress fraction (0..1) from current stage index / total stages. */
 function computeProgress(session: any, flowStagesMap?: Record<string, any[]>): number {
   if (session.status === "completed") return 1;
-  if (session.status === "failed") return 1;
+  if (session.status === "failed" || session.status === "killed") return 1;
   const flowName = session.pipeline || session.flow;
   if (!flowName) return 0;
   const stages = flowStagesMap?.[flowName];

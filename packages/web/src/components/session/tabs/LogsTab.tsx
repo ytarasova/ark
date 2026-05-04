@@ -9,7 +9,7 @@ interface LogsTabProps {
   status?: string | null;
 }
 
-const TERMINAL_STATES = new Set(["completed", "failed", "stopped", "archived"]);
+const TERMINAL_STATES = new Set(["completed", "failed", "killed", "stopped", "archived"]);
 const POLL_INTERVAL_MS = 2000;
 const TAIL_DEFAULT = 500;
 

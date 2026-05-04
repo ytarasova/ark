@@ -129,7 +129,9 @@ test("session/kill RPC returns { ok: false } for terminal sessions", async () =>
   const router = new Router();
   registerSessionHandlers(router, app);
 
-  for (const status of ["completed", "failed", "stopped", "archived"] as const) {
+  // `killed` included -- killing an already-killed session should be a no-op
+  // (not a second overwrite). Bug #419 made this distinct from "failed".
+  for (const status of ["completed", "failed", "killed", "stopped", "archived"] as const) {
     const session = await app.sessions.create({
       summary: `kill-terminal-${status}`,
       flow: "autonomous-sdlc",
@@ -146,6 +148,29 @@ test("session/kill RPC returns { ok: false } for terminal sessions", async () =>
   }
 });
 
+test("session/kill RPC does not overwrite a crashed (failed) session", async () => {
+  // Prior behaviour flipped failed -> failed and overwrote error="boom" with
+  // error="killed". After #419 the kill path aborts on any terminal status,
+  // preserving the original crash signal for forensics.
+  const router = new Router();
+  registerSessionHandlers(router, app);
+
+  const session = await app.sessions.create({
+    summary: "kill-preserves-crash",
+    flow: "autonomous-sdlc",
+  });
+  await app.sessions.update(session.id, { status: "failed", error: "boom" } as any);
+
+  const req = createRequest(203, "session/kill", { sessionId: session.id });
+  const res = await router.dispatch(req);
+  const result = (res as JsonRpcResponse).result as Record<string, unknown>;
+
+  expect(result.ok).toBe(false);
+  const after = await app.sessions.get(session.id);
+  expect(after?.status).toBe("failed");
+  expect(after?.error).toBe("boom");
+});
+
 test("session/kill RPC throws SESSION_NOT_FOUND for unknown session", async () => {
   const router = new Router();
   registerSessionHandlers(router, app);
@@ -157,7 +182,11 @@ test("session/kill RPC throws SESSION_NOT_FOUND for unknown session", async () =
   expect(err.code).toBe(-32002);
 });
 
-test("session/kill RPC marks running session as failed with reason killed", async () => {
+test("session/kill RPC marks running session as killed (not failed) with error=null", async () => {
+  // #419: operator-initiated kill gets its own terminal status so dashboards
+  // and alerts can tell a deliberate Kill apart from a real crash. Prior
+  // behaviour wrote status="failed", error="killed"; now the status itself
+  // carries the intent and error stays null.
   const router = new Router();
   registerSessionHandlers(router, app);
 
@@ -181,8 +210,8 @@ test("session/kill RPC marks running session as failed with reason killed", asyn
   expect(typeof result.terminated_at).toBe("number");
 
   const updated = await app.sessions.get(session.id);
-  expect(updated?.status).toBe("failed");
-  expect(updated?.error).toBe("killed");
+  expect(updated?.status).toBe("killed");
+  expect(updated?.error).toBeNull();
 
   const events = await app.events.list(session.id);
   const killEv = events.find((e: any) => e.type === "session_killed");

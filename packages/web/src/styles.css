@@ -30,6 +30,7 @@
   --waiting: #fbbf24;
   --completed: #34d399;
   --failed: #f87171;
+  --killed: #a78bfa;
   --stopped: rgba(107, 114, 128, 0.4);
   --running-glow: 0 0 8px rgba(96, 165, 250, 0.4);
   --failed-glow: 0 0 8px rgba(248, 113, 113, 0.3);
@@ -710,6 +711,9 @@ body.is-macos .drag-region {
 .status-dot-sm.failed {
   background: var(--failed);
   box-shadow: var(--failed-glow);
+}
+.status-dot-sm.killed {
+  background: var(--killed);
 }
 .status-dot-sm.stopped,
 .status-dot-sm.pending {

@@ -89,7 +89,7 @@ export class SessionService {
     if (!session) return { ok: false, message: `Session ${id} not found` };
 
     // Idempotent: already in terminal state with no running process
-    if (!opts?.force && ["stopped", "completed", "failed"].includes(session.status) && !session.session_id) {
+    if (!opts?.force && ["stopped", "completed", "failed", "killed"].includes(session.status) && !session.session_id) {
       return { ok: true, message: "OK", sessionId: id };
     }
 

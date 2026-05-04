@@ -4,7 +4,7 @@ import type { SessionStatus } from "../ui/StatusDot.js";
 import { friendlyAgentName } from "../../lib/inline-display.js";
 
 export function normalizeStatus(s: string): SessionStatus {
-  const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "stopped", "pending"];
+  const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "killed", "stopped", "pending"];
   if (valid.includes(s as SessionStatus)) return s as SessionStatus;
   if (s === "blocked" || s === "ready") return "pending";
   return "stopped";
@@ -15,6 +15,7 @@ export function buildStageProgress(session: any, flowStages: any[]): StageProgre
   const currentStage = session.stage;
   const currentIdx = flowStages.findIndex((s: any) => s.name === currentStage);
   const isFailed = session.status === "failed";
+  const isKilled = session.status === "killed";
   const isStopped = session.status === "stopped";
   const isCompleted = session.status === "completed";
   const isRunning = session.status === "running" || session.status === "waiting";
@@ -23,10 +24,14 @@ export function buildStageProgress(session: any, flowStages: any[]): StageProgre
     if (isCompleted) return { name: s.name, state: "done" as const };
     if (currentIdx < 0) return { name: s.name, state: "pending" as const };
     // Earlier stages genuinely advanced, mark them done regardless of
-    // whether the session was later stopped / failed mid-flow.
+    // whether the session was later stopped / failed / killed mid-flow.
     if (i < currentIdx) return { name: s.name, state: "done" as const };
     if (i === currentIdx) {
       if (isFailed) return { name: s.name, state: "failed" as const };
+      // `killed` is a user-initiated stop, not a crash -- render it the same
+      // way as `stopped` in the stage pipeline so it doesn't look like a
+      // failure. The session-level badge still shows "killed" distinctly.
+      if (isKilled) return { name: s.name, state: "stopped" as const };
       if (isStopped) return { name: s.name, state: "stopped" as const };
       if (isRunning) return { name: s.name, state: "active" as const };
       return { name: s.name, state: "pending" as const };
@@ -649,6 +654,7 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
   const sessionTerminal =
     sessionStatus === "completed" ||
     sessionStatus === "failed" ||
+    sessionStatus === "killed" ||
     sessionStatus === "stopped" ||
     sessionStatus === "archived";
   if (sessionTerminal && pendingTools.size > 0) {

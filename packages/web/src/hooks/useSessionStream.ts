@@ -29,7 +29,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useApi } from "./useApi.js";
 
 const ACTIVE_STATES = new Set(["running", "waiting", "blocked", "pending", "ready"]);
-const TERMINAL_STATES = new Set(["completed", "stopped", "failed"]);
+const TERMINAL_STATES = new Set(["completed", "stopped", "failed", "killed"]);
 const RUNNING_STATES = new Set(["running", "waiting"]);
 
 export interface SessionCostTotals {
