@@ -21,7 +21,7 @@ withTestContext();
 describe("soft delete", () => {
   it("softDeleteSession sets status to 'deleting' and deleted_at", async () => {
     const s = await getApp().sessions.create({ summary: "test" });
-    await getApp().sessions.update(s.id, { status: "running" });
+    await getApp().sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
     await getApp().sessions.softDelete(s.id);
     const after = await getApp().sessions.get(s.id);
     expect(after!.status).toBe("deleting");
@@ -62,6 +62,7 @@ describe("soft delete", () => {
     const s = await getApp().sessions.create({ summary: "expired" });
     const twoMinAgo = new Date(Date.now() - 120_000).toISOString();
     await getApp().sessions.update(s.id, {
+      session_id: `ark-s-${s.id}`,
       status: "deleting",
       config: { ...s.config, _deleted_at: twoMinAgo, _pre_delete_status: "running" },
     });
@@ -82,7 +83,7 @@ describe("soft delete", () => {
 describe("sessionLifecycle.deleteSession with soft delete", async () => {
   it("soft-deletes instead of hard-deleting", async () => {
     const s = await getApp().sessions.create({ summary: "soft-kill" });
-    await getApp().sessions.update(s.id, { status: "running" });
+    await getApp().sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
     const result = await getApp().sessionLifecycle.deleteSession(s.id);
     expect(result.ok).toBe(true);
     const after = await getApp().sessions.get(s.id);
@@ -115,7 +116,7 @@ describe("soft delete edge cases", async () => {
 
   it("softDeleteSession on already-deleted session overwrites state", async () => {
     const s = await getApp().sessions.create({ summary: "double-delete" });
-    await getApp().sessions.update(s.id, { status: "running" });
+    await getApp().sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
     await getApp().sessions.softDelete(s.id);
     // Delete again -- should update _deleted_at
     const before = (await getApp().sessions.get(s.id))!;
@@ -133,15 +134,15 @@ describe("soft delete edge cases", async () => {
 
   it("undeleteSession returns null for non-deleting session", async () => {
     const s = await getApp().sessions.create({ summary: "not-deleted" });
-    await getApp().sessions.update(s.id, { status: "running" });
+    await getApp().sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
     expect(await getApp().sessions.undelete(s.id)).toBeNull();
   });
 
   it("listSessions with status filter still excludes deleting", async () => {
     const s1 = await getApp().sessions.create({ summary: "active" });
     const s2 = await getApp().sessions.create({ summary: "deleted-running" });
-    await getApp().sessions.update(s1.id, { status: "running" });
-    await getApp().sessions.update(s2.id, { status: "running" });
+    await getApp().sessions.update(s1.id, { session_id: `ark-s-${s1.id}`, status: "running" });
+    await getApp().sessions.update(s2.id, { session_id: `ark-s-${s2.id}`, status: "running" });
     await getApp().sessions.softDelete(s2.id);
     const running = await getApp().sessions.list({ status: "running" });
     expect(running.find((x) => x.id === s1.id)).toBeDefined();
@@ -155,7 +156,11 @@ describe("soft delete edge cases", async () => {
 
   it("softDeleteSession preserves config fields other than delete metadata", async () => {
     const s = await getApp().sessions.create({ summary: "with-config" });
-    await getApp().sessions.update(s.id, { status: "running", config: { custom: "data", nested: { a: 1 } } });
+    await getApp().sessions.update(s.id, {
+      session_id: `ark-s-${s.id}`,
+      status: "running",
+      config: { custom: "data", nested: { a: 1 } },
+    });
     await getApp().sessions.softDelete(s.id);
     const after = (await getApp().sessions.get(s.id))!;
     expect(after.config.custom).toBe("data");
@@ -176,7 +181,7 @@ describe("soft delete edge cases", async () => {
 
   it("sessionLifecycle.undeleteSession returns error message for non-deleted session", async () => {
     const s = await getApp().sessions.create({ summary: "not-deleted-async" });
-    await getApp().sessions.update(s.id, { status: "running" });
+    await getApp().sessions.update(s.id, { session_id: `ark-s-${s.id}`, status: "running" });
     const result = await getApp().sessionLifecycle.undeleteSession(s.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found or not deleted");

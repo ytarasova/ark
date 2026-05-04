@@ -180,7 +180,12 @@ describe("applyReport outcome extraction", async () => {
     });
 
     const session = await app.sessions.create({ summary: "Test outcome", flow: "outcome-report-flow" });
-    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "review",
+      agent: "reviewer",
+    });
 
     const result = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
@@ -202,7 +207,12 @@ describe("applyReport outcome extraction", async () => {
     });
 
     const session = await app.sessions.create({ summary: "Test no outcome", flow: "outcome-no-report" });
-    await app.sessions.update(session.id, { status: "running", stage: "build", agent: "builder" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "build",
+      agent: "builder",
+    });
 
     const result = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
@@ -228,7 +238,12 @@ describe("advance with outcome routing", async () => {
     });
 
     const session = await app.sessions.create({ summary: "Test advance", flow: "outcome-advance" });
-    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "review",
+      agent: "reviewer",
+    });
 
     // Advance with outcome "approved" -- should go to "deploy" (skipping "revise")
     const result = await app.stageAdvance.advance(session.id, true, "approved");
@@ -250,7 +265,12 @@ describe("advance with outcome routing", async () => {
     });
 
     const session = await app.sessions.create({ summary: "Test advance rejected", flow: "outcome-advance2" });
-    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "review",
+      agent: "reviewer",
+    });
 
     // Advance with outcome "rejected" -- should go to "revise"
     const result = await app.stageAdvance.advance(session.id, true, "rejected");
@@ -272,7 +292,12 @@ describe("advance with outcome routing", async () => {
     });
 
     const session = await app.sessions.create({ summary: "Test linear fallback", flow: "outcome-advance-linear" });
-    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
+      status: "running",
+      stage: "review",
+      agent: "reviewer",
+    });
 
     // Advance without outcome -- should go to linear next ("revise")
     const result = await app.stageAdvance.advance(session.id, true);

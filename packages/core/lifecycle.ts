@@ -41,7 +41,7 @@ import { logDebug } from "./observability/structured-log.js";
  *   6. arkd       -- agent daemon; forwards to conductor
  *   7. metrics poller
  *   8. maintenance pollers (purge, tmux status, notify daemon)
- *   9. stale state scan (one-shot)
+ *   9. boot file cleanup (one-shot)
  *  10. signal handlers (last so ctrl-c hits a fully-booted app)
  */
 const START_ORDER: (keyof Cradle)[] = [
@@ -53,7 +53,7 @@ const START_ORDER: (keyof Cradle)[] = [
   "arkdLauncher",
   "metricsPoller",
   "maintenancePollers",
-  "staleStateDetector",
+  "bootCleanup",
   "signalHandlers",
   // sessionDrain is resolved LAST so awilix disposes it FIRST during shutdown.
   // Its disposer drains + stops sessions while the conductor/arkd are still up.

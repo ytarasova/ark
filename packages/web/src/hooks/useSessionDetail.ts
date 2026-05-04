@@ -207,6 +207,7 @@ export function useSessionDetail({
     diffData,
     diffFiles,
     stages,
+    flowStages,
     completedStages,
     totalStages,
     progressPct,

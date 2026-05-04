@@ -77,23 +77,19 @@ export class StatusPollerRegistry {
 }
 
 /**
- * Probe whether the agent's tmux session is still live.
+ * Probe whether the agent is still live on its compute target.
  *
- * The naive `executor.status(handle)` only queries the conductor's local
- * tmux daemon, which is wrong for remote dispatches: the tmux session
- * lives on EC2 / k8s / Firecracker, not on the conductor. Local probe
- * always returns `not_found` for remote handles, and the poller flips
- * the session to `completed` ~3s after launch even though the agent is
- * happily running on the remote host.
+ * Each runtime owns its own status check via `Executor.probeStatus`:
+ *   - tmux-based runtimes (claude-code, codex, gemini, goose, cli-agent)
+ *     ask arkd `/agent/status` (-> `tmux has-session`)
+ *   - process-based runtimes (claude-agent) ask arkd `/process/status`
+ *     (-> `kill(pid, 0)`); their handle never points at a tmux session,
+ *     so the tmux check would always say "not running" and prematurely
+ *     flip the row to completed within ~3s of launch (#435).
  *
- * Fix: prefer the compute provider's `checkSession`, which is implemented
- * by `ArkdBackedProvider` in terms of arkd's `/agent/status` endpoint.
- * For remote dispatches that endpoint is reached over the SSM forward
- * tunnel and probes tmux on the remote host. For local dispatches it
- * probes the local arkd which already shares its tmux daemon with the
- * conductor, so the answer matches what `executor.status` would have
- * returned. Falls back to `executor.status` only when there is no
- * provider/compute on the session (e.g. dispatch without compute_name).
+ * Falls back to the legacy `executor.status(handle)` only when there is
+ * no provider/compute on the session (legacy dispatch without
+ * compute_name) AND the executor has not implemented probeStatus.
  *
  * Transient probe failures (arkd unreachable, network timeout) keep the
  * status as `running` rather than tripping a false `not_found` -- a
@@ -110,14 +106,17 @@ async function probeSessionStatus(
     try {
       const { provider, compute } = await resolveProvider(app, session);
       if (provider && compute) {
-        // Pass the session through so the provider reads
-        // session.config.arkd_local_forward_port (#423) instead of the
-        // shared compute-level field.
+        if (executor.probeStatus) {
+          // Pass the session through so the provider reads
+          // session.config.arkd_local_forward_port (#423) instead of the
+          // shared compute-level field.
+          return await executor.probeStatus({ app, session, handle, compute, provider });
+        }
         const running = await provider.checkSession(compute, handle, session);
         return running ? { state: "running" } : { state: "not_found" };
       }
     } catch (err: any) {
-      logWarn("status", `provider.checkSession failed for ${sessionId}: ${err?.message ?? err}; keeping running`);
+      logWarn("status", `provider status probe failed for ${sessionId}: ${err?.message ?? err}; keeping running`);
       return { state: "running" };
     }
   }
@@ -200,9 +199,9 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         const session = await app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
 
-        // Guard: verify the session's current tmux handle still matches the one
-        // we are polling. After a stage handoff, the session gets a new agent
-        // with a different handle. If they don't match, this poller is stale.
+        // Defensive guard: with explicit stopStatusPoller calls in stage-advance,
+        // this branch should never fire on a healthy stage handoff. Kept as a
+        // safety net for direct sessions.update() calls that bypass StageAdvancer.
         if (session.session_id && session.session_id !== handle) return;
 
         // "not_found" means the tmux session exited (process finished) -- treat as completed

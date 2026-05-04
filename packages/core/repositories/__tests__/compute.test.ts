@@ -216,7 +216,7 @@ describe("ComputeRepository", async () => {
       isolation_kind: "docker",
       status: "stopped",
     });
-    const updated = await repo.update("upd", { status: "running" as ComputeStatus });
+    const updated = await repo.update("upd", { session_id: `ark-s-${"upd"}`, status: "running" as ComputeStatus });
     expect(updated!.status).toBe("running");
   });
 
@@ -257,7 +257,9 @@ describe("ComputeRepository", async () => {
   });
 
   it("update returns null for nonexistent", async () => {
-    expect(await repo.update("no-exist", { status: "running" as ComputeStatus })).toBeNull();
+    expect(
+      await repo.update("no-exist", { session_id: `ark-s-${"no-exist"}`, status: "running" as ComputeStatus }),
+    ).toBeNull();
   });
 
   // -- delete -----------------------------------------------------------

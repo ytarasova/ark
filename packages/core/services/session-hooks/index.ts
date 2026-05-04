@@ -25,11 +25,6 @@ export class SessionHooks {
     this.handoff = new HandoffMediator(deps);
   }
 
-  /** Detect session status from tmux content (fallback when hooks don't fire). */
-  detectStatus(sessionId: string): Promise<string | null> {
-    return this.hookStatus.detectStatus(sessionId);
-  }
-
   /** Process a hook status event; returns updates + events + flags for the caller to apply. */
   applyHookStatus(session: Session, hookEvent: string, payload: Record<string, unknown>): Promise<HookStatusResult> {
     return this.hookStatus.apply(session, hookEvent, payload);

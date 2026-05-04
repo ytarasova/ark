@@ -110,7 +110,11 @@ function toolResultTurn(ts: string) {
 describe("E2E: Hook -> Index -> Query flow", async () => {
   it("Stop hook with transcript_path indexes and getSessionConversation returns turns", async () => {
     const session = await getApp().sessions.create({ summary: "e2e-conv-basic" });
-    await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(session.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${session.id}`,
+    });
 
     const transcriptPath = writeTranscript(app.config.dirs.ark, "conv-basic.jsonl", [
       userTurn("fix the auth bug in the login module", "2026-01-01T00:01:00Z"),
@@ -139,7 +143,11 @@ describe("E2E: Hook -> Index -> Query flow", async () => {
 describe("E2E: Incremental indexing", async () => {
   it("second Stop hook adds new messages without duplicates", async () => {
     const session = await getApp().sessions.create({ summary: "e2e-incremental" });
-    await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(session.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${session.id}`,
+    });
 
     const transcriptPath = writeTranscript(app.config.dirs.ark, "conv-incr.jsonl", [
       userTurn("implement the caching layer for redis", "2026-01-01T00:01:00Z"),
@@ -162,7 +170,11 @@ describe("E2E: Incremental indexing", async () => {
     ]);
 
     // Simulate going back to running then stopping again
-    await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(session.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${session.id}`,
+    });
     await postHookStatus(session.id, {
       hook_event_name: "Stop",
       transcript_path: transcriptPath,
@@ -180,7 +192,11 @@ describe("E2E: Per-session search", async () => {
   it("searchSessionConversation is scoped to one session", async () => {
     // Session A -- talks about authentication
     const sessionA = await getApp().sessions.create({ summary: "e2e-search-A" });
-    await app.sessions.update(sessionA.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(sessionA.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${sessionA.id}`,
+    });
     const pathA = writeTranscript(app.config.dirs.ark, "conv-a.jsonl", [
       userTurn("fix the authentication middleware vulnerability", "2026-01-01T00:01:00Z"),
       assistantTurn("I have patched the authentication middleware to prevent bypass", "2026-01-01T00:02:00Z"),
@@ -189,7 +205,11 @@ describe("E2E: Per-session search", async () => {
 
     // Session B -- talks about database
     const sessionB = await getApp().sessions.create({ summary: "e2e-search-B" });
-    await app.sessions.update(sessionB.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(sessionB.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${sessionB.id}`,
+    });
     const pathB = writeTranscript(app.config.dirs.ark, "conv-b.jsonl", [
       userTurn("optimize the database connection pooling", "2026-01-01T00:01:00Z"),
       assistantTurn("I have optimized the database connection pool settings", "2026-01-01T00:02:00Z"),
@@ -220,7 +240,11 @@ describe("E2E: Cross-session search", async () => {
   it("searchTranscripts finds matches across both sessions via FTS5", async () => {
     // Session C -- mentions "deployment pipeline"
     const sessionC = await getApp().sessions.create({ summary: "e2e-cross-C" });
-    await app.sessions.update(sessionC.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(sessionC.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${sessionC.id}`,
+    });
     const pathC = writeTranscript(app.config.dirs.ark, "conv-c.jsonl", [
       assistantTurn("I have configured the deployment pipeline for staging", "2026-01-01T00:01:00Z"),
     ]);
@@ -228,7 +252,11 @@ describe("E2E: Cross-session search", async () => {
 
     // Session D -- also mentions "deployment"
     const sessionD = await getApp().sessions.create({ summary: "e2e-cross-D" });
-    await app.sessions.update(sessionD.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(sessionD.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${sessionD.id}`,
+    });
     const pathD = writeTranscript(app.config.dirs.ark, "conv-d.jsonl", [
       assistantTurn("Fixed the deployment rollback mechanism for production", "2026-01-01T00:01:00Z"),
     ]);
@@ -251,7 +279,15 @@ describe("E2E: Cross-session search", async () => {
 describe("E2E: Token usage stored on hook", async () => {
   it("Stop hook with transcript_path stores aggregated token usage", async () => {
     const session = await getApp().sessions.create({ summary: "e2e-usage" });
-    await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    // Production parity: launch_executor is set by post-launch when the
+    // dispatcher resolves the runtime. Without it, recordUsage skips
+    // (no runtime resolvable -> no parser -> no cost ledger entry).
+    await app.sessions.mergeConfig(session.id, { launch_executor: "claude-code" });
+    await app.sessions.update(session.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${session.id}`,
+    });
 
     const transcriptPath = writeTranscript(app.config.dirs.ark, "conv-usage.jsonl", [
       userTurn("analyze the performance bottleneck in the query", "2026-01-01T00:01:00Z"),
@@ -289,7 +325,11 @@ describe("E2E: Token usage stored on hook", async () => {
 describe("E2E: Noise filtering", async () => {
   it("tool_use and tool_result entries are not in getSessionConversation", async () => {
     const session = await getApp().sessions.create({ summary: "e2e-noise" });
-    await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
+    await app.sessions.update(session.id, {
+      status: "running",
+      claude_session_id: CLAUDE_SESSION_ID,
+      session_id: `ark-s-${session.id}`,
+    });
 
     const transcriptPath = writeTranscript(app.config.dirs.ark, "conv-noise.jsonl", [
       userTurn("please read the config file and explain it", "2026-01-01T00:01:00Z"),

@@ -14,7 +14,7 @@ afterAll(async () => {
 describe("auto-join", async () => {
   test("parent advances when all children complete", async () => {
     const parent = await app.sessions.create({ summary: "Parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, { tasks: [{ summary: "A" }, { summary: "B" }] });
     expect(result.ok).toBe(true);
@@ -32,7 +32,7 @@ describe("auto-join", async () => {
 
   test("parent stays waiting when some children not done", async () => {
     const parent = await app.sessions.create({ summary: "Parent2", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { session_id: `ark-s-${parent.id}`, stage: "implement", status: "running" });
 
     const result = await fanOut(app, parent.id, { tasks: [{ summary: "C" }, { summary: "D" }] });
 

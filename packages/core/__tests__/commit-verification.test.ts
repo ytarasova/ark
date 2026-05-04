@@ -63,6 +63,7 @@ describe("Commit verification: uncommitted changes", async () => {
     const gitDir = createTempGitRepo();
     const session = await app.sessions.create({ summary: "staged changes test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -93,6 +94,7 @@ describe("Commit verification: uncommitted changes", async () => {
 
     const session = await app.sessions.create({ summary: "modified tracked test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -122,6 +124,7 @@ describe("Commit verification: uncommitted changes", async () => {
 
     const session = await app.sessions.create({ summary: "untracked only test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -151,6 +154,7 @@ describe("Commit verification: uncommitted changes", async () => {
 
     const session = await app.sessions.create({ summary: "clean test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -171,7 +175,7 @@ describe("Commit verification: uncommitted changes", async () => {
 describe("Commit verification: sessions without workdir", async () => {
   it("skips commit check when no workdir is set", async () => {
     const session = await app.sessions.create({ summary: "no workdir test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
@@ -183,6 +187,7 @@ describe("Commit verification: sessions without workdir", async () => {
   it("skips commit check when no branch is set", async () => {
     const session = await app.sessions.create({ summary: "no branch test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: "/tmp/some-dir",
@@ -203,6 +208,7 @@ describe("Commit verification: rejection events", async () => {
     const gitDir = createTempGitRepo();
     const session = await app.sessions.create({ summary: "rejection event test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -227,6 +233,7 @@ describe("Commit verification: rejection events", async () => {
     const gitDir = createTempGitRepo();
     const session = await app.sessions.create({ summary: "session alive test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -248,6 +255,7 @@ describe("Commit verification: rejection events", async () => {
     const gitDir = createTempGitRepo();
     const session = await app.sessions.create({ summary: "config saved test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -276,7 +284,7 @@ describe("Commit verification: manual gate interaction", async () => {
   it("skips commit check for manual gate stages (bare flow)", async () => {
     // Manual gate stages don't advance, so commit verification is deferred to human
     const session = await app.sessions.create({ summary: "manual gate test", flow: "bare" });
-    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "work"));
 
@@ -301,6 +309,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
 
     const session = await app.sessions.create({ summary: "no stage commits", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -334,6 +343,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
 
     const session = await app.sessions.create({ summary: "has stage commits", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -371,6 +381,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
 
     const session = await app.sessions.create({ summary: "prior commits only", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -395,6 +406,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
 
     const session = await app.sessions.create({ summary: "rejection sha test", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -421,6 +433,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
 
     const session = await app.sessions.create({ summary: "no sha fallback", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -448,6 +461,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", async 
 
     const session = await app.sessions.create({ summary: "hook no commits", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -481,6 +495,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", async 
 
     const session = await app.sessions.create({ summary: "hook has commits", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -509,6 +524,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", async 
 
     const session = await app.sessions.create({ summary: "hook no sha", flow: "quick" });
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       workdir: gitDir,

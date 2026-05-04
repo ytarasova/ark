@@ -83,7 +83,7 @@ describe("SessionDispatchListeners watchdog", () => {
       app.events,
       async (id) => {
         // Real launch shape: flip to running, return ok:true.
-        await app.sessions.update(id, { status: "running" });
+        await app.sessions.update(id, { session_id: `ark-s-${id}`, status: "running" });
         return { ok: true, message: "launched" };
       },
       { dispatchWatchdogMs: 1000 },

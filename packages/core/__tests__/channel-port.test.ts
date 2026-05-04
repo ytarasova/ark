@@ -45,7 +45,7 @@ describe("isChannelPortAvailable", async () => {
     const port = getApp().sessions.channelPort(session.id);
     // startSession creates a session with status 'pending', update to 'running'
 
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
     expect(await getApp().sessions.isChannelPortAvailable(port)).toBe(false);
   });
 
@@ -58,7 +58,7 @@ describe("isChannelPortAvailable", async () => {
     });
     const port = getApp().sessions.channelPort(session.id);
 
-    await getApp().sessions.update(session.id, { status: "running" });
+    await getApp().sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
     expect(await getApp().sessions.isChannelPortAvailable(port, session.id)).toBe(true);
   });
 });

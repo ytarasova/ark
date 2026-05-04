@@ -48,7 +48,7 @@ describe("mediateStageHandoff", async () => {
       app.container.register({
         dispatchService: asValue({
           dispatch: async (id: string) => {
-            await app.sessions.update(id, { status: "running" });
+            await app.sessions.update(id, { session_id: `ark-s-${id}`, status: "running" });
             return { ok: true, message: "stubbed-dispatch" };
           },
         }),
@@ -369,7 +369,7 @@ describe("mediateStageHandoff", async () => {
 describe("applyReport + mediateStageHandoff integration", async () => {
   it("report with shouldAdvance feeds into mediateStageHandoff correctly", async () => {
     const session = await app.sessions.create({ summary: "integration test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     // Step 1: applyReport determines shouldAdvance
     const report: OutboundMessage = {
@@ -403,7 +403,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
 
   it("report on manual gate does not trigger handoff", async () => {
     const session = await app.sessions.create({ summary: "manual integration", flow: "bare" });
-    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const report: OutboundMessage = {
       type: "completed",
@@ -423,6 +423,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
     const session = await app.sessions.create({ summary: "stale error handoff", flow: "quick" });
     // Simulate: session has a stale error from a previous failed attempt
     await app.sessions.update(session.id, {
+      session_id: `ark-s-${session.id}`,
       status: "running",
       stage: "implement",
       error: "previous failure from retry",
@@ -463,7 +464,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
 describe("applyHookStatus + mediateStageHandoff integration", async () => {
   it("SessionEnd on auto-gate session feeds into mediateStageHandoff", async () => {
     const session = await app.sessions.create({ summary: "hook integration", flow: "autonomous" });
-    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
     const fresh = await app.sessions.get(session.id)!;
 
     // Step 1: applyHookStatus determines shouldAdvance
@@ -512,14 +513,14 @@ describe("mediateStageHandoff via conductor HTTP", async () => {
     app.container.register({
       dispatchService: asValue({
         dispatch: async (id: string) => {
-          await app.sessions.update(id, { status: "running" });
+          await app.sessions.update(id, { session_id: `ark-s-${id}`, status: "running" });
           return { ok: true, message: "stubbed-conductor-dispatch" };
         },
       }),
     });
 
     const session = await app.sessions.create({ summary: "conductor handoff test", flow: "quick" });
-    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "implement" });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -555,7 +556,7 @@ describe("mediateStageHandoff via conductor HTTP", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
     const session = await app.sessions.create({ summary: "hook handoff test", flow: "autonomous" });
-    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`, {
       method: "POST",
@@ -580,7 +581,7 @@ describe("mediateStageHandoff via conductor HTTP", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
     const session = await app.sessions.create({ summary: "manual conductor test", flow: "bare" });
-    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running", stage: "work" });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
