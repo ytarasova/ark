@@ -242,8 +242,21 @@ Key fields:
 - `depends_on`: list of prior stage names for DAG ordering. Enables parallel execution of stages with no ordering constraint.
 - `action`: replaces `agent` for non-LLM stages. Built-in actions: `create_pr` (push branch + `gh pr create`), `auto_merge` (wait for CI then merge).
 - `edges`: explicit graph edges with `condition` expressions for conditional routing (see the `conditional` flow). Edges support `from`, `to`, `condition`, and `label` fields.
+- `on_outcome`: map of outcome labels to target stage names. When an agent completes with an `outcome` field (e.g. `approved`, `needs_changes`, `rejected`), the flow routes to the mapped stage instead of the linear next. Unknown or missing outcomes fall back to the linear successor. Targets are validated against the flow's stage list at load time.
 - `task`: per-stage task prompt override. Template variables (`{summary}`, `{repo}`, `{workdir}`) are substituted at dispatch.
 - Fan-out stages wait for all their spawned children before the parent advances (auto-join on child completion).
+
+```yaml
+# Outcome-based routing -- terser alternative to an `edges:` block
+stages:
+  - name: review
+    agent: reviewer
+    gate: auto
+    on_outcome:
+      approved: deploy
+      needs_changes: revise
+      rejected: reject-close
+```
 
 ```bash
 ark flow list
@@ -290,7 +303,7 @@ ark agent show implementer
 # agents/implementer.yaml
 name: implementer
 description: Implements a plan into working code
-runtime: claude # default runtime; override with --runtime
+runtime: claude-code # default runtime; override with --runtime
 model: sonnet # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
@@ -307,15 +320,18 @@ env: {}
 
 Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
 
-### Runtimes (5)
+### Runtimes (6)
 
-| Name         | Tool                        | Billing                     | Transcript parser                  |
-| ------------ | --------------------------- | --------------------------- | ---------------------------------- |
-| `claude`     | Claude Code CLI             | api (per token)             | claude                             |
-| `claude-max` | Claude Code (Max sub)       | subscription ($200/mo flat) | claude                             |
-| `codex`      | OpenAI Codex CLI            | api                         | codex (default model: gpt-5-codex) |
-| `gemini`     | Google Gemini CLI           | api                         | gemini                             |
-| `goose`      | Goose CLI (Block / LF AAIF) | api                         | goose                              |
+| Name           | Tool                             | Billing                     | Transcript parser                  |
+| -------------- | -------------------------------- | --------------------------- | ---------------------------------- |
+| `claude-code`  | Claude Code CLI                  | api (per token)             | claude                             |
+| `claude-agent` | Anthropic Agent SDK (in-process) | api                         | agent-sdk                          |
+| `claude-max`   | Claude Code (Max subscription)   | subscription ($200/mo flat) | claude                             |
+| `codex`        | OpenAI Codex CLI                 | api                         | codex (default model: gpt-5-codex) |
+| `gemini`       | Google Gemini CLI                | api                         | gemini                             |
+| `goose`        | Goose CLI (Block / LF AAIF)      | api                         | goose                              |
+
+`claude-code` runs the Claude Code CLI in tmux; `claude-agent` runs the Anthropic Agent SDK in-process (no tmux, no CLI fork) and supports gateway wire-format compatibility modes (`compat: [bedrock]`) for routing through non-Anthropic gateways.
 
 ```bash
 ark runtime list
@@ -343,11 +359,12 @@ ark session start --repo . --summary "Big refactor" \
 # runtimes/codex.yaml
 name: codex
 description: OpenAI Codex CLI
-type: cli-agent # claude-code | cli-agent | subprocess
-command: ["codex", "--auto"]
-task_delivery: stdin # stdin | file | arg
-billing_mode: api # api | subscription | free
-transcript_parser: codex # selects CodexTranscriptParser
+type: cli-agent # claude-code | claude-agent | cli-agent | goose | subprocess
+command: ["codex", "--approval-mode", "full-auto"]
+task_delivery: arg # stdin | file | arg
+billing:
+  mode: api # api | subscription | free
+  transcript_parser: codex # selects CodexTranscriptParser
 models:
   - id: gpt-5-codex
     label: "GPT-5 Codex"
@@ -358,10 +375,14 @@ env:
   OPENAI_API_KEY: "${OPENAI_API_KEY}"
 ```
 
-Three executor types are registered at boot:
+Goose uses the same shape with `type: goose` and `task_delivery: arg` (it reads the task from a CLI argument). `claude-agent` is in-process so has no `command` or `task_delivery` field -- instead it declares `secrets:` and an optional `compat:` list (e.g. `[bedrock]`) for gateway wire-format transcoding.
+
+Executor types registered at boot:
 
 - `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
-- `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
+- `claude-agent` -- runs the Anthropic Agent SDK in-process (no tmux), streaming events through arkd's hooks endpoint.
+- `cli-agent` -- any other CLI tool in tmux, with worktree isolation (used by codex, gemini).
+- `goose` -- Goose CLI with recipe-file task delivery.
 - `subprocess` -- generic child process, no tmux.
 
 Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture`.
@@ -399,7 +420,7 @@ A project-level skill with the same name overrides a global or builtin one.
 ```yaml
 # agents/reviewer.yaml
 name: reviewer
-runtime: claude
+runtime: claude-code
 skills: [code-review, security-scan, self-review]
 ```
 
@@ -1243,4 +1264,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc, conditional routing, and outcome-based stage transitions), 12 agents, 6 runtimes (Claude Code, Claude Agent SDK, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
