@@ -192,5 +192,10 @@ export async function dispatchInlineSubStage(
     return { ok: false, message: `Inline sub-stage '${subStage.name}' agent exited with error` };
   }
 
-  return { ok: true, message: `sub-stage '${subStage.name}' complete` };
+  return {
+    ok: true,
+    launched: false,
+    reason: "inline_substage_complete",
+    message: `sub-stage '${subStage.name}' complete`,
+  };
 }

@@ -39,7 +39,14 @@ export async function validateSessionForDispatch(
   if (!session) return { early: { ok: false, message: `Session ${sessionId} not found` } };
 
   if (session.status === "running" && session.session_id) {
-    return { early: { ok: true, message: `Already running (${session.session_id})` } };
+    return {
+      early: {
+        ok: true,
+        launched: false,
+        reason: "already_running",
+        message: `Already running (${session.session_id})`,
+      },
+    };
   }
   if (session.status !== "ready" && session.status !== "blocked") {
     return {
@@ -92,7 +99,12 @@ export async function maybeHandleActionStage(
   if (postAction?.status === "ready") {
     await deps.mediateStageHandoff(sessionId, { autoDispatch: true, source: "dispatch_action" });
   }
-  return { ok: true, message: `Executed action '${earlyAction.action}'` };
+  return {
+    ok: true,
+    launched: false,
+    reason: "action_stage",
+    message: `Executed action '${earlyAction.action}'`,
+  };
 }
 
 /**

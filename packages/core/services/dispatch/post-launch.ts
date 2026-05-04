@@ -149,5 +149,5 @@ export async function finalizeLaunch(
   });
   track("session_dispatched", { agent: agentName });
 
-  return { ok: true, message: tmuxName };
+  return { ok: true, launched: true, message: tmuxName };
 }

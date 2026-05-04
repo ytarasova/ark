@@ -7,7 +7,7 @@
  */
 
 import { logDebug } from "../../observability/structured-log.js";
-import type { DispatchDeps } from "./types.js";
+import type { DispatchDeps, DispatchResult } from "./types.js";
 import type { Session } from "../../../types/index.js";
 
 export class HostedDispatcher {
@@ -15,14 +15,10 @@ export class HostedDispatcher {
 
   /**
    * Returns:
-   *   - { ok, message } if we attempted scheduling (success or failure).
+   *   - DispatchResult if we attempted scheduling (success or failure).
    *   - null if no scheduler is wired (local mode; caller falls through).
    */
-  async dispatch(
-    sessionId: string,
-    session: Session,
-    log: (msg: string) => void,
-  ): Promise<{ ok: boolean; message: string } | null> {
+  async dispatch(sessionId: string, session: Session, log: (msg: string) => void): Promise<DispatchResult | null> {
     const scheduler = this.deps.getScheduler();
     if (!scheduler) {
       logDebug("session", "Scheduler not available -- fall through to local dispatch");
@@ -48,7 +44,7 @@ export class HostedDispatcher {
         actor: "scheduler",
         data: { worker_id: worker.id, worker_url: worker.url, tenant_id: tenantId },
       });
-      return { ok: true, message: `Dispatched to worker ${worker.id}` };
+      return { ok: true, launched: true, message: `Dispatched to worker ${worker.id}` };
     } catch (schedErr: any) {
       return { ok: false, message: schedErr.message ?? "Scheduling failed" };
     }

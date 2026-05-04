@@ -71,6 +71,11 @@ export class FanOutDispatcher {
       };
     }
 
-    return { ok: true, message: `Forked into ${children.length} sessions` };
+    return {
+      ok: true,
+      launched: false,
+      reason: "fork_parent",
+      message: `Forked into ${children.length} sessions`,
+    };
   }
 }

@@ -339,6 +339,8 @@ export async function dispatchForEachSpawn(
   }
   return {
     ok: true,
+    launched: false,
+    reason: "for_each_spawn_complete",
     message: `for_each: ${items.length} iterations complete`,
   };
 }
