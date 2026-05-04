@@ -731,20 +731,43 @@ function deriveStageStatus(
     if (currentIdx >= 0 && stageIdx > currentIdx) return "pending";
   }
 
-  // Per-stage signals from the event stream.
-  let lastFailure = false;
-  let sawCompletion = false;
+  // Per-stage signals from the event stream. We track the LATEST signal
+  // chronologically so retries are handled correctly: e.g. on_failure:
+  // retry(N) emits session_failed for the first attempt, then re-dispatches
+  // and emits stage_started + (eventually) stage_handoff. The stage's
+  // terminal state should reflect the LAST signal -- the successful retry
+  // -- not the first failure. Tracking via "ever saw failure" left
+  // retried-and-succeeded stages stuck on FAILED in the UI even though
+  // the flow advanced past them.
+  let latestFailure = false;
   let sawHandoffAway = false;
+  let sawCompletion = false;
   for (const ev of events) {
     const evStage = ev.stage || ev.data?.stage || null;
     const evType = String(ev.type ?? "");
     if (evType === "stage_handoff") {
       const data = typeof ev.data === "object" && ev.data ? ev.data : {};
-      if (data.from_stage === stageName && data.to_stage && data.to_stage !== stageName) sawHandoffAway = true;
+      if (data.from_stage === stageName && data.to_stage && data.to_stage !== stageName) {
+        sawHandoffAway = true;
+        // Successful handoff away -- supersedes any earlier failure on
+        // this stage (the retry succeeded).
+        latestFailure = false;
+      }
     }
     if (evStage !== stageName) continue;
-    if (evType === "stage_completed") sawCompletion = true;
-    if (evType === "session_failed" || evType === "dispatch_failed" || evType === "stage_failed") lastFailure = true;
+    if (evType === "stage_completed") {
+      sawCompletion = true;
+      latestFailure = false;
+    }
+    if (evType === "stage_started") {
+      // A new attempt is starting on this stage. Reset the failure
+      // tracker so the previous attempt's failure doesn't poison the
+      // outcome of the retry.
+      latestFailure = false;
+    }
+    if (evType === "session_failed" || evType === "dispatch_failed" || evType === "stage_failed") {
+      latestFailure = true;
+    }
   }
 
   if (sessionStage === stageName) {
@@ -756,8 +779,8 @@ function deriveStageStatus(
   }
 
   // Stage isn't the current one. If we saw a handoff away or completion, it's done.
-  if (sawHandoffAway || sawCompletion) return lastFailure ? "failed" : "done";
-  return lastFailure ? "failed" : "pending";
+  if (sawHandoffAway || sawCompletion) return latestFailure ? "failed" : "done";
+  return latestFailure ? "failed" : "pending";
 }
 
 /**

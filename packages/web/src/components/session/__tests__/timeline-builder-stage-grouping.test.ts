@@ -129,6 +129,51 @@ describe("groupTimelineByStage", () => {
     expect(verify.status).toBe("active");
   });
 
+  it("retried-and-succeeded stage shows as done, not failed (regression: on_failure retry)", () => {
+    // The on_failure: retry(N) directive emits session_failed for the
+    // first attempt, then re-dispatches the same stage. If the retry
+    // succeeds and hands off to the next stage, the UI must show the
+    // stage as "done" -- not "failed" with the residue of the original
+    // attempt's session_failed event.
+    const events = [
+      ev("stage_started", {
+        stage: "implement",
+        data: { agent: "implementer" },
+        created_at: "2026-05-04T17:50:34Z",
+      }),
+      // First attempt fails: agent exits without committing.
+      ev("session_failed", {
+        stage: "implement",
+        data: { error: "Agent exited without committing any changes", hook_event: "SessionEnd" },
+        created_at: "2026-05-04T17:53:38Z",
+      }),
+      // Retry kicks off (on_failure: retry).
+      ev("stage_started", {
+        stage: "implement",
+        data: { agent: "implementer" },
+        created_at: "2026-05-04T17:53:39Z",
+      }),
+      // Retry succeeds and hands off to verify.
+      ev("stage_handoff", {
+        stage: "implement",
+        data: { from_stage: "implement", to_stage: "verify" },
+        created_at: "2026-05-04T17:59:18Z",
+      }),
+      ev("stage_started", { stage: "verify", data: { agent: "verifier" }, created_at: "2026-05-04T17:59:18Z" }),
+    ];
+    const timeline = buildConversationTimeline(events, [], { status: "running", stage: "verify" });
+    const groups = groupTimelineByStage(timeline, events, { status: "running", stage: "verify" }, [
+      "implement",
+      "verify",
+      "pr",
+      "merge",
+    ]);
+
+    const impl = groups.find((g) => g.name === "implement")!;
+    expect(impl).toBeDefined();
+    expect(impl.status).toBe("done");
+  });
+
   it("derives failed status when current stage hit a dispatch_failed", () => {
     const events = [
       ev("stage_started", { stage: "merge", data: { agent: "merger" } }),
