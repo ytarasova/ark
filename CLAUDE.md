@@ -1,6 +1,6 @@
 # Ark
 
-Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with 11 compute providers, knowledge graph, LLM router, and multi-tenant control plane. Supports Claude Code, Codex, Gemini CLI, and Goose runtimes. Bun + tmux only.
+Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with pluggable compute (local, Docker, DevContainer, Firecracker, EC2 via arkd, K8s, K8s+Kata), knowledge graph, LLM router, and multi-tenant control plane. Supports Claude Code, headless Claude Agent SDK, Claude Max, Codex, Gemini CLI, and Goose runtimes. Bun + tmux only.
 
 ## Commands
 
@@ -31,7 +31,7 @@ make test             # run if you touched logic
 packages/
   cli/       -> Commander.js CLI entry
   core/      -> Sessions, stores, flows, agents, channels, conductor, search, app context
-  compute/   -> 11 providers (local, docker, devcontainer, firecracker, ec2-*, e2b, k8s, k8s-kata)
+  compute/   -> Providers (local, docker, devcontainer, firecracker, ec2-arkd-*, k8s, k8s-kata)
   arkd/      -> Universal agent daemon (:19300) on every compute target
   router/    -> LLM Router (OpenAI-compatible proxy, 3 policies, circuit breakers)
   server/    -> JSON-RPC handlers (delegate to services via AppContext)
@@ -39,11 +39,13 @@ packages/
   web/       -> Vite web dashboard (SSE, Recharts)
   desktop/   -> Electron shell wrapping the web dashboard
   types/     -> Domain interfaces
+  e2e/       -> End-to-end tests (Playwright for web + desktop)
 agents/      -> Agent YAML definitions
-runtimes/    -> Runtime definitions (claude, codex, gemini, goose)
+runtimes/    -> Runtime definitions (claude-code, claude-agent, claude-max, codex, gemini, goose)
 flows/       -> Flow definitions (autonomous-sdlc, quick, fan-out, etc.)
 skills/      -> Builtin skills
 recipes/     -> Recipe templates
+mcp-configs/ -> MCP config stubs (Atlassian, GitHub, Linear, Figma)
 .infra/      -> Dockerfile, docker-compose, Helm chart
 ```
 
@@ -52,11 +54,11 @@ No workspaces -- packages coordinated via relative imports.
 **Key entry points:**
 
 - `AppContext` (`app.ts`) -- repos: `app.sessions`, `app.computes`; services: `app.sessionService`; stores: `app.flows`, `app.skills`, `app.agents`, `app.recipes`
-- `SessionService` (`services/session.ts`) -- lifecycle facade, delegates to `session-orchestration.ts`
-- `session-orchestration.ts` -- all orchestration. Every function takes `app: AppContext` as first arg
+- `SessionService` (`services/session.ts`) -- lifecycle facade, delegates to the orchestration subpackages
+- `services/session/` + `services/dispatch/` + `services/stage-advance/` -- orchestration subpackages. Every entry point takes `app: AppContext` as first arg
 - MCP server (`packages/server/mcp/`) -- HTTP MCP at `:19400/mcp`. 27 tools (read + Tier 1/2 write). See `docs/mcp.md`.
 
-**Orchestration (current + future).** Ark uses a custom session/flow state machine today (`packages/core/state/flow.ts` + `packages/core/services/*-orchestration.ts`). A Temporal-backed replacement is in design (`docs/temporal.md`); phases tracked in #374. Local Temporal cluster for Phase 1+ dev is `make dev-temporal` (see `docs/temporal-local-dev.md`). Nothing under `packages/core/state/` or `packages/core/services/*-orchestration.ts` changes until Phase 2 lands.
+**Orchestration (current + future).** Ark uses a custom session/flow state machine today (`packages/core/state/flow.ts` + the services subpackages under `packages/core/services/{session,dispatch,stage-advance}/`). A Temporal-backed replacement is in design (`docs/temporal.md`); phases tracked in #374. Local Temporal cluster for Phase 1+ dev is `make dev-temporal` (see `docs/temporal-local-dev.md`). Nothing under `packages/core/state/` or those service subpackages changes until Phase 2 lands.
 
 ## Key Gotchas
 

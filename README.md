@@ -54,7 +54,7 @@ ark search "authentication"
 | Feature | Description | Docs |
 |---------|-------------|------|
 | **Sessions** | Full lifecycle management -- create, dispatch, stop, resume, fork, clone, export/import | [Guide](docs/guide.md#sessions) |
-| **Multi-Runtime Support** | 5 runtimes (Claude, Claude Max subscription, Codex, Gemini, Goose) with runtime/role separation -- any agent role on any LLM backend | [CLAUDE.md](CLAUDE.md#runtimes) |
+| **Multi-Runtime Support** | 6 runtimes (Claude Code, headless Claude Agent SDK, Claude Max, Codex, Gemini, Goose) with runtime/role separation -- any agent role on any LLM backend | [CLAUDE.md](CLAUDE.md) |
 | **SDLC Flows** | DAG-based multi-stage pipelines with fan-out, auto-join, verification gates, and 12 specialized agents | [Guide](docs/guide.md#flows--agents) |
 | **Knowledge Graph** | Unified knowledge across codebase, sessions, memories, and learnings via ops-codegraph (33 languages via tree-sitter, native Rust engine) | [Guide](docs/guide.md#knowledge-graph) |
 | **LLM Router** | OpenAI-compatible proxy with 3 routing policies, circuit breakers, and cost tracking. Injects `ANTHROPIC_BASE_URL`/`OPENAI_BASE_URL` into executors at dispatch | [Guide](docs/guide.md#llm-router) |
@@ -62,7 +62,7 @@ ark search "authentication"
 | **Compute Templates** | Named compute presets in `~/.ark/config.yaml` under `compute_templates:`. CLI: `ark compute template list|show|create|delete`, `ark compute create --from-template <name>` | [Guide](docs/guide.md#compute) |
 | **Multi-Tenant Control Plane** | API key auth, tenant scoping on all entities, role-based access (admin/member/viewer), tenant integration policies (router_required, auto_index_required, tensorzero_enabled), DB-backed resource stores | [Guide](docs/guide.md#control-plane) |
 | **Auto-Index on Dispatch** | Local mode honors `knowledge.auto_index` config. Remote compute (arkd) ALWAYS indexes via `/codegraph/index` endpoint | [Guide](docs/guide.md#knowledge-graph) |
-| **Runtime Billing Modes** | `api` (per-token pricing), `subscription` (e.g. Claude Max $200/mo, tokens recorded for rate limits), `free`. Polymorphic transcript parsers per runtime | [CLAUDE.md](CLAUDE.md#runtimes) |
+| **Runtime Billing Modes** | `api` (per-token pricing), `subscription` (e.g. Claude Max $200/mo, tokens recorded for rate limits), `free`. Polymorphic transcript parsers per runtime | [CLAUDE.md](CLAUDE.md) |
 | **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
 | **Desktop App** | Electron wrapper around the web dashboard -- native menus, local-first | [Install](packages/desktop/INSTALL.md) |
@@ -106,17 +106,20 @@ packages/
   types/      Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
   e2e/        End-to-end tests (Playwright for web + desktop)
 
-agents/       12 agent definitions (ticket-intake, spec-planner, plan-auditor,
+agents/       13 agent definitions (ticket-intake, spec-planner, plan-auditor,
               implementer, task-implementer, verifier, reviewer, documenter,
-              closer, retro, planner, worker)
-runtimes/     5 runtime definitions (claude, claude-max, codex, gemini, goose)
-flows/        13 flow definitions (default, quick, bare, autonomous, autonomous-sdlc,
-              parallel, fan-out, pr-review, dag-parallel, islc, islc-quick,
-              brainstorm, conditional)
+              closer, retro, planner, worker, goose-recipe-runner)
+runtimes/     6 runtime definitions (claude-code, claude-agent, claude-max,
+              codex, gemini, goose)
+flows/        22 flow definitions under flows/definitions/ (autonomous-sdlc,
+              quick, bare, autonomous, parallel, fan-out, dag-parallel,
+              pr-review, islc/islc-quick, brainstorm, conditional, docs,
+              goose-recipe, e2e-noop, ...) + per-recipe flows at the flows/ root
 skills/       7 builtin skills (code-review, plan-audit, sanity-gate,
               security-scan, self-review, spec-extraction, test-writing)
-recipes/      8 recipe templates (quick-fix, feature-build, code-review,
-              fix-bug, new-feature, ideate, islc, islc-quick)
+recipes/      10 recipe templates (quick-fix, feature-build, code-review,
+              fix-bug, new-feature, ideate, islc, islc-quick, self-dogfood,
+              self-quick)
 mcp-configs/  MCP config stubs (Atlassian, GitHub, Linear, Figma)
 .infra/       Dockerfile, docker-compose, Helm chart
 docs/         User documentation + GitHub Pages site
@@ -133,18 +136,21 @@ docs/         User documentation + GitHub Pages site
 ## Development
 
 ```bash
-make dev              # TypeScript watch mode
-make test             # Run all tests sequentially (never parallel -- ports collide)
-make test-file F=path # Run a single test file
-make web              # Launch web dashboard
-make desktop          # Launch Electron desktop app
-make desktop-build    # Package Electron app for distribution
-make lint             # Lint
-make clean            # Remove build artifacts
-make uninstall        # Remove ark symlink
+make dev              # hot-reload: API (:8420) + Vite HMR (:5173) + auto-starts daemon
+make dev-daemon       # hot-reload: server daemon (conductor + arkd + WS)
+make test             # run all tests (parallel, --concurrency 4)
+make test-file F=path # run a single test file
+make format           # Prettier auto-fix (required before every commit)
+make lint             # ESLint, zero warnings allowed
+make web              # launch web dashboard
+make desktop          # launch Electron desktop app
+make build-desktop    # package Electron app for distribution
+make drift            # drizzle-kit check (CI gate for schema drift)
+make clean            # remove build artifacts
+make uninstall        # remove ark symlink
 ```
 
-Tests use `bun:test`. Always run via `make test` -- never call `bun test` directly (tests must run sequentially to avoid port collisions).
+Tests use `bun:test`. Always run via `make test` -- never call `bun test` directly. Tests run in parallel (`--concurrency 4`); each test boots a fresh `AppContext.forTestAsync()` with isolated ports + arkDir.
 
 ## Deployment
 
