@@ -1,56 +1,80 @@
 /**
- * Generic channel pub/sub: `POST /channel/{name}/publish` + `GET /channel/{name}/subscribe`.
+ * Generic channel pub/sub.
  *
- * arkd is the rendezvous for two directions of opaque-envelope traffic that
- * previously lived on hard-coded routes:
+ * Endpoints:
+ *   - `POST /channel/{name}/publish` -- fire-and-forget producer.
+ *   - `WS /ws/channel/{name}` -- persistent subscriber over WebSocket.
+ *
+ * arkd is the rendezvous for two directions of opaque-envelope traffic:
  *
  *   - `hooks` channel: agent -> conductor. Carries hook events,
- *     channel-report frames (agent -> conductor session reports), and
- *     channel-relay frames (agent -> agent messages). Each envelope carries
+ *     channel-report frames, and channel-relay frames. Each envelope carries
  *     its own `kind` so the conductor's `arkd-events-consumer` can dispatch.
  *
  *   - `user-input` channel: conductor -> agent. Carries `{ session, content,
  *     control? }` envelopes; the agent's user-message stream consumer
  *     filters by `envelope.session === ARK_SESSION_ID`.
  *
+ * Why WebSocket for subscribers: previously this used HTTP/1.1 long-poll
+ * (NDJSON over fetch+ReadableStream). That works in steady state but
+ * silently breaks when traffic goes idle for >~5min: client fetch keep-
+ * alive, server idle timers, and intermediate proxies (SSM tunnel) can
+ * each tear the connection down independently of the application. A user
+ * steer published in that gap sat in arkd's ring buffer with no parked
+ * subscriber, delivered up to 5min late on the next reattach.
+ *
+ * WebSocket fixes this at the protocol level: Bun's WS server sends
+ * automatic ping frames (`sendPings: true` is the default), the client
+ * answers with pong, and every layer sees periodic traffic. No
+ * application-level keepalive plumbing needed.
+ *
  * Channels are GLOBAL (shared across all sessions on this arkd instance).
  * Subscribers see every envelope on the channel; per-session filtering is
- * the consumer's responsibility, carried in the envelope. This keeps the
- * primitive minimal -- arkd does not parse envelope contents.
+ * the consumer's responsibility, carried in the envelope.
  *
- * Storage shape: per-channel-name in-memory queue + parked-waiter list. When
- * an envelope arrives:
- *   - If a subscriber is currently parked, hand the envelope directly
- *     (`delivered: true`).
- *   - Otherwise buffer it on the channel's ring; the next subscriber drains
- *     it on connect (`delivered: false`).
+ * Fan-out semantics: each envelope goes to the FIRST open subscriber in
+ * insertion order. This is deliberate: `hooks` is single-reader (one
+ * conductor per arkd) and `user-input` is read by exactly one agent. If a
+ * future channel needs true broadcast, add a `broadcast: true` flag to the
+ * subscribe handshake; the extension point is obvious.
  *
- * Multi-subscriber on the same channel is fan-OUT in waiter order: each
- * envelope goes to the first parked waiter. This matches the legacy
- * user-messages route's semantics; the hooks-channel consumer is
- * effectively single-reader (one conductor per arkd).
+ * Subscribe handshake: the server sends `{ "type": "subscribed" }` as the
+ * very first frame on every new WS connection, from inside the `open()`
+ * handler -- after `s.subscribers.add(ws)` has run and the ring has been
+ * drained. The client's `subscribeToChannel` returns a Promise that resolves
+ * only after receiving this ack. Any publish that happens after the caller's
+ * await is guaranteed to find a live subscriber. No Bun.sleep race fudges.
  *
- * Validation: channel names are restricted to the same safe-name pattern as
- * tmux session names (`[A-Za-z0-9_-]{1,64}`), so the path segment never
- * contains `/`, spaces, or shell metacharacters. Nested paths
- * (`/channel/foo/bar/publish`) are rejected; the route handler matches
- * exactly one segment between `/channel/` and `/publish` or `/subscribe`.
+ * Validation: channel names are restricted to `[A-Za-z0-9_-]{1,64}`.
+ * Nested paths (`/channel/foo/bar/publish`) are rejected.
  */
 
+import type { ServerWebSocket } from "bun";
 import { json, type RouteCtx, SAFE_TMUX_NAME_RE } from "../internal.js";
 import { logDebug, logInfo } from "../../core/observability/structured-log.js";
 
 type Envelope = Record<string, unknown>;
 
+/**
+ * Control frame the server sends as the very first message on every new
+ * subscriber WS. Pre-stringified at module load to avoid repeated
+ * JSON.stringify on the hot path.
+ *
+ * The client's `webSocketToAsyncIterable` strips this frame before yielding
+ * to callers; only envelope payloads are visible to consumers.
+ */
+export const SUBSCRIBED_ACK = JSON.stringify({ type: "subscribed" });
+
+/** Per-WS-connection data attached via `server.upgrade(req, { data })`. */
+export interface ChannelWsData {
+  channel: string;
+}
+
 interface ChannelState {
-  /** Buffered envelopes waiting for a subscriber. FIFO drained on connect. */
+  /** Buffered envelopes waiting for a subscriber. FIFO drained on next connect. */
   ring: Envelope[];
-  /**
-   * Parked subscribers. When `publish` arrives and the ring is empty, the
-   * first waiter is shifted off and given the envelope directly. Each call
-   * to `dequeue` parks at most one waiter per subscriber-loop iteration.
-   */
-  waiters: Array<(env: Envelope) => void>;
+  /** Currently-open WS subscribers in connect order. */
+  subscribers: Set<ServerWebSocket<ChannelWsData>>;
 }
 
 const channels = new Map<string, ChannelState>();
@@ -58,7 +82,7 @@ const channels = new Map<string, ChannelState>();
 function stateFor(name: string): ChannelState {
   let s = channels.get(name);
   if (!s) {
-    s = { ring: [], waiters: [] };
+    s = { ring: [], subscribers: new Set() };
     channels.set(name, s);
   }
   return s;
@@ -66,78 +90,139 @@ function stateFor(name: string): ChannelState {
 
 function enqueue(name: string, envelope: Envelope): boolean {
   const s = stateFor(name);
-  // Hand directly to a waiter when one is parked, otherwise buffer.
-  const waiter = s.waiters.shift();
-  if (waiter) {
-    waiter(envelope);
-    return true;
+  // Fan-out to the first open subscriber. Iteration order = insertion order,
+  // so the first-attached subscriber gets each envelope. If delivery throws
+  // (socket half-closed mid-send), drop that subscriber and try the next.
+  for (const ws of s.subscribers) {
+    try {
+      ws.send(JSON.stringify(envelope));
+      return true;
+    } catch {
+      s.subscribers.delete(ws);
+    }
   }
+  // No live subscriber -- buffer for the next connect.
   s.ring.push(envelope);
   return false;
 }
 
-function dequeue(name: string, signal: AbortSignal): Promise<Envelope | null> {
-  const s = stateFor(name);
-  const buffered = s.ring.shift();
-  if (buffered) return Promise.resolve(buffered);
-  if (signal.aborted) return Promise.resolve(null);
-  return new Promise<Envelope | null>((resolve) => {
-    const onAbort = (): void => {
-      const idx = s.waiters.indexOf(deliver);
-      if (idx >= 0) s.waiters.splice(idx, 1);
-      resolve(null);
-    };
-    const deliver = (env: Envelope): void => {
-      signal.removeEventListener("abort", onAbort);
-      resolve(env);
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-    s.waiters.push(deliver);
-  });
-}
-
 /**
- * Internal helper: enqueue an envelope on a channel from inside arkd
- * (e.g. the legacy /channel/<sid> report path forwards through here).
- * Returns `true` when handed directly to a parked subscriber, `false`
- * when buffered. Production callers usually ignore the return value;
- * the buffered case is still durable until the next subscriber drains.
+ * Publish an envelope from inside arkd (e.g. legacy channel-report path).
+ * Returns `true` when delivered to a live subscriber, `false` when buffered.
  */
 export function publishOnChannel(name: string, envelope: Envelope): boolean {
   return enqueue(name, envelope);
 }
 
 /**
- * Test-only helper: clear all per-channel queues + waiters. Production code
- * never needs this -- channel state goes away naturally when arkd exits.
+ * Bun WebSocket handler for `/ws/channel/{name}`. Wired into the
+ * `Bun.serve({ websocket })` config in `server.ts`.
+ *
+ * Subscribe handshake
+ * -------------------
+ * `open`: add the WS to `s.subscribers`, drain the ring buffer in FIFO
+ * order, then send `SUBSCRIBED_ACK` (`{ type: "subscribed" }`). The ack
+ * arrives at the client only after all three steps complete -- giving the
+ * client's `subscribeToChannel` a deterministic "I am parked" signal. Any
+ * publish that races with the WS Upgrade response will either have been
+ * buffered in the ring (drained before the ack) or will find a live
+ * subscriber (delivered directly). Either way the ack arrives after the
+ * server is in a consistent state.
+ *
+ * `message`: ignored. Publishers use `POST /channel/{name}/publish`.
+ *
+ * `close`: remove the WS from the subscriber set.
+ *
+ * Keep-alive
+ * ----------
+ * Bun's WS server sends ping frames automatically when `sendPings: true`
+ * (configured in `server.ts`). The client WebSocket replies with pong,
+ * keeping every TCP / proxy / SSM tunnel layer's idle timer alive without
+ * any application-level heartbeat.
+ */
+export const channelWebSocketHandler = {
+  open(ws: ServerWebSocket<ChannelWsData>): void {
+    const { channel } = ws.data;
+    const s = stateFor(channel);
+    s.subscribers.add(ws);
+
+    // Drain buffered envelopes before sending the ack so the client receives
+    // them in the same contiguous burst, not after a gap.
+    while (s.ring.length > 0) {
+      const env = s.ring.shift()!;
+      try {
+        ws.send(JSON.stringify(env));
+      } catch {
+        // Socket closed during drain -- re-queue at the front for the next
+        // subscriber and bail without sending the ack.
+        s.subscribers.delete(ws);
+        s.ring.unshift(env);
+        return;
+      }
+    }
+
+    // Send the ready ack LAST -- after the subscriber is registered and the
+    // ring is empty. The client unblocks its subscribeToChannel Promise on
+    // this frame.
+    try {
+      ws.send(SUBSCRIBED_ACK);
+    } catch {
+      s.subscribers.delete(ws);
+      return;
+    }
+
+    logInfo("compute", `arkd channels: ws subscriber attached channel=${channel}`);
+  },
+
+  message(_ws: ServerWebSocket<ChannelWsData>, _msg: string | Buffer): void {
+    // Subscribers do not push messages to the channel via WS; publishers use
+    // POST /channel/{name}/publish. Ignore any incoming frames.
+    logDebug("compute", "arkd channels: ws subscriber sent unexpected message; ignoring");
+  },
+
+  close(ws: ServerWebSocket<ChannelWsData>): void {
+    const { channel } = ws.data;
+    const s = channels.get(channel);
+    if (s) s.subscribers.delete(ws);
+    logInfo("compute", `arkd channels: ws subscriber detached channel=${channel}`);
+  },
+};
+
+/**
+ * Test-only: close all open subscriber WS connections and clear every
+ * channel's ring buffer. Called in `afterEach` to prevent connection and
+ * state leaks between test cases.
  */
 export function _resetForTests(): void {
   for (const s of channels.values()) {
     s.ring.length = 0;
-    // Unblock any parked waiter so its loop can observe the abort path.
-    for (const w of s.waiters) w({});
-    s.waiters.length = 0;
+    for (const ws of s.subscribers) {
+      try {
+        ws.close();
+      } catch {
+        /* already closed */
+      }
+    }
+    s.subscribers.clear();
   }
   channels.clear();
 }
 
-function ndjsonLine(envelope: Envelope): Uint8Array {
-  return new TextEncoder().encode(JSON.stringify(envelope) + "\n");
-}
-
-/**
- * Match `/channel/<name>/<verb>` exactly. Returns the channel name when the
- * path matches and the name is safe; null otherwise. Rejects nested paths
- * (anything with more than three `/`-separated segments after the leading
- * `/channel/`).
- */
-function matchChannelPath(path: string, verb: "publish" | "subscribe"): string | null {
+function matchPublishPath(path: string): string | null {
   const prefix = "/channel/";
-  const suffix = `/${verb}`;
+  const suffix = "/publish";
   if (!path.startsWith(prefix) || !path.endsWith(suffix)) return null;
   const inner = path.slice(prefix.length, path.length - suffix.length);
   if (inner.length === 0) return null;
-  // Reject nested paths: a single safe-name segment only.
+  if (!SAFE_TMUX_NAME_RE.test(inner)) return null;
+  return inner;
+}
+
+export function matchWsChannelPath(path: string): string | null {
+  const prefix = "/ws/channel/";
+  if (!path.startsWith(prefix)) return null;
+  const inner = path.slice(prefix.length);
+  if (inner.length === 0) return null;
   if (!SAFE_TMUX_NAME_RE.test(inner)) return null;
   return inner;
 }
@@ -145,7 +230,7 @@ function matchChannelPath(path: string, verb: "publish" | "subscribe"): string |
 export async function handleChannelRoutes(req: Request, path: string, _ctx: RouteCtx): Promise<Response | null> {
   // ── Producer: POST /channel/{name}/publish ──────────────────────────────
   if (req.method === "POST" && path.startsWith("/channel/") && path.endsWith("/publish")) {
-    const name = matchChannelPath(path, "publish");
+    const name = matchPublishPath(path);
     if (!name) {
       return json({ error: "invalid channel name: must match [A-Za-z0-9_-]{1,64}" }, 400);
     }
@@ -163,77 +248,7 @@ export async function handleChannelRoutes(req: Request, path: string, _ctx: Rout
     return json({ ok: true, delivered });
   }
 
-  // ── Consumer: GET /channel/{name}/subscribe ─────────────────────────────
-  if (req.method === "GET" && path.startsWith("/channel/") && path.endsWith("/subscribe")) {
-    const name = matchChannelPath(path, "subscribe");
-    if (!name) {
-      return json({ error: "invalid channel name: must match [A-Za-z0-9_-]{1,64}" }, 400);
-    }
-
-    const ac = new AbortController();
-    req.signal.addEventListener("abort", () => ac.abort());
-
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        logInfo("compute", `arkd channels: subscriber attached channel=${name}`);
-        // Keepalive: emit a benign frame every 30s so HTTP/1.1 idle
-        // timers (Bun runtime, intermediate proxies, the SSM tunnel)
-        // see the connection as live and don't tear it down. The frame
-        // is `{}` -- consumers (subscribeUserMessages, the conductor's
-        // arkd-events-consumer) treat envelopes without their expected
-        // fields as no-ops and discard them. Without this, mid-session
-        // user steers landed in arkd's ring buffer with no parked
-        // subscriber to receive them, then waited up to 5 minutes for
-        // the next reconnect.
-        const KEEPALIVE_INTERVAL_MS = 30_000;
-        const keepalive = setInterval(() => {
-          if (ac.signal.aborted) return;
-          try {
-            controller.enqueue(ndjsonLine({} as Envelope));
-          } catch {
-            /* stream closed */
-          }
-        }, KEEPALIVE_INTERVAL_MS);
-        keepalive.unref?.();
-        void (async () => {
-          try {
-            while (!ac.signal.aborted) {
-              const env = await dequeue(name, ac.signal);
-              if (!env) break;
-              try {
-                controller.enqueue(ndjsonLine(env));
-              } catch {
-                logDebug("compute", `channels: enqueue threw, stream closed channel=${name}`);
-                ac.abort();
-              }
-            }
-          } finally {
-            clearInterval(keepalive);
-            try {
-              controller.close();
-            } catch {
-              /* already closed */
-            }
-            logInfo("compute", `arkd channels: subscriber detached channel=${name}`);
-          }
-        })();
-      },
-      cancel() {
-        ac.abort();
-      },
-    });
-
-    return new Response(stream, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/x-ndjson",
-        "Cache-Control": "no-cache, no-transform",
-        // Prevent any intermediate proxy from buffering chunks.
-        "X-Accel-Buffering": "no",
-        Connection: "keep-alive",
-      },
-    });
-  }
-
+  // WS subscribe is handled in server.ts via Bun's native upgrade path;
+  // channel-level routing uses matchWsChannelPath above.
   return null;
 }
