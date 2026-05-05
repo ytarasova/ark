@@ -1,9 +1,9 @@
 import { type Command, Option } from "commander";
 import chalk from "chalk";
 import { execSync } from "child_process";
-import { join } from "path";
 import * as core from "../../../core/index.js";
 import { SESSION_STATUSES } from "../../../types/index.js";
+import type { AttachPlan } from "../../../core/services/session/attach.js";
 import { getArkClient } from "../../app-client.js";
 import { coloredStatusIcon } from "../../formatters.js";
 
@@ -188,77 +188,49 @@ export function registerViewCommands(session: Command) {
     .action(async (id, opts) => {
       const ark = await getArkClient();
 
-      // Check if this is an agent-sdk session -- those have no tmux pane.
-      // Read the session to inspect config.launch_executor, then tail
-      // transcript.jsonl + stdio.log instead of spawning tmux attach.
-      let sessionData: any;
+      // Single RPC; the server owns the decision via SessionAttachService.
+      // The response is a discriminated AttachPlan. Each mode has exactly
+      // one CLI behaviour -- no spread of conditions across surfaces.
+      let plan: AttachPlan;
       try {
-        const r = await ark.sessionRead(id);
-        sessionData = r.session;
-      } catch {
-        // Session may not exist; let sessionAttachCommand surface the error below.
-      }
-
-      const launchExecutor = (sessionData?.config as Record<string, unknown> | undefined)?.launch_executor;
-      // Older sessions persisted the legacy `agent-sdk` executor name -- accept both.
-      if (launchExecutor === "claude-agent" || launchExecutor === "agent-sdk") {
-        if (
-          sessionData?.status === "completed" ||
-          sessionData?.status === "failed" ||
-          sessionData?.status === "archived"
-        ) {
-          console.error(chalk.red(`Session is ${sessionData.status}; no live output stream.`));
-          console.error(chalk.dim("Use `ark session output <id>` to view the transcript."));
-          process.exit(1);
-        }
-
-        // Derive tracksDir from local config (same path the server uses).
-        const { loadConfig } = await import("../../../core/config.js");
-        const config = loadConfig();
-        const transcriptPath = join(config.dirs.tracks, id, "transcript.jsonl");
-        const stdioPath = join(config.dirs.tracks, id, "stdio.log");
-
-        if (opts.printOnly) {
-          process.stdout.write(`tail -n 200 -F ${transcriptPath} ${stdioPath}\n`);
-          return;
-        }
-
-        console.log(chalk.dim(`Attaching to agent-sdk session ${id} (Ctrl-C to detach)`));
-        console.log(chalk.dim(`Tailing: ${transcriptPath}`));
-
-        // Tail both files raw. Use `ark session output` for the pretty-formatted
-        // one-shot view; live formatted tailing is deferred to a future pass.
-        const proc = Bun.spawn({
-          cmd: ["tail", "-n", "200", "-F", transcriptPath, stdioPath],
-          stdout: "inherit",
-          stderr: "inherit",
-        });
-        await proc.exited;
-        return;
-      }
-
-      // Non-agent-sdk path: resolve the attach command via RPC. The server returns
-      // attachable:false for completed/failed/archived/not-yet-dispatched sessions
-      // so we can surface a friendly message instead of trying to spawn
-      // `tmux attach` against a pane that doesn't exist.
-      let res: { command: string; displayHint: string; attachable: boolean; reason?: string };
-      try {
-        res = await ark.sessionAttachCommand(id);
+        plan = (await ark.sessionAttachCommand(id)) as AttachPlan;
       } catch (e: any) {
         console.error(chalk.red(e?.message ?? `Session ${id} not found`));
         process.exit(1);
       }
-      if (!res.attachable) {
-        console.error(chalk.red(res.reason ?? "Session is not attachable."));
-        console.error(chalk.dim("Try `ark session resume` if the agent needs to be relaunched."));
-        process.exit(1);
+
+      switch (plan.mode) {
+        case "none":
+          console.error(chalk.red(plan.reason));
+          console.error(chalk.dim("Try `ark session resume` if the agent needs to be relaunched."));
+          process.exit(1);
+          return;
+
+        case "tail": {
+          if (opts.printOnly) {
+            process.stdout.write(`tail -n 200 -F ${plan.transcriptPath} ${plan.stdioPath}\n`);
+            return;
+          }
+          console.log(chalk.dim(`Attaching to ${id} (Ctrl-C to detach) -- ${plan.reason}`));
+          console.log(chalk.dim(`Tailing: ${plan.transcriptPath}`));
+          const proc = Bun.spawn({
+            cmd: ["tail", "-n", "200", "-F", plan.transcriptPath, plan.stdioPath],
+            stdout: "inherit",
+            stderr: "inherit",
+          });
+          await proc.exited;
+          return;
+        }
+
+        case "interactive":
+          if (opts.printOnly) {
+            // Machine-friendly: emit transport so it can be piped / captured.
+            process.stdout.write(plan.transportCommand + "\n");
+            return;
+          }
+          execSync(plan.transportCommand, { stdio: "inherit" });
+          return;
       }
-      if (opts.printOnly) {
-        // Machine-friendly: stdout so it can be piped / captured.
-        process.stdout.write(res.command + "\n");
-        return;
-      }
-      execSync(res.command, { stdio: "inherit" });
     });
 
   session

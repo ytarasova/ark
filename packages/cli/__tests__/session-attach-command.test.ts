@@ -41,33 +41,33 @@ afterAll(async () => {
 });
 
 describe("ArkClient.sessionAttachCommand", () => {
-  it("returns attachable:true with a tmux command for a dispatched running session", async () => {
+  it("interactive plan for a dispatched running session", async () => {
     const s = await app.sessions.create({ summary: "attach-cli-ok" } as any);
     await app.sessions.update(s.id, { session_id: "ark-cli-test-1", status: "running" } as any);
     const ark = await getArkClient();
-    const res = await ark.sessionAttachCommand(s.id);
-    expect(res.attachable).toBe(true);
-    expect(res.command).toContain("tmux attach");
-    expect(res.command).toContain("ark-cli-test-1");
-    expect(res.displayHint).toBeDefined();
+    const plan: any = await ark.sessionAttachCommand(s.id);
+    expect(plan.mode).toBe("interactive");
+    // User-facing command is ark-native; transport command is the raw tmux.
+    expect(plan.command).toBe(`ark session attach ${s.id}`);
+    expect(plan.transportCommand).toContain("tmux attach");
+    expect(plan.transportCommand).toContain("ark-cli-test-1");
   });
 
-  it("returns attachable:false with a friendly reason for a completed session", async () => {
+  it("none plan with a friendly reason for a completed session", async () => {
     const s = await app.sessions.create({ summary: "attach-cli-done" } as any);
     await app.sessions.update(s.id, { session_id: "ark-cli-done-1", status: "completed" } as any);
     const ark = await getArkClient();
-    const res = await ark.sessionAttachCommand(s.id);
-    expect(res.attachable).toBe(false);
-    expect(res.command).toBe("");
-    expect(res.reason).toContain("completed");
+    const plan: any = await ark.sessionAttachCommand(s.id);
+    expect(plan.mode).toBe("none");
+    expect(plan.reason).toContain("completed");
   });
 
-  it("returns attachable:false when session has not been dispatched", async () => {
+  it("none plan when session has not been dispatched", async () => {
     const s = await app.sessions.create({ summary: "attach-cli-pending" } as any);
     const ark = await getArkClient();
-    const res = await ark.sessionAttachCommand(s.id);
-    expect(res.attachable).toBe(false);
-    expect(res.reason).toContain("dispatched");
+    const plan: any = await ark.sessionAttachCommand(s.id);
+    expect(plan.mode).toBe("none");
+    expect(plan.reason).toContain("dispatched");
   });
 
   it("surfaces an RPC error for an unknown session id", async () => {

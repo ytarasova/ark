@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { StaticTerminal } from "../../StaticTerminal.js";
 import { LiveTerminalPanel } from "../LiveTerminalPanel.js";
 import { CopyAttachCommandButton } from "../CopyAttachCommandButton.js";
+import { useApi } from "../../../hooks/useApi.js";
+import type { SessionAttachCommandResponse } from "../../../../../protocol/index.js";
 
 interface TerminalTabProps {
   sessionId: string;
@@ -10,35 +13,47 @@ interface TerminalTabProps {
   isActive: boolean;
   /** Parent hash-router tab key; controls lazy-mount of the live socket. */
   tabActive: boolean;
-  /**
-   * Executor that spawned this session's agent. Used to skip the live-
-   * terminal WS path for runtimes that don't have an interactive PTY
-   * (claude-agent runs as a plain process via arkd /process/spawn, so
-   * there is no tmux pane to attach to and the WS just reconnect-loops).
-   */
-  launchExecutor?: string;
 }
 
 /**
- * Terminal output. Render branches by session state + runtime:
- *   - Process-only runtimes (claude-agent / agent-sdk): there is no
- *     interactive PTY. Show explanatory empty state with a pointer to
- *     Conversation / Logs tabs. Suppresses the "Reconnecting..." loop
- *     that fires when LiveTerminalPanel tries to attach to a missing
- *     pane.
- *   - Live PTY runtime + active session: WS-backed xterm via
- *     /terminal/:sessionId, plus an `ark session attach` hint for users
- *     who want a native shell.
- *   - Completed/failed with a recording: full-height static replay.
- *     The CLI-attach card is hidden -- there's no pane to attach to.
- *   - No live pane and no recording: empty-state copy.
+ * Terminal output. The render branch is driven by the server's AttachPlan,
+ * not by re-deriving "is this an interactive runtime?" client-side. The
+ * server is the single source of truth for runtime semantics; this
+ * component just renders one of three plans.
+ *
+ *   - "interactive": live PTY available -> xterm + CLI attach card.
+ *   - "tail":        non-interactive runtime (claude-agent) -> empty
+ *                    state pointing to Conversation / Logs tabs.
+ *   - "none":        terminal status / not yet dispatched ->
+ *                    static replay (if available) or empty state.
+ *
+ * While the plan is loading, fall back to the recording (if any) or a
+ * loading hint -- avoids flashing the wrong empty state on first render.
  */
-const PROCESS_ONLY_RUNTIMES = new Set(["claude-agent", "agent-sdk"]);
+export function TerminalTab({ sessionId, output, cols, rows, isActive, tabActive }: TerminalTabProps) {
+  const api = useApi();
+  const [plan, setPlan] = useState<SessionAttachCommandResponse | null>(null);
 
-export function TerminalTab({ sessionId, output, cols, rows, isActive, tabActive, launchExecutor }: TerminalTabProps) {
-  const isProcessOnly = launchExecutor !== undefined && PROCESS_ONLY_RUNTIMES.has(launchExecutor);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getAttachCommand(sessionId)
+      .then((p) => {
+        if (!cancelled) setPlan(p);
+      })
+      .catch(() => {
+        // Plan unavailable -- keep `plan` null and let the loading
+        // fallback render. The CopyAttachCommandButton (for interactive
+        // sessions) handles its own error state below.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, sessionId]);
 
-  if (isProcessOnly) {
+  // Plan still resolving: show recording if we have one, otherwise nothing.
+  // Avoids flashing "No terminal output" before the plan arrives.
+  if (!plan) {
     if (output) {
       return (
         <div className="terminal-tab">
@@ -50,15 +65,48 @@ export function TerminalTab({ sessionId, output, cols, rows, isActive, tabActive
     }
     return (
       <div className="terminal-tab">
-        <div className="terminal-tab-empty">
-          This agent runs as a plain process and has no interactive terminal.
-          <br />
-          Live output is in the Conversation and Logs tabs.
-        </div>
+        <div className="terminal-tab-empty">Loading...</div>
       </div>
     );
   }
 
+  if (plan.mode === "tail") {
+    if (output) {
+      return (
+        <div className="terminal-tab">
+          <div className="terminal-tab-body">
+            <StaticTerminal output={output} cols={cols} rows={rows} />
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="terminal-tab">
+        <div className="terminal-tab-empty">{plan.reason}</div>
+      </div>
+    );
+  }
+
+  if (plan.mode === "none") {
+    if (output) {
+      return (
+        <div className="terminal-tab">
+          <div className="terminal-tab-body">
+            <StaticTerminal output={output} cols={cols} rows={rows} />
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="terminal-tab">
+        <div className="terminal-tab-empty">{plan.reason}</div>
+      </div>
+    );
+  }
+
+  // plan.mode === "interactive": isActive guards us from showing the WS
+  // panel for sessions whose row says "running" but whose pane is gone
+  // (the Conversation tab's source-of-truth).
   if (isActive) {
     return (
       <div className="terminal-tab">

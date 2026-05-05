@@ -31,16 +31,17 @@ export function CopyAttachCommandButton({ sessionId }: CopyAttachCommandButtonPr
     setState({ kind: "loading" });
     api
       .getAttachCommand(sessionId)
-      .then((res) => {
+      .then((plan) => {
         if (cancelled) return;
-        if (!res.attachable) {
-          setState({
-            kind: "unavailable",
-            reason: res.reason ?? "Session is not attachable.",
-          });
-          return;
+        switch (plan.mode) {
+          case "interactive":
+            setState({ kind: "ready", command: plan.command, displayHint: plan.displayHint });
+            return;
+          case "tail":
+          case "none":
+            setState({ kind: "unavailable", reason: plan.reason });
+            return;
         }
-        setState({ kind: "ready", command: res.command, displayHint: res.displayHint });
       })
       .catch((err) => {
         if (cancelled) return;

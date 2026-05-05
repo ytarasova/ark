@@ -2,6 +2,14 @@ name: claude-agent
 description: "Anthropic Agent SDK (in-process, direct or gateway-routed)"
 type: claude-agent
 permission_mode: bypassPermissions
+# This runtime spawns the agent as a plain process via arkd
+# /process/spawn -- there is NO tmux pane and NO interactive PTY.
+# `ark session attach` and the web Terminal tab consult this flag and
+# show "live output is in Conversation/Logs tabs" instead of WS-
+# reconnect-looping against a pane that doesn't exist. The four tmux-
+# based runtimes (claude-code, codex, gemini, goose) leave this unset
+# and the default `true` applies.
+interactive: false
 secrets:
   - ANTHROPIC_API_KEY
   - ANTHROPIC_BASE_URL

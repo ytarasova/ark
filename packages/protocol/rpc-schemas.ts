@@ -446,19 +446,41 @@ export type SessionRestoreResponse = z.infer<typeof sessionRestoreResponse>;
 // ── session/attach-command ──────────────────────────────────────────────────
 
 /**
- * Returns the CLI command a user should run to attach to a session's tmux
- * pane. Also flags whether the session is actually attachable: completed,
- * failed, and not-yet-dispatched sessions have no tmux pane to attach to.
+ * Discriminated AttachPlan describing how a caller should attach to a
+ * session. Server-side authoritative -- all decision logic lives in
+ * SessionAttachService; clients render or exec the variant they receive.
+ *
+ *   - "interactive" -- session has a live PTY. `command` is the user-facing
+ *     ark-native string for the web UI; `transportCommand` is the raw
+ *     tmux/SSM/kubectl invocation the CLI execs to drop into the shell.
+ *   - "tail"        -- runtime is non-interactive (claude-agent et al).
+ *     CLI tails `transcriptPath` + `stdioPath`; web UI shows empty state
+ *     pointing to Conversation/Logs tabs.
+ *   - "none"        -- not attachable (terminal status, not yet dispatched).
+ *     Both surfaces show `reason`.
  */
 export const sessionAttachCommandRequest = sessionIdParams;
 export type SessionAttachCommandRequest = z.infer<typeof sessionAttachCommandRequest>;
 
-export const sessionAttachCommandResponse = z.object({
-  command: z.string(),
-  displayHint: z.string(),
-  attachable: z.boolean(),
-  reason: z.string().optional(),
-});
+export const sessionAttachCommandResponse = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("interactive"),
+    command: z.string(),
+    transportCommand: z.string(),
+    displayHint: z.string(),
+  }),
+  z.object({
+    mode: z.literal("tail"),
+    transcriptPath: z.string(),
+    stdioPath: z.string(),
+    displayHint: z.string(),
+    reason: z.string(),
+  }),
+  z.object({
+    mode: z.literal("none"),
+    reason: z.string(),
+  }),
+]);
 export type SessionAttachCommandResponse = z.infer<typeof sessionAttachCommandResponse>;
 
 // ── compute/list ────────────────────────────────────────────────────────────

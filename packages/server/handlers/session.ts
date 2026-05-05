@@ -566,16 +566,11 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return result;
   });
 
-  // ── Session attach (CLI command string) ──────────────────────────────────
+  // ── Session attach ──────────────────────────────────────────────────────
   //
-  // Returns the shell command a user should run to attach to the tmux pane
-  // for `sessionId`, plus a short display hint for the UI. Sessions that
-  // aren't currently dispatched (no tmux pane, terminal states, missing)
-  // come back as `attachable: false` with a `reason` the UI shows instead.
-  //
-  // For remote compute targets (ec2, k8s, ...), we delegate to the provider's
-  // `getAttachCommand(compute, session)` so the returned string includes the
-  // `aws ssm start-session` / `kubectl exec` prefix the user needs to run locally.
+  // Domain logic lives in SessionAttachService; this handler only resolves
+  // the tenant-scoped session and serialises the AttachPlan over the wire.
+  // No status/runtime/compute branching here.
   router.handle("session/attach-command", async (params, _notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const scoped = resolveTenantApp(app, ctx);
@@ -583,59 +578,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (!session) {
       throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
-
-    // Terminal-state check first: completed / failed / archived sessions have
-    // had their tmux pane torn down at cleanup time (session_id cleared too),
-    // so this case must take precedence over the missing-session_id check
-    // below -- otherwise the UI shows "not yet dispatched" for sessions that
-    // ran end-to-end.
-    if (session.status === "completed" || session.status === "failed" || session.status === "archived") {
-      return {
-        command: "",
-        displayHint: "",
-        attachable: false,
-        reason: `Session is ${session.status}; no live pane to attach to.`,
-      };
-    }
-    // Pre-dispatch / between-stage sessions have no tmux pane yet.
-    if (!session.session_id) {
-      return {
-        command: "",
-        displayHint: "",
-        attachable: false,
-        reason: "Session has not been dispatched yet.",
-      };
-    }
-
-    // Runtime-aware attach guidance.
-    //
-    // claude-agent runs as a plain process via arkd /process/spawn; there
-    // is NO tmux pane and NO interactive PTY to attach to. Live output is
-    // already streamed to the Conversation / Logs tabs via the hook
-    // pipeline. Attaching to a non-existent pane just errors with
-    // "session not found" and the UI shows the dreaded "Reconnecting 3/4
-    // ..." loop. Surface the right guidance instead.
-    //
-    // Tmux-based runtimes (claude-code, codex, gemini, goose) DO have a
-    // pane. For those we surface the ark-native `ark session attach`
-    // command -- never the raw transport (`aws ssm start-session`,
-    // `kubectl exec`, `tmux attach`). Whether the pane is on local tmux,
-    // EC2 via SSM, or k8s via kubectl is an implementation detail ark
-    // already encapsulates inside `ark session attach`.
-    const executorName = (session.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
-    if (executorName === "claude-agent" || executorName === "agent-sdk") {
-      return {
-        command: "",
-        displayHint: "",
-        attachable: false,
-        reason:
-          "This agent runs as a plain process (no interactive terminal). " +
-          "Live output appears in the Conversation and Logs tabs.",
-      };
-    }
-    const command = `ark session attach ${session.id}`;
-    const displayHint = "Run this on the host where ark is installed:";
-    return { command, displayHint, attachable: true };
+    return scoped.sessionAttach.planFor(session);
   });
 
   router.handle("worktree/diff", async (params, _notify, ctx) => {

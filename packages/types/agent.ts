@@ -72,6 +72,25 @@ export interface RuntimeDefinition {
    * preserves the SDK's hardcoded default for users on Anthropic-direct.
    */
   default_haiku_model?: string;
+  /**
+   * Whether sessions on this runtime can be attached to interactively
+   * (xterm.js Terminal tab + `ark session attach <id>`).
+   *
+   * Runtimes that launch the agent in a tmux pane with a real PTY
+   * (claude-code, codex, gemini, goose) get an interactive shell the
+   * user can drop into.
+   *
+   * Runtimes that spawn a plain process via arkd `/process/spawn`
+   * (claude-agent, future cli-agent variants) have NO PTY -- the
+   * "Terminal" tab can only show static stdio.log tails. Setting
+   * `interactive: false` makes ark return `attachable: false` from
+   * `session/attach-command` with a clear "live output is in
+   * Conversation/Logs tabs" message instead of the WS reconnect-loop.
+   *
+   * Default: `true` (preserves existing behaviour for the four
+   * tmux-based runtimes; only the agent-sdk family declares `false`).
+   */
+  interactive?: boolean;
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

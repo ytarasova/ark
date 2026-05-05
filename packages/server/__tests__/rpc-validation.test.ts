@@ -354,10 +354,13 @@ const fixtures: Record<string, MethodFixture> = {
   "session/attach-command": {
     validRequest: { sessionId: "s-1" },
     invalidRequest: {},
+    // Discriminated AttachPlan -- happy path is the "interactive" variant:
+    // user-facing ark-native command + transport command for the CLI to exec.
     sampleResponse: {
-      command: "tmux attach -t ark-s-1",
-      displayHint: "Detach with Ctrl+B then D",
-      attachable: true,
+      mode: "interactive",
+      command: "ark session attach s-1",
+      transportCommand: "tmux attach -t ark-s-1",
+      displayHint: "Run this on the host where ark is installed:",
     },
   },
   "model/list": {

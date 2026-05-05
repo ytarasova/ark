@@ -28,6 +28,7 @@ import type { StatusPollerRegistry } from "../executors/status-poller.js";
 import { SessionService, ComputeService, HistoryService } from "../services/index.js";
 import { SessionHooks } from "../services/session-hooks/index.js";
 import { SessionLifecycle } from "../services/session/index.js";
+import { SessionAttachService } from "../services/session/attach.js";
 import { DispatchService } from "../services/dispatch/index.js";
 import { StageAdvanceService } from "../services/stage-advance/index.js";
 import { executeAction } from "../services/actions/index.js";
@@ -84,6 +85,8 @@ export function registerServices(
     historyService: asFunction((c: { db: DatabaseAdapter }) => new HistoryService(c.db), {
       lifetime,
     }),
+
+    sessionAttach: asFunction((c: { app: AppContext }) => new SessionAttachService(c.app), { lifetime }),
 
     sessionHooks: asFunction(
       (c: {

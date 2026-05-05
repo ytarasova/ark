@@ -131,7 +131,6 @@ export function TabPanels(props: TabPanelsProps) {
           rows={session?.pty_rows}
           isActive={isActive}
           tabActive={activeTab === "terminal"}
-          launchExecutor={(session?.config as { launch_executor?: string } | null | undefined)?.launch_executor}
         />
       )}
       {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => onToggleTodo(Number(id))} />}
