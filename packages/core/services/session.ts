@@ -336,7 +336,7 @@ export class SessionService {
   ): Promise<"agent" | "action" | "noop"> {
     if (!stage) return "noop";
     try {
-      const flow = await import("../state/flow.js");
+      const flow = await import("./flow.js");
       const action = flow.getStageAction(this.app, flowName, stage);
       if (action.type === "agent" || action.type === "fork") return "agent";
       if (action.type === "action") return "action";
@@ -360,7 +360,7 @@ export class SessionService {
       try {
         const session = await this.sessions.get(sessionId);
         if (!session?.stage) return;
-        const flow = await import("../state/flow.js");
+        const flow = await import("./flow.js");
         const action = flow.getStageAction(this.app, session.flow, session.stage);
         if (action.type !== "action" || !action.action) return;
         const { executeAction } = await import("./actions/index.js");

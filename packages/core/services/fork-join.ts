@@ -8,7 +8,7 @@
 import { randomUUID } from "crypto";
 
 import type { AppContext } from "../app.js";
-import * as flow from "../state/flow.js";
+import * as flow from "./flow.js";
 import { logWarn } from "../observability/structured-log.js";
 import { markDispatchFailedShared } from "./session-dispatch-listeners.js";
 

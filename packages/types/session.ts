@@ -140,7 +140,7 @@ export interface Session {
   workspace_id: string | null;
   /**
    * Orchestrator that drives this session's state machine. `"custom"` is the
-   * in-tree engine under `packages/core/state/flow.ts`. A Temporal-backed
+   * in-tree engine under `packages/core/services/flow.ts`. A Temporal-backed
    * alternative is in design (#374) and will ship as a second enum value;
    * the column exists today so that the eventual cutover doesn't need a
    * simultaneous schema change.

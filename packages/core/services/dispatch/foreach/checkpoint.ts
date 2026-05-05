@@ -12,7 +12,7 @@
  */
 
 import type { DispatchDeps } from "../types.js";
-import type { ForEachCheckpoint } from "../../../state/flow.js";
+import type { ForEachCheckpoint } from "../../flow.js";
 
 /**
  * Write (or update) the for_each checkpoint on the session config.

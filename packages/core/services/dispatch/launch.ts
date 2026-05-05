@@ -15,7 +15,7 @@
 import type { DispatchDeps } from "./types.js";
 import type { AgentDefinition } from "../../agent/agent.js";
 import type { Session } from "../../../types/index.js";
-import type { StageDefinition } from "../../state/flow.js";
+import type { StageDefinition } from "../flow.js";
 import type { StageSecretResolver } from "./secrets-resolve.js";
 import type { Executor, LaunchResult } from "../../executor.js";
 import type { PlacementCtx } from "../../secrets/placement-types.js";

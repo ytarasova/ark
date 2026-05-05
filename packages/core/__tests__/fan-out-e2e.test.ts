@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { fanOut, checkAutoJoin } from "../services/fork-join.js";
 import { spawnSubagent } from "../services/subagents.js";
-import { getReadyStages, getStages, validateDAG } from "../state/flow.js";
+import { getReadyStages, getStages, validateDAG } from "../services/flow.js";
 
 let app: AppContext;
 beforeAll(async () => {

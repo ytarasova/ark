@@ -15,7 +15,7 @@ import type { AppContext } from "../app.js";
 import type { Session } from "../../types/index.js";
 import * as agentRegistry from "../agent/agent.js";
 import { buildSessionVars } from "../template.js";
-import { resolveFlow } from "../state/flow.js";
+import { resolveFlow } from "./flow.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
 import { logDebug } from "../observability/structured-log.js";
 import { readPlanMd } from "./plan-artifact.js";

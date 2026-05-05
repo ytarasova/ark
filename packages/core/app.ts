@@ -36,7 +36,7 @@ import type { SnapshotStore } from "../compute/core/snapshot-store.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
-import { setProfilesArkDir } from "./state/profiles.js";
+import { setProfilesArkDir } from "./services/profile.js";
 import type {
   SessionRepository,
   ComputeRepository,
@@ -299,7 +299,7 @@ export class AppContext {
       for (const session of running) {
         const cp = (session.config as Record<string, unknown> | null)?.for_each_checkpoint;
         if (!cp || typeof cp !== "object") continue;
-        const cpTyped = cp as import("./state/flow.js").ForEachCheckpoint;
+        const cpTyped = cp as import("./services/flow.js").ForEachCheckpoint;
 
         li(
           "boot",
@@ -350,7 +350,7 @@ export class AppContext {
       for (const session of sessions) {
         const inlineFlow = (session.config as Record<string, unknown> | null)?.inline_flow;
         if (!inlineFlow || typeof inlineFlow !== "object") continue;
-        const def = inlineFlow as import("./state/flow.js").FlowDefinition;
+        const def = inlineFlow as import("./services/flow.js").FlowDefinition;
         if (!def.name || !Array.isArray(def.stages)) continue;
         this.flows.registerInline?.(def.name, def);
       }

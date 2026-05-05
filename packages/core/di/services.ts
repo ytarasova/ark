@@ -39,7 +39,7 @@ import { garbageCollectComputeIfTemplate } from "../services/compute-lifecycle.j
 import { capturePlanMdIfPresent } from "../services/plan-artifact.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { provisionWorkspaceWorkdir } from "../workspace/provisioner.js";
-import * as flow from "../state/flow.js";
+import * as flow from "../services/flow.js";
 import { buildTaskWithHandoff, extractSubtasks } from "../services/task-builder.js";
 import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "../services/dispatch-context.js";
 import * as agentRegistry from "../agent/agent.js";

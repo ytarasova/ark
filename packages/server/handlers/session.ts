@@ -395,7 +395,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const scoped = resolveTenantApp(app, ctx);
     const session = await scoped.sessions.get(sessionId);
     if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
-    const { getStages } = await import("../../core/state/flow.js");
+    const { getStages } = await import("../../core/services/flow.js");
     const stages = getStages(scoped, session.flow).map((s) => ({
       name: s.name,
       type: s.action ? "action" : s.agent ? "agent" : (s.type ?? "agent"),

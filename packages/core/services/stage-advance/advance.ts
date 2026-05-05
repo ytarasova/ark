@@ -7,7 +7,7 @@
  */
 
 import type { Session } from "../../../types/index.js";
-import { parseGraphFlow, getSuccessors, resolveNextStages, computeSkippedStages } from "../../state/graph-flow.js";
+import { parseGraphFlow, getSuccessors, resolveNextStages, computeSkippedStages } from "../flow-graph.js";
 import { logDebug } from "../../observability/structured-log.js";
 import { recordEvent } from "../../observability.js";
 import { emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../../observability/otlp.js";

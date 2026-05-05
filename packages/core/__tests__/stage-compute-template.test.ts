@@ -16,7 +16,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { AppContext } from "../app.js";
-import { getStage, getStages } from "../state/flow.js";
+import { getStage, getStages } from "../services/flow.js";
 
 let app: AppContext;
 

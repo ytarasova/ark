@@ -26,7 +26,7 @@ export type { HookStatusResult, ReportResult } from "./services/session-hooks/in
 export type { SessionOpResult } from "./services/session/types.js";
 
 // Flow
-export * from "./state/flow.js";
+export * from "./services/flow.js";
 
 // Template
 export { substituteVars, buildSessionVars } from "./template.js";
@@ -219,7 +219,7 @@ export {
   profileGroupPrefix,
   setProfilesArkDir,
   type Profile,
-} from "./state/profiles.js";
+} from "./services/profile.js";
 
 // Notification daemon
 export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./infra/notify-daemon.js";
@@ -229,9 +229,6 @@ export { registerInstance, activeInstanceCount } from "./infra/instance-lock.js"
 
 // Theme
 export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from "./theme.js";
-
-// UI state persistence
-export { loadUiState, saveUiState, type UiState } from "./state/ui-state.js";
 
 // MCP Socket Pool
 export {
@@ -364,7 +361,7 @@ export {
   type GraphFlow,
   type FlowNode,
   type FlowEdge,
-} from "./state/graph-flow.js";
+} from "./services/flow-graph.js";
 
 // Composable termination conditions
 export {

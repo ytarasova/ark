@@ -7,7 +7,7 @@ import {
   isJoinNode,
   isFanOutNode,
   validateGraphFlow,
-} from "../state/graph-flow.js";
+} from "../services/flow-graph.js";
 import { AppContext } from "../app.js";
 
 // ── Pure graph-flow unit tests (no AppContext needed) ──────────────────────

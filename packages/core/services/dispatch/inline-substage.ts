@@ -12,7 +12,7 @@
 
 import type { DispatchDeps, DispatchResult } from "./types.js";
 import type { AgentDefinition } from "../../agent/agent.js";
-import type { StageDefinition } from "../../state/flow.js";
+import type { StageDefinition } from "../flow.js";
 import type { StageSecretResolver } from "./secrets-resolve.js";
 import { buildLaunchEnv, launchAgent } from "./launch.js";
 import { sessionAsVars } from "../task-builder.js";

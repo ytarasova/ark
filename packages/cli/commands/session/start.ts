@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { resolve } from "path";
 import { execSync } from "child_process";
 import * as core from "../../../core/index.js";
-import { getArkClient, getInProcessApp } from "../../app-client.js";
+import { getArkClient } from "../../app-client.js";
 import { SessionStartService, SessionStartPlanError } from "../../services/session-start.js";
 
 export function registerStartCommands(session: Command) {

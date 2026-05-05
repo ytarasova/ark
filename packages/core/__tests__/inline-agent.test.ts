@@ -11,7 +11,7 @@ import { test, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { setApp, clearApp } from "./test-helpers.js";
 import { buildInlineAgent } from "../agent/agent.js";
-import type { InlineAgentSpec } from "../state/flow.js";
+import type { InlineAgentSpec } from "../services/flow.js";
 
 let app: AppContext;
 

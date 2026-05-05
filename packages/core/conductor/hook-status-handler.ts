@@ -18,7 +18,6 @@ import { appForRequest } from "./tenant.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { handleReport } from "./report-pipeline.js";
 import { eventBus } from "../hooks.js";
-import { safeAsync } from "../safe.js";
 import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
 
