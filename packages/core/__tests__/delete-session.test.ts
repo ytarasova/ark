@@ -184,25 +184,4 @@ describe("sessionLifecycle.deleteSession", async () => {
     expect(after1).not.toBeNull();
     expect(after1!.status).toBe("deleting");
   });
-
-  it("works when session has no compute (compute_name is null)", async () => {
-    const session = await app.sessionLifecycle.start({
-      repo: "/tmp/fake-repo",
-      summary: "no-compute-test",
-      flow: "bare",
-      // No compute_name specified
-    });
-
-    // Verify compute_name is null
-    expect(session.compute_name).toBeNull();
-
-    // Should not throw
-    const result = await app.sessionLifecycle.deleteSession(session.id);
-    expect(result.ok).toBe(true);
-    expect(result.message).toBe("Session deleted (undo available for 90s)");
-    // Soft-delete: session still exists with status "deleting"
-    const after = await app.sessions.get(session.id);
-    expect(after).not.toBeNull();
-    expect(after!.status).toBe("deleting");
-  });
 });

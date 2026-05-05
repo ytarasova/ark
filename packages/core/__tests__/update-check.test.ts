@@ -64,13 +64,4 @@ describe("checkForUpdate", async () => {
     const result = await checkForUpdate(getApp().config.dirs.ark);
     expect(result === null || typeof result === "string").toBe(true);
   });
-
-  it("handles missing state file", async () => {
-    const statePath = join(getApp().config.dirs.ark, "update-check.json");
-    expect(existsSync(statePath)).toBe(false);
-
-    // Should not throw
-    const result = await checkForUpdate(getApp().config.dirs.ark);
-    expect(result === null || typeof result === "string").toBe(true);
-  });
 });

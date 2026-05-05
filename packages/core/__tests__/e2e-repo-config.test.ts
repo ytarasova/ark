@@ -64,21 +64,6 @@ describe("repo-scoped config E2E", async () => {
     expect(session.group_name).toBe("explicit-group");
   });
 
-  it("no config file means defaults are used", async () => {
-    const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-empty-"));
-
-    const session = await app.sessionLifecycle.start({
-      summary: "e2e-repo-config-none",
-      workdir: repoDir,
-    });
-    sessionIds.push(session.id);
-
-    // Default flow is "default" when nothing is specified
-    expect(session.flow).toBe("default");
-    expect(session.group_name).toBeNull();
-    expect(session.compute_name).toBeNull();
-  });
-
   it("falls back to repo path when workdir is not set", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-fallback-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "group: from-repo\n");

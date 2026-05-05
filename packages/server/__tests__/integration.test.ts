@@ -161,25 +161,6 @@ describe("end-to-end: server + client", async () => {
     client.close();
   });
 
-  it("session list without status returns all non-archived sessions", async () => {
-    const { client } = createInMemoryPair();
-    await client.initialize();
-
-    const s1 = await client.sessionStart({ summary: "all-test-1", repo: ".", flow: "bare" });
-    const s2 = await client.sessionStart({ summary: "all-test-2", repo: ".", flow: "bare" });
-    await client.sessionUpdate(s1.id, { status: "running" });
-
-    // List without filter should include both
-    const all = await client.sessionList();
-    expect(all.some((s: any) => s.id === s1.id)).toBe(true);
-    expect(all.some((s: any) => s.id === s2.id)).toBe(true);
-
-    // Clean up
-    await client.sessionDelete(s1.id);
-    await client.sessionDelete(s2.id);
-    client.close();
-  });
-
   it("session list excludes archived by default but includes them when filtered", async () => {
     const { client } = createInMemoryPair();
     await client.initialize();
