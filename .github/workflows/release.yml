@@ -461,7 +461,7 @@ jobs:
           # users can author their own agents/models/flows etc. under
           # ~/.ark/<dir>/ or <repo>/.ark/<dir>/ and have them merged over
           # what the release ships.
-          cp -r agents runtimes flows skills recipes mcp-configs models "$root/"
+          cp -r agents runtimes flows skills mcp-configs models "$root/"
 
           # Web UI
           cp -r packages/web/dist/* "$root/web/" 2>/dev/null || true
