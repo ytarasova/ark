@@ -259,5 +259,4 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
     const ok = app.skills.delete(resolvedName, resolved, projectArg(resolved, projectRoot));
     return { ok };
   });
-
 }
