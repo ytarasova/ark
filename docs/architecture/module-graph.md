@@ -2,7 +2,7 @@
 
 > generated: 1970-01-01T00:00:00.000Z  -  regenerate with `make audit`.
 
-Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types.  Total modules: **922**.
+Tracked packages: core, server, cli, web, protocol, compute, router, arkd, types.  Total modules: **927**.
 
 ## Fan-in leaderboard (top 20)
 
@@ -113,7 +113,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ## Full graph
 
-<details><summary>922 modules</summary>
+<details><summary>927 modules</summary>
 
 ### `packages/arkd/client.ts`
 
@@ -6657,10 +6657,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/components/ComputeView.tsx`
 
 - fan-in: 1
-- fan-out: 7
+- fan-out: 8
 - imports:
   - `packages/web/src/components/compute/ComputeDetailPanel.tsx`
   - `packages/web/src/components/compute/NewComputeForm.tsx`
+  - `packages/web/src/components/compute/helpers.ts`
   - `packages/web/src/components/ui/ListRow.tsx`
   - `packages/web/src/components/ui/badge.tsx`
   - `packages/web/src/hooks/useApi.ts`
@@ -6696,10 +6697,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/components/FlowsView.tsx`
 
 - fan-in: 1
-- fan-out: 10
+- fan-out: 11
 - imports:
   - `packages/web/src/components/flows/FlowForm.tsx`
   - `packages/web/src/components/flows/FlowStageList.tsx`
+  - `packages/web/src/components/flows/pipeline/adapters.ts`
   - `packages/web/src/components/pipeline/PipelineViewer.tsx`
   - `packages/web/src/components/ui/ListRow.tsx`
   - `packages/web/src/components/ui/badge.tsx`
@@ -6884,23 +6886,34 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/components/admin/TeamsTab.tsx`
 
 - fan-in: 1
-- fan-out: 1
+- fan-out: 2
 - imports:
+  - `packages/web/src/components/admin/adminApi.ts`
   - `packages/web/src/components/ui/button.tsx`
 
 ### `packages/web/src/components/admin/TenantsTab.tsx`
 
 - fan-in: 1
-- fan-out: 1
+- fan-out: 2
 - imports:
+  - `packages/web/src/components/admin/adminApi.ts`
   - `packages/web/src/components/ui/button.tsx`
 
 ### `packages/web/src/components/admin/UsersTab.tsx`
 
 - fan-in: 1
-- fan-out: 1
+- fan-out: 2
 - imports:
+  - `packages/web/src/components/admin/adminApi.ts`
   - `packages/web/src/components/ui/button.tsx`
+
+### `packages/web/src/components/admin/adminApi.ts`
+
+- fan-in: 3
+- fan-out: 2
+- imports:
+  - `packages/web/src/transport/TransportContext.tsx`
+  - `packages/web/src/transport/types.ts`
 
 ### `packages/web/src/components/agents/AgentDetailPanel.tsx`
 
@@ -6944,13 +6957,14 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/components/compute/ComputeDetailPanel.tsx`
 
 - fan-in: 1
-- fan-out: 9
+- fan-out: 10
 - imports:
   - `packages/web/src/components/compute/ComputeActions.tsx`
   - `packages/web/src/components/compute/ComputeDrawer.tsx`
   - `packages/web/src/components/compute/MetricBar.tsx`
   - `packages/web/src/components/compute/MetricSparkline.tsx`
   - `packages/web/src/components/compute/MetricsSkeleton.tsx`
+  - `packages/web/src/components/compute/helpers.ts`
   - `packages/web/src/components/ui/badge.tsx`
   - `packages/web/src/components/ui/card.tsx`
   - `packages/web/src/hooks/useApi.ts`
@@ -6959,8 +6973,9 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/components/compute/ComputeDrawer.tsx`
 
 - fan-in: 1
-- fan-out: 4
+- fan-out: 5
 - imports:
+  - `packages/web/src/components/compute/helpers.ts`
   - `packages/web/src/components/ui/badge.tsx`
   - `packages/web/src/components/ui/button.tsx`
   - `packages/web/src/hooks/useApi.ts`
@@ -6969,8 +6984,9 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/components/compute/MetricBar.tsx`
 
 - fan-in: 1
-- fan-out: 1
+- fan-out: 2
 - imports:
+  - `packages/web/src/components/compute/helpers.ts`
   - `packages/web/src/lib/utils.ts`
 
 ### `packages/web/src/components/compute/MetricSparkline.tsx`
@@ -6998,6 +7014,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
   - `packages/web/src/components/ui/input.tsx`
   - `packages/web/src/hooks/useApi.ts`
   - `packages/web/src/lib/utils.ts`
+
+### `packages/web/src/components/compute/helpers.ts`
+
+- fan-in: 4
+- fan-out: 0
 
 ### `packages/web/src/components/flow-editor/FlowEdgeLabel.tsx`
 
@@ -7055,6 +7076,13 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - imports:
   - `packages/web/src/components/ui/badge.tsx`
   - `packages/web/src/components/ui/separator.tsx`
+
+### `packages/web/src/components/flows/pipeline/adapters.ts`
+
+- fan-in: 1
+- fan-out: 1
+- imports:
+  - `packages/web/src/components/pipeline/types.ts`
 
 ### `packages/web/src/components/mode/binding-types.ts`
 
@@ -7205,7 +7233,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/web/src/components/pipeline/types.ts`
 
-- fan-in: 9
+- fan-in: 10
 - fan-out: 0
 
 ### `packages/web/src/components/secrets/NewSecretForm.tsx`
@@ -7836,6 +7864,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 - imports:
   - `packages/web/src/lib/utils.ts`
 
+### `packages/web/src/components/ui/index.ts`
+
+- fan-in: 1
+- fan-out: 0
+
 ### `packages/web/src/components/ui/input.tsx`
 
 - fan-in: 10
@@ -8063,14 +8096,22 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/hooks/useSessions.ts`
 
 - fan-in: 1
-- fan-out: 1
+- fan-out: 2
 - imports:
   - `packages/web/src/hooks/useSessionQueries.ts`
+  - `packages/web/src/hooks/useSse.ts`
 
 ### `packages/web/src/hooks/useSmartPoll.ts`
 
 - fan-in: 1
 - fan-out: 0
+
+### `packages/web/src/hooks/useSse.ts`
+
+- fan-in: 1
+- fan-out: 1
+- imports:
+  - `packages/web/src/transport/TransportContext.tsx`
 
 ### `packages/web/src/hooks/useTerminalSocket.ts`
 
@@ -8143,10 +8184,11 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 ### `packages/web/src/pages/DesignPreviewPage.tsx`
 
 - fan-in: 1
-- fan-out: 4
+- fan-out: 5
 - imports:
   - `packages/web/src/components/ui/StageProgressBar.tsx`
   - `packages/web/src/components/ui/StatusDot.tsx`
+  - `packages/web/src/components/ui/index.ts`
   - `packages/web/src/themes/ThemeProvider.tsx`
   - `packages/web/src/themes/tokens.ts`
 
@@ -8318,7 +8360,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/web/src/transport/TransportContext.tsx`
 
-- fan-in: 4
+- fan-in: 6
 - fan-out: 2
 - imports:
   - `packages/web/src/transport/HttpTransport.ts`
@@ -8326,7 +8368,7 @@ Modules with fan-in 0. Entry points (cli/index.ts, packages/server/index.ts, tes
 
 ### `packages/web/src/transport/types.ts`
 
-- fan-in: 4
+- fan-in: 5
 - fan-out: 0
 
 ### `packages/web/src/util.ts`
