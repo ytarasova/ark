@@ -31,10 +31,19 @@ export interface AgentDefinition {
   runtime?: string;
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
-  /** Optional goose recipe path (native YAML), handled by gooseExecutor. */
-  recipe?: string;
-  /** Optional goose sub-recipe paths, handled by gooseExecutor. */
-  sub_recipes?: string[];
+  /**
+   * Per-runtime-type configuration block. Keys are runtime types (`goose`,
+   * `claude-code`, `claude-agent`, ...). Each runtime's executor reads ONLY
+   * its own entry. Use this for fields that don't generalize across runtimes
+   * (goose recipe paths, agent-sdk-only knobs, ...) so adding a new runtime
+   * never requires editing the core AgentDefinition shape.
+   *
+   *   runtime_config:
+   *     goose:
+   *       recipe: "{inputs.files.recipe}"
+   *       sub_recipes: ["{inputs.files.sub}"]
+   */
+  runtime_config?: Record<string, Record<string, unknown>>;
   /**
    * Per-runtime field overrides. Keyed by runtime name (e.g. `agent-sdk`,
    * `claude`, `gemini`). After the dispatch runtime is resolved, the matching
@@ -79,11 +88,25 @@ export function resolveAgent(
   if (agent.system_prompt) {
     agent.system_prompt = substituteVars(agent.system_prompt, vars);
   }
-  // Agents may reference session inputs in the recipe path, e.g.
-  // `recipe: "{inputs.files.recipe}"`. Resolve at agent-load time so the
-  // executor (e.g. goose) sees the concrete filesystem path.
-  if (agent.recipe) {
-    agent.recipe = substituteVars(agent.recipe, vars);
+  // Agents may reference session inputs in runtime-specific paths, e.g.
+  // `runtime_config.goose.recipe: "{inputs.files.recipe}"`. Resolve string
+  // values inside `runtime_config` at agent-load time so the executor sees
+  // concrete filesystem paths. Walks one level into each runtime block;
+  // arrays of strings are substituted element-wise. Non-string leaves pass
+  // through untouched -- runtimes that store numbers / objects keep them.
+  if (agent.runtime_config) {
+    for (const runtimeKey of Object.keys(agent.runtime_config)) {
+      const block = agent.runtime_config[runtimeKey];
+      if (!block || typeof block !== "object") continue;
+      for (const k of Object.keys(block)) {
+        const v = block[k];
+        if (typeof v === "string") {
+          block[k] = substituteVars(v, vars);
+        } else if (Array.isArray(v)) {
+          block[k] = v.map((item) => (typeof item === "string" ? substituteVars(item, vars) : item));
+        }
+      }
+    }
   }
   return agent;
 }

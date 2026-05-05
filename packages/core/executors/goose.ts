@@ -84,10 +84,20 @@ export function buildGooseCommand(opts: GooseCommandOpts): string[] {
     args.push("-s");
   }
 
-  // Recipe delivery takes precedence over text delivery
-  if (opts.agent.recipe) {
-    args.push("--recipe", opts.agent.recipe);
-    for (const subRecipe of opts.agent.sub_recipes ?? []) {
+  // Recipe delivery takes precedence over text delivery. Recipe + sub_recipes
+  // live under `agent.runtime_config.goose.*` -- these are goose-specific
+  // semantics and don't belong on the generic AgentDefinition shape.
+  const gooseConfig = (opts.agent.runtime_config?.goose ?? {}) as {
+    recipe?: unknown;
+    sub_recipes?: unknown;
+  };
+  const recipe = typeof gooseConfig.recipe === "string" ? gooseConfig.recipe : null;
+  const subRecipes = Array.isArray(gooseConfig.sub_recipes)
+    ? gooseConfig.sub_recipes.filter((s): s is string => typeof s === "string" && s.length > 0)
+    : [];
+  if (recipe) {
+    args.push("--recipe", recipe);
+    for (const subRecipe of subRecipes) {
       args.push("--sub-recipe", subRecipe);
     }
     for (const [k, v] of Object.entries(opts.params ?? {})) {

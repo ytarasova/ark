@@ -61,17 +61,17 @@ export interface RuntimeDefinition {
    */
   compat?: string[];
   /**
-   * Override the bundled claude binary's default haiku model id for built-in
-   * subagents (Explore etc.) that the SDK ships with. Built-in subagents
-   * cannot be reconfigured via the SDK's `agents` option, but the bundled
-   * binary honours `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Set this when routing
-   * through a gateway whose haiku slug differs from the SDK default
-   * `claude-haiku-4-5-20251001` (e.g. TF/Bedrock typically wants
-   * `pi-agentic/global.anthropic.claude-haiku-4-5`). Only relevant for the
-   * `agent-sdk` runtime; ignored elsewhere. Opt-in -- leaving it unset
-   * preserves the SDK's hardcoded default for users on Anthropic-direct.
+   * Per-runtime-type configuration block. Keys are runtime types
+   * (`claude-agent`, `goose`, `claude-code`, ...). Each runtime's executor
+   * reads ONLY its own entry. Lives here -- not as top-level fields on
+   * `RuntimeDefinition` -- so adding a runtime-specific knob never requires
+   * editing the core types module. Examples:
+   *
+   *   runtime_config:
+   *     claude-agent:
+   *       default_haiku_model: pi-agentic/global.anthropic.claude-haiku-4-5
    */
-  default_haiku_model?: string;
+  runtime_config?: Record<string, Record<string, unknown>>;
   /**
    * Whether sessions on this runtime can be attached to interactively
    * (xterm.js Terminal tab + `ark session attach <id>`).
@@ -112,16 +112,18 @@ export interface AgentDefinition {
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
   /**
-   * Optional Goose recipe file path (native Goose YAML). When set, the goose
-   * executor dispatches `goose run --recipe <path> --params k=v` instead of
-   * text delivery. Path is resolved relative to the agent's workdir.
+   * Per-runtime-type configuration block. Keys are runtime types (`goose`,
+   * `claude-code`, `claude-agent`, ...). Each runtime's executor reads ONLY
+   * its own entry. Lives here -- not as top-level fields on
+   * `AgentDefinition` -- so adding a runtime-specific knob never requires
+   * editing the core types module. Examples:
+   *
+   *   runtime_config:
+   *     goose:
+   *       recipe: "{inputs.files.recipe}"
+   *       sub_recipes: ["{inputs.files.sub_recipe}"]
    */
-  recipe?: string;
-  /**
-   * Optional list of Goose sub-recipe paths. Passed as `--sub-recipe <path>`
-   * flags alongside the main recipe. Only meaningful when `recipe` is set.
-   */
-  sub_recipes?: string[];
+  runtime_config?: Record<string, Record<string, unknown>>;
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

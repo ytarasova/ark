@@ -27,21 +27,24 @@ import { logInfo, logWarn, logError } from "../observability/structured-log.js";
  * launch.ts (and the bundled claude binary it spawns) read at runtime.
  *
  * Mapping:
- *   - `compat: ["bedrock", ...]`     -> ARK_COMPAT (comma-joined)
- *   - `default_haiku_model: "<id>"`  -> ANTHROPIC_DEFAULT_HAIKU_MODEL
+ *   - `compat: ["bedrock", ...]`                            -> ARK_COMPAT (comma-joined)
+ *   - `runtime_config.claude-agent.default_haiku_model: ".."` -> ANTHROPIC_DEFAULT_HAIKU_MODEL
  *
  * Exported for unit testing without booting an AppContext.
  */
 export function buildAgentSdkRuntimeEnv(runtimeDef: unknown): Record<string, string> {
   const env: Record<string, string> = {};
-  const def = runtimeDef as { compat?: unknown; default_haiku_model?: unknown } | null | undefined;
+  const def = runtimeDef as
+    | { compat?: unknown; runtime_config?: Record<string, Record<string, unknown>> }
+    | null
+    | undefined;
 
   const compat = Array.isArray(def?.compat)
     ? (def.compat as unknown[]).filter((c): c is string => typeof c === "string" && c.length > 0)
     : [];
   if (compat.length > 0) env.ARK_COMPAT = compat.join(",");
 
-  const haiku = def?.default_haiku_model;
+  const haiku = def?.runtime_config?.["claude-agent"]?.default_haiku_model;
   if (typeof haiku === "string" && haiku.length > 0) {
     env.ANTHROPIC_DEFAULT_HAIKU_MODEL = haiku;
   }
