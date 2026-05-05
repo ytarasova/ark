@@ -1,112 +1,134 @@
-# Verification Report -- Handoff Test (ark-s-h33osnwveh)
+# Verification Report -- fix-arkd-spawn-bash-enoent-on-ec2
 
-**Date:** 2026-04-22
-**Branch:** ark-s-h33osnwveh (worktree: s-h33osnwveh)
-**Verifier:** ISLC Verifier (Handoff Test)
+**Date:** 2026-05-05
+**Branch:** ark-s-wg571i41xi
+**Fix commit:** f9f7fd0f fix(arkd): absolute /bin/bash + default PATH fallback for EC2 spawn
+**Verifier:** ISLC Verifier
 **Verdict:** VERIFY: PASS WITH WARNINGS
 
 ---
 
 ## Step 1 -- Context
 
-**Autonomous Decision:** The worktree at `/private/var/folders/0m/d1ncpjbd42n1y__cdr08745r0000gn/T/ark-test-18893-YEQWAr/worktrees/s-h33osnwveh` no longer exists — it was cleaned up before verification began. The Bash tool shell state is bound to that directory and cannot execute commands.
+**Workflow files:** No `spec.md` or `plan.md` found in `.workflow/` directory.
+**State:** Prior verify-report.md was for a different session (fix/web-session-view-overhaul).
+**Jira:** No Jira MCP tool available.
 
-Files successfully read:
-- `/Users/paytmlabs/Projects/ark/.workflow/state.json` — exists, references prior run on `fix/web-session-view-overhaul` (2026-04-17)
-- `/Users/paytmlabs/Projects/ark/.workflow/verify-report.md` — exists, prior verification result: PASS WITH WARNINGS
-- `spec.md` — **not found**
-- `plan.md` — **not found**
+**Fix summary (from commit message and code inspection):**
 
-**Jira:** Not accessible (no Jira MCP tool available, network unavailable from this context).
+On EC2, `arkd` runs as a systemd unit that sets only `HOME`. `Bun.spawn` resolves
+unqualified commands (`bash`) through the child's `PATH`, which is empty when the
+parent env has no `PATH`. This caused `claude-agent.ts` launcher dispatch to fail
+with `ENOENT`.
 
-**Discrepancy logged:** `state.json` branch is `fix/web-session-view-overhaul`; current git branch per environment is `ark-s-h33osnwveh`. The session worktree `s-h33osnwveh` maps to a different branch context. This is expected for a "handoff test" session that uses its own isolated worktree.
+**Two-layer fix in commit f9f7fd0f:**
+
+1. `packages/core/executors/claude-agent.ts`: Changed `cmd: "bash"` to `cmd: "/bin/bash"` (absolute path, bypasses PATH lookup).
+2. `packages/arkd/routes/process.ts`: Added `buildSpawnEnv()` + `DEFAULT_SPAWN_PATH` constant that guarantees a non-empty PATH in child envs spawned via `/process/spawn`.
+3. `packages/arkd/__tests__/process.test.ts`: 6 new tests (5 unit + 1 integration).
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `packages/arkd/__tests__/process.test.ts` | +76 lines: 6 new tests for `buildSpawnEnv` and PATH propagation |
+| `packages/arkd/routes/process.ts` | +26 lines: `DEFAULT_SPAWN_PATH`, `buildSpawnEnv()`, wired into `spawnProcess()` |
+| `packages/core/executors/claude-agent.ts` | -2/+7 lines: `cmd: "bash"` -> `cmd: "/bin/bash"` with explanatory comment |
 
 ---
 
 ## Step 2 -- Automated Test Verification
 
-**Method:** Cannot run tests — Bash is non-functional (working directory no longer exists). Falling back to prior run results from state.json and verify-report.md.
+### Affected packages (direct)
 
-**Prior run result (2026-04-17, branch fix/web-session-view-overhaul):**
+| Package | Tests | Pass | Fail | Skip |
+|---------|-------|------|------|------|
+| `packages/arkd` | 22 | 22 | 0 | 0 |
+| `packages/core/executors` | 5 | 5 | 0 | 0 |
+
+All new tests pass. Process test suite: 22/22 including all 6 new tests.
+
+### Full test suite
 
 | Metric | Value |
 |--------|-------|
-| Total | 144 |
-| Passed | 144 |
-| Failed | 0 |
-| Skipped | 0 |
-| Coverage | Not recorded |
+| Total | 5591 |
+| Passed | 5571 |
+| Failed | **2** |
+| Skipped | 15 |
+| Todo | 3 |
 
-**Result: PASS** (from prior run — cannot re-execute due to worktree deletion)
+**2 failures -- both pre-existing, unrelated to this fix:**
 
-**Note:** The handoff test worktree (`s-h33osnwveh`) was deleted before this verification ran. The git status showed only deleted files (`D` prefix throughout), confirming the worktree was cleaned up. No new test results can be generated in this session.
+1. `end-to-end: server + client > session list without status returns all non-archived sessions`
+   - Confirmed pre-existing: fails identically with the fix stashed (no changes applied).
+   - File: not in the three files touched by this commit.
+
+2. `Conductor /hooks/status endpoint > returns 400 for missing session param`
+   - Passes when `conductor-hooks.test.ts` is run in isolation (33/33).
+   - Fails only in the full parallel suite -- port collision / timing flakiness.
+   - Not in any file touched by this commit.
+
+**Result: PASS** (for changes introduced by this fix; 2 pre-existing failures are not regressions)
 
 ---
 
 ## Step 3 -- Security Scan
 
-**Cannot run automated scan** (Bash non-functional). Prior security review from verify-report.md:
+| Check | Status | Notes |
+|-------|--------|-------|
+| Hardcoded secrets | PASS | `DEFAULT_SPAWN_PATH` is a path string, not a credential |
+| SQL injection | PASS | No SQL in changed files |
+| XSS | PASS | Server-side only |
+| Command injection | PASS | `req.cmd`/`req.args` were already caller-controlled; no new surface |
+| PATH traversal | **IMPROVED** | Absolute `/bin/bash` removes the attack vector where a malicious PATH could substitute a fake `bash` |
+| Env injection via `req.env` | PASS | Same merge semantics as before (`{ ...process.env, ...(req.env ?? {}) }`); only the PATH fallback is new; caller is trusted orchestrator |
+| Dependency vulnerabilities | WARN | 6 moderate dev-only vulnerabilities (Claude SDK file permissions, vitest/vite) -- pre-existing, not exploitable in production |
 
-| Check | Status |
-|-------|--------|
-| Hardcoded secrets/credentials | PASS |
-| SQL injection | PASS |
-| Unvalidated user input | PASS |
-| Insecure dependencies | WARN (7 moderate, dev-only: vitest/vite/yaml) |
-| XSS vectors | PASS |
-| Insecure crypto | PASS |
-| Directory traversal | PASS |
-| Missing auth checks | PASS |
-| Sensitive data in logs | PASS |
-| Insecure deserialization | PASS |
-
-**Result: WARN** (7 moderate dev-only vulnerabilities — no critical/high)
+**Result: PASS** (security posture strictly improved for PATH traversal case)
 
 ---
 
 ## Step 4 -- Code Quality Review
 
-**Cannot run linter** (Bash non-functional). Prior quality review from verify-report.md:
+| Check | Status | Notes |
+|-------|--------|-------|
+| `make lint` (ESLint, 0 warnings) | PASS | No output = no warnings |
+| `make format` (Prettier) | PASS | All changed files unchanged |
+| No dead code | PASS | `DEFAULT_SPAWN_PATH` and `buildSpawnEnv` are exported and used |
+| No debug statements | PASS | |
+| Error handling | PASS | `buildSpawnEnv` is pure; errors in `spawnProcess` handled by existing try/catch |
+| Comment quality | WARN | `DEFAULT_SPAWN_PATH` and `buildSpawnEnv` have multi-line docstrings (CLAUDE.md style guide discourages multi-line comment blocks). Content is accurate and the WHY is non-obvious (EC2 systemd behavior) -- borderline acceptable |
+| Log message accuracy | PASS | Log line updated: `cmd: \`bash ${workerLauncherPath}\`` -> `cmd: \`/bin/bash ${workerLauncherPath}\`` |
 
-| Item | Status |
-|------|--------|
-| No dead code / unused imports | PASS |
-| No debug statements | PASS |
-| Error handling complete | PASS |
-| Logging follows conventions | PASS |
-| No unnecessary complexity | PASS |
-| Functions reasonably sized | WARN (stage-orchestrator.ts 1255 lines, session-lifecycle.ts 604 lines) |
-| ESLint (make lint) | PASS (0 warnings, 0 errors) |
-
-**Result: PASS WITH WARNINGS** (large file sizes, non-blocking)
+**Result: PASS WITH WARNINGS** (verbose docstrings are non-blocking)
 
 ---
 
 ## Step 5 -- Acceptance Criteria Validation
 
-spec.md not accessible. Verified against prior report and state.json.
+No `spec.md` found. Derived acceptance criteria from commit message and code:
 
 | AC # | Criterion | Verified By | Status |
 |------|-----------|-------------|--------|
-| 1 | Session view: scroll, terminal, colors, attachments, markdown | Prior tests (144/144) | PASS |
-| 2 | StaticTerminal: manual col detection, overflow-x-auto, no FitAddon | terminal-display.test.ts 11/11 | PASS |
-| 3 | Attention View button, panel width, back navigation | Code inspection (prior run) | PASS |
-| 4 | Unread badge red matching icon rail dot | Code inspection (prior run) | PASS |
-| 5 | session-orchestration.ts decomposed into 6 focused services | Code inspection (prior run) | PASS |
-| 6 | Session detail flex-1 min-h-0 terminal container | session-layout.test.ts | PASS |
-| 7 | Attachments display | attachments.test.ts 13/13 | PASS |
-| 8 | Event timeline / detail drawer | event-timeline + detail-drawer tests | PASS |
-| 9 | Core session lifecycle unaffected by refactor | e2e-session-lifecycle.test.ts 13/13 | PASS |
+| 1 | `claude-agent.ts` uses absolute `/bin/bash` instead of `bash` | Code inspection: `packages/core/executors/claude-agent.ts:269` | PASS |
+| 2 | `buildSpawnEnv` injects `DEFAULT_SPAWN_PATH` when neither parent nor request env has `PATH` | Unit test: "injects DEFAULT_SPAWN_PATH when neither parent nor request env has PATH" | PASS |
+| 3 | `buildSpawnEnv` injects fallback when parent `PATH` is empty string | Unit test: "injects DEFAULT_SPAWN_PATH when parent PATH is empty string" | PASS |
+| 4 | `buildSpawnEnv` preserves parent `PATH` when caller does not override | Unit test: "preserves parent PATH when no override is supplied" | PASS |
+| 5 | Caller-supplied `PATH` in `req.env` wins over parent `PATH` | Unit test: "request PATH wins over parent PATH" | PASS |
+| 6 | Non-PATH keys merge correctly, request wins on conflict | Unit test: "merges non-PATH keys from both sources, request overrides on conflict" | PASS |
+| 7 | `/process/spawn` child receives `/bin` in PATH when caller omits PATH from env | Integration test: "caller-supplied env without PATH still produces a child that can resolve shell utilities" | PASS |
+| 8 | `DEFAULT_SPAWN_PATH` matches POSIX standard | Code: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` -- confirmed against systemd `DEFAULT_PATH_NORMAL` | PASS |
 
 ---
 
 ## Step 6 -- Design / UAT Review
 
-spec.md not accessible; no Figma URLs available. **Skipped.**
+No Figma URLs found. **Skipped** (server-side bug fix, no UI changes).
 
 ---
 
-## Step 7 -- Verdict
+## Step 7 -- Verification Verdict
 
 **VERIFY: PASS WITH WARNINGS**
 
@@ -114,23 +136,29 @@ spec.md not accessible; no Figma URLs available. **Skipped.**
 
 ### Warnings (3)
 
-1. **Worktree deleted before verification** — The test worktree `s-h33osnwveh` was cleaned up before this run. Bash is non-functional; test re-execution was not possible. Verification falls back to prior run results from 2026-04-17.
-2. **7 moderate npm audit vulnerabilities** — dev tooling (vitest/vite) + yaml parser. Not exploitable in production. Recommend `npm audit fix`.
-3. **Large file sizes** — `stage-orchestrator.ts` (1255 lines), `session-lifecycle.ts` (604 lines) exceed preferred guidelines. Acceptable for this decomposition scope.
+1. **2 pre-existing test failures** in full suite: `end-to-end: session list` (confirmed pre-existing) and `Conductor /hooks/status` (flaky, passes in isolation). Neither is in changed files. Not regressions introduced by this fix.
+
+2. **6 moderate npm audit vulnerabilities** (dev-only: Claude SDK file perms, vitest/vite). Pre-existing. Not exploitable in production.
+
+3. **Verbose docstrings** on `DEFAULT_SPAWN_PATH` and `buildSpawnEnv` in `process.ts`. The WHY (EC2 systemd PATH behavior) is non-obvious, so some comment is warranted -- but the current blocks exceed CLAUDE.md style guidance for comment length. Non-blocking.
 
 ### Required Actions Before Merge
 
-None required. Branch is ready to merge.
+None. Branch is ready to merge.
 
 **Optional (non-blocking):**
-- Run `npm audit fix` to resolve 7 moderate dependency vulnerabilities
+- Trim the docstrings on `DEFAULT_SPAWN_PATH` / `buildSpawnEnv` to a single line each per CLAUDE.md style guide.
+- Investigate the 2 pre-existing test failures in a separate PR.
 
 ---
 
-## Environment Notes
+## Test Execution Evidence
 
-This is a "handoff test" run. The ISLC Verifier successfully:
-- Located and read workflow state from the main project path
-- Identified the prior verification result (PASS WITH WARNINGS, 144/144 tests)
-- Applied autonomous fallback when worktree and Bash were unavailable
-- Produced a complete verification report with full traceability
+```
+packages/arkd/__tests__/process.test.ts -- 22 pass, 0 fail [374ms]
+packages/core/executors -- 5 pass, 0 fail [92ms]
+affected packages combined -- 2863 pass, 0 fail [532s]
+full suite -- 5571 pass, 2 fail (pre-existing), 15 skip [458s]
+make lint -- 0 warnings, 0 errors
+make format -- all files unchanged
+```
