@@ -1,5 +1,5 @@
 import { cn } from "../../lib/utils.js";
-import type { DaemonStatus } from "../../hooks/useDaemonStatus.js";
+import type { DaemonStatus, Reachability } from "../../hooks/useDaemonStatus.js";
 
 export interface IconRailItem {
   id: string;
@@ -47,6 +47,16 @@ export interface IconRailProps extends React.ComponentProps<"nav"> {
  *
  * Hover tooltips appear as pills to the right of each icon using native CSS.
  */
+/**
+ * "arkd: connection refused (http://localhost:19300)" -- pull the diagnostic
+ * details out of the Reachability so the tooltip tells the operator what
+ * went wrong, not just that something is off.
+ */
+function offlineReason(label: string, r: Reachability): string {
+  const detail = r.message || r.reason || "offline";
+  return r.url ? `${label}: ${detail} (${r.url})` : `${label}: ${detail}`;
+}
+
 function getDaemonDot(ds: DaemonStatus | null | undefined): {
   color: string;
   glow: string;
@@ -64,17 +74,19 @@ function getDaemonDot(ds: DaemonStatus | null | undefined): {
     };
   }
   if (conductor.online || arkd.online) {
+    const offline = conductor.online ? arkd : conductor;
+    const label = conductor.online ? "arkd" : "Conductor";
     return {
       color: "bg-[var(--waiting)]",
       glow: "",
-      title: `${conductor.online ? "Conductor" : "arkd"} online, ${conductor.online ? "arkd" : "conductor"} offline`,
+      title: offlineReason(label, offline),
       status: "partial",
     };
   }
   return {
     color: "bg-[var(--failed)]",
     glow: "shadow-[var(--failed-glow)]",
-    title: "Daemon offline -- run: ark server daemon start",
+    title: [offlineReason("Conductor", conductor), offlineReason("arkd", arkd)].join("\n"),
     status: "offline",
   };
 }

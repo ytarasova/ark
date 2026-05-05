@@ -20,7 +20,7 @@ import {
   Shield,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
+import type { DaemonStatus, Reachability } from "../hooks/useDaemonStatus.js";
 
 interface SidebarProps {
   activeView: string;
@@ -29,6 +29,12 @@ interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   daemonStatus?: DaemonStatus | null;
+}
+
+/** One-liner diagnostic for an offline service, e.g. `arkd: connection refused (http://localhost:19300)`. */
+function offlineReason(label: string, r: Reachability): string {
+  const detail = r.message || r.reason || "offline";
+  return r.url ? `${label}: ${detail} (${r.url})` : `${label}: ${detail}`;
 }
 
 /** Derive overall health from daemon probe results. */
@@ -43,16 +49,18 @@ function getDotState(ds: DaemonStatus | null | undefined): { color: string; glow
     };
   }
   if (conductor.online || arkd.online) {
+    const offline = conductor.online ? arkd : conductor;
+    const label = conductor.online ? "arkd" : "Conductor";
     return {
       color: "bg-[var(--waiting)]",
       glow: "",
-      title: `${conductor.online ? "Conductor" : "arkd"} online, ${conductor.online ? "arkd" : "conductor"} offline`,
+      title: offlineReason(label, offline),
     };
   }
   return {
     color: "bg-[var(--failed)]",
     glow: "",
-    title: "Conductor and arkd offline",
+    title: [offlineReason("Conductor", conductor), offlineReason("arkd", arkd)].join("\n"),
   };
 }
 

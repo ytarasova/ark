@@ -2,9 +2,28 @@ import { useState, useEffect, useCallback } from "react";
 import { useApi } from "./useApi.js";
 import { useSmartPoll } from "./useSmartPoll.js";
 
+/** Stable failure category surfaced by `daemon/status`. */
+export type ReachabilityReason = "connection-refused" | "timeout" | "http-error" | "unknown";
+
+/**
+ * Per-service reachability report. `online` / `url` are always present;
+ * when the probe failed, `reason` categorises the failure and `message`
+ * carries the human-readable detail (e.g. "connection refused",
+ * "/health returned HTTP 503"). `latencyMs` is the time the probe took
+ * -- surface it in debug overlays but not in the main status dot.
+ */
+export interface Reachability {
+  online: boolean;
+  url: string;
+  latencyMs?: number;
+  reason?: ReachabilityReason;
+  message?: string;
+  httpStatus?: number;
+}
+
 export interface DaemonStatus {
-  conductor: { online: boolean; url: string };
-  arkd: { online: boolean; url: string };
+  conductor: Reachability;
+  arkd: Reachability;
   router: { online: boolean };
 }
 
@@ -20,11 +39,14 @@ export function useDaemonStatus(intervalMs = 15000): DaemonStatus | null {
     api
       .getDaemonStatus()
       .then(setStatus)
-      .catch(() => {
-        // If the RPC itself fails, the web server is down
+      .catch((err: unknown) => {
+        // If the RPC itself fails, the web server is down. Treat that as
+        // an unknown-cause offline for both services so the UI can render
+        // the same diagnostic path it uses for a failed /health probe.
+        const message = err instanceof Error ? err.message : String(err ?? "RPC call failed");
         setStatus({
-          conductor: { online: false, url: "" },
-          arkd: { online: false, url: "" },
+          conductor: { online: false, url: "", reason: "unknown", message },
+          arkd: { online: false, url: "", reason: "unknown", message },
           router: { online: false },
         });
       });
