@@ -64,7 +64,7 @@
 <p>Auto-generated from the Commander.js tree. Run <code>make docs-cli</code> to regenerate.</p>
 </blockquote>
 <blockquote>
-<p>Version: 0.21.30</p>
+<p>Version: 0.21.41</p>
 </blockquote>
 <h2>Usage</h2>
 <pre><code>ark [options] &lt;command&gt;
@@ -117,10 +117,6 @@
 <tr>
 <td><a href="#ark-skill"><code>ark skill</code></a></td>
 <td>Manage skills</td>
-</tr>
-<tr>
-<td><a href="#ark-recipe"><code>ark recipe</code></a></td>
-<td>Manage recipes</td>
 </tr>
 <tr>
 <td><a href="#ark-schedule"><code>ark schedule</code></a></td>
@@ -275,10 +271,6 @@
 <td>Bridge stdin/stdout to a pooled MCP socket (internal)</td>
 </tr>
 <tr>
-<td><a href="#ark-acp"><code>ark acp</code></a></td>
-<td>Start headless ACP server on stdin/stdout (JSON-RPC)</td>
-</tr>
-<tr>
 <td><a href="#ark-repo-map"><code>ark repo-map</code></a></td>
 <td>Generate repository structure map</td>
 </tr>
@@ -373,11 +365,6 @@
 <td><code>--claude-session &lt;id&gt;</code></td>
 <td></td>
 <td>Create from an existing Claude Code session (use &#39;ark claude list&#39; to find IDs)</td>
-</tr>
-<tr>
-<td><code>--recipe &lt;name&gt;</code></td>
-<td></td>
-<td>Create session from a recipe template</td>
 </tr>
 <tr>
 <td><code>--max-budget &lt;usd&gt;</code></td>
@@ -2202,96 +2189,6 @@
 <td><code>name</code></td>
 <td>yes</td>
 <td>Skill name</td>
-</tr>
-</tbody></table>
-<p><strong>Options:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>-s, --scope &lt;scope&gt;</code></td>
-<td><code>&quot;global&quot;</code></td>
-<td>Scope: global or project</td>
-</tr>
-</tbody></table>
-<h2><code>ark recipe</code></h2>
-<p>Manage recipes</p>
-<p><strong>Synopsis:</strong> <code>ark recipe</code></p>
-<h3><code>ark recipe list</code></h3>
-<p>List available recipes</p>
-<p><strong>Synopsis:</strong> <code>ark recipe list</code></p>
-<h3><code>ark recipe show</code></h3>
-<p>Show recipe details</p>
-<p><strong>Synopsis:</strong> <code>ark recipe show &lt;name&gt;</code></p>
-<p><strong>Arguments:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Argument</th>
-<th>Required</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>name</code></td>
-<td>yes</td>
-<td>Recipe name</td>
-</tr>
-</tbody></table>
-<h3><code>ark recipe create</code></h3>
-<p>Create a new recipe</p>
-<p><strong>Synopsis:</strong> <code>ark recipe create [options]</code></p>
-<p><strong>Options:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>--from &lt;file&gt;</code></td>
-<td></td>
-<td>Create from YAML file</td>
-</tr>
-<tr>
-<td><code>--from-session &lt;id&gt;</code></td>
-<td></td>
-<td>Create from existing session</td>
-</tr>
-<tr>
-<td><code>-n, --name &lt;name&gt;</code></td>
-<td></td>
-<td>Recipe name (required with --from-session)</td>
-</tr>
-<tr>
-<td><code>-s, --scope &lt;scope&gt;</code></td>
-<td><code>&quot;global&quot;</code></td>
-<td>Scope: global or project</td>
-</tr>
-</tbody></table>
-<h3><code>ark recipe delete</code></h3>
-<p>Delete a recipe (global or project only)</p>
-<p><strong>Synopsis:</strong> <code>ark recipe delete [options] &lt;name&gt;</code></p>
-<p><strong>Arguments:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Argument</th>
-<th>Required</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>name</code></td>
-<td>yes</td>
-<td>Recipe name</td>
 </tr>
 </tbody></table>
 <p><strong>Options:</strong></p>
@@ -5323,9 +5220,6 @@
 <td></td>
 </tr>
 </tbody></table>
-<h2><code>ark acp</code></h2>
-<p>Start headless ACP server on stdin/stdout (JSON-RPC)</p>
-<p><strong>Synopsis:</strong> <code>ark acp</code></p>
 <h2><code>ark repo-map</code></h2>
 <p>Generate repository structure map</p>
 <p><strong>Synopsis:</strong> <code>ark repo-map [options] [dir]</code></p>

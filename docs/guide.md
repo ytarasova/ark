@@ -1161,7 +1161,6 @@ Additional CLI commands for diagnostics, initialization, and programmatic access
 | --------------- | ----------------------------------------------------------------------------------------------------- |
 | `ark doctor`    | Check system prerequisites (bun, tmux, git, gh, claude). Guards `session start` against missing deps. |
 | `ark init`      | Initialize Ark for a repo -- creates `.ark.yaml`, runs prerequisite checks.                           |
-| `ark acp`       | Start a headless JSON-RPC server on stdin/stdout for programmatic access.                             |
 | `ark repo-map`  | Generate a repository structure map.                                                                  |
 | `ark pr list`   | List sessions bound to PRs.                                                                           |
 | `ark pr status` | Show session bound to a specific PR URL.                                                              |
