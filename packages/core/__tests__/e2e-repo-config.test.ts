@@ -73,13 +73,10 @@ describe("repo-scoped config E2E", async () => {
     });
     sessionIds.push(session.id);
 
-    // Default flow is "default" when nothing is specified.
-    // Default compute_name is "local" -- the repo backfills it at create
-    // time so downstream views (compute panel, dispatch resolver) never
-    // see NULL on fresh sessions. See #472.
+    // Default flow is "default" when nothing is specified
     expect(session.flow).toBe("default");
     expect(session.group_name).toBeNull();
-    expect(session.compute_name).toBe("local");
+    expect(session.compute_name).toBeNull();
   });
 
   it("falls back to repo path when workdir is not set", async () => {

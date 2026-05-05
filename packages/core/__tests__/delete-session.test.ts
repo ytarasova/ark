@@ -186,20 +186,15 @@ describe("sessionLifecycle.deleteSession", async () => {
   });
 
   it("works when session has no compute (compute_name is null)", async () => {
-    // Defensive test: legacy DB rows from before #472 may have NULL
-    // compute_name. New sessions can't reach this state via the create path
-    // (the repo defaults compute_name to "local" -- see
-    // packages/core/repositories/session.ts), so we have to demote the
-    // column manually to recreate the legacy shape and exercise the
-    // delete path against it.
     const session = await app.sessionLifecycle.start({
       repo: "/tmp/fake-repo",
       summary: "no-compute-test",
       flow: "bare",
+      // No compute_name specified
     });
-    await app.sessions.update(session.id, { compute_name: null });
-    const reread = await app.sessions.get(session.id);
-    expect(reread!.compute_name).toBeNull();
+
+    // Verify compute_name is null
+    expect(session.compute_name).toBeNull();
 
     // Should not throw
     const result = await app.sessionLifecycle.deleteSession(session.id);
