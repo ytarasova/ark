@@ -26,6 +26,8 @@ import * as m010 from "./010_stage_operations.js";
 import * as m011 from "./011_session_orchestrator.js";
 // Migration 012: rename compute.runtime_kind to compute.isolation_kind.
 import * as m012 from "./012_isolation_kind_rename.js";
+// Migration 013: retag eval knowledge nodes to type='eval_session' (#480).
+import * as m013 from "./013_eval_session_type.js";
 
 export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m001.VERSION, name: m001.NAME, up: m001.up },
@@ -44,4 +46,5 @@ export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m010.VERSION, name: m010.NAME, up: m010.up },
   { version: m011.VERSION, name: m011.NAME, up: m011.up },
   { version: m012.VERSION, name: m012.NAME, up: m012.up },
+  { version: m013.VERSION, name: m013.NAME, up: m013.up },
 ];
