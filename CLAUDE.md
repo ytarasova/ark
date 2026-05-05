@@ -30,7 +30,7 @@ make test             # run if you touched logic
 ```
 packages/
   cli/       -> Commander.js CLI entry
-  core/      -> Sessions, stores, flows, agents, channels, conductor, search, app context
+  core/      -> Sessions, stores, flows, agents, channels, conductor, app context
   compute/   -> 11 providers (local, docker, devcontainer, firecracker, ec2-*, e2b, k8s, k8s-kata)
   arkd/      -> Universal agent daemon (:19300) on every compute target
   router/    -> LLM Router (OpenAI-compatible proxy, 3 policies, circuit breakers)
@@ -39,6 +39,7 @@ packages/
   web/       -> Vite web dashboard (SSE, Recharts)
   desktop/   -> Electron shell wrapping the web dashboard
   types/     -> Domain interfaces
+  workspace/ -> Multi-repo workspace store + provisioner (workspaces + workspace_repos tables)
 agents/      -> Agent YAML definitions
 runtimes/    -> Runtime definitions (claude, codex, gemini, goose)
 flows/       -> Flow definitions (autonomous-sdlc, quick, fan-out, etc.)
