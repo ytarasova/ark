@@ -72,6 +72,32 @@ interface ProcessEntry {
 const processes = new Map<string, ProcessEntry>();
 
 /**
+ * POSIX default PATH. Matches systemd's `DEFAULT_PATH_NORMAL` and the value
+ * login(1) falls back to when /etc/login.defs has no ENV_PATH. Used as a
+ * defense-in-depth fallback when neither arkd's own `process.env.PATH` nor
+ * the caller's `req.env` supplies a PATH -- which is exactly what happens
+ * on EC2 where arkd runs under a systemd unit that sets only `HOME`: any
+ * caller that spawns an unqualified `bash` / `sh` would otherwise fail
+ * with ENOENT because `Bun.spawn` resolves the cmd through the child env's
+ * PATH, not the parent's.
+ */
+export const DEFAULT_SPAWN_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+
+/**
+ * Build the env that the spawned child inherits. Merges arkd's own process
+ * env with any caller-supplied overrides (caller wins), then guarantees a
+ * non-empty PATH so unqualified cmds resolve. Exported for unit testing.
+ */
+export function buildSpawnEnv(
+  parentEnv: NodeJS.ProcessEnv,
+  reqEnv: Record<string, string> | undefined,
+): Record<string, string> {
+  const env = { ...parentEnv, ...(reqEnv ?? {}) } as Record<string, string>;
+  if (!env.PATH || env.PATH.length === 0) env.PATH = DEFAULT_SPAWN_PATH;
+  return env;
+}
+
+/**
  * Test-only helper: clear the in-memory process map. Production code never
  * needs this -- the map is bounded by the runtime layer's own session
  * lifecycle, and entries cost a handful of bytes each.
@@ -144,7 +170,7 @@ async function spawnProcess(req: ProcessSpawnReq): Promise<ProcessSpawnRes> {
   const child = Bun.spawn({
     cmd: [req.cmd, ...req.args],
     cwd: req.workdir,
-    env: { ...process.env, ...(req.env ?? {}) } as Record<string, string>,
+    env: buildSpawnEnv(process.env, req.env),
     stdout: wantPipes ? "pipe" : "ignore",
     stderr: wantPipes ? "pipe" : "ignore",
   });
