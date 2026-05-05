@@ -32,7 +32,16 @@ export interface ContextPackage {
   skills: Array<{ name: string; description: string }>;
 }
 
-export type NodeType = "file" | "symbol" | "session" | "memory" | "learning" | "skill" | "recipe" | "agent";
+export type NodeType =
+  | "file"
+  | "symbol"
+  | "session"
+  | "eval_session"
+  | "memory"
+  | "learning"
+  | "skill"
+  | "recipe"
+  | "agent";
 export type EdgeRelation =
   | "depends_on"
   | "imports"

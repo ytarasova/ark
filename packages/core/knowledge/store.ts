@@ -95,17 +95,7 @@ export class KnowledgeStore {
     await this.db.prepare("DELETE FROM knowledge WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
   }
 
-  // Eval nodes are tagged with `metadata.eval = true` by evaluateSession in
-  // packages/core/knowledge/evals.ts. They share `type: "session"` with
-  // production sessions, so without an explicit filter they pollute every
-  // search/list call -- including the auto-injected context block on
-  // every dispatch (#480). Default-exclude them; eval-side reads opt in
-  // via `includeEvals: true`.
-  private isEvalNode(node: KnowledgeNode): boolean {
-    return node.metadata?.eval === true;
-  }
-
-  async listNodes(opts?: { type?: NodeType; limit?: number; includeEvals?: boolean }): Promise<KnowledgeNode[]> {
+  async listNodes(opts?: { type?: NodeType; limit?: number }): Promise<KnowledgeNode[]> {
     let sql = "SELECT * FROM knowledge WHERE tenant_id = ?";
     const params: unknown[] = [this.tenantId];
     if (opts?.type) {
@@ -113,20 +103,12 @@ export class KnowledgeStore {
       params.push(opts.type);
     }
     sql += " ORDER BY updated_at DESC";
-    // Over-fetch when filtering evals so we still hit `limit` after the
-    // post-filter. Bounded to 4x to avoid scanning the whole table on
-    // pathological eval-heavy stores.
-    const includeEvals = opts?.includeEvals ?? false;
-    const rawLimit = opts?.limit;
-    if (rawLimit) {
+    if (opts?.limit) {
       sql += " LIMIT ?";
-      params.push(includeEvals ? rawLimit : Math.min(rawLimit * 4, rawLimit + 100));
+      params.push(opts.limit);
     }
     const rows = (await this.db.prepare(sql).all(...params)) as NodeRow[];
-    let nodes = rows.map((r) => this.rowToNode(r));
-    if (!includeEvals) nodes = nodes.filter((n) => !this.isEvalNode(n));
-    if (rawLimit && nodes.length > rawLimit) nodes = nodes.slice(0, rawLimit);
-    return nodes;
+    return rows.map((r) => this.rowToNode(r));
   }
 
   // --- Edge CRUD ---
@@ -225,9 +207,14 @@ export class KnowledgeStore {
   }
 
   // --- Search ---
+  // NOTE: callers searching production context (e.g. `buildContext` in
+  // context.ts) should NOT pass `eval_session` in `types`. Eval nodes
+  // belong to a separate type by design (#480) -- if a future caller
+  // wants to mix them with production search, that's a deliberate opt-in
+  // by listing both types in the `types` filter.
   async search(
     query: string,
-    opts?: { types?: NodeType[]; limit?: number; includeEvals?: boolean },
+    opts?: { types?: NodeType[]; limit?: number },
   ): Promise<Array<KnowledgeNode & { score: number }>> {
     const words = query
       .toLowerCase()
@@ -240,6 +227,11 @@ export class KnowledgeStore {
     if (opts?.types?.length) {
       sql += ` AND type IN (${opts.types.map(() => "?").join(", ")})`;
       params.push(...opts.types);
+    } else {
+      // No type filter passed: a search-the-whole-store call. Exclude
+      // eval_session by default since these never belong in production
+      // dispatch context. Callers wanting evals must list types explicitly.
+      sql += ` AND type != 'eval_session'`;
     }
     // LIKE-based search (works for both SQLite and Postgres)
     const likeClauses = words.map(() => "(LOWER(label) LIKE ? OR LOWER(content) LIKE ?)");
@@ -247,23 +239,19 @@ export class KnowledgeStore {
     for (const w of words) {
       params.push(`%${w}%`, `%${w}%`);
     }
-    // Same over-fetch trick as listNodes -- fetch 4x when filtering evals
-    // so the post-filtered result still hits the caller's limit.
-    const includeEvals = opts?.includeEvals ?? false;
-    const rawLimit = opts?.limit ?? 20;
     sql += ` LIMIT ?`;
-    params.push(includeEvals ? rawLimit : Math.min(rawLimit * 4, rawLimit + 100));
+    params.push(opts?.limit ?? 20);
 
     const rows = (await this.db.prepare(sql).all(...params)) as NodeRow[];
-    let scored = rows.map((row) => {
-      const node = this.rowToNode(row);
-      // Simple scoring: count word matches
-      const text = `${node.label} ${node.content ?? ""}`.toLowerCase();
-      const score = words.reduce((s, w) => s + (text.includes(w) ? 1 : 0), 0) / words.length;
-      return { ...node, score };
-    });
-    if (!includeEvals) scored = scored.filter((n) => !this.isEvalNode(n));
-    return scored.sort((a, b) => b.score - a.score).slice(0, rawLimit);
+    return rows
+      .map((row) => {
+        const node = this.rowToNode(row);
+        // Simple scoring: count word matches
+        const text = `${node.label} ${node.content ?? ""}`.toLowerCase();
+        const score = words.reduce((s, w) => s + (text.includes(w) ? 1 : 0), 0) / words.length;
+        return { ...node, score };
+      })
+      .sort((a, b) => b.score - a.score);
   }
 
   // --- Bulk ---
