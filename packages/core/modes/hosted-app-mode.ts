@@ -86,7 +86,6 @@ export function buildHostedAppMode(database: DatabaseMode, config?: ArkConfig): 
     fsCapability: null,
     knowledgeCapability: null,
     repoMapCapability: null,
-    ftsRebuildCapability: null,
     hostCommandCapability: null,
     computeBootstrap: makeNoopComputeBootstrap(),
     migrations: buildMigrationsCapability("postgres"),

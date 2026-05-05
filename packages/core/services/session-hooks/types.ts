@@ -82,14 +82,11 @@ export interface SessionHooksDeps {
 
 export interface HookStatusResult {
   newStatus?: string;
-  shouldIndex?: boolean;
   claudeSessionId?: string;
   /** Store updates to apply */
   updates?: Partial<Session>;
   /** Events to log */
   events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
-  /** Transcript indexing info */
-  indexTranscript?: { transcriptPath: string; sessionId: string };
   /** Whether to call advance() after applying updates (auto-gate SessionEnd fallback) */
   shouldAdvance?: boolean;
   /** Whether to auto-dispatch next stage after advance */

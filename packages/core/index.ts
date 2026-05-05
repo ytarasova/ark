@@ -70,20 +70,6 @@ export * from "./infra/tmux.js";
 // Event bus
 export * from "./hooks.js";
 
-// Search
-export {
-  searchSessions,
-  searchTranscripts,
-  indexTranscripts,
-  indexSession,
-  getIndexStats,
-  getSessionConversation,
-  searchSessionConversation,
-  ftsTableExists,
-  type SearchResult,
-  type SearchOpts,
-} from "./search/search.js";
-
 // GitHub PR utilities (lookup, formatting)
 export { findSessionByPR, formatReviewPrompt, extractComments } from "./integrations/github-pr.js";
 
@@ -104,13 +90,6 @@ export {
 export { startConductor } from "./conductor/conductor.js";
 
 // Claude sessions
-export {
-  listClaudeSessions,
-  getClaudeSession,
-  refreshClaudeSessionsCache,
-  type ClaudeSession,
-} from "./claude/sessions.js";
-
 // Repo-scoped config
 export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 
@@ -244,9 +223,6 @@ export {
 
 // Notification daemon
 export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./infra/notify-daemon.js";
-
-// Global search
-export { searchAllConversations, type GlobalSearchResult } from "./search/global-search.js";
 
 // Multi-instance coordination
 export { registerInstance, activeInstanceCount } from "./infra/instance-lock.js";

@@ -129,11 +129,6 @@ const WRITE_METHODS = new Set([
   "profile/delete",
   "profile/set",
   "config/write",
-  "history/import",
-  "history/refresh",
-  "history/index",
-  "history/rebuild-fts",
-  "history/refresh-and-index",
   "tools/delete",
 ]);
 
