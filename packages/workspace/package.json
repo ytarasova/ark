@@ -1,0 +1,12 @@
+{
+  "name": "@ark/workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./types.ts",
+    "./constants": "./constants.ts"
+  }
+}
