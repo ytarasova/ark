@@ -7,12 +7,12 @@
  * timer handles so the caller can `clearInterval` on shutdown.
  */
 
-import type { AppContext } from "../app.js";
-import { safeAsync } from "../safe.js";
-import { listSchedules, cronMatches, updateScheduleLastRun } from "../schedule.js";
-import { pollPRReviews } from "../integrations/pr-poller.js";
-import { pollPRMerges } from "../integrations/pr-merge-poller.js";
-import { pollIssues } from "../integrations/issue-poller.js";
+import type { AppContext } from "../../app.js";
+import { safeAsync } from "../../safe.js";
+import { listSchedules, cronMatches, updateScheduleLastRun } from "../../schedule.js";
+import { pollPRReviews } from "../../integrations/pr-poller.js";
+import { pollPRMerges } from "../../integrations/pr-merge-poller.js";
+import { pollIssues } from "../../integrations/issue-poller.js";
 
 /** Interval between schedule and PR review poll ticks. */
 const POLL_INTERVAL_MS = 60_000;

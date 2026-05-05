@@ -32,7 +32,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { startConductor } from "../conductor/conductor.js";
+import { startConductor } from "../conductor/server/conductor.js";
 
 const TEST_PORT = 19198;
 const BASE = `http://localhost:${TEST_PORT}`;

@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { startConductor } from "../conductor/conductor.js";
+import { startConductor } from "../conductor/server/conductor.js";
 import { withTestContext, getApp } from "./test-helpers.js";
 
 const TEST_PORT = 19199;

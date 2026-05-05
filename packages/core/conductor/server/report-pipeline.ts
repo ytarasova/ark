@@ -8,14 +8,14 @@
  * (notifications, artifact tracking, knowledge indexing, auto-PR).
  */
 
-import type { AppContext } from "../app.js";
-import { createWorktreePR } from "../services/worktree/index.js";
-import { eventBus } from "../hooks.js";
-import type { OutboundMessage } from "./channel-types.js";
-import { safeAsync } from "../safe.js";
-import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
-import { sendOSNotification } from "../notify.js";
-import { markDispatchFailedShared } from "../services/session-dispatch-listeners.js";
+import type { AppContext } from "../../app.js";
+import { createWorktreePR } from "../../services/worktree/index.js";
+import { eventBus } from "../../hooks.js";
+import type { OutboundMessage } from "../common/channel-types.js";
+import { safeAsync } from "../../safe.js";
+import { logDebug, logError, logInfo, logWarn } from "../../observability/structured-log.js";
+import { sendOSNotification } from "../../notify.js";
+import { markDispatchFailedShared } from "../../services/session-dispatch-listeners.js";
 
 export async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
   const result = await app.sessionHooks.applyReport(sessionId, report);
@@ -124,7 +124,7 @@ export async function handleReport(app: AppContext, sessionId: string, report: O
 
   if (report.type === "completed" && app.knowledge) {
     try {
-      const { indexSessionCompletion } = await import("../knowledge/indexer.js");
+      const { indexSessionCompletion } = await import("../../knowledge/indexer.js");
       const s = await app.sessions.get(sessionId);
       const changedFiles = ((report as unknown as Record<string, unknown>).filesChanged as string[] | undefined) ?? [];
       await indexSessionCompletion(app.knowledge, sessionId, s?.summary ?? "", "completed", changedFiles);
@@ -136,7 +136,7 @@ export async function handleReport(app: AppContext, sessionId: string, report: O
   if (report.type === "completed" && !result.prUrl) {
     const s = await app.sessions.get(sessionId);
     if (s && !s.pr_url && s.config?.github_url && s.branch) {
-      const { loadRepoConfig } = await import("../repo-config.js");
+      const { loadRepoConfig } = await import("../../repo-config.js");
       const repoConfig = s.workdir ? loadRepoConfig(s.workdir) : {};
       const autoPR = repoConfig.auto_pr !== false;
 

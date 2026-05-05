@@ -5,8 +5,8 @@
  * as 503s here. Hosted control-plane mounts the manager at DI startup.
  */
 
-import type { AppContext } from "../app.js";
-import { logInfo } from "../observability/structured-log.js";
+import type { AppContext } from "../../app.js";
+import { logInfo } from "../../observability/structured-log.js";
 
 export function handleTenantPolicyGet(app: AppContext, tenantId: string): Response {
   try {
@@ -39,7 +39,7 @@ export async function handleTenantPolicySet(app: AppContext, req: Request, tenan
       default_provider: (body.default_provider as string) ?? "k8s",
       max_concurrent_sessions: (body.max_concurrent_sessions as number) ?? 10,
       max_cost_per_day_usd: (body.max_cost_per_day_usd as number | null) ?? null,
-      compute_pools: (body.compute_pools as unknown as import("../auth/tenant-policy.js").ComputePoolRef[]) ?? [],
+      compute_pools: (body.compute_pools as unknown as import("../../auth/tenant-policy.js").ComputePoolRef[]) ?? [],
       router_enabled: (body.router_enabled as boolean | null) ?? null,
       router_required: (body.router_required as boolean) ?? false,
       router_policy: (body.router_policy as string | null) ?? null,

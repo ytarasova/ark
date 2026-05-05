@@ -13,8 +13,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { startConductor } from "../conductor/conductor.js";
-import type { OutboundMessage } from "../conductor/channel-types.js";
+import { startConductor } from "../conductor/server/conductor.js";
+import type { OutboundMessage } from "../conductor/common/channel-types.js";
 
 const TEST_PORT = 19197;
 

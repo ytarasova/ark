@@ -143,7 +143,7 @@ export async function processReviewFeedback(
   const channelPort = await app.sessions.channelPort(session.id);
   const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
   const delivered = await safeAsync(`pr-poller: deliverToChannel for ${session.id}`, async () => {
-    const { deliverToChannel } = await import("../conductor/conductor.js");
+    const { deliverToChannel } = await import("../conductor/server/conductor.js");
     await deliverToChannel(app, session, channelPort, steerPayload);
   });
   if (delivered) return;

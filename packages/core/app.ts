@@ -451,7 +451,7 @@ export class AppContext {
         if (!provider) continue;
         const arkdUrl = (provider as { getArkdUrl?: (c: typeof compute) => string }).getArkdUrl?.(compute);
         if (!arkdUrl) continue;
-        const { startArkdEventsConsumer } = await import("./conductor/arkd-events-consumer.js");
+        const { startArkdEventsConsumer } = await import("./conductor/server/arkd-events-consumer.js");
         startArkdEventsConsumer(tenantApp, computeName, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
         consumers++;
       } catch (err: any) {

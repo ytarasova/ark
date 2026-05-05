@@ -94,7 +94,7 @@ export interface AuxiliaryDaemons {
 export async function startAuxiliaryDaemons(app: AppContext): Promise<AuxiliaryDaemons> {
   const auxiliary: { stop: () => void }[] = [];
 
-  const { startConductor } = await import("../../core/conductor/conductor.js");
+  const { startConductor } = await import("../../core/conductor/server/conductor.js");
   const { startArkd } = await import("../../arkd/index.js");
   const { DEFAULT_CONDUCTOR_PORT, DEFAULT_ARKD_PORT } = await import("../../core/constants.js");
 

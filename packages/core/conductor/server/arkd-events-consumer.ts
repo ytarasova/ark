@@ -28,14 +28,14 @@
  * a flaky network can't kill the conductor.
  */
 
-import type { Session } from "../../types/index.js";
-import type { AppContext } from "../app.js";
+import type { Session } from "../../../types/index.js";
+import type { AppContext } from "../../app.js";
 import { handleHookStatus } from "./hook-status-handler.js";
 import { handleReport } from "./report-pipeline.js";
-import type { OutboundMessage } from "./channel-types.js";
+import type { OutboundMessage } from "../common/channel-types.js";
 import { deliverToChannel } from "./deliver-to-channel.js";
-import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
-import { ArkdClient } from "../../arkd/index.js";
+import { logDebug, logInfo, logWarn } from "../../observability/structured-log.js";
+import { ArkdClient } from "../../../arkd/index.js";
 
 interface ConsumerEntry {
   computeName: string;

@@ -3,10 +3,10 @@
  * and the `/api/sessions/:id/tree/stream` SSE endpoint.
  */
 
-import type { AppContext } from "../app.js";
+import type { AppContext } from "../../app.js";
 import { appForRequest } from "./tenant.js";
-import { eventBus } from "../hooks.js";
-import { readForensicFile } from "../services/session-forensic.js";
+import { eventBus } from "../../hooks.js";
+import { readForensicFile } from "../../services/session-forensic.js";
 
 /** Extract a path segment by index, returning null if missing. */
 function extractPathSegment(path: string, index: number): string | null {

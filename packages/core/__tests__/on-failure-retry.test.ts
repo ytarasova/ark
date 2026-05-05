@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { parseOnFailure } from "../services/session-hooks/index.js";
-import { startConductor } from "../conductor/conductor.js";
+import { startConductor } from "../conductor/server/conductor.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

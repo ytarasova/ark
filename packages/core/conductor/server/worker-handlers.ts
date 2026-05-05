@@ -7,8 +7,8 @@
  * clean 503 rather than propagate the raw stack.
  */
 
-import type { AppContext } from "../app.js";
-import { logInfo } from "../observability/structured-log.js";
+import type { AppContext } from "../../app.js";
+import { logInfo } from "../../observability/structured-log.js";
 
 export async function handleWorkerRegister(app: AppContext, req: Request): Promise<Response> {
   try {

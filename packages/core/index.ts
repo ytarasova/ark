@@ -87,7 +87,7 @@ export {
 } from "./integrations/issue-poller.js";
 
 // Conductor
-export { startConductor } from "./conductor/conductor.js";
+export { startConductor } from "./conductor/server/conductor.js";
 
 // Claude sessions
 // Repo-scoped config

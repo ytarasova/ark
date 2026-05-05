@@ -7,9 +7,9 @@
  * check-suite or health probe fails within the configured timeout.
  */
 
-import type { AppContext } from "../app.js";
-import { logError } from "../observability/structured-log.js";
-import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
+import type { AppContext } from "../../app.js";
+import { logError } from "../../observability/structured-log.js";
+import { watchMergedPR, type RollbackConfig } from "../../integrations/rollback.js";
 
 /** GitHub PR merge webhook payload (subset of fields we use). */
 interface GitHubPRWebhookPayload {
@@ -65,7 +65,7 @@ export async function handlePRMergeWebhook(app: AppContext, req: Request): Promi
     const res = await fetch(`https://api.github.com/repos/${repo.full_name}/commits/${sha}/check-suites`, {
       headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" },
     });
-    return res.json() as Promise<{ check_suites: import("../integrations/rollback.js").CheckSuiteResult[] }>;
+    return res.json() as Promise<{ check_suites: import("../../integrations/rollback.js").CheckSuiteResult[] }>;
   };
 
   const healthFetcher = config.health_url
@@ -79,7 +79,7 @@ export async function handlePRMergeWebhook(app: AppContext, req: Request): Promi
       }
     : undefined;
 
-  const onRevert = async (revertPayload: import("../integrations/rollback.js").RevertPayload) => {
+  const onRevert = async (revertPayload: import("../../integrations/rollback.js").RevertPayload) => {
     await fetch(`https://api.github.com/repos/${repo?.full_name}/pulls`, {
       method: "POST",
       headers: {

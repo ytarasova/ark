@@ -6,7 +6,7 @@
  * adapter from `Request` headers to the resolver input shape.
  */
 
-import type { AppContext } from "../app.js";
+import type { AppContext } from "../../app.js";
 
 export type TenantResolution = { ok: true; app: AppContext } | { ok: false; response: Response };
 

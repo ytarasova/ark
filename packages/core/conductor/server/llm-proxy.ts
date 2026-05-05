@@ -5,7 +5,7 @@
  * compute can reach the router through the single conductor hostname.
  */
 
-import type { AppContext } from "../app.js";
+import type { AppContext } from "../../app.js";
 
 /**
  * Proxy an HTTP request to the LLM router, streaming the response back.

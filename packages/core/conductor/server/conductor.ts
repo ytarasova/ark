@@ -35,11 +35,11 @@ declare const Bun: {
   };
 };
 
-import type { Session } from "../../types/index.js";
-import type { AppContext } from "../app.js";
-import type { OutboundMessage } from "./channel-types.js";
-import { logInfo } from "../observability/structured-log.js";
-import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST } from "../constants.js";
+import type { Session } from "../../../types/index.js";
+import type { AppContext } from "../../app.js";
+import type { OutboundMessage } from "../common/channel-types.js";
+import { logInfo } from "../../observability/structured-log.js";
+import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST } from "../../constants.js";
 import { appForRequest } from "./tenant.js";
 import { handleReport } from "./report-pipeline.js";
 import { handleHookStatus } from "./hook-status-handler.js";
@@ -249,5 +249,5 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: Cond
 }
 
 // Re-exported so existing integration imports keep working:
-//   `import { deliverToChannel } from "../conductor/conductor.js"`
+//   `import { deliverToChannel } from "../../conductor/conductor.js"`
 export { deliverToChannel } from "./deliver-to-channel.js";

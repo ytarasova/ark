@@ -13,14 +13,13 @@
  * status transitions.
  */
 
-import type { AppContext } from "../app.js";
+import type { AppContext } from "../../app.js";
 import { appForRequest } from "./tenant.js";
-import type { OutboundMessage } from "./channel-types.js";
+import type { OutboundMessage } from "../common/channel-types.js";
 import { handleReport } from "./report-pipeline.js";
-import { eventBus } from "../hooks.js";
-import { safeAsync } from "../safe.js";
-import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
-import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
+import { eventBus } from "../../hooks.js";
+import { logDebug, logError, logInfo, logWarn } from "../../observability/structured-log.js";
+import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../../observability/otlp.js";
 
 export async function handleHookStatus(app: AppContext, req: Request, url: URL): Promise<Response> {
   const sessionId = url.searchParams.get("session");
@@ -94,7 +93,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
   if (event === "PreToolUse") {
     const toolName = String(payload.tool_name ?? "");
     const toolInput = (payload.tool_input ?? {}) as Record<string, any>;
-    const { evaluateToolCall } = await import("../session/guardrails.js");
+    const { evaluateToolCall } = await import("../../session/guardrails.js");
     const evalResult = evaluateToolCall(toolName, toolInput);
 
     if (evalResult.action === "block") {
@@ -193,7 +192,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
       // Worktree removal + session_cleaned event (idempotent; safe to call
       // here without transactional coupling -- cleanup is external state only).
       try {
-        const { cleanupSession } = await import("../services/session/cleanup.js");
+        const { cleanupSession } = await import("../../services/session/cleanup.js");
         const sessionForCleanup = await scoped.sessions.get(sessionId);
         if (sessionForCleanup) await cleanupSession(scoped, sessionForCleanup);
       } catch (err: any) {
@@ -205,7 +204,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
       flushSpans();
 
       try {
-        const { evaluateSession } = await import("../knowledge/evals.js");
+        const { evaluateSession } = await import("../../knowledge/evals.js");
         const freshSession = await scoped.sessions.get(sessionId);
         if (freshSession) await evaluateSession(scoped, freshSession);
       } catch {

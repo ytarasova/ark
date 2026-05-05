@@ -7,13 +7,13 @@
  * instead of pulling in the full Conductor class file.
  */
 
-import type { Session } from "../../types/index.js";
-import type { AppContext } from "../app.js";
-import { getProvider } from "../../compute/index.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
-import { ArkdClient } from "../../arkd/client.js";
-import { logDebug } from "../observability/structured-log.js";
-import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
+import type { Session } from "../../../types/index.js";
+import type { AppContext } from "../../app.js";
+import { getProvider } from "../../../compute/index.js";
+import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { ArkdClient } from "../../../arkd/client.js";
+import { logDebug } from "../../observability/structured-log.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "../../constants.js";
 
 /**
  * Deliver a message to a session's channel, using arkd if available.
