@@ -59,7 +59,16 @@ export class SessionService {
    * no telemetry, no OTLP spans (those belong at the orchestration layer above).
    */
   async start(opts: CreateSessionOpts): Promise<Session> {
-    const session = await this.sessions.create(opts);
+    // compute_name fallback: explicit arg > "local". Mirrors the
+    // service-level default in `services/session/create.ts` so every
+    // path through `sessionService.start` lands in the DB with a
+    // non-null compute_name (the compute panel filter relies on this).
+    // Tests that need the legacy NULL behaviour go through
+    // `app.sessions.create()` directly. See #472.
+    const session = await this.sessions.create({
+      ...opts,
+      compute_name: opts.compute_name ?? "local",
+    });
 
     // Apply agent override if specified
     if (opts.agent) {
