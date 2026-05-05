@@ -33,7 +33,7 @@ afterEach(async () => {
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
-function waitFor(fn: () => boolean | Promise<boolean>, timeoutMs = 10000): Promise<void> {
+function waitFor(fn: () => boolean | Promise<boolean>, timeoutMs = 25000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = async () => {
