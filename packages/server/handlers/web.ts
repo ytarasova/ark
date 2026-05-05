@@ -21,19 +21,7 @@ import { exportSession } from "../../core/session/share.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { generateOpenApiSpec } from "../../core/openapi.js";
 import { DEFAULT_ARKD_URL } from "../../core/constants.js";
-
-/** Probe a URL's /health endpoint with a short timeout. Returns true if reachable. */
-async function probeHealth(baseUrl: string, timeoutMs = 2000): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const resp = await fetch(`${baseUrl}/health`, { signal: controller.signal });
-    clearTimeout(timer);
-    return resp.ok;
-  } catch {
-    return false;
-  }
-}
+import { probeReachability } from "../../core/infra/reachability.js";
 
 export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Status ───────────────────────────────────────────────────────────────
@@ -47,15 +35,21 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   });
 
   // ── Daemon auto-detection ────────────────────────────────────────────────
+  //
+  // `conductor` and `arkd` carry the full ReachabilityResult (online +
+  // url + optional reason / message / latencyMs / httpStatus) so the UI
+  // can render an actionable diagnostic when a probe fails. The `online`
+  // + `url` fields are preserved for legacy callers that only inspect
+  // those two keys.
   router.handle("daemon/status", async () => {
     const conductorUrl = app.config.conductorUrl;
     const arkdUrl = process.env.ARK_ARKD_URL || DEFAULT_ARKD_URL;
 
-    const [conductor, arkd] = await Promise.all([probeHealth(conductorUrl), probeHealth(arkdUrl)]);
+    const [conductor, arkd] = await Promise.all([probeReachability(conductorUrl), probeReachability(arkdUrl)]);
 
     return {
-      conductor: { online: conductor, url: conductorUrl },
-      arkd: { online: arkd, url: arkdUrl },
+      conductor,
+      arkd,
       router: { online: app.config.router.enabled },
     };
   });

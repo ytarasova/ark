@@ -62,6 +62,29 @@ describe("daemon/status RPC handler", async () => {
     }
   });
 
+  it("surfaces a reachability reason + message + url when arkd is unreachable", async () => {
+    // Point arkd URL at an unused port so the probe fails fast.
+    const origUrl = process.env.ARK_ARKD_URL;
+    process.env.ARK_ARKD_URL = "http://localhost:19398";
+    try {
+      server = startWebServer(getApp(), { port: 18563 });
+      const data = await rpcResult(18563, "daemon/status");
+      const result = data.result as Record<string, any>;
+
+      expect(result.arkd.online).toBe(false);
+      expect(result.arkd.url).toBe("http://localhost:19398");
+      // Categorised reason lets the UI render an actionable diagnostic rather
+      // than a bare "could not reach arkd" banner. Accept either reason here
+      // because host firewalls may convert refused -> timeout.
+      expect(["connection-refused", "timeout", "unknown"]).toContain(result.arkd.reason);
+      expect(typeof result.arkd.message).toBe("string");
+      expect(typeof result.arkd.latencyMs).toBe("number");
+    } finally {
+      if (origUrl !== undefined) process.env.ARK_ARKD_URL = origUrl;
+      else delete process.env.ARK_ARKD_URL;
+    }
+  });
+
   it("includes proper URLs from config/env", async () => {
     server = startWebServer(getApp(), { port: 18562 });
     const data = await rpcResult(18562, "daemon/status");

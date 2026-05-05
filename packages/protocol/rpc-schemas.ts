@@ -1301,10 +1301,21 @@ export type StatusGetResponse = z.infer<typeof statusGetResponse>;
 export const daemonStatusRequest = z.object({}).loose();
 export type DaemonStatusRequest = z.infer<typeof daemonStatusRequest>;
 
+const reachabilitySchema = z
+  .object({
+    online: z.boolean(),
+    url: z.string(),
+    latencyMs: z.number().optional(),
+    reason: z.enum(["connection-refused", "timeout", "http-error", "unknown"]).optional(),
+    message: z.string().optional(),
+    httpStatus: z.number().optional(),
+  })
+  .loose();
+
 export const daemonStatusResponse = z
   .object({
-    conductor: z.object({ online: z.boolean(), url: z.string() }).loose(),
-    arkd: z.object({ online: z.boolean(), url: z.string() }).loose(),
+    conductor: reachabilitySchema,
+    arkd: reachabilitySchema,
     router: z.object({ online: z.boolean() }).loose(),
   })
   .loose();
