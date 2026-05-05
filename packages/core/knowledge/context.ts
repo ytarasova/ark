@@ -95,8 +95,14 @@ export async function buildContext(
         break;
       case "session":
         if (ctx.sessions.length < maxSessions) {
+          // Filter eval-harness sessions out of the prod context. They
+          // pollute every dispatch with rows like
+          // `eval:s-...: Eval: plan-then-implement iteration 0 (, changed: )`
+          // because outcome + files_changed are empty by design. See #480.
+          const sessionId = node.id.replace("session:", "");
+          if (sessionId.startsWith("eval:") || sessionId.startsWith("eval-")) break;
           ctx.sessions.push({
-            id: node.id.replace("session:", ""),
+            id: sessionId,
             summary: node.label,
             outcome: (node.metadata.outcome as string) ?? "",
             files_changed: (node.metadata.files_changed as string[]) ?? [],
@@ -151,12 +157,17 @@ export function formatContextAsMarkdown(ctx: ContextPackage, opts?: { maxChars?:
   }
 
   if (ctx.sessions.length > 0) {
-    const s =
-      "## Related Past Sessions\n" +
-      ctx.sessions
-        .map((s) => `- **${s.id}**: ${s.summary} (${s.outcome}, changed: ${s.files_changed.join(", ")})`)
-        .join("\n");
-    addSection(s);
+    // Suppress empty trailing parens. When outcome + files_changed are both
+    // empty, the old format produced `(, changed: )`; build the suffix
+    // conditionally instead so signal-free rows render cleanly. See #480.
+    const lines = ctx.sessions.map((s) => {
+      const parts: string[] = [];
+      if (s.outcome) parts.push(s.outcome);
+      if (s.files_changed.length) parts.push(`changed: ${s.files_changed.join(", ")}`);
+      const suffix = parts.length ? ` (${parts.join(", ")})` : "";
+      return `- **${s.id}**: ${s.summary}${suffix}`;
+    });
+    addSection("## Related Past Sessions\n" + lines.join("\n"));
   }
 
   if (ctx.files.length > 0) {
