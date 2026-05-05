@@ -40,9 +40,6 @@ import { capturePlanMdIfPresent } from "../services/plan-artifact.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { provisionWorkspaceWorkdir } from "../workspace/provisioner.js";
 import * as flow from "../state/flow.js";
-import { extractAndSaveSkills } from "../agent/skill-extractor.js";
-import { getSessionConversation } from "../search/search.js";
-import { logDebug } from "../observability/structured-log.js";
 import { buildTaskWithHandoff, extractSubtasks } from "../services/task-builder.js";
 import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "../services/dispatch-context.js";
 import * as agentRegistry from "../agent/agent.js";
@@ -276,19 +273,6 @@ export function registerServices(
           sessionClone: (id, newName) => c.app.sessionLifecycle.clone(id, newName),
           capturePlanMd: (session) => capturePlanMdIfPresent(c.app, session),
           gcComputeIfTemplate: (computeName) => garbageCollectComputeIfTemplate(c.app, computeName ?? null),
-          extractAndSaveSkills: async (sessionId) => {
-            try {
-              const conv = await getSessionConversation(c.app, sessionId);
-              if (conv.length === 0) return;
-              const turns = conv.map((cv) => ({
-                role: cv.role === "message" ? "user" : "assistant",
-                content: cv.content,
-              }));
-              extractAndSaveSkills(sessionId, turns, c.app);
-            } catch {
-              logDebug("session", "skill extraction is best-effort");
-            }
-          },
           saveCheckpoint: (sessionId) => saveCheckpoint({ sessions: c.sessions, events: c.events }, sessionId),
           getStage: (flowName, stageName) => flow.getStage(c.app, flowName, stageName),
           getStageAction: (flowName, stageName) => flow.getStageAction(c.app, flowName, stageName),

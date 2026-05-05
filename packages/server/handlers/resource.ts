@@ -1,7 +1,6 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { guardBuiltin, projectArg, resolveProjectRoot, resolveScope, type Scope } from "./scope-helpers.js";
 import { registerComputeHandlers } from "./resource-compute.js";
@@ -12,8 +11,6 @@ import type {
   FlowReadParams,
   SkillDefinition,
   SkillReadParams,
-  RecipeReadParams,
-  RecipeUseParams,
   RuntimeReadParams,
   GroupCreateParams,
   GroupDeleteParams,
@@ -199,33 +196,6 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("model/list", async () => {
     const projectRoot = resolveProjectRoot();
     return { models: app.models.list(projectRoot) };
-  });
-  router.handle("recipe/list", async () => ({ recipes: await app.recipes.list() }));
-  router.handle("recipe/read", async (p) => {
-    const { name } = extract<RecipeReadParams>(p, ["name"]);
-    const recipe = await app.recipes.get(name);
-    if (!recipe) throw new RpcError(`Recipe '${name}' not found`, ErrorCodes.NOT_FOUND);
-    return { recipe };
-  });
-
-  router.handle("recipe/use", async (p) => {
-    const { name, variables } = extract<RecipeUseParams>(p, ["name"]);
-    const recipe = await app.recipes.get(name);
-    if (!recipe) throw new RpcError(`Recipe '${name}' not found`, ErrorCodes.NOT_FOUND);
-    const instance = instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
-    const session = await app.sessionService.start(instance);
-    return { session };
-  });
-
-  router.handle("recipe/delete", async (p) => {
-    const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
-    const projectRoot = resolveProjectRoot();
-    const existing = app.recipes.get(name, projectRoot);
-    if (!existing) throw new RpcError(`Recipe '${name}' not found`, ErrorCodes.NOT_FOUND);
-    guardBuiltin(existing, "Recipe", name, "delete");
-    const resolvedScope = resolveScope(scope, existing, projectRoot);
-    const ok = app.recipes.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
-    return { ok };
   });
   router.handle("group/list", async () => ({ groups: await app.sessions.getGroups() }));
   router.handle("group/create", async (p) => {

@@ -175,35 +175,3 @@ describe("skill/* yaml CRUD", () => {
   });
 });
 
-describe("recipe/* yaml CRUD", () => {
-  it("recipe/create persists a YAML-sourced recipe and recipe/delete removes it", async () => {
-    const yaml = YAML.stringify({
-      name: "crud-recipe",
-      description: "test recipe",
-      flow: "default",
-      variables: [],
-    });
-    const create = await router.dispatch(createRequest(1, "recipe/create", { name: "crud-recipe", yaml }));
-    expect(ok(create).ok).toBe(true);
-
-    const list = await router.dispatch(createRequest(2, "recipe/list", {}));
-    const recipes = ok(list).recipes as Array<{ name: string }>;
-    expect(recipes.find((r) => r.name === "crud-recipe")).toBeDefined();
-
-    const del = await router.dispatch(createRequest(3, "recipe/delete", { name: "crud-recipe" }));
-    expect(ok(del).ok).toBe(true);
-  });
-
-  it("recipe/create requires a non-empty flow field", async () => {
-    const yaml = YAML.stringify({ name: "no-flow", description: "oops" });
-    const res = await router.dispatch(createRequest(1, "recipe/create", { name: "no-flow", yaml }));
-    expect(err(res)).toBeDefined();
-    expect(err(res).message).toMatch(/flow/);
-  });
-
-  it("recipe/delete refuses builtin recipes", async () => {
-    const res = await router.dispatch(createRequest(1, "recipe/delete", { name: "quick-fix" }));
-    expect(err(res)).toBeDefined();
-    expect(err(res).message).toContain("builtin");
-  });
-});

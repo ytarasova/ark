@@ -78,10 +78,6 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
       const skill = app.skills.get(name, projectRoot);
       return { skill };
     }
-    if (kind === "ark-recipe") {
-      const recipe = app.recipes.get(name, projectRoot);
-      return { recipe };
-    }
     return { content: null };
   });
 }

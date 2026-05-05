@@ -32,7 +32,6 @@ import type { StageAdvanceService } from "./services/stage-advance/index.js";
 import type { FlowStore } from "./stores/flow-store.js";
 import type { SkillStore } from "./stores/skill-store.js";
 import type { AgentStore } from "./stores/agent-store.js";
-import type { RecipeStore } from "./stores/recipe-store.js";
 import type { RuntimeStore } from "./stores/runtime-store.js";
 import type { ModelStore } from "./stores/model-store.js";
 import type { KnowledgeStore } from "./knowledge/store.js";
@@ -127,7 +126,6 @@ export interface Cradle {
   flows: FlowStore;
   skills: SkillStore;
   agents: AgentStore;
-  recipes: RecipeStore;
   runtimes: RuntimeStore;
   models: ModelStore;
 

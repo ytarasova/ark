@@ -95,7 +95,6 @@ const WRITE_METHODS = new Set([
   "worktree/cleanup",
   "skill/save",
   "skill/delete",
-  "recipe/delete",
   "agent/create",
   "agent/update",
   "agent/delete",

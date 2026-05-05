@@ -27,7 +27,6 @@ export function registerStartCommands(session: Command) {
     .option("-g, --group <name>", "Group name")
     .option("-a, --attach", "Attach to the session's tmux pane after starting")
     .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
-    .option("--recipe <name>", "Create session from a recipe template")
     .option(
       "--max-budget <usd>",
       "Cumulative cost cap for this session in USD. Halts for_each if exceeded.",
@@ -83,7 +82,6 @@ export function registerStartCommands(session: Command) {
       const ark = await getArkClient();
       const planner = new SessionStartService({
         client: {
-          recipeRead: (name) => ark.recipeRead(name),
           flowRead: (name) => ark.flowRead(name),
         },
         getClaudeSession: async (id) => {

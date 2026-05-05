@@ -171,7 +171,7 @@ describe("ArkClient", async () => {
     expect(err.message).toBe("ArkClient closed");
   });
 
-  it("lists resources (agents, flows, skills, recipes)", async () => {
+  it("lists resources (agents, flows, skills)", async () => {
     const { client } = createPair();
     await client.initialize();
     const agents = await client.agentList();
@@ -180,8 +180,6 @@ describe("ArkClient", async () => {
     expect(Array.isArray(flows)).toBe(true);
     const skills = await client.skillList();
     expect(Array.isArray(skills)).toBe(true);
-    const recipes = await client.recipeList();
-    expect(Array.isArray(recipes)).toBe(true);
     client.close();
   });
 

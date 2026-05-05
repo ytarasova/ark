@@ -3,7 +3,7 @@ import type { Compute, CreateComputeOpts } from "./compute.js";
 import type { Event } from "./event.js";
 import type { Message } from "./message.js";
 import type { AgentDefinition, SkillDefinition, RuntimeDefinition } from "./agent.js";
-import type { FlowDefinition, RecipeDefinition } from "./flow.js";
+import type { FlowDefinition } from "./flow.js";
 import type {
   ComputeSnapshot,
   Profile,
@@ -260,23 +260,6 @@ export interface SkillReadParams {
 }
 export interface SkillReadResult {
   skill: SkillDefinition;
-}
-
-export interface RecipeListResult {
-  recipes: RecipeDefinition[];
-}
-export interface RecipeReadParams {
-  name: string;
-}
-export interface RecipeReadResult {
-  recipe: RecipeDefinition;
-}
-export interface RecipeUseParams {
-  name: string;
-  variables?: Record<string, string>;
-}
-export interface RecipeUseResult {
-  session: Session;
 }
 
 // ── Groups ──────────────────────────────────────────────────────────────────

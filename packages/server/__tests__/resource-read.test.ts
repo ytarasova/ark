@@ -101,24 +101,6 @@ describe("runtime/read", async () => {
   });
 });
 
-describe("recipe/read", async () => {
-  it("returns a builtin recipe by name", async () => {
-    const recipes = ok(await router.dispatch(createRequest(1, "recipe/list", {})));
-    const first = (recipes.recipes as Array<{ name: string }>)[0];
-    expect(first).toBeDefined();
-
-    const res = await router.dispatch(createRequest(2, "recipe/read", { name: first.name }));
-    const recipe = ok(res).recipe as Record<string, unknown>;
-    expect(recipe.name).toBe(first.name);
-  });
-
-  it("returns error for unknown recipe", async () => {
-    const res = await router.dispatch(createRequest(1, "recipe/read", { name: "nonexistent-recipe-xyz" }));
-    expect(err(res)).toBeDefined();
-    expect(err(res).message).toContain("not found");
-  });
-});
-
 describe("compute/read", async () => {
   it("reads the seeded local compute target", async () => {
     const listRes = await router.dispatch(createRequest(1, "compute/list", {}));

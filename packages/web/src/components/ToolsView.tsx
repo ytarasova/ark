@@ -1,48 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../hooks/useApi.js";
-import { useSkillsQuery, useRecipesQuery } from "../hooks/useToolQueries.js";
+import { useSkillsQuery } from "../hooks/useToolQueries.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Wrench } from "lucide-react";
 
-type Tab = "skills" | "recipes";
+type Tab = "skills";
 
 interface ToolsViewProps {
   activeTab?: Tab;
   onTabChange?: (tab: Tab) => void;
 }
 
-export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: ToolsViewProps) {
+export function ToolsView({ activeTab: _activeTab = "skills", onTabChange: _onTabChange }: ToolsViewProps) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const tab = activeTab;
   const { data: skills = [] } = useSkillsQuery();
-  const { data: recipes = [] } = useRecipesQuery();
   const [selected, setSelected] = useState<any>(null);
-  const [actionMsg, setActionMsg] = useState<string | null>(null);
-
-  // Reset selection when tab changes
-  useEffect(() => {
-    setSelected(null);
-  }, [tab]);
-
-  const items = tab === "skills" ? skills : recipes;
 
   return (
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
       <div className="border-r border-border overflow-y-auto">
-        {items.length === 0 && (
+        {skills.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center py-8">
               <Wrench size={24} className="text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">No {tab} found</p>
+              <p className="text-sm text-muted-foreground">No skills found</p>
             </div>
           </div>
         )}
-        {items.map((item: any) => (
+        {skills.map((item: any) => (
           <div
             key={item.name}
             className={cn(
@@ -65,93 +55,14 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
           <>
             <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name}</h2>
             {selected.description && <p className="text-sm text-muted-foreground mb-5">{selected.description}</p>}
-            {tab === "skills" && (
-              <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                  Content
-                </h3>
-                <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
-                  {selected.content || selected.prompt || "(no content)"}
-                </div>
+            <div className="mb-4">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                Content
+              </h3>
+              <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
+                {selected.content || selected.prompt || "(no content)"}
               </div>
-            )}
-            {tab === "recipes" && (
-              <>
-                <div className="mb-4">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                    Configuration
-                  </h3>
-                  <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
-                    <span className="text-muted-foreground">Flow</span>
-                    <span
-                      className="text-card-foreground"
-                      style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
-                    >
-                      {selected.flow || "-"}
-                    </span>
-                    <span className="text-muted-foreground">Agent</span>
-                    <span
-                      className="text-card-foreground"
-                      style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
-                    >
-                      {selected.agent || "-"}
-                    </span>
-                    <span className="text-muted-foreground">Repo</span>
-                    <span
-                      className="text-card-foreground"
-                      style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
-                    >
-                      {selected.repo || "-"}
-                    </span>
-                  </div>
-                </div>
-                {selected.variables && Array.isArray(selected.variables) && selected.variables.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                      Variables
-                    </h3>
-                    <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
-                      {selected.variables.map((v: any) => (
-                        <div key={v.name} className="contents">
-                          <span className="text-muted-foreground">
-                            {v.name}
-                            {v.required ? " *" : ""}
-                          </span>
-                          <span className="text-card-foreground font-mono text-xs">{v.description || "-"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {selected.summary && (
-                  <div className="mb-4">
-                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                      Summary
-                    </h3>
-                    <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
-                      {selected.summary}
-                    </div>
-                  </div>
-                )}
-                <div className="mt-4">
-                  <Button
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        await api.createSession({ recipe: selected.name, repo: ".", flow: selected.flow || "bare" });
-                        setActionMsg("Session created from recipe");
-                        setTimeout(() => setActionMsg(null), 3000);
-                      } catch {
-                        setActionMsg("Failed to create session");
-                        setTimeout(() => setActionMsg(null), 3000);
-                      }
-                    }}
-                  >
-                    Use Recipe
-                  </Button>
-                </div>
-              </>
-            )}
+            </div>
             {selected.source !== "builtin" && (
               <div className="mt-4">
                 <Button
@@ -159,11 +70,9 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
                   size="xs"
                   onClick={async () => {
                     try {
-                      if (tab === "skills") await api.deleteSkill(selected.name);
-                      else await api.deleteRecipe(selected.name);
+                      await api.deleteSkill(selected.name);
                       setSelected(null);
                       queryClient.invalidateQueries({ queryKey: ["skills"] });
-                      queryClient.invalidateQueries({ queryKey: ["recipes"] });
                     } catch {
                       /* delete may fail if resource is in use */
                     }
@@ -173,12 +82,9 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
                 </Button>
               </div>
             )}
-            {actionMsg && <div className="mt-2 text-xs text-[var(--running)]">{actionMsg}</div>}
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-            Select a {tab === "skills" ? "skill" : "recipe"}
-          </div>
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Select a skill</div>
         )}
       </div>
     </div>

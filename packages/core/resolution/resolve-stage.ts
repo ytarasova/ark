@@ -207,9 +207,11 @@ function buildAgent(
     if (!agent) {
       throw new Error(`Agent "${ref}" not found`);
     }
-    // Render templates that matter at the stage level.
+    // Render templates that matter at the stage level. Runtime-specific
+    // string values inside agent.runtime_config (e.g. goose.recipe paths)
+    // are substituted by resolveAgent at agent-load time; only the
+    // system_prompt renders here.
     if (agent.system_prompt) agent.system_prompt = substituteVars(agent.system_prompt, vars);
-    if (agent.recipe) agent.recipe = substituteVars(agent.recipe, vars);
     return { agentBase: agent, agentRef: ref };
   }
 

@@ -43,20 +43,6 @@ export {
 // Skill
 export { type SkillDefinition } from "./agent/skill.js";
 
-// Recipe
-export {
-  instantiateRecipe,
-  validateRecipeParams,
-  resolveSubRecipe,
-  listSubRecipes,
-  sessionToRecipe,
-  type RecipeDefinition,
-  type RecipeVariable,
-  type RecipeParameter,
-  type RecipeInstance,
-  type SubRecipeRef,
-} from "./agent/recipe.js";
-
 // Executor
 export type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "./executor.js";
 export { registerExecutor, getExecutor, listExecutors, resetExecutors } from "./executor.js";
@@ -139,14 +125,6 @@ export {
   cronMatches,
   type Schedule,
 } from "./schedule.js";
-
-// Skill extraction
-export {
-  extractSkillCandidates,
-  extractAndSaveSkills,
-  type SkillCandidate,
-  type ConversationTurn,
-} from "./agent/skill-extractor.js";
 
 // Structured review output
 export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review.js";
@@ -523,6 +501,5 @@ export { SessionService, ComputeService, HistoryService } from "./services/index
 export { type FlowStore, type FlowSummary, FileFlowStore } from "./stores/index.js";
 export { type SkillStore, FileSkillStore } from "./stores/index.js";
 export { type AgentStore, FileAgentStore } from "./stores/index.js";
-export { type RecipeStore, FileRecipeStore } from "./stores/index.js";
 export { type RuntimeStore, FileRuntimeStore } from "./stores/index.js";
 export { type ModelStore, FileModelStore } from "./stores/index.js";

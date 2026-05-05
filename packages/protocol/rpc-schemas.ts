@@ -633,8 +633,6 @@ const agentDefinitionSchema = z
     runtime: z.string().optional(),
     command: z.array(z.string()).optional(),
     task_delivery: z.enum(["stdin", "file", "arg"]).optional(),
-    recipe: z.string().optional(),
-    sub_recipes: z.array(z.string()).optional(),
     _source: z.enum(["builtin", "global", "project"]).optional(),
     _path: z.string().optional(),
   })
@@ -1380,7 +1378,7 @@ export type ProfileDeleteResponse = z.infer<typeof profileDeleteResponse>;
 
 const toolEntrySchema = z
   .object({
-    kind: z.enum(["mcp-server", "command", "claude-skill", "ark-skill", "ark-recipe", "context"]),
+    kind: z.enum(["mcp-server", "command", "claude-skill", "ark-skill", "context"]),
     name: z.string(),
     description: z.string(),
     source: z.string(),
@@ -1427,42 +1425,6 @@ export type SkillDeleteRequest = z.infer<typeof skillDeleteRequest>;
 
 export const skillDeleteResponse = z.object({ ok: z.boolean() });
 export type SkillDeleteResponse = z.infer<typeof skillDeleteResponse>;
-
-// ── recipe/list ─────────────────────────────────────────────────────────────
-
-const recipeDefinitionSchema = z
-  .object({
-    name: z.string(),
-    description: z.string(),
-    repo: z.string().optional(),
-    flow: z.string(),
-    agent: z.string().optional(),
-    compute: z.string().optional(),
-    group: z.string().optional(),
-    variables: z.array(z.unknown()),
-    parameters: z.array(z.unknown()).optional(),
-    defaults: z.record(z.string(), z.string()).optional(),
-    sub_recipes: z.array(z.unknown()).optional(),
-    _source: z.enum(["builtin", "project", "global"]).optional(),
-  })
-  .loose();
-
-export const recipeListRequest = z.object({}).loose();
-export type RecipeListRequest = z.infer<typeof recipeListRequest>;
-
-export const recipeListResponse = z.object({ recipes: z.array(recipeDefinitionSchema) });
-export type RecipeListResponse = z.infer<typeof recipeListResponse>;
-
-// ── recipe/delete ───────────────────────────────────────────────────────────
-
-export const recipeDeleteRequest = z.object({
-  name: z.string().min(1),
-  scope: z.string().optional(),
-});
-export type RecipeDeleteRequest = z.infer<typeof recipeDeleteRequest>;
-
-export const recipeDeleteResponse = z.object({ ok: z.boolean() });
-export type RecipeDeleteResponse = z.infer<typeof recipeDeleteResponse>;
 
 // ── runtime/list ────────────────────────────────────────────────────────────
 
@@ -2066,8 +2028,6 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "tools/list": { request: toolsListRequest, response: toolsListResponse },
   "skill/save": { request: skillSaveRequest, response: skillSaveResponse },
   "skill/delete": { request: skillDeleteRequest, response: skillDeleteResponse },
-  "recipe/list": { request: recipeListRequest, response: recipeListResponse },
-  "recipe/delete": { request: recipeDeleteRequest, response: recipeDeleteResponse },
   "runtime/list": { request: runtimeListRequest, response: runtimeListResponse },
   "runtime/read": { request: runtimeReadRequest, response: runtimeReadResponse },
   "model/list": { request: modelListRequest, response: modelListResponse },

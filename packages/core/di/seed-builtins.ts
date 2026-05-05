@@ -26,7 +26,7 @@ import type { AppContext } from "../app.js";
 import { resolveStoreBaseDir } from "../install-paths.js";
 import { logInfo, logWarn } from "../observability/structured-log.js";
 
-type Kind = "flow" | "agent" | "skill" | "recipe" | "runtime";
+type Kind = "flow" | "agent" | "skill" | "runtime";
 
 interface KindSpec {
   kind: Kind;
@@ -40,7 +40,6 @@ const SPECS: KindSpec[] = [
   { kind: "flow", subdir: join("flows", "definitions"), pick: (a) => a.flows as any },
   { kind: "agent", subdir: "agents", pick: (a) => a.agents as any },
   { kind: "skill", subdir: "skills", pick: (a) => a.skills as any },
-  { kind: "recipe", subdir: "recipes", pick: (a) => a.recipes as any },
   { kind: "runtime", subdir: "runtimes", pick: (a) => a.runtimes as any },
 ];
 
@@ -62,7 +61,7 @@ const SPECS: KindSpec[] = [
  */
 export async function seedBuiltinResources(app: AppContext, opts?: { baseDir?: string }): Promise<void> {
   const base = opts?.baseDir ?? resolveStoreBaseDir();
-  const counts: Record<Kind, number> = { flow: 0, agent: 0, skill: 0, recipe: 0, runtime: 0 };
+  const counts: Record<Kind, number> = { flow: 0, agent: 0, skill: 0, runtime: 0 };
   let total = 0;
   const missingDirs: string[] = [];
   let dirsFound = 0;
@@ -131,7 +130,7 @@ export async function seedBuiltinResources(app: AppContext, opts?: { baseDir?: s
 
   logInfo(
     "general",
-    `seeded ${total} builtin resources: flows=${counts.flow}, agents=${counts.agent}, skills=${counts.skill}, recipes=${counts.recipe}, runtimes=${counts.runtime}`,
+    `seeded ${total} builtin resources: flows=${counts.flow}, agents=${counts.agent}, skills=${counts.skill}, runtimes=${counts.runtime}`,
   );
 }
 

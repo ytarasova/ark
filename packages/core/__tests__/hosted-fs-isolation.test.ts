@@ -370,7 +370,7 @@ describe("M6 -- seedBuiltinResources is strict in hosted mode", () => {
     // dirs found AND no existing rows).
     const stmt = ctx.db.prepare("DELETE FROM resource_definitions");
     await stmt.run();
-    for (const s of [ctx.flows, ctx.skills, ctx.agents, ctx.recipes, ctx.runtimes]) {
+    for (const s of [ctx.flows, ctx.skills, ctx.agents, ctx.runtimes]) {
       const backing = (s as { backing?: unknown }).backing ?? s;
       const cache = (backing as { syncCache?: Map<string, unknown> }).syncCache;
       if (cache instanceof Map) cache.clear();

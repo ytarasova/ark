@@ -108,9 +108,6 @@ import type {
   SkillSaveResponse,
   SkillDeleteRequest,
   SkillDeleteResponse,
-  RecipeListResponse,
-  RecipeDeleteRequest,
-  RecipeDeleteResponse,
   ScheduleListRequest,
   ScheduleListResponse,
   ScheduleCreateRequest,
@@ -376,18 +373,12 @@ export function makeApi(transport: WebTransport) {
     detachMcp: (dir: string, name: string) =>
       rpc<McpDetachByDirResponse>("mcp/detach-by-dir", { dir, name } satisfies McpDetachByDirRequest),
 
-    // ── Skills & Recipes ─────────────────────────────────────────────────────
+    // ── Skills ───────────────────────────────────────────────────────────────
     getSkills: () => rpc<SkillListResponse>("skill/list", {} satisfies SkillListRequest).then((r) => r.skills),
     createSkill: (data: SkillSaveRequest) =>
       rpc<SkillSaveResponse>("skill/save", data).then((r) => ({ ok: true as const, name: r.name })),
     deleteSkill: (name: string, scope?: string) =>
       rpc<SkillDeleteResponse>("skill/delete", { name, scope } satisfies SkillDeleteRequest),
-    getRecipes: () => rpc<RecipeListResponse>("recipe/list").then((r) => r.recipes),
-    deleteRecipe: (name: string, scope?: string) =>
-      rpc<RecipeDeleteResponse>("recipe/delete", {
-        name,
-        scope: scope ?? "global",
-      } satisfies RecipeDeleteRequest),
 
     // ── Agents, Runtimes & Flows ─────────────────────────────────────────────
     getAgents: () => rpc<AgentListResponse>("agent/list", {} satisfies AgentListRequest).then((r) => r.agents),

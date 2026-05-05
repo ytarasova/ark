@@ -132,15 +132,6 @@ describe("skill/list", async () => {
   });
 });
 
-describe("recipe/list", async () => {
-  it("returns builtin recipes", async () => {
-    const res = ok(await router.dispatch(createRequest(1, "recipe/list", {})));
-    const recipes = res.recipes as Array<{ name: string }>;
-    expect(recipes.length).toBeGreaterThan(0);
-    expect(recipes.some((r) => r.name === "quick-fix")).toBe(true);
-  });
-});
-
 describe("runtime/list", async () => {
   it("returns available runtimes", async () => {
     const res = ok(await router.dispatch(createRequest(1, "runtime/list", {})));
