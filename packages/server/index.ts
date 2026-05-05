@@ -12,6 +12,7 @@ import { ArkdClient } from "../arkd/client.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
 import { providerOf } from "../compute/adapters/provider-map.js";
 import { handleMcpRequest } from "./mcp/index.js";
+import { readLocalBearer, matchesLocalBearer } from "./auth/local-bearer.js";
 
 export interface ServerConnection {
   id: string;
@@ -38,6 +39,14 @@ export interface ServerAuthConfig {
   requireToken: boolean;
   defaultTenant: string | null;
   apiKeys: MaterializeOptions["apiKeys"];
+  /**
+   * Local arkd.token value cached at `attachAuth` time. Non-null only when
+   * the file existed on disk at startup; the `/mcp` gate reads it to
+   * enforce a bearer check in local profile. `null` means "grandfather
+   * fresh installs that have never booted arkd" -- the gate becomes a
+   * no-op so `ark init` flows keep working.
+   */
+  localBearerToken: string | null;
 }
 
 export class ArkServer {
@@ -80,6 +89,10 @@ export class ArkServer {
       requireToken: app.config.authSection.requireToken,
       defaultTenant: app.config.authSection.defaultTenant,
       apiKeys: app.apiKeys,
+      // Read the arkd.token file once at attach time -- `ark token rotate`
+      // already prints "Restart the daemon to pick up the new value", so
+      // hot-reloading would just widen the file's blast radius.
+      localBearerToken: readLocalBearer(app.config.dirs.ark),
     };
   }
 
@@ -182,6 +195,36 @@ export class ArkServer {
       queryToken: credentials?.queryToken ?? null,
       apiKeys: this.auth.apiKeys,
     });
+  }
+
+  /**
+   * Gate the `/mcp` route on a bearer check that runs in BOTH profiles.
+   *
+   * - Hosted (`requireToken=true`): return null. The existing
+   *   `resolveContextFromCredentials` + anonymous-tenant 401 path in the
+   *   `/mcp` branch is already fail-closed for invalid tokens.
+   * - Local (`requireToken=false`) with `arkd.token` on disk: require the
+   *   caller to present the same bearer that arkd uses. Otherwise the MCP
+   *   route is reachable by any process that can hit `localhost:19400`,
+   *   including a DNS-rebinding browser tab or a second user on the host.
+   *   That is exactly the exposure #421 closes.
+   * - Local with no `arkd.token` yet (fresh install): return null. `ark
+   *   init` flows that run before the daemon's first boot must stay
+   *   unbroken; once arkd writes the file on first boot, the gate
+   *   activates from then on.
+   * - No `attachAuth` at all (unit-test boot): return null. Tests that want
+   *   to exercise the gate call `attachAuth` explicitly.
+   */
+  private requireMcpBearer(authorizationHeader: string | null, queryToken: string | null): Response | null {
+    if (!this.auth) return null;
+    if (this.auth.requireToken) return null;
+    const expected = this.auth.localBearerToken;
+    if (!expected) return null;
+    const provided = extractBearer(authorizationHeader, queryToken);
+    if (!provided || !matchesLocalBearer(provided, expected)) {
+      return new Response("Unauthorized: /mcp requires the local arkd.token bearer", { status: 401 });
+    }
+    return null;
   }
 
   /** Start server on stdio (JSONL over stdin/stdout). */
@@ -298,6 +341,16 @@ export class ArkServer {
         if (url.pathname === "/mcp") {
           const mcpApp = self.app ?? app;
           if (!mcpApp) return new Response("MCP route requires AppContext", { status: 503 });
+
+          // Bearer gate that runs in BOTH local and hosted profiles. In local
+          // mode it checks against the on-disk arkd.token (same file `ark
+          // token` prints); in hosted mode it returns null and lets the
+          // existing requireToken + anonymous-tenant 401 path below do the
+          // work. Fresh installs that have not booted arkd yet have no token
+          // on disk and keep the grandfather open path. See #421.
+          const gate = self.requireMcpBearer(authorizationHeader, queryToken);
+          if (gate) return gate;
+
           let ctx: TenantContext;
           try {
             ctx = await self.resolveContextFromCredentials({ authorizationHeader, queryToken });
@@ -687,3 +740,17 @@ async function resolveArkdForSession(
 }
 
 export { Router } from "./router.js";
+
+/**
+ * Pull a bearer out of either the `Authorization: Bearer <t>` header or the
+ * `?token=` query param. Same precedence as `resolveToken` in
+ * `core/auth/context.ts` -- header wins when both are present.
+ */
+function extractBearer(authorizationHeader: string | null, queryToken: string | null): string | null {
+  if (authorizationHeader && authorizationHeader.startsWith("Bearer ")) {
+    const token = authorizationHeader.slice(7).trim();
+    if (token.length > 0) return token;
+  }
+  if (queryToken && queryToken.length > 0) return queryToken;
+  return null;
+}
