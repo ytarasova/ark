@@ -3998,7 +3998,7 @@
       "imports": [
         "packages/core/app.ts",
         "packages/core/claude/claude.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/template.ts"
       ],
       "importedBy": [
@@ -4063,11 +4063,11 @@
         "packages/core/services/creds-secret-reconciler.ts",
         "packages/core/services/dispatch/index.ts",
         "packages/core/services/index.ts",
+        "packages/core/services/profile.ts",
         "packages/core/services/session-hooks/index.ts",
         "packages/core/services/session/attach.ts",
         "packages/core/services/session/index.ts",
         "packages/core/services/stage-advance/index.ts",
-        "packages/core/state/profiles.ts",
         "packages/core/storage/blob-store.ts",
         "packages/core/stores/index.ts",
         "packages/types/index.ts"
@@ -4158,6 +4158,7 @@
         "packages/core/services/dispatch-context.ts",
         "packages/core/services/dispatch/target-lifecycle.ts",
         "packages/core/services/dispatch/target-resolver.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/fork-join.ts",
         "packages/core/services/plan-artifact.ts",
         "packages/core/services/provisioning-steps.ts",
@@ -4174,7 +4175,6 @@
         "packages/core/services/worktree/setup.ts",
         "packages/core/session/replay.ts",
         "packages/core/session/share.ts",
-        "packages/core/state/flow.ts",
         "packages/core/tenant-scope.ts",
         "packages/core/tickets/registry.ts",
         "packages/core/tools.ts",
@@ -5927,6 +5927,7 @@
         "packages/core/services/dispatch-claude-auth.ts",
         "packages/core/services/dispatch-context.ts",
         "packages/core/services/dispatch/index.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/fork-join.ts",
         "packages/core/services/index.ts",
         "packages/core/services/plan-artifact.ts",
@@ -5938,7 +5939,6 @@
         "packages/core/services/task-builder.ts",
         "packages/core/services/worktree/index.ts",
         "packages/core/session/checkpoint.ts",
-        "packages/core/state/flow.ts",
         "packages/core/stores/flow-store.ts",
         "packages/core/stores/model-store.ts",
         "packages/core/stores/runtime-store.ts",
@@ -6668,8 +6668,8 @@
         "packages/core/integrations/github-pr.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/safe.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/review-gate.ts",
-        "packages/core/state/flow.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -7590,6 +7590,7 @@
         "packages/core/services/dispatch/post-launch.ts",
         "packages/core/services/dispatch/secrets-resolve.ts",
         "packages/core/services/dispatch/target-resolver.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/fork-join.ts",
         "packages/core/services/idempotency.ts",
         "packages/core/services/plan-artifact.ts",
@@ -7611,7 +7612,6 @@
         "packages/core/services/worktree/pr.ts",
         "packages/core/services/worktree/setup.ts",
         "packages/core/session/guardrails.ts",
-        "packages/core/state/flow.ts",
         "packages/core/tools.ts",
         "packages/core/triggers/dispatcher.ts",
         "packages/core/triggers/store.ts",
@@ -7974,7 +7974,7 @@
         "packages/core/agent/agent.ts",
         "packages/core/app.ts",
         "packages/core/models/resolver.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/template.ts",
         "packages/types/agent.ts",
         "packages/types/index.ts",
@@ -8445,8 +8445,8 @@
       "imports": [
         "packages/core/agent/agent.ts",
         "packages/core/services/dispatch/types.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/task-builder.ts",
-        "packages/core/state/flow.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -8458,7 +8458,7 @@
       "imports": [
         "packages/compute/adapters/provider-map.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -8481,7 +8481,7 @@
         "packages/core/services/dispatch/secrets-resolve.ts",
         "packages/core/services/dispatch/task-assembly.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/template.ts"
       ],
       "importedBy": [
@@ -8492,7 +8492,7 @@
       "path": "packages/core/services/dispatch/dispatch-fanout.ts",
       "imports": [
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/services/dispatch/dispatch-core.ts"
@@ -8505,7 +8505,7 @@
         "packages/core/services/dispatch/foreach/inline-loop.ts",
         "packages/core/services/dispatch/foreach/spawn-loop.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/services/dispatch/dispatch-core.ts"
@@ -8538,7 +8538,7 @@
       "path": "packages/core/services/dispatch/foreach/checkpoint.ts",
       "imports": [
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/services/dispatch/foreach/inline-loop.ts",
@@ -8550,7 +8550,7 @@
       "path": "packages/core/services/dispatch/foreach/child-spawner.ts",
       "imports": [
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/services/dispatch/dispatch-foreach.ts",
@@ -8566,7 +8566,7 @@
         "packages/core/services/dispatch/foreach/iteration-vars.ts",
         "packages/core/services/dispatch/foreach/orchestration.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/services/dispatch/dispatch-foreach.ts"
@@ -8575,7 +8575,7 @@
     {
       "path": "packages/core/services/dispatch/foreach/iteration-vars.ts",
       "imports": [
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/template.ts"
       ],
       "importedBy": [
@@ -8600,7 +8600,7 @@
         "packages/core/services/dispatch/foreach/checkpoint.ts",
         "packages/core/services/dispatch/foreach/list-resolve.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/services/dispatch/foreach/inline-loop.ts",
@@ -8617,7 +8617,7 @@
         "packages/core/services/dispatch/foreach/iteration-vars.ts",
         "packages/core/services/dispatch/foreach/orchestration.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/template.ts"
       ],
       "importedBy": [
@@ -8641,7 +8641,7 @@
       "imports": [
         "packages/core/services/dispatch/dispatch-core.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/app.ts",
@@ -8657,8 +8657,8 @@
         "packages/core/services/dispatch/launch.ts",
         "packages/core/services/dispatch/secrets-resolve.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/services/task-builder.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts",
+        "packages/core/services/task-builder.ts"
       ],
       "importedBy": [
         "packages/core/services/dispatch/dispatch-core.ts"
@@ -8675,7 +8675,7 @@
         "packages/core/secrets/placement.ts",
         "packages/core/services/dispatch/secrets-resolve.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -8702,7 +8702,7 @@
       "imports": [
         "packages/core/observability/structured-log.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -8766,7 +8766,7 @@
         "packages/core/secrets/types.ts",
         "packages/core/services/compute.ts",
         "packages/core/services/dispatch-claude-auth.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/stores/flow-store.ts",
         "packages/core/stores/runtime-store.ts",
         "packages/types/index.ts"
@@ -8797,12 +8797,60 @@
       ]
     },
     {
+      "path": "packages/core/services/flow-graph.ts",
+      "imports": [],
+      "importedBy": [
+        "packages/core/services/stage-advance/advance.ts"
+      ]
+    },
+    {
+      "path": "packages/core/services/flow.ts",
+      "imports": [
+        "packages/core/app.ts",
+        "packages/core/observability/structured-log.ts",
+        "packages/core/template.ts"
+      ],
+      "importedBy": [
+        "packages/core/agent/agent.ts",
+        "packages/core/di/services.ts",
+        "packages/core/integrations/pr-poller.ts",
+        "packages/core/resolution/resolve-stage.ts",
+        "packages/core/services/dispatch/agent-resolve.ts",
+        "packages/core/services/dispatch/compute-resolve.ts",
+        "packages/core/services/dispatch/dispatch-core.ts",
+        "packages/core/services/dispatch/dispatch-fanout.ts",
+        "packages/core/services/dispatch/dispatch-foreach.ts",
+        "packages/core/services/dispatch/foreach/checkpoint.ts",
+        "packages/core/services/dispatch/foreach/child-spawner.ts",
+        "packages/core/services/dispatch/foreach/inline-loop.ts",
+        "packages/core/services/dispatch/foreach/iteration-vars.ts",
+        "packages/core/services/dispatch/foreach/orchestration.ts",
+        "packages/core/services/dispatch/foreach/spawn-loop.ts",
+        "packages/core/services/dispatch/index.ts",
+        "packages/core/services/dispatch/inline-substage.ts",
+        "packages/core/services/dispatch/launch.ts",
+        "packages/core/services/dispatch/secrets-resolve.ts",
+        "packages/core/services/dispatch/types.ts",
+        "packages/core/services/fork-join.ts",
+        "packages/core/services/session-hooks/types.ts",
+        "packages/core/services/session.ts",
+        "packages/core/services/session/create.ts",
+        "packages/core/services/session/review.ts",
+        "packages/core/services/stage-advance/types.ts",
+        "packages/core/services/subagents.ts",
+        "packages/core/services/task-builder.ts",
+        "packages/core/stores/ephemeral-flow-store.ts",
+        "packages/core/stores/flow-store.ts",
+        "packages/server/handlers/session.ts"
+      ]
+    },
+    {
       "path": "packages/core/services/fork-join.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts",
-        "packages/core/services/session-dispatch-listeners.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts",
+        "packages/core/services/session-dispatch-listeners.ts"
       ],
       "importedBy": [
         "packages/core/di/services.ts",
@@ -8847,6 +8895,15 @@
       "importedBy": [
         "packages/core/di/services.ts",
         "packages/core/services/task-builder.ts"
+      ]
+    },
+    {
+      "path": "packages/core/services/profile.ts",
+      "imports": [],
+      "importedBy": [
+        "packages/core/app.ts",
+        "packages/core/services/session/create.ts",
+        "packages/server/handlers/web.ts"
       ]
     },
     {
@@ -8961,7 +9018,7 @@
         "packages/core/repositories/todo.ts",
         "packages/core/runtimes/transcript-parser.ts",
         "packages/core/services/dispatch/types.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/stores/flow-store.ts",
         "packages/types/index.ts"
       ],
@@ -9008,13 +9065,13 @@
         "packages/core/repositories/message.ts",
         "packages/core/repositories/session.ts",
         "packages/core/services/actions/index.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/fork-join.ts",
         "packages/core/services/review-gate.ts",
         "packages/core/services/session-dispatch-listeners.ts",
         "packages/core/services/session-output.ts",
         "packages/core/services/subagents.ts",
         "packages/core/services/worktree/index.ts",
-        "packages/core/state/flow.ts",
         "packages/core/storage/blob-store.ts",
         "packages/types/index.ts"
       ],
@@ -9057,9 +9114,9 @@
         "packages/core/observability/structured-log.ts",
         "packages/core/observability/telemetry.ts",
         "packages/core/repo-config.ts",
+        "packages/core/services/flow.ts",
+        "packages/core/services/profile.ts",
         "packages/core/services/session/types.ts",
-        "packages/core/state/flow.ts",
-        "packages/core/state/profiles.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -9096,8 +9153,8 @@
       "path": "packages/core/services/session/review.ts",
       "imports": [
         "packages/core/repo-config.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/session/types.ts",
-        "packages/core/state/flow.ts",
         "packages/core/template.ts"
       ],
       "importedBy": [
@@ -9169,9 +9226,9 @@
         "packages/core/observability.ts",
         "packages/core/observability/otlp.ts",
         "packages/core/observability/structured-log.ts",
+        "packages/core/services/flow-graph.ts",
         "packages/core/services/idempotency.ts",
         "packages/core/services/stage-advance/types.ts",
-        "packages/core/state/graph-flow.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -9241,7 +9298,7 @@
         "packages/core/repositories/session.ts",
         "packages/core/repositories/todo.ts",
         "packages/core/runtimes/transcript-parser.ts",
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/stores/flow-store.ts",
         "packages/core/stores/runtime-store.ts",
         "packages/types/index.ts"
@@ -9259,8 +9316,8 @@
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts",
-        "packages/core/services/session-dispatch-listeners.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts",
+        "packages/core/services/session-dispatch-listeners.ts"
       ],
       "importedBy": [
         "packages/core/services/session.ts"
@@ -9273,8 +9330,8 @@
         "packages/core/app.ts",
         "packages/core/message-filter.ts",
         "packages/core/observability/structured-log.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/plan-artifact.ts",
-        "packages/core/state/flow.ts",
         "packages/core/template.ts",
         "packages/types/index.ts"
       ],
@@ -9398,68 +9455,6 @@
       ]
     },
     {
-      "path": "packages/core/state/flow.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/observability/structured-log.ts",
-        "packages/core/template.ts"
-      ],
-      "importedBy": [
-        "packages/core/agent/agent.ts",
-        "packages/core/di/services.ts",
-        "packages/core/integrations/pr-poller.ts",
-        "packages/core/resolution/resolve-stage.ts",
-        "packages/core/services/dispatch/agent-resolve.ts",
-        "packages/core/services/dispatch/compute-resolve.ts",
-        "packages/core/services/dispatch/dispatch-core.ts",
-        "packages/core/services/dispatch/dispatch-fanout.ts",
-        "packages/core/services/dispatch/dispatch-foreach.ts",
-        "packages/core/services/dispatch/foreach/checkpoint.ts",
-        "packages/core/services/dispatch/foreach/child-spawner.ts",
-        "packages/core/services/dispatch/foreach/inline-loop.ts",
-        "packages/core/services/dispatch/foreach/iteration-vars.ts",
-        "packages/core/services/dispatch/foreach/orchestration.ts",
-        "packages/core/services/dispatch/foreach/spawn-loop.ts",
-        "packages/core/services/dispatch/index.ts",
-        "packages/core/services/dispatch/inline-substage.ts",
-        "packages/core/services/dispatch/launch.ts",
-        "packages/core/services/dispatch/secrets-resolve.ts",
-        "packages/core/services/dispatch/types.ts",
-        "packages/core/services/fork-join.ts",
-        "packages/core/services/session-hooks/types.ts",
-        "packages/core/services/session.ts",
-        "packages/core/services/session/create.ts",
-        "packages/core/services/session/review.ts",
-        "packages/core/services/stage-advance/types.ts",
-        "packages/core/services/subagents.ts",
-        "packages/core/services/task-builder.ts",
-        "packages/core/stores/ephemeral-flow-store.ts",
-        "packages/core/stores/flow-store.ts",
-        "packages/server/handlers/session.ts"
-      ]
-    },
-    {
-      "path": "packages/core/state/graph-flow.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/services/stage-advance/advance.ts"
-      ]
-    },
-    {
-      "path": "packages/core/state/profiles.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/app.ts",
-        "packages/core/services/session/create.ts",
-        "packages/server/handlers/web.ts"
-      ]
-    },
-    {
-      "path": "packages/core/state/ui-state.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
       "path": "packages/core/storage/blob-store.ts",
       "imports": [],
       "importedBy": [
@@ -9512,7 +9507,7 @@
     {
       "path": "packages/core/stores/ephemeral-flow-store.ts",
       "imports": [
-        "packages/core/state/flow.ts",
+        "packages/core/services/flow.ts",
         "packages/core/stores/flow-store.ts"
       ],
       "importedBy": []
@@ -9520,7 +9515,7 @@
     {
       "path": "packages/core/stores/flow-store.ts",
       "imports": [
-        "packages/core/state/flow.ts"
+        "packages/core/services/flow.ts"
       ],
       "importedBy": [
         "packages/core/container.ts",
@@ -9585,9 +9580,9 @@
         "packages/core/services/dispatch/foreach/iteration-vars.ts",
         "packages/core/services/dispatch/foreach/list-resolve.ts",
         "packages/core/services/dispatch/foreach/spawn-loop.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/session/review.ts",
-        "packages/core/services/task-builder.ts",
-        "packages/core/state/flow.ts"
+        "packages/core/services/task-builder.ts"
       ]
     },
     {
@@ -11048,12 +11043,12 @@
         "packages/core/app.ts",
         "packages/core/executor.ts",
         "packages/core/recordings.ts",
+        "packages/core/services/flow.ts",
         "packages/core/services/session-forensic.ts",
         "packages/core/services/session-snapshot.ts",
         "packages/core/services/session/cleanup.ts",
         "packages/core/session/replay.ts",
         "packages/core/session/share.ts",
-        "packages/core/state/flow.ts",
         "packages/core/storage/blob-store.ts",
         "packages/protocol/types.ts",
         "packages/server/handlers/scope-helpers.ts",
@@ -11128,9 +11123,9 @@
         "packages/core/knowledge/types.ts",
         "packages/core/observability/costs.ts",
         "packages/core/openapi.ts",
+        "packages/core/services/profile.ts",
         "packages/core/services/worktree/index.ts",
         "packages/core/session/share.ts",
-        "packages/core/state/profiles.ts",
         "packages/core/theme.ts",
         "packages/protocol/types.ts",
         "packages/server/router.ts",
@@ -13497,8 +13492,7 @@
     {
       "path": "packages/web/src/hooks/useDaemonStatus.ts",
       "imports": [
-        "packages/web/src/hooks/useApi.ts",
-        "packages/web/src/hooks/useSmartPoll.ts"
+        "packages/web/src/hooks/useApi.ts"
       ],
       "importedBy": [
         "packages/web/src/App.tsx",
@@ -13680,7 +13674,7 @@
     {
       "path": "packages/web/src/hooks/useSessionTreeStream.ts",
       "imports": [
-        "packages/web/src/transport/TransportContext.tsx"
+        "packages/web/src/hooks/useSseSubscription.ts"
       ],
       "importedBy": [
         "packages/web/src/components/session/FlowTreePanel.tsx"
@@ -13690,25 +13684,19 @@
       "path": "packages/web/src/hooks/useSessions.ts",
       "imports": [
         "packages/web/src/hooks/useSessionQueries.ts",
-        "packages/web/src/hooks/useSse.ts"
+        "packages/web/src/hooks/useSseSubscription.ts"
       ],
       "importedBy": [
         "packages/web/src/pages/SessionsPage.tsx"
       ]
     },
     {
-      "path": "packages/web/src/hooks/useSmartPoll.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/web/src/hooks/useDaemonStatus.ts"
-      ]
-    },
-    {
-      "path": "packages/web/src/hooks/useSse.ts",
+      "path": "packages/web/src/hooks/useSseSubscription.ts",
       "imports": [
         "packages/web/src/transport/TransportContext.tsx"
       ],
       "importedBy": [
+        "packages/web/src/hooks/useSessionTreeStream.ts",
         "packages/web/src/hooks/useSessions.ts"
       ]
     },
@@ -14125,8 +14113,7 @@
         "packages/web/src/App.tsx",
         "packages/web/src/components/admin/adminApi.ts",
         "packages/web/src/hooks/useApi.ts",
-        "packages/web/src/hooks/useSessionTreeStream.ts",
-        "packages/web/src/hooks/useSse.ts",
+        "packages/web/src/hooks/useSseSubscription.ts",
         "packages/web/src/pages/LoginPage.tsx"
       ]
     },
