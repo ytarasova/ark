@@ -9,11 +9,15 @@
     "packages/arkd/server.ts",
     "packages/router/index.ts",
     "packages/web/build.ts",
-    "packages/web/src/main.tsx",
+    "packages/web/src/App.tsx",
+    "packages/web/src/index.html",
     "packages/web/vite.config.ts",
+    "packages/web/playwright.config.ts",
     "packages/desktop/main.js",
     "packages/desktop/preload.js",
     "packages/desktop/playwright.config.ts",
+    "packages/e2e/playwright.config.ts",
+    "packages/e2e/fixtures/global-teardown.ts",
     "packages/core/migrations/registry.ts",
     "packages/core/migrations/0*.ts",
     "packages/core/migrations/01*.ts",
@@ -26,13 +30,14 @@
     "**/*.spec.ts",
     "scripts/**/*.ts"
   ],
-  "project": ["packages/**/*.ts", "scripts/**/*.ts"],
+  "project": ["packages/**/*.{ts,tsx}", "scripts/**/*.{ts,tsx}"],
   "ignore": ["**/node_modules/**", ".infra/spikes/**", "docs/**"],
-  "ignoreBinaries": ["bun", "ark", "make", "tmux", "tsc", "ssm"],
   "ignoreDependencies": [
-    "tailwindcss",
-    "@tailwindcss/vite",
-    "@vitejs/plugin-react",
-    "@types/.*"
+    "@optave/codegraph",
+    "@radix-ui/react-tooltip",
+    "@radix-ui/react-separator",
+    "@xyflow/react",
+    "recharts",
+    "tailwindcss"
   ]
 }

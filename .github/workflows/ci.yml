@@ -39,6 +39,16 @@ jobs:
       - name: Format check
         run: bunx --bun prettier --check "packages/**/*.{ts,tsx,js,jsx,json,css}"
 
+      # Dead-code scan: knip walks the entry chain declared in knip.json
+      # and flags files / exports / dependencies that nothing reaches.
+      # Non-blocking for now -- the config still has a few false positives
+      # around html-entry tracing and binary-only deps. The output appears
+      # in the CI log; convert to a hard failure once the report is
+      # consistently empty across PRs.
+      - name: Dead-code scan (knip)
+        continue-on-error: true
+        run: bunx --bun knip --reporter compact || true
+
       - name: Unit tests (excludes E2E and integration)
         # `--concurrency 4` matches `make test` locally (~7 min). The
         # previous `--concurrency 1` ran serially and consistently
