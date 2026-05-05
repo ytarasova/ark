@@ -167,7 +167,7 @@ export class CoreDispatcher {
 
     const autonomy = stageDef?.autonomy ?? "full";
 
-    // Build task (with handoff context, knowledge, repo-map, rework prompt).
+    // Build task (with handoff context, repo-map, rework prompt).
     const { task, taskPreview } = await assembleTask(this.deps, session, stage, agentName, log);
 
     // Two distinct identifiers, do not conflate:

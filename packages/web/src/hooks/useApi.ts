@@ -396,11 +396,6 @@ export function makeApi(transport: WebTransport) {
       } satisfies WorktreeCreatePrRequest),
     cleanupWorktrees: () => rpc<WorktreeCleanupResponse>("worktree/cleanup"),
 
-    // ── Conductor ────────────────────────────────────────────────────────────
-    getLearnings: () => rpc<LearningListResponse>("learning/list").then((r) => r.learnings),
-    recordLearning: (title: string, desc: string) =>
-      rpc<LearningAddResponse>("learning/add", { title, description: desc } satisfies LearningAddRequest),
-
     // ── Schedules ────────────────────────────────────────────────────────────
     getSchedules: () =>
       rpc<ScheduleListResponse>("schedule/list", {} satisfies ScheduleListRequest).then((r) => r.schedules),

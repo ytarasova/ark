@@ -14,8 +14,8 @@
  *
  *   1. A single conditional at DI composition picks `LocalAppMode` or
  *      `HostedAppMode` based on `config.database.url` presence.
- *   2. Each capability (filesystem, knowledge-graph, MCP-by-dir, FTS rebuild)
- *      is either a real implementation (local) or `null` (hosted).
+ *   2. Each capability (filesystem, MCP-by-dir, FTS rebuild) is either a
+ *      real implementation (local) or `null` (hosted).
  *   3. Handlers that are local-only are registered conditionally via
  *      `registerLocalOnlyHandlers` -- they never see a mode flag.
  *   4. A thin safety net: handlers that are still shared read
@@ -249,7 +249,7 @@ export async function resolveBearerAuth(
  * DI composition. Every other caller goes through `app.mode.*`.
  *
  * The optional `app` param is required for capabilities that close over runtime
- * dependencies (knowledge store, db). When omitted (e.g. in unit tests that
+ * dependencies (db). When omitted (e.g. in unit tests that
  * only need the `kind` or capabilities that don't touch app state), those
  * capabilities are still populated but operations against them will fail at
  * first use -- not what you want at runtime.

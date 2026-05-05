@@ -132,12 +132,11 @@ export function useSessionDetail({
   ).length;
   const filesChanged = diffData?.filesChanged ?? 0;
 
-  // Top-level tabs (+ optional Errors). Knowledge is URL-only -- it's a
-  // low-frequency, low-density panel that doesn't earn top-level real estate.
-  // Timeline (formerly "Conversation") absorbs the old Events tab: the
-  // conversation builder already surfaces every stage/tool/action event the
-  // Events tab rendered raw, so keeping both was pure duplication. Each row
-  // in the Timeline view is clickable to open the raw event in a drawer.
+  // Top-level tabs (+ optional Errors). Timeline (formerly "Conversation")
+  // absorbs the old Events tab: the conversation builder already surfaces
+  // every stage/tool/action event the Events tab rendered raw, so keeping
+  // both was pure duplication. Each row in the Timeline view is clickable
+  // to open the raw event in a drawer.
   const tabs: TabDef[] = [
     { id: "conversation", label: "Session", badge: conversationCount > 0 ? conversationCount : undefined },
     { id: "flow", label: "Flow", badge: totalStages > 0 ? `${completedStages}/${totalStages}` : undefined },

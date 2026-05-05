@@ -4,7 +4,7 @@ import type { Event } from "./event.js";
 import type { Message } from "./message.js";
 import type { AgentDefinition, SkillDefinition, RuntimeDefinition } from "./agent.js";
 import type { FlowDefinition } from "./flow.js";
-import type { ComputeSnapshot, Profile, ToolEntry, MemoryEntry, Schedule, SessionCost } from "./common.js";
+import type { ComputeSnapshot, Profile, ToolEntry, Schedule, SessionCost } from "./common.js";
 
 // ── Session ─────────────────────────────────────────────────────────────────
 
@@ -303,44 +303,6 @@ export interface MetricsSnapshotResult {
 export interface CostsReadResult {
   costs: SessionCost[];
   total: number;
-}
-
-// ── Memory ──────────────────────────────────────────────────────────────────
-
-export interface MemoryListParams {
-  scope?: string;
-}
-export interface MemoryListResult {
-  memories: MemoryEntry[];
-}
-export interface MemoryRecallParams {
-  query: string;
-  scope?: string;
-  limit?: number;
-}
-export interface MemoryRecallResult {
-  results: MemoryEntry[];
-}
-export interface MemoryForgetParams {
-  id: string;
-}
-export interface MemoryForgetResult {
-  ok: boolean;
-}
-export interface MemoryAddParams {
-  content: string;
-  tags?: string[];
-  scope?: string;
-  importance?: number;
-}
-export interface MemoryAddResult {
-  memory: MemoryEntry;
-}
-export interface MemoryClearParams {
-  scope?: string;
-}
-export interface MemoryClearResult {
-  count: number;
 }
 
 // ── Schedule ────────────────────────────────────────────────────────────────

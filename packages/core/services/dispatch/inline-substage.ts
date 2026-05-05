@@ -5,7 +5,7 @@
  * parent session's worktree without changing `session.stage`. Unlike the main
  * dispatch path:
  *   - Task is already template-substituted (passed as subStage.task directly).
- *   - No buildTask / knowledge inject / repo-map overhead.
+ *   - No buildTask / repo-map overhead.
  *   - Launch, then poll until the agent process reaches a terminal state, then
  *     restore the parent session to "ready" so the loop can continue.
  */

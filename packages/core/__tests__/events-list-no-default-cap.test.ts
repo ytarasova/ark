@@ -6,9 +6,9 @@
  *   - session/read in the server, so the web UI lost any events past #200
  *     and rendered Pre/PostToolUse-paired tools as stuck "running" when the
  *     Post landed in the dropped tail.
- *   - knowledge/evals, conductor /events, task-builder context, share
- *     exports, handoff retry counts -- every caller that wanted "all events
- *     for this session" without thinking about pagination.
+ *   - conductor /events, task-builder context, share exports, handoff
+ *     retry counts -- every caller that wanted "all events for this
+ *     session" without thinking about pagination.
  *
  * Real incident: PAI-31995 dispatch on the staging box. The child session
  * had 320 events. UI fetched 200, so 3 Bash blocks rendered as RUNNING

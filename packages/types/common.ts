@@ -17,19 +17,6 @@ export interface ToolEntry {
   config?: Record<string, unknown>;
 }
 
-// ── Memory ────────────────────────────────────────────────────────────────────
-
-export interface MemoryEntry {
-  id: string;
-  content: string;
-  tags: string[];
-  scope: string;
-  importance: number;
-  createdAt: string;
-  accessedAt: string;
-  accessCount: number;
-}
-
 // ── Schedule ──────────────────────────────────────────────────────────────────
 
 export interface Schedule {

@@ -149,8 +149,6 @@ export interface GetAppCb {
  *   getStage/Action   -- stage definition + action-type lookup
  *   buildTask         -- buildTaskWithHandoff helper (still takes AppContext)
  *   extractSubtasks   -- extractSubtasks helper (for fork)
- *   indexRepo         -- indexRepoForDispatch helper
- *   injectKnowledge   -- injectKnowledgeContext helper
  *   injectRepoMap     -- injectRepoMap helper
  *   materializeClaudeAuth -- tenant auth materialization
  *   resolveAgent      -- agentRegistry.resolveAgentWithRuntime
