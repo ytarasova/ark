@@ -5,7 +5,7 @@ import { Badge } from "../ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { Cpu, HardDrive, MemoryStick, Clock, Container, Terminal, Activity } from "lucide-react";
 import { useApi } from "../../hooks/useApi.js";
-import { statusDotColor, pctColor, isArkProcess } from "./helpers.js";
+import { statusDotColor, pctColor, isArkProcess, filterSessionsForCompute } from "./helpers.js";
 import { MetricBar } from "./MetricBar.js";
 import { MetricSparkline } from "./MetricSparkline.js";
 import { MetricsSkeleton } from "./MetricsSkeleton.js";
@@ -55,30 +55,14 @@ export function ComputeDetailPanel({
   const m = snapshot?.metrics;
   const arkProcs = (snapshot?.processes ?? []).filter((p) => isArkProcess(p.command));
   const otherProcs = (snapshot?.processes ?? []).filter((p) => !isArkProcess(p.command));
-  // Sessions explicitly dispatched to this compute, plus unattached ones
-  // (compute_name == null). The unattached bucket is a server-side gap --
-  // the dispatcher only writes `compute_name` when a stage resolves to a
-  // compute template (see packages/core/services/dispatch.ts around the
-  // `stageCompute` branch); sessions that run against the implicit local
-  // host never get attributed. Until that gap is fixed on the server,
-  // render them here rather than silently drop them, but don't pretend
-  // they belong to any specific provider.
-  // Show only sessions that are actually live on this compute. Filter on:
-  // 1. compute_name matches the panel's compute (or local computes pick up
-  //    sessions with no compute_name set).
-  // 2. Status is non-terminal AND the session has dispatched. Sessions in
-  //    `pending` / `ready` / orphaned-`running` rows that never got a
-  //    session_id (e.g. dispatch_failed, agent stuck before launch-agent)
-  //    show up as empty Session rows in the UI -- which is the bug the
-  //    screenshot caught. Requiring `session_id` is the durable test for
-  //    "this session is actually running on a worker."
-  const TERMINAL_STATUSES = new Set(["completed", "failed", "stopped", "archived", "killed"]);
-  const computeSessions = sessions.filter((s) => {
-    if (s.compute_name !== computeName && s.compute_name != null) return false;
-    if (TERMINAL_STATUSES.has(s.status)) return false;
-    if (!s.session_id) return false;
-    return true;
-  });
+  // Which live workers belong to the compute row on screen? See
+  // `filterSessionsForCompute` for the three rules -- the tricky one is
+  // that unattached sessions (compute_name=null) must ONLY land on the
+  // local compute panel, not on every provider. The dispatcher leaves
+  // compute_name=null for sessions resolving against the seeded `local`
+  // row (see defaultProvider in local-app-mode.ts); re-attributing them
+  // to every compute was the "wrong sessions" bug in the screenshot.
+  const computeSessions = filterSessionsForCompute(sessions as any[], computeName);
 
   const isTemplate = !!compute.is_template;
 
