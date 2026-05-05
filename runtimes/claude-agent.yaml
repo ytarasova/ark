@@ -35,7 +35,12 @@ compat: [bedrock]
 # `claude-haiku-4-5-20251001` -- TF/Bedrock typically wants
 # `pi-agentic/global.anthropic.claude-haiku-4-5`. Leave unset on
 # Anthropic-direct (the SDK's bundled id works there).
-# default_haiku_model: pi-agentic/global.anthropic.claude-haiku-4-5
+#
+# Lives under runtime_config so runtime-specific knobs don't leak onto the
+# generic RuntimeDefinition shape:
+# runtime_config:
+#   claude-agent:
+#     default_haiku_model: pi-agentic/global.anthropic.claude-haiku-4-5
 billing:
   mode: api
   transcript_parser: agent-sdk

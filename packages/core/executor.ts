@@ -23,10 +23,14 @@ export interface LaunchOpts {
     runtime?: string;
     /** Resolved runtime kind from RuntimeStore merge (mirrors AgentDefinition). */
     _resolved_runtime_type?: string;
-    /** Optional goose recipe path (native YAML), handled by gooseExecutor. */
-    recipe?: string;
-    /** Optional goose sub-recipe paths, handled by gooseExecutor. */
-    sub_recipes?: string[];
+    /**
+     * Per-runtime-type config block (mirrors AgentDefinition.runtime_config).
+     * Each runtime's executor reads ONLY its own entry -- e.g. the goose
+     * executor reads `runtime_config.goose.recipe`. Lives here, not as
+     * top-level fields, so adding a runtime-specific knob doesn't ripple
+     * through every executor's type imports.
+     */
+    runtime_config?: Record<string, Record<string, unknown>>;
   };
   task: string;
   claudeArgs?: string[];

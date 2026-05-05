@@ -103,9 +103,11 @@ describe("buildGooseCommand", () => {
     expect(argv).not.toContain("--recipe");
   });
 
-  it("uses --recipe delivery when agent.recipe is set and skips -t", () => {
+  it("uses --recipe delivery when runtime_config.goose.recipe is set and skips -t", () => {
     const argv = buildGooseCommand({
-      agent: makeAgent({ recipe: "/repo/recipes/islc-orchestrate.yaml" }),
+      agent: makeAgent({
+        runtime_config: { goose: { recipe: "/repo/recipes/islc-orchestrate.yaml" } },
+      }),
       task: "ignored when recipe is set",
       sessionId: "s-1",
     });
@@ -114,11 +116,15 @@ describe("buildGooseCommand", () => {
     expect(argv).not.toContain("-t");
   });
 
-  it("passes every sub-recipe as --sub-recipe when agent.sub_recipes is set", () => {
+  it("passes every sub-recipe as --sub-recipe when runtime_config.goose.sub_recipes is set", () => {
     const argv = buildGooseCommand({
       agent: makeAgent({
-        recipe: "/repo/recipes/islc-orchestrate.yaml",
-        sub_recipes: ["/repo/recipes/islc-plan.yaml", "/repo/recipes/islc-execute.yaml"],
+        runtime_config: {
+          goose: {
+            recipe: "/repo/recipes/islc-orchestrate.yaml",
+            sub_recipes: ["/repo/recipes/islc-plan.yaml", "/repo/recipes/islc-execute.yaml"],
+          },
+        },
       }),
       task: "",
       sessionId: "s-1",
@@ -132,7 +138,7 @@ describe("buildGooseCommand", () => {
 
   it("passes every recipe param as --params k=v when agent has a recipe", () => {
     const argv = buildGooseCommand({
-      agent: makeAgent({ recipe: "/repo/recipes/main.yaml" }),
+      agent: makeAgent({ runtime_config: { goose: { recipe: "/repo/recipes/main.yaml" } } }),
       task: "",
       sessionId: "s-1",
       params: { ticket: "IN-57970", summary: "Fix widget", workdir: "/tmp/wt" },
