@@ -106,16 +106,17 @@ async function resolveRemoteRouting(
   }
 
   // RESILIENCE: ensure the arkd transport is up before we build the client.
-  // After a daemon restart the previous SSM tunnel is dead but its port may
-  // still be cached on session.config / compute.config. Calling
-  // `target.compute.ensureReachable` re-allocates a fresh tunnel and writes
-  // the new port; without this, the action stage would post to a dead
-  // localhost port and fail with ECONNREFUSED.
+  // Action stages don't go through dispatch-core's lifecycle, so they must
+  // resolve the same handle (with its compute-specific meta -- instance_id
+  // for EC2, etc.) and call ensureReachable themselves. Building a stub
+  // `{meta:{}}` handle here was the bug: ensureReachable hit `readMeta(h)`
+  // which threw "missing meta.ec2", the catch swallowed the error, and
+  // getArkdUrl then threw "no arkd_local_forward_port" -- causing every
+  // action stage on a remote compute to fail after a conductor restart.
   try {
-    const { resolveComputeTarget } = await import("../../compute-resolver.js");
-    const { target } = await resolveComputeTarget(app, session);
-    if (target?.compute.ensureReachable) {
-      const handle = { kind: target.compute.kind, name: compute.name, meta: {} };
+    const { resolveTargetAndHandle } = await import("../dispatch/target-resolver.js");
+    const { target, handle } = await resolveTargetAndHandle(app, session);
+    if (target?.compute.ensureReachable && handle) {
       await target.compute.ensureReachable(handle, { app, sessionId: session.id });
     }
   } catch (err: any) {
