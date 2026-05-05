@@ -36,7 +36,31 @@ export class HookStatusApplier {
     // response -- the latter flaps when the state machine advances
     // mid-flight (#435) and would re-stamp the runtime's traffic with
     // whichever stage happens to be current at write time.
-    const hookStage = (typeof payload.stage === "string" && payload.stage) || session.stage || undefined;
+    const payloadStage = typeof payload.stage === "string" && payload.stage ? payload.stage : undefined;
+    const hookStage = payloadStage || session.stage || undefined;
+
+    // Stale-hook guard: when the runtime stamped a stage and it differs from
+    // session.stage, the state machine has already advanced past the stage
+    // this hook is about. The previous agent is still alive on its compute
+    // and is firing delayed hooks -- we must log the event for timeline
+    // attribution but NOT transition the new stage's state, or an advance()
+    // triggered here would route off the still-running next stage.
+    if (payloadStage && session.stage && payloadStage !== session.stage) {
+      result.events!.push({
+        type: "hook_status",
+        opts: {
+          stage: hookStage,
+          actor: "hook",
+          data: {
+            event: hookEvent,
+            stale: true,
+            current_stage: session.stage,
+            ...payload,
+          } as Record<string, unknown>,
+        },
+      });
+      return result;
+    }
 
     // Check if this session uses manual gate (interactive - user controls lifecycle)
     const stageDef = session.stage ? getStage(session.flow, session.stage) : null;

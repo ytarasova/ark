@@ -27,6 +27,30 @@ export class ReportApplier {
     }
     const result: ReportResult = { updates: {}, logEvents: [], busEvents: [] };
 
+    // Stale-report guard: when the agent stamped a non-empty stage and it
+    // differs from session.stage, the state machine has already advanced
+    // past the stage this report is about. The previous agent is still
+    // alive on its compute and is sending delayed reports -- log the event
+    // for timeline attribution but do NOT transition the new stage's state,
+    // or an advance() triggered here would route off the still-running next
+    // stage. See docs in hook-status.ts for the parallel guard.
+    const reportStage = report.stage && report.stage.length > 0 ? report.stage : undefined;
+    if (reportStage && session.stage && reportStage !== session.stage) {
+      result.logEvents!.push({
+        type: `agent_${report.type}`,
+        opts: {
+          stage: reportStage,
+          actor: "agent",
+          data: {
+            ...(report as unknown as Record<string, unknown>),
+            stale: true,
+            current_stage: session.stage,
+          },
+        },
+      });
+      return result;
+    }
+
     // Log event
     result.logEvents!.push({
       type: `agent_${report.type}`,
