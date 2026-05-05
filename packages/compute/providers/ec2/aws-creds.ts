@@ -63,11 +63,7 @@ async function loadFromIni(): Promise<typeof import("@aws-sdk/credential-provide
  * AWS SDK v3 treats `credentials: undefined` the same as the field
  * being absent -- both fall through to the default chain.
  */
-export function awsCredentialsForProfile({
-  profile,
-}: {
-  profile?: string;
-}): AwsCredentialIdentityProvider | undefined {
+export function awsCredentialsForProfile({ profile }: { profile?: string }): AwsCredentialIdentityProvider | undefined {
   if (!profile) return undefined;
   return async () => {
     // Construct a fresh fromIni provider each call so the next file

@@ -14,16 +14,27 @@ Transport: Streamable HTTP (MCP 2025-03-26 spec).
 
 ## Auth
 
-`Authorization: Bearer <token>`
+`Authorization: Bearer <token>` is required in **both** local and hosted
+profiles. Missing or invalid tokens get a 401; there is no anonymous
+fallback for the MCP route.
 
-- **Local**: token is in `~/.ark/arkd.token` (auto-generated on first
-  daemon boot -- the same one `./ark` and the web UI use).
+- **Local**: the token is `~/.ark/arkd.token`, auto-generated on the
+  first daemon boot. Print it with `ark token` (or rotate with `ark
+  token rotate` -- restart the daemon after rotating). The same file
+  backs arkd's internal auth, so you only manage one secret per install.
 - **Hosted**: generate a per-user API token in the web UI under
-  Settings -> MCP tokens.
+  Settings -> MCP tokens. `ark token list` shows your keys (values are
+  never re-printed after issue). The on-disk `arkd.token` in hosted mode
+  is the operator's master key -- `ark token` refuses to print it.
 
-When `auth.requireToken` is on (control-plane profile default), missing
-or invalid tokens get a 401 -- there is no anonymous fallback for the
-MCP route.
+Fresh install window: if the daemon has never booted on this host there
+is no `arkd.token` yet and the `/mcp` gate stays open so `ark init`
+flows work. Run the daemon once (`ark server daemon start`) to
+activate the gate; it remains active from then on.
+
+The bearer may also ride in the URL as `?token=<value>` -- useful when a
+client cannot set custom headers on an HTTP request (browsers on upgrade,
+some embedded tooling).
 
 ## Connecting an MCP client
 
