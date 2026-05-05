@@ -508,16 +508,6 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: [] as unknown as Record<string, unknown>,
     sampleResponse: { tools: [] },
   },
-  "mcp/attach-by-dir": {
-    validRequest: { dir: "/tmp", name: "srv", config: {} },
-    invalidRequest: { dir: "/tmp", name: "srv" },
-    sampleResponse: { ok: true },
-  },
-  "mcp/detach-by-dir": {
-    validRequest: { dir: "/tmp", name: "srv" },
-    invalidRequest: { dir: "/tmp" },
-    sampleResponse: { ok: true },
-  },
   "skill/save": {
     validRequest: { name: "s1" },
     invalidRequest: {},

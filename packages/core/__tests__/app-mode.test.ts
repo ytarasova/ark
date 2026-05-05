@@ -27,7 +27,6 @@ describe("buildAppMode", () => {
     expect(mode.kind).toBe("local");
     expect(mode.fsCapability).not.toBeNull();
     expect(mode.knowledgeCapability).toBeNull(); // no app arg -> knowledge needs app
-    expect(mode.mcpDirCapability).not.toBeNull();
     expect(mode.repoMapCapability).not.toBeNull();
     expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).not.toBeNull();
@@ -38,7 +37,6 @@ describe("buildAppMode", () => {
     expect(mode.kind).toBe("hosted");
     expect(mode.fsCapability).toBeNull();
     expect(mode.knowledgeCapability).toBeNull();
-    expect(mode.mcpDirCapability).toBeNull();
     expect(mode.repoMapCapability).toBeNull();
     expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
@@ -85,7 +83,6 @@ describe("buildHostedAppMode", () => {
     expect(mode.kind).toBe("hosted");
     expect(mode.fsCapability).toBeNull();
     expect(mode.knowledgeCapability).toBeNull();
-    expect(mode.mcpDirCapability).toBeNull();
     expect(mode.repoMapCapability).toBeNull();
     expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();

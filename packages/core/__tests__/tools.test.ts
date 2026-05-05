@@ -6,7 +6,7 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 import { withTestContext } from "./test-helpers.js";
-import { discoverTools, addMcpServer, removeMcpServer, addCommand, removeCommand, getCommand } from "../tools.js";
+import { discoverTools, removeMcpServer, addCommand, removeCommand, getCommand } from "../tools.js";
 
 const { getCtx } = withTestContext();
 
@@ -194,49 +194,17 @@ describe("discoverTools", () => {
 });
 
 describe("MCP server CRUD", () => {
-  it("addMcpServer / removeMcpServer round-trip", async () => {
-    const dir = makeProjectDir();
-
-    addMcpServer(dir, "test-server", { command: "node", args: ["srv.js"] });
-    let tools = await discoverTools(dir);
-    let mcp = tools.filter((t) => t.kind === "mcp-server");
-    expect(mcp.length).toBe(1);
-    expect(mcp[0].name).toBe("test-server");
-    expect(mcp[0].config).toEqual({ command: "node", args: ["srv.js"] });
-
-    removeMcpServer(dir, "test-server");
-    tools = await discoverTools(dir);
-    mcp = tools.filter((t) => t.kind === "mcp-server");
-    expect(mcp.length).toBe(0);
-  });
-
-  it("addMcpServer preserves existing servers", async () => {
-    const dir = makeProjectDir();
-    addMcpServer(dir, "first", { command: "a" });
-    addMcpServer(dir, "second", { command: "b" });
-
-    const parsed = JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf-8"));
-    expect(Object.keys(parsed.mcpServers).length).toBe(2);
-    expect(parsed.mcpServers.first.command).toBe("a");
-    expect(parsed.mcpServers.second.command).toBe("b");
-  });
-
-  it("addMcpServer handles JSONC in existing file", async () => {
+  it("removeMcpServer drops a server from .mcp.json (used by tools/delete kind=mcp-server)", async () => {
     const dir = makeProjectDir();
     writeFileSync(
       join(dir, ".mcp.json"),
-      `{
-  // existing config
-  "mcpServers": {
-    "old": { "command": "old" }
-  }
-}`,
+      JSON.stringify({ mcpServers: { keep: { command: "k" }, drop: { command: "d" } } }),
     );
 
-    addMcpServer(dir, "new-server", { command: "new" });
-    const tools = await discoverTools(dir);
-    const mcp = tools.filter((t) => t.kind === "mcp-server");
-    expect(mcp.length).toBe(2);
+    removeMcpServer(dir, "drop");
+
+    const parsed = JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf-8"));
+    expect(Object.keys(parsed.mcpServers)).toEqual(["keep"]);
   });
 
   it("removeMcpServer is a no-op when .mcp.json is missing", async () => {

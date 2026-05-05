@@ -128,14 +128,6 @@ export class SystemClient {
     return this.rpc("tools/read", opts);
   }
 
-  async mcpAttach(sessionId: string, server: Record<string, unknown>): Promise<void> {
-    await this.rpc("mcp/attach", { sessionId, server });
-  }
-
-  async mcpDetach(sessionId: string, serverName: string): Promise<void> {
-    await this.rpc("mcp/detach", { sessionId, serverName });
-  }
-
   // ── Schedule ────────────────────────────────────────────────────────────────
 
   async scheduleList(): Promise<Schedule[]> {

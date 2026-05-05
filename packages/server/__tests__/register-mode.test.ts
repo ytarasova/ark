@@ -17,8 +17,6 @@ import { buildHostedAppMode, buildLocalAppMode } from "../../core/modes/app-mode
 const LOCAL_ONLY_METHODS = [
   "fs/list-dir",
   "history/rebuild-fts",
-  "mcp/attach-by-dir",
-  "mcp/detach-by-dir",
   "repo-map/get",
   "knowledge/ingest",
   "knowledge/index",

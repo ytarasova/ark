@@ -85,7 +85,6 @@ export function buildHostedAppMode(database: DatabaseMode, config?: ArkConfig): 
     kind: "hosted",
     fsCapability: null,
     knowledgeCapability: null,
-    mcpDirCapability: null,
     repoMapCapability: null,
     ftsRebuildCapability: null,
     hostCommandCapability: null,

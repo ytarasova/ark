@@ -6,13 +6,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
-import type {
-  ToolsListParams,
-  ToolsDeleteParams,
-  ToolsReadParams,
-  McpAttachParams,
-  McpDetachParams,
-} from "../../types/index.js";
+import type { ToolsListParams, ToolsDeleteParams, ToolsReadParams } from "../../types/index.js";
 
 /**
  * Whitelist the directories a claude-skill file may live in.
@@ -89,21 +83,5 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
       return { recipe };
     }
     return { content: null };
-  });
-
-  router.handle("mcp/attach", async (p) => {
-    const { sessionId, server } = extract<McpAttachParams>(p, ["sessionId", "server"]);
-    const session = await app.sessions.get(sessionId);
-    if (!session) throw new RpcError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND);
-    core.addMcpServer(session.workdir ?? session.repo, server.name as string, server);
-    return { ok: true };
-  });
-
-  router.handle("mcp/detach", async (p) => {
-    const { sessionId, serverName } = extract<McpDetachParams>(p, ["sessionId", "serverName"]);
-    const session = await app.sessions.get(sessionId);
-    if (!session) throw new RpcError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND);
-    core.removeMcpServer(session.workdir ?? session.repo, serverName);
-    return { ok: true };
   });
 }

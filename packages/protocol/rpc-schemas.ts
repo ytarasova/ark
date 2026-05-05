@@ -1394,29 +1394,6 @@ export type ToolsListRequest = z.infer<typeof toolsListRequest>;
 export const toolsListResponse = z.object({ tools: z.array(toolEntrySchema) });
 export type ToolsListResponse = z.infer<typeof toolsListResponse>;
 
-// ── mcp/attach-by-dir ───────────────────────────────────────────────────────
-
-export const mcpAttachByDirRequest = z.object({
-  dir: z.string().min(1),
-  name: z.string().min(1),
-  config: z.record(z.string(), z.unknown()),
-});
-export type McpAttachByDirRequest = z.infer<typeof mcpAttachByDirRequest>;
-
-export const mcpAttachByDirResponse = z.object({ ok: z.boolean() });
-export type McpAttachByDirResponse = z.infer<typeof mcpAttachByDirResponse>;
-
-// ── mcp/detach-by-dir ───────────────────────────────────────────────────────
-
-export const mcpDetachByDirRequest = z.object({
-  dir: z.string().min(1),
-  name: z.string().min(1),
-});
-export type McpDetachByDirRequest = z.infer<typeof mcpDetachByDirRequest>;
-
-export const mcpDetachByDirResponse = z.object({ ok: z.boolean() });
-export type McpDetachByDirResponse = z.infer<typeof mcpDetachByDirResponse>;
-
 // ── skill/save ──────────────────────────────────────────────────────────────
 
 export const skillSaveRequest = z
@@ -2087,8 +2064,6 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "profile/create": { request: profileCreateRequest, response: profileCreateResponse },
   "profile/delete": { request: profileDeleteRequest, response: profileDeleteResponse },
   "tools/list": { request: toolsListRequest, response: toolsListResponse },
-  "mcp/attach-by-dir": { request: mcpAttachByDirRequest, response: mcpAttachByDirResponse },
-  "mcp/detach-by-dir": { request: mcpDetachByDirRequest, response: mcpDetachByDirResponse },
   "skill/save": { request: skillSaveRequest, response: skillSaveResponse },
   "skill/delete": { request: skillDeleteRequest, response: skillDeleteResponse },
   "recipe/list": { request: recipeListRequest, response: recipeListResponse },

@@ -12,7 +12,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync, unlink
 import { join, basename } from "path";
 import stripJsonComments from "strip-json-comments";
 import type { AppContext } from "./app.js";
-import { logInfo, logDebug } from "./observability/structured-log.js";
+import { logDebug } from "./observability/structured-log.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -169,22 +169,6 @@ export async function discoverTools(projectDir?: string, app?: AppContext): Prom
 }
 
 // ── MCP Server CRUD ─────────────────────────────────────────────────────────
-
-/** Add or update an MCP server in the project's .mcp.json. */
-export function addMcpServer(projectDir: string, name: string, config: Record<string, unknown>): void {
-  const mcpPath = join(projectDir, ".mcp.json");
-  let existing: Record<string, any> = {};
-  if (existsSync(mcpPath)) {
-    try {
-      existing = readJsonc(mcpPath) as Record<string, any>;
-    } catch {
-      logInfo("session", "start fresh if parse fails");
-    }
-  }
-  if (!existing.mcpServers) existing.mcpServers = {};
-  existing.mcpServers[name] = config;
-  writeFileSync(mcpPath, JSON.stringify(existing, null, 2));
-}
 
 /** Remove an MCP server from the project's .mcp.json. */
 export function removeMcpServer(projectDir: string, name: string): void {

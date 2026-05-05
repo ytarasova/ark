@@ -383,15 +383,6 @@ export interface ToolsReadParams {
   projectRoot?: string;
 }
 
-export interface McpAttachParams {
-  sessionId: string;
-  server: Record<string, unknown>;
-}
-export interface McpDetachParams {
-  sessionId: string;
-  serverName: string;
-}
-
 // ── Metrics ─────────────────────────────────────────────────────────────────
 
 export interface MetricsSnapshotParams {

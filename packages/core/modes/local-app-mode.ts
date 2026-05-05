@@ -15,7 +15,6 @@ import { execFile } from "child_process";
 import type { AppContext } from "../app.js";
 import { RpcError } from "../../protocol/types.js";
 import { logDebug } from "../observability/structured-log.js";
-import { addMcpServer, removeMcpServer } from "../tools.js";
 import { buildTenantScope } from "../tenant-scope.js";
 import { generateRepoMap } from "../repo-map.js";
 import { listClaudeSessions, refreshClaudeSessionsCache } from "../claude/sessions.js";
@@ -28,7 +27,6 @@ import type {
   FsListDirResult,
   FsDirEntry,
   KnowledgeCapability,
-  McpDirCapability,
   RepoMapCapability,
   FtsRebuildCapability,
   HostCommandCapability,
@@ -127,19 +125,6 @@ function makeFsCapability(): FsCapability {
       const parent = cwd === parsed.root ? null : resolve(cwd, "..");
 
       return { cwd, parent, home, entries };
-    },
-  };
-}
-
-// ── MCP by directory ───────────────────────────────────────────────────────
-
-function makeMcpDirCapability(): McpDirCapability {
-  return {
-    attach(dir, name, config) {
-      addMcpServer(dir, name, config);
-    },
-    detach(dir, name) {
-      removeMcpServer(dir, name);
     },
   };
 }
@@ -263,7 +248,6 @@ function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBoots
  */
 export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): AppMode {
   const fsCapability = makeFsCapability();
-  const mcpDirCapability = makeMcpDirCapability();
   const repoMapCapability = makeRepoMapCapability();
   const knowledgeCapability = app ? makeKnowledgeCapability(app) : null;
   const ftsRebuildCapability = app ? makeFtsRebuildCapability(app) : null;
@@ -285,7 +269,6 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
     kind: "local",
     fsCapability,
     knowledgeCapability,
-    mcpDirCapability,
     repoMapCapability,
     ftsRebuildCapability,
     hostCommandCapability,

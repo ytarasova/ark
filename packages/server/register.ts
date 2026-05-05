@@ -154,7 +154,7 @@ export function registerLocalOnlyHandlers(router: Router, app: AppContext): void
   if (app.mode.ftsRebuildCapability) {
     registerHistoryLocalHandlers(router, app);
   }
-  if (app.mode.knowledgeCapability && app.mode.mcpDirCapability && app.mode.repoMapCapability) {
+  if (app.mode.knowledgeCapability && app.mode.repoMapCapability) {
     registerWebLocalHandlers(router, app);
   }
   if (app.mode.knowledgeCapability) {

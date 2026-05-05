@@ -49,12 +49,6 @@ export interface FsListDirResult {
   entries: FsDirEntry[];
 }
 
-/** MCP-by-directory attach / detach (writes to `<dir>/.claude.json`). */
-export interface McpDirCapability {
-  attach(dir: string, name: string, config: Record<string, unknown>): void;
-  detach(dir: string, name: string): void;
-}
-
 /** Repo-map generation (reads arbitrary local directories). */
 export interface RepoMapCapability {
   generate(dir: string): Promise<Record<string, unknown>>;
@@ -200,7 +194,6 @@ export interface AppMode {
   readonly kind: "local" | "hosted";
   readonly fsCapability: FsCapability | null;
   readonly knowledgeCapability: KnowledgeCapability | null;
-  readonly mcpDirCapability: McpDirCapability | null;
   readonly repoMapCapability: RepoMapCapability | null;
   readonly ftsRebuildCapability: FtsRebuildCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;

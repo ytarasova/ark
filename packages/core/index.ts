@@ -174,15 +174,7 @@ export { checkPrereqs, formatPrereqCheck, hasRequiredPrereqs, type PrereqResult 
 export { sendOSNotification } from "./notify.js";
 
 // Unified tool discovery
-export {
-  discoverTools,
-  removeMcpServer,
-  removeCommand,
-  getCommand,
-  addMcpServer,
-  addCommand,
-  type ToolEntry,
-} from "./tools.js";
+export { discoverTools, removeMcpServer, removeCommand, getCommand, addCommand, type ToolEntry } from "./tools.js";
 
 // Replay
 export { buildReplay, type ReplayStep } from "./session/replay.js";
