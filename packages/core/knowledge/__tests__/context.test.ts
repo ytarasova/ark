@@ -261,4 +261,49 @@ describe("formatContextAsMarkdown", () => {
 
     expect(md).toContain("changed: a.ts, b.ts");
   });
+
+  // #480: empty outcome + empty files_changed used to render
+  // `(, changed: )`, polluting every dispatched prompt. Suffix now elides.
+  it("omits empty trailing parens when outcome and files_changed are blank", () => {
+    const md = formatContextAsMarkdown({
+      files: [],
+      memories: [],
+      sessions: [
+        {
+          id: "s-empty",
+          summary: "Some summary",
+          outcome: "",
+          files_changed: [],
+          date: "2026-04-01",
+        },
+      ],
+      learnings: [],
+      skills: [],
+    });
+
+    expect(md).toContain("- **s-empty**: Some summary");
+    expect(md).not.toContain("(, changed: )");
+    expect(md).not.toMatch(/\(\)/);
+  });
+
+  it("includes outcome alone when files_changed is empty", () => {
+    const md = formatContextAsMarkdown({
+      files: [],
+      memories: [],
+      sessions: [
+        {
+          id: "s-3",
+          summary: "Just outcome",
+          outcome: "success",
+          files_changed: [],
+          date: "2026-04-01",
+        },
+      ],
+      learnings: [],
+      skills: [],
+    });
+
+    expect(md).toContain("- **s-3**: Just outcome (success)");
+    expect(md).not.toContain("changed:");
+  });
 });

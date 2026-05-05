@@ -26,7 +26,6 @@ export interface AgentEvalResult {
 
 /** Shape of the metadata we attach to an `eval:<sessionId>` knowledge node. */
 interface EvalNodeMetadata {
-  eval: boolean;
   agentRole: string;
   runtime: string;
   model: string;
@@ -44,7 +43,6 @@ interface EvalNodeMetadata {
 function asEvalMeta(metadata: Record<string, unknown> | undefined): EvalNodeMetadata {
   const m = metadata ?? {};
   return {
-    eval: Boolean(m.eval),
     agentRole: typeof m.agentRole === "string" ? m.agentRole : "unknown",
     runtime: typeof m.runtime === "string" ? m.runtime : "claude",
     model: typeof m.model === "string" ? m.model : "unknown",
@@ -115,13 +113,18 @@ export async function evaluateSession(app: AppContext, session: Session): Promis
     timestamp: new Date().toISOString(),
   };
 
+  // Eval nodes use a dedicated type rather than `type: "session"` with a
+  // `metadata.eval` flag. Keeping them in the same bucket as production
+  // sessions made every store.search() / store.listNodes({type:"session"})
+  // call leak eval rows into production prompts (#480). The type is now
+  // the source of truth: production reads ignore "eval_session", eval-side
+  // reads query it explicitly.
   await app.knowledge.addNode({
     id: `eval:${session.id}`,
-    type: "session",
+    type: "eval_session",
     label: `Eval: ${session.summary ?? session.id}`,
     content: JSON.stringify(result.metrics),
     metadata: {
-      eval: true,
       agentRole: result.agentRole,
       runtime: result.runtime,
       model: result.model,
@@ -153,10 +156,10 @@ export async function getAgentStats(
   testPassRate: number;
   prRate: number;
 }> {
-  const allNodes = await app.knowledge.listNodes({ type: "session" });
+  const allNodes = await app.knowledge.listNodes({ type: "eval_session" });
   const evalNodes = allNodes
     .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
-    .filter(({ meta }) => meta.eval && (!agentRole || meta.agentRole === agentRole));
+    .filter(({ meta }) => !agentRole || meta.agentRole === agentRole);
 
   if (evalNodes.length === 0) {
     return {
@@ -204,10 +207,10 @@ export async function detectDrift(
   avgTurnsDelta: number;
   alert: boolean;
 }> {
-  const allNodes = await app.knowledge.listNodes({ type: "session" });
+  const allNodes = await app.knowledge.listNodes({ type: "eval_session" });
   const allEvals = allNodes
     .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
-    .filter(({ meta }) => meta.eval && meta.agentRole === agentRole);
+    .filter(({ meta }) => meta.agentRole === agentRole);
 
   const now = Date.now();
   const recentCutoff = now - recentDays * 86400000;
@@ -251,8 +254,8 @@ export async function detectDrift(
  * List eval nodes, optionally filtered by agent role.
  */
 export async function listEvals(app: AppContext, agentRole?: string, limit: number = 20): Promise<AgentEvalResult[]> {
-  const allNodes = await app.knowledge.listNodes({ type: "session", limit: limit * 2 });
-  let evalNodes = allNodes.map((n) => ({ node: n, meta: asEvalMeta(n.metadata) })).filter(({ meta }) => meta.eval);
+  const allNodes = await app.knowledge.listNodes({ type: "eval_session", limit: limit * 2 });
+  let evalNodes = allNodes.map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }));
 
   if (agentRole) {
     evalNodes = evalNodes.filter(({ meta }) => meta.agentRole === agentRole);

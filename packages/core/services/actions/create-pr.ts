@@ -54,6 +54,14 @@ export const createPrAction: ActionHandler = {
 
     const result = await createWorktreePR(app, sessionId, { title: session.summary ?? undefined });
     if (result.ok) {
+      // Persist pr_url to the session row. Without this, the next stage
+      // (auto_merge) sees an empty pr_url and either stalls or fails late
+      // with a misleading "Session has no PR URL" error -- the upstream
+      // bug behind #476. The auto-find-via-`gh pr view` branch above
+      // already does this; the freshly-created branch was missing it.
+      if (result.pr_url) {
+        await app.sessions.update(sessionId, { pr_url: result.pr_url });
+      }
       await app.events.log(sessionId, "action_executed", {
         stage: session.stage ?? undefined,
         actor: "system",

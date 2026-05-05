@@ -544,4 +544,68 @@ describe("KnowledgeStore", async () => {
       await scoped.knowledge.clear();
     });
   });
+
+  // #480: eval-harness sessions live in a dedicated `type: "eval_session"`
+  // bucket so they cannot pollute production search / listNodes results.
+  // They previously shared `type: "session"` with a `metadata.eval` flag,
+  // which leaked them into every dispatched agent prompt's
+  // `Related Past Sessions` block.
+  describe("eval-session type isolation", async () => {
+    it("listNodes({ type: 'session' }) returns only production sessions", async () => {
+      await store.clear();
+      await store.addNode({ id: "session:s-prod-1", type: "session", label: "Production work" });
+      await store.addNode({
+        id: "eval:s-eval-1",
+        type: "eval_session",
+        label: "Eval: plan-then-implement iteration 0",
+      });
+
+      const results = await store.listNodes({ type: "session" });
+      const ids = results.map((n) => n.id);
+      expect(ids).toContain("session:s-prod-1");
+      expect(ids).not.toContain("eval:s-eval-1");
+    });
+
+    it("listNodes({ type: 'eval_session' }) returns only eval sessions", async () => {
+      await store.clear();
+      await store.addNode({ id: "session:s-prod-1b", type: "session", label: "Production work" });
+      await store.addNode({ id: "eval:s-eval-2", type: "eval_session", label: "Eval: foo" });
+
+      const results = await store.listNodes({ type: "eval_session" });
+      const ids = results.map((n) => n.id);
+      expect(ids).toContain("eval:s-eval-2");
+      expect(ids).not.toContain("session:s-prod-1b");
+    });
+
+    it("search() excludes eval_session by default (no types filter)", async () => {
+      await store.clear();
+      await store.addNode({
+        id: "session:s-prod-2",
+        type: "session",
+        label: "plan-then-implement real work",
+      });
+      await store.addNode({
+        id: "eval:s-eval-3",
+        type: "eval_session",
+        label: "Eval: plan-then-implement iteration 0",
+      });
+
+      const results = await store.search("plan-then-implement");
+      const ids = results.map((n) => n.id);
+      expect(ids).toContain("session:s-prod-2");
+      expect(ids).not.toContain("eval:s-eval-3");
+    });
+
+    it("search() includes eval_session when explicitly listed in types", async () => {
+      await store.clear();
+      await store.addNode({
+        id: "eval:s-eval-4",
+        type: "eval_session",
+        label: "Eval: prod query target",
+      });
+
+      const results = await store.search("prod query target", { types: ["eval_session"] });
+      expect(results.map((n) => n.id)).toContain("eval:s-eval-4");
+    });
+  });
 });

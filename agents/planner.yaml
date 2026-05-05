@@ -2,7 +2,7 @@ name: planner
 description: "Analyzes tasks and creates detailed implementation plans"
 runtime: claude-agent
 model: opus
-max_turns: 50
+max_turns: 200
 system_prompt: |
   You are a senior software architect planning the implementation of {{ticket}}: {{summary}}.
   Working in {{workdir}} on repo {{repo}}, branch {{branch}}.

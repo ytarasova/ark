@@ -28,4 +28,24 @@ describe("session compute dispatch", async () => {
     const result = await getApp().dispatchService.dispatch(session.id);
     expect(result.ok).toBe(false);
   });
+
+  // #472: sessions dispatched without an explicit `compute` arg used to land
+  // with NULL compute_name in the DB. The compute panel's predicate then
+  // treated NULL as "match every compute" and surfaced one session under
+  // every panel. Backfill the default at create time so the row has the
+  // compute attribution every downstream view expects.
+  it("sessionService.start defaults compute_name to 'local' when not specified", async () => {
+    const session = await getApp().sessionService.start({ summary: "no-compute-arg" });
+    const stored = await getApp().sessions.get(session.id);
+    expect(stored?.compute_name).toBe("local");
+  });
+
+  it("sessionService.start respects an explicit compute_name", async () => {
+    const session = await getApp().sessionService.start({
+      summary: "explicit-compute",
+      compute_name: "ec2-ssm",
+    });
+    const stored = await getApp().sessions.get(session.id);
+    expect(stored?.compute_name).toBe("ec2-ssm");
+  });
 });

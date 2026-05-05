@@ -255,7 +255,14 @@ export class SessionRepository {
       summary: opts.summary ?? null,
       repo: opts.repo ?? null,
       branch,
-      computeName: opts.compute_name ?? null,
+      // Default to "local" when caller didn't specify. Without this, the
+      // top-level compute_name column ended up NULL on every dispatch that
+      // didn't pass --compute, and the web compute panel's filter then
+      // matched NULL against every compute (one session under multiple
+      // panels). The system already implicitly resolves NULL to local at
+      // dispatch time; persisting it here keeps the DB and UI consistent.
+      // See #472.
+      computeName: opts.compute_name ?? "local",
       workdir: opts.workdir ?? null,
       stage: null,
       status: "pending",

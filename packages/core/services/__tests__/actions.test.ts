@@ -87,4 +87,15 @@ describe("action registry", async () => {
     expect(executed?.data?.skipped).toBe("pr_already_exists");
     expect(executed?.data?.pr_url).toBe("https://github.com/owner/repo/pull/42");
   });
+
+  // #475: auto_merge used to silently advance into the GitHub merge code
+  // path even when create_pr produced no URL, then bomb out deep with
+  // "Session has no PR URL". Gate at the action entry instead.
+  it("auto_merge fails fast when session has no pr_url (no create_pr produced one)", async () => {
+    const s = await app.sessions.create({ summary: "auto-merge no-pr test", flow: "default" });
+    // Explicitly NOT setting pr_url -- this is the s-vpp1r7a4h5 repro.
+    const res = await executeAction(app, s.id, "auto_merge");
+    expect(res.ok).toBe(false);
+    expect(res.message).toMatch(/no PR URL/i);
+  });
 });

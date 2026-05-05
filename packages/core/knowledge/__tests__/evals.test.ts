@@ -61,8 +61,7 @@ describe("evaluateSession", async () => {
     // Verify knowledge node was created
     const node = await app.knowledge.getNode(`eval:${created.id}`);
     expect(node).not.toBeNull();
-    expect(node!.type).toBe("session");
-    expect((node!.metadata as any).eval).toBe(true);
+    expect(node!.type).toBe("eval_session");
     expect((node!.metadata as any).agentRole).toBe("implementer");
   });
 
@@ -96,13 +95,13 @@ describe("evaluateSession", async () => {
 describe("getAgentStats", async () => {
   it("returns correct aggregates", async () => {
     // Clear existing eval nodes
-    await app.knowledge.clear({ type: "session" });
+    await app.knowledge.clear({ type: "eval_session" });
 
     // Create 3 eval nodes manually
     for (let i = 0; i < 3; i++) {
       await app.knowledge.addNode({
         id: `eval:s-stats-${i}`,
-        type: "session",
+        type: "eval_session",
         label: `Eval ${i}`,
         content: JSON.stringify({ turnCount: 10 + i, durationMs: 60000 * (i + 1) }),
         metadata: {
@@ -146,7 +145,7 @@ describe("detectDrift", async () => {
   });
 
   it("detects degradation when completion drops", async () => {
-    await app.knowledge.clear({ type: "session" });
+    await app.knowledge.clear({ type: "eval_session" });
 
     const now = Date.now();
 
@@ -154,7 +153,7 @@ describe("detectDrift", async () => {
     for (let i = 0; i < 5; i++) {
       const nodeId = await app.knowledge.addNode({
         id: `eval:s-drift-base-${i}`,
-        type: "session",
+        type: "eval_session",
         label: `Baseline ${i}`,
         content: "{}",
         metadata: {
@@ -190,11 +189,11 @@ describe("detectDrift", async () => {
 
 describe("listEvals", async () => {
   it("returns eval results", async () => {
-    await app.knowledge.clear({ type: "session" });
+    await app.knowledge.clear({ type: "eval_session" });
 
     await app.knowledge.addNode({
       id: "eval:s-list-1",
-      type: "session",
+      type: "eval_session",
       label: "Eval 1",
       content: JSON.stringify({ turnCount: 5, durationMs: 30000, tokenCost: 0.25, filesChanged: 3, retryCount: 0 }),
       metadata: {
@@ -222,18 +221,18 @@ describe("listEvals", async () => {
   });
 
   it("filters by agent role", async () => {
-    await app.knowledge.clear({ type: "session" });
+    await app.knowledge.clear({ type: "eval_session" });
 
     await app.knowledge.addNode({
       id: "eval:s-filter-1",
-      type: "session",
+      type: "eval_session",
       label: "Eval A",
       content: "{}",
       metadata: { eval: true, agentRole: "planner" },
     });
     await app.knowledge.addNode({
       id: "eval:s-filter-2",
-      type: "session",
+      type: "eval_session",
       label: "Eval B",
       content: "{}",
       metadata: { eval: true, agentRole: "implementer" },
@@ -248,12 +247,12 @@ describe("listEvals", async () => {
   });
 
   it("respects limit", async () => {
-    await app.knowledge.clear({ type: "session" });
+    await app.knowledge.clear({ type: "eval_session" });
 
     for (let i = 0; i < 10; i++) {
       await app.knowledge.addNode({
         id: `eval:s-limit-${i}`,
-        type: "session",
+        type: "eval_session",
         label: `Eval ${i}`,
         content: "{}",
         metadata: { eval: true, agentRole: "worker" },
