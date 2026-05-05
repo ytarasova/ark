@@ -140,10 +140,3 @@ describe("skill CRUD handlers", async () => {
   });
 });
 
-describe("recipe CRUD handlers", async () => {
-  it("recipe/delete refuses builtin recipes", async () => {
-    const res = await router.dispatch(createRequest(1, "recipe/delete", { name: "quick-fix" }));
-    expect(err(res)).toBeDefined();
-    expect(err(res).message).toContain("builtin");
-  });
-});

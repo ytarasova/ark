@@ -17,7 +17,7 @@ import { logInfo, logDebug } from "./observability/structured-log.js";
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export interface ToolEntry {
-  kind: "mcp-server" | "command" | "claude-skill" | "ark-skill" | "ark-recipe" | "context";
+  kind: "mcp-server" | "command" | "claude-skill" | "ark-skill" | "context";
   name: string;
   description: string;
   source: string; // file path or "builtin"
@@ -119,16 +119,6 @@ async function discoverArkSkills(app: AppContext, projectDir?: string): Promise<
   }));
 }
 
-async function discoverArkRecipes(app: AppContext, projectDir?: string): Promise<ToolEntry[]> {
-  const recipes = await app.recipes.list(projectDir);
-  return recipes.map((r) => ({
-    kind: "ark-recipe" as const,
-    name: r.name,
-    description: r.description ?? "",
-    source: r._source ?? "builtin",
-  }));
-}
-
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -147,7 +137,6 @@ export async function discoverTools(projectDir?: string, app?: AppContext): Prom
 
   if (app) {
     entries.push(...(await discoverArkSkills(app, projectDir)));
-    entries.push(...(await discoverArkRecipes(app, projectDir)));
   }
 
   // Sort by kind then name
@@ -157,7 +146,6 @@ export async function discoverTools(projectDir?: string, app?: AppContext): Prom
     "claude-skill": 2,
     context: 3,
     "ark-skill": 4,
-    "ark-recipe": 5,
   };
   entries.sort((a, b) => {
     const ko = (kindOrder[a.kind] ?? 99) - (kindOrder[b.kind] ?? 99);

@@ -55,7 +55,7 @@ import type { SessionLifecycle } from "./services/session/index.js";
 import type { SessionAttachService } from "./services/session/attach.js";
 import type { DispatchService } from "./services/dispatch/index.js";
 import type { StageAdvanceService } from "./services/stage-advance/index.js";
-import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore, ModelStore } from "./stores/index.js";
+import type { FlowStore, SkillStore, AgentStore, RuntimeStore, ModelStore } from "./stores/index.js";
 import { ComputeRegistries } from "./compute-registries.js";
 import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
@@ -674,9 +674,6 @@ export class AppContext {
   }
   get agents(): AgentStore {
     return this._resolve("agents");
-  }
-  get recipes(): RecipeStore {
-    return this._resolve("recipes");
   }
   get runtimes(): RuntimeStore {
     return this._resolve("runtimes");

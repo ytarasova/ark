@@ -207,13 +207,6 @@ export class StageAdvancer {
       }
       await this.markFlowCompleted(sessionId, stage, flowName, undefined);
 
-      // Extract skills from completed session transcript (best-effort).
-      try {
-        await deps.extractAndSaveSkills(sessionId);
-      } catch {
-        logDebug("session", "skill extraction is best-effort");
-      }
-
       return { ok: true, message: "Flow completed" };
     }
 

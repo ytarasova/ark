@@ -26,7 +26,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { guardBuiltin, projectArg, resolveProjectRoot, resolveScope, type Scope } from "./scope-helpers.js";
-import type { AgentDefinition, SkillDefinition, RecipeDefinition } from "../../types/index.js";
+import type { AgentDefinition, SkillDefinition } from "../../types/index.js";
 
 const AGENT_DEFAULTS: Omit<AgentDefinition, "name"> = {
   description: "",
@@ -93,22 +93,6 @@ function buildSkill(name: string, body: Partial<SkillDefinition>): SkillDefiniti
     description: body.description ?? "",
     prompt: body.prompt ?? "",
     tags: body.tags ?? [],
-  };
-}
-
-function buildRecipe(name: string, body: Partial<RecipeDefinition>): RecipeDefinition {
-  return {
-    name,
-    description: body.description ?? "",
-    flow: body.flow ?? "",
-    ...(body.repo ? { repo: body.repo } : {}),
-    ...(body.agent ? { agent: body.agent } : {}),
-    ...(body.compute ? { compute: body.compute } : {}),
-    ...(body.group ? { group: body.group } : {}),
-    variables: body.variables ?? [],
-    ...(body.parameters ? { parameters: body.parameters } : {}),
-    ...(body.defaults ? { defaults: body.defaults } : {}),
-    ...(body.sub_recipes ? { sub_recipes: body.sub_recipes } : {}),
   };
 }
 
@@ -276,51 +260,4 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
     return { ok };
   });
 
-  // ── Recipes ───────────────────────────────────────────────────────────
-
-  handle("recipe/create", async (p) => {
-    const params = extract<{ name: string; yaml?: string; scope?: Scope } & Partial<RecipeDefinition>>(p, ["name"]);
-    const name = requireName(params.name);
-    const projectRoot = resolveProjectRoot();
-    const existing = app.recipes.get(name, projectRoot);
-    if (existing && existing._source !== "builtin") {
-      throw new RpcError(`Recipe '${name}' already exists`, ErrorCodes.INVALID_PARAMS);
-    }
-
-    let body: Partial<RecipeDefinition>;
-    if (typeof params.yaml === "string") {
-      const parsed = parseYaml(params.yaml, "recipe");
-      if (parsed.name && parsed.name !== name) {
-        throw new RpcError(
-          `yaml name '${parsed.name}' does not match request name '${name}'`,
-          ErrorCodes.INVALID_PARAMS,
-        );
-      }
-      body = parsed as Partial<RecipeDefinition>;
-    } else {
-      const { yaml: _yaml, scope: _scope, name: _name, ...rest } = params;
-      body = rest as Partial<RecipeDefinition>;
-    }
-
-    if (!body.flow || typeof body.flow !== "string" || body.flow.trim().length === 0) {
-      throw new RpcError("recipe requires a non-empty 'flow' field", ErrorCodes.INVALID_PARAMS);
-    }
-
-    const recipe = buildRecipe(name, body);
-    const resolved = resolveScope(params.scope, null, projectRoot);
-    app.recipes.save(recipe.name, recipe, resolved, projectArg(resolved, projectRoot));
-    return { ok: true, name: recipe.name, scope: resolved };
-  });
-
-  handle("recipe/delete", async (p) => {
-    const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
-    const resolvedName = requireName(name);
-    const projectRoot = resolveProjectRoot();
-    const existing = app.recipes.get(resolvedName, projectRoot);
-    if (!existing) throw new RpcError(`Recipe '${resolvedName}' not found`, ErrorCodes.SESSION_NOT_FOUND);
-    guardBuiltin(existing, "Recipe", resolvedName, "delete");
-    const resolved = resolveScope(scope, existing, projectRoot);
-    const ok = app.recipes.delete(resolvedName, resolved, projectArg(resolved, projectRoot));
-    return { ok };
-  });
 }

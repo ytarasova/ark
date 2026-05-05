@@ -41,7 +41,6 @@ describe("port catalog shape", () => {
       | Ports.FlowStore
       | Ports.AgentStore
       | Ports.SkillStore
-      | Ports.RecipeStore
       | Ports.RuntimeStore;
 
     // Runtime check: barrel module loads without error.

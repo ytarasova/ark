@@ -1,24 +1,19 @@
 /**
- * AgentClient -- agent / skill / recipe / runtime resource RPCs.
+ * AgentClient -- agent / skill / runtime resource RPCs.
  *
  * Carries the agent-C block (YAML-driven create/edit/copy) -- see markers
  * below.
  */
 
 import type {
-  Session,
   AgentDefinition,
   AgentListResult,
   AgentReadResult,
   SkillListResult,
   SkillReadResult,
-  RecipeListResult,
-  RecipeReadResult,
-  RecipeUseResult,
   RuntimeListResult,
   RuntimeReadResult,
   SkillDefinition,
-  RecipeDefinition,
   RuntimeDefinition,
 } from "../../types/index.js";
 import type { RpcFn } from "./rpc.js";
@@ -82,25 +77,6 @@ export class AgentClient {
     return runtime;
   }
 
-  async recipeList(): Promise<RecipeDefinition[]> {
-    const { recipes } = await this.rpc<RecipeListResult>("recipe/list");
-    return recipes;
-  }
-
-  async recipeRead(name: string): Promise<RecipeDefinition> {
-    const { recipe } = await this.rpc<RecipeReadResult>("recipe/read", { name });
-    return recipe;
-  }
-
-  async recipeUse(name: string, variables?: Record<string, string>): Promise<Session> {
-    const { session } = await this.rpc<RecipeUseResult>("recipe/use", { name, variables });
-    return session;
-  }
-
-  async recipeDelete(name: string, scope?: "global" | "project"): Promise<{ ok: boolean }> {
-    return this.rpc("recipe/delete", { name, scope });
-  }
-
   // --- BEGIN agent-C: resource CRUD methods ---
 
   /**
@@ -157,21 +133,6 @@ export class AgentClient {
 
   // `skillDelete` already exists on this class and hits the same `skill/delete`
   // RPC method our new handler responds to.
-
-  /**
-   * Create a new recipe from a full YAML string. Requires a non-empty
-   * `flow` field in the YAML.
-   */
-  async recipeCreate(opts: {
-    name: string;
-    yaml: string;
-    scope?: "global" | "project";
-  }): Promise<{ ok: boolean; name: string; scope: string }> {
-    return this.rpc("recipe/create", opts as unknown as Record<string, unknown>);
-  }
-
-  // `recipeDelete` already exists on this class and hits the same
-  // `recipe/delete` RPC method our new handler responds to.
 
   // --- END agent-C ---
 }

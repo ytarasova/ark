@@ -75,7 +75,6 @@ function makeDeps(overrides: Partial<StageAdvanceDeps> = {}): TraceableDeps {
     sessionClone: async () => ({ ok: true, sessionId: "s2" }),
     capturePlanMd: async () => {},
     gcComputeIfTemplate: async () => false,
-    extractAndSaveSkills: async () => {},
     saveCheckpoint: async () => {},
     getStage: (_flow: string, stageName: string) => ({ name: stageName, isolation: "fresh" }),
     getStageAction: (_flow: string, _stageName: string) => ({ type: "agent", agent: "test-agent" }),

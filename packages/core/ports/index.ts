@@ -35,5 +35,4 @@ export type { ComputeProvider } from "../../compute/types.js";
 export type { FlowStore, FlowSummary } from "../stores/flow-store.js";
 export type { AgentStore } from "../stores/agent-store.js";
 export type { SkillStore } from "../stores/skill-store.js";
-export type { RecipeStore } from "../stores/recipe-store.js";
 export type { RuntimeStore } from "../stores/runtime-store.js";

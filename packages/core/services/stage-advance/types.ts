@@ -21,9 +21,8 @@
  *     sessionClone: service callbacks. Passed as narrow function refs so
  *     StageAdvance never holds a back-ref to AppContext / SessionLifecycle
  *     directly. Breaks the StageAdvance <-> SessionLifecycle cycle.
- *   - capturePlanMd / gcComputeIfTemplate / extractAndSaveSkills /
- *     getSessionConversation: orchestration-side helpers that still take
- *     AppContext upstream. Wrapped at registration time.
+ *   - capturePlanMd / gcComputeIfTemplate: orchestration-side helpers that
+ *     still take AppContext upstream. Wrapped at registration time.
  *   - getStage / getStageAction / resolveNextStage / evaluateGate:
  *     the flow-state helpers in `state/flow.ts` take AppContext today
  *     (for resource-store lookups). Wrapped as narrow callbacks so the
@@ -71,9 +70,6 @@ export interface CapturePlanMdCb {
 }
 export interface GcComputeIfTemplateCb {
   (computeName: string | null | undefined): Promise<boolean>;
-}
-export interface ExtractAndSaveSkillsCb {
-  (sessionId: string): Promise<void>;
 }
 export interface SaveCheckpointCb {
   (sessionId: string): Promise<void>;
@@ -131,7 +127,6 @@ export interface StageAdvanceDeps {
   // Orchestration-side helpers that still take AppContext upstream.
   capturePlanMd: CapturePlanMdCb;
   gcComputeIfTemplate: GcComputeIfTemplateCb;
-  extractAndSaveSkills: ExtractAndSaveSkillsCb;
   saveCheckpoint: SaveCheckpointCb;
 
   // Flow-engine callbacks (state/flow.ts helpers take AppContext today).

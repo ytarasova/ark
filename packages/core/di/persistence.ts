@@ -30,7 +30,6 @@ import {
   FileFlowStore,
   FileSkillStore,
   FileAgentStore,
-  FileRecipeStore,
   FileRuntimeStore,
   FileModelStore,
   EphemeralFlowStore,
@@ -153,10 +152,6 @@ export function registerResourceStores(container: AppContainer): void {
         makeAgentStore(c.db, c.config, c.mode, c.models),
       { lifetime: Lifetime.SINGLETON },
     ),
-    recipes: asFunction(
-      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeRecipeStore(c.db, c.config, c.mode),
-      { lifetime: Lifetime.SINGLETON },
-    ),
     runtimes: asFunction(
       (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeRuntimeStore(c.db, c.config, c.mode),
       { lifetime: Lifetime.SINGLETON },
@@ -215,17 +210,6 @@ function makeAgentStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode, m
   return new FileAgentStore({
     builtinDir: join(resolveStoreBaseDir(), "agents"),
     userDir: join(config.dirs.ark, "agents"),
-  });
-}
-
-function makeRecipeStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
-  if (mode.kind === "hosted") {
-    initResourceDefinitionsTable(db);
-    return new DbResourceStore(db, "recipe", { description: "", flow: "default" });
-  }
-  return new FileRecipeStore({
-    builtinDir: join(resolveStoreBaseDir(), "recipes"),
-    userDir: join(config.dirs.ark, "recipes"),
   });
 }
 

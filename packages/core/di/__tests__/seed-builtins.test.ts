@@ -87,7 +87,7 @@ afterEach(() => {
   harness = null;
 });
 
-function countBuiltins(): { flow: number; agent: number; skill: number; recipe: number; runtime: number } {
+function countBuiltins(): { flow: number; agent: number; skill: number; runtime: number } {
   const base = resolveStoreBaseDir();
   const count = (sub: string) => {
     const dir = join(base, sub);
@@ -98,7 +98,6 @@ function countBuiltins(): { flow: number; agent: number; skill: number; recipe: 
     flow: count(join("flows", "definitions")),
     agent: count("agents"),
     skill: count("skills"),
-    recipe: count("recipes"),
     runtime: count("runtimes"),
   };
 }
@@ -122,7 +121,6 @@ describe("seedBuiltinResources", () => {
     expect(await dbCount(h, "flow")).toBe(expected.flow);
     expect(await dbCount(h, "agent")).toBe(expected.agent);
     expect(await dbCount(h, "skill")).toBe(expected.skill);
-    expect(await dbCount(h, "recipe")).toBe(expected.recipe);
     expect(await dbCount(h, "runtime")).toBe(expected.runtime);
   });
 
@@ -133,7 +131,6 @@ describe("seedBuiltinResources", () => {
       flow: await dbCount(h, "flow"),
       agent: await dbCount(h, "agent"),
       skill: await dbCount(h, "skill"),
-      recipe: await dbCount(h, "recipe"),
       runtime: await dbCount(h, "runtime"),
     };
 
@@ -143,7 +140,6 @@ describe("seedBuiltinResources", () => {
     expect(await dbCount(h, "flow")).toBe(before.flow);
     expect(await dbCount(h, "agent")).toBe(before.agent);
     expect(await dbCount(h, "skill")).toBe(before.skill);
-    expect(await dbCount(h, "recipe")).toBe(before.recipe);
     expect(await dbCount(h, "runtime")).toBe(before.runtime);
   });
 

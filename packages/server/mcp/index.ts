@@ -12,7 +12,6 @@ import "./tools/session.js"; // side-effect register
 import "./tools/flow.js"; // side-effect register
 import "./tools/agent.js"; // side-effect register
 import "./tools/skill.js"; // side-effect register
-import "./tools/recipe.js"; // side-effect register
 import "./tools/compute.js"; // side-effect register
 import "./tools/secrets.js"; // side-effect register
 

@@ -53,7 +53,6 @@ describe("DI container registration", async () => {
     expect(container.resolve("flows")).toBeDefined();
     expect(container.resolve("skills")).toBeDefined();
     expect(container.resolve("agents")).toBeDefined();
-    expect(container.resolve("recipes")).toBeDefined();
   });
 
   it("config is registered before boot (in constructor)", async () => {
@@ -90,7 +89,6 @@ describe("AppContext accessors resolve from container", async () => {
     expect(app.flows).toBe(app.container.resolve("flows"));
     expect(app.skills).toBe(app.container.resolve("skills"));
     expect(app.agents).toBe(app.container.resolve("agents"));
-    expect(app.recipes).toBe(app.container.resolve("recipes"));
   });
 
   it("singleton registrations return same instance on repeated resolve", async () => {
@@ -354,14 +352,6 @@ describe("resource stores via container", async () => {
     expect(typeof agents.list).toBe("function");
   });
 
-  it("recipes store is accessible and has list()", async () => {
-    app = await AppContext.forTestAsync();
-    await app.boot();
-    setApp(app);
-
-    const recipes = app.recipes;
-    expect(typeof recipes.list).toBe("function");
-  });
 });
 
 // ── Cross-service integration ───────────────────────────────────────────────

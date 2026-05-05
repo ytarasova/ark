@@ -34,7 +34,6 @@ export interface SessionStartOpts {
   group?: string;
   attach?: boolean;
   claudeSession?: string;
-  recipe?: string;
   runtime?: string;
   model?: string;
   maxBudget?: number;
@@ -44,7 +43,6 @@ export interface SessionStartOpts {
 
 /** Collaborator the service calls into. Kept as an interface so unit tests can stub. */
 export interface SessionStartClient {
-  recipeRead(name: string): Promise<any>;
   flowRead(name: string): Promise<any>;
 }
 
@@ -122,30 +120,6 @@ export class SessionStartService {
         kind: "info",
         message: `Importing Claude session ${cs.sessionId.slice(0, 8)} from ${cs.project}`,
       });
-    }
-
-    // ── Recipe instantiation ────────────────────────────────────────
-    let recipeAgent: string | undefined;
-    if (opts.recipe) {
-      let recipe: any;
-      try {
-        recipe = await this.env.client.recipeRead(opts.recipe);
-      } catch {
-        throw new SessionStartPlanError(`Recipe not found: ${opts.recipe}`);
-      }
-      const core = await import("../../core/index.js");
-      const instance = core.instantiateRecipe(recipe, {
-        ...(opts.summary ? { summary: opts.summary } : {}),
-        ...(opts.repo ? { repo: opts.repo } : {}),
-      });
-      if (!opts.summary && instance.summary) opts.summary = instance.summary;
-      if (!opts.summary) opts.summary = recipe.description;
-      if (!opts.flow || opts.flow === "default") opts.flow = instance.flow;
-      if (!opts.compute && instance.compute) opts.compute = instance.compute;
-      if (!opts.group && instance.group) opts.group = instance.group;
-      if (!repo && instance.repo) repo = instance.repo;
-      recipeAgent = instance.agent;
-      notes.push({ kind: "info", message: `Using recipe '${recipe.name}' (${recipe._source})` });
     }
 
     // ── Session config overrides ────────────────────────────────────
@@ -271,7 +245,6 @@ export class SessionStartService {
       ...(opts.branch ? { branch: opts.branch } : {}),
       flow: flowArg,
       compute_name: opts.compute,
-      agent: recipeAgent,
       workdir,
       group_name: opts.group,
       ...(sessionConfig ? { config: sessionConfig } : {}),
