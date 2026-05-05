@@ -153,7 +153,7 @@ export async function getAgentStats(
   testPassRate: number;
   prRate: number;
 }> {
-  const allNodes = await app.knowledge.listNodes({ type: "session" });
+  const allNodes = await app.knowledge.listNodes({ type: "session", includeEvals: true });
   const evalNodes = allNodes
     .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
     .filter(({ meta }) => meta.eval && (!agentRole || meta.agentRole === agentRole));
@@ -204,7 +204,7 @@ export async function detectDrift(
   avgTurnsDelta: number;
   alert: boolean;
 }> {
-  const allNodes = await app.knowledge.listNodes({ type: "session" });
+  const allNodes = await app.knowledge.listNodes({ type: "session", includeEvals: true });
   const allEvals = allNodes
     .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
     .filter(({ meta }) => meta.eval && meta.agentRole === agentRole);
@@ -251,7 +251,7 @@ export async function detectDrift(
  * List eval nodes, optionally filtered by agent role.
  */
 export async function listEvals(app: AppContext, agentRole?: string, limit: number = 20): Promise<AgentEvalResult[]> {
-  const allNodes = await app.knowledge.listNodes({ type: "session", limit: limit * 2 });
+  const allNodes = await app.knowledge.listNodes({ type: "session", limit: limit * 2, includeEvals: true });
   let evalNodes = allNodes.map((n) => ({ node: n, meta: asEvalMeta(n.metadata) })).filter(({ meta }) => meta.eval);
 
   if (agentRole) {

@@ -544,4 +544,72 @@ describe("KnowledgeStore", async () => {
       await scoped.knowledge.clear();
     });
   });
+
+  // #480: eval-flagged session nodes share `type: "session"` with
+  // production sessions but should NOT surface in production search /
+  // listNodes results. They polluted every dispatched agent prompt
+  // (`Related Past Sessions` block was almost entirely eval rows).
+  describe("eval-node default exclusion", async () => {
+    it("listNodes excludes eval-flagged sessions by default", async () => {
+      await store.clear();
+      await store.addNode({ id: "session:s-prod-1", type: "session", label: "Production work" });
+      await store.addNode({
+        id: "eval:s-eval-1",
+        type: "session",
+        label: "Eval: plan-then-implement iteration 0",
+        metadata: { eval: true },
+      });
+
+      const results = await store.listNodes({ type: "session" });
+      const ids = results.map((n) => n.id);
+      expect(ids).toContain("session:s-prod-1");
+      expect(ids).not.toContain("eval:s-eval-1");
+    });
+
+    it("listNodes returns eval nodes when includeEvals is true", async () => {
+      await store.clear();
+      await store.addNode({
+        id: "eval:s-eval-2",
+        type: "session",
+        label: "Eval: foo",
+        metadata: { eval: true },
+      });
+
+      const results = await store.listNodes({ type: "session", includeEvals: true });
+      expect(results.map((n) => n.id)).toContain("eval:s-eval-2");
+    });
+
+    it("search excludes eval-flagged sessions by default", async () => {
+      await store.clear();
+      await store.addNode({
+        id: "session:s-prod-2",
+        type: "session",
+        label: "plan-then-implement real work",
+      });
+      await store.addNode({
+        id: "eval:s-eval-3",
+        type: "session",
+        label: "Eval: plan-then-implement iteration 0",
+        metadata: { eval: true },
+      });
+
+      const results = await store.search("plan-then-implement");
+      const ids = results.map((n) => n.id);
+      expect(ids).toContain("session:s-prod-2");
+      expect(ids).not.toContain("eval:s-eval-3");
+    });
+
+    it("search returns eval nodes when includeEvals is true", async () => {
+      await store.clear();
+      await store.addNode({
+        id: "eval:s-eval-4",
+        type: "session",
+        label: "Eval: prod query target",
+        metadata: { eval: true },
+      });
+
+      const results = await store.search("prod query target", { includeEvals: true });
+      expect(results.map((n) => n.id)).toContain("eval:s-eval-4");
+    });
+  });
 });

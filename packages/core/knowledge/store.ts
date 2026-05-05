@@ -95,7 +95,17 @@ export class KnowledgeStore {
     await this.db.prepare("DELETE FROM knowledge WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
   }
 
-  async listNodes(opts?: { type?: NodeType; limit?: number }): Promise<KnowledgeNode[]> {
+  // Eval nodes are tagged with `metadata.eval = true` by evaluateSession in
+  // packages/core/knowledge/evals.ts. They share `type: "session"` with
+  // production sessions, so without an explicit filter they pollute every
+  // search/list call -- including the auto-injected context block on
+  // every dispatch (#480). Default-exclude them; eval-side reads opt in
+  // via `includeEvals: true`.
+  private isEvalNode(node: KnowledgeNode): boolean {
+    return node.metadata?.eval === true;
+  }
+
+  async listNodes(opts?: { type?: NodeType; limit?: number; includeEvals?: boolean }): Promise<KnowledgeNode[]> {
     let sql = "SELECT * FROM knowledge WHERE tenant_id = ?";
     const params: unknown[] = [this.tenantId];
     if (opts?.type) {
@@ -103,12 +113,20 @@ export class KnowledgeStore {
       params.push(opts.type);
     }
     sql += " ORDER BY updated_at DESC";
-    if (opts?.limit) {
+    // Over-fetch when filtering evals so we still hit `limit` after the
+    // post-filter. Bounded to 4x to avoid scanning the whole table on
+    // pathological eval-heavy stores.
+    const includeEvals = opts?.includeEvals ?? false;
+    const rawLimit = opts?.limit;
+    if (rawLimit) {
       sql += " LIMIT ?";
-      params.push(opts.limit);
+      params.push(includeEvals ? rawLimit : Math.min(rawLimit * 4, rawLimit + 100));
     }
     const rows = (await this.db.prepare(sql).all(...params)) as NodeRow[];
-    return rows.map((r) => this.rowToNode(r));
+    let nodes = rows.map((r) => this.rowToNode(r));
+    if (!includeEvals) nodes = nodes.filter((n) => !this.isEvalNode(n));
+    if (rawLimit && nodes.length > rawLimit) nodes = nodes.slice(0, rawLimit);
+    return nodes;
   }
 
   // --- Edge CRUD ---
@@ -209,7 +227,7 @@ export class KnowledgeStore {
   // --- Search ---
   async search(
     query: string,
-    opts?: { types?: NodeType[]; limit?: number },
+    opts?: { types?: NodeType[]; limit?: number; includeEvals?: boolean },
   ): Promise<Array<KnowledgeNode & { score: number }>> {
     const words = query
       .toLowerCase()
@@ -229,19 +247,23 @@ export class KnowledgeStore {
     for (const w of words) {
       params.push(`%${w}%`, `%${w}%`);
     }
+    // Same over-fetch trick as listNodes -- fetch 4x when filtering evals
+    // so the post-filtered result still hits the caller's limit.
+    const includeEvals = opts?.includeEvals ?? false;
+    const rawLimit = opts?.limit ?? 20;
     sql += ` LIMIT ?`;
-    params.push(opts?.limit ?? 20);
+    params.push(includeEvals ? rawLimit : Math.min(rawLimit * 4, rawLimit + 100));
 
     const rows = (await this.db.prepare(sql).all(...params)) as NodeRow[];
-    return rows
-      .map((row) => {
-        const node = this.rowToNode(row);
-        // Simple scoring: count word matches
-        const text = `${node.label} ${node.content ?? ""}`.toLowerCase();
-        const score = words.reduce((s, w) => s + (text.includes(w) ? 1 : 0), 0) / words.length;
-        return { ...node, score };
-      })
-      .sort((a, b) => b.score - a.score);
+    let scored = rows.map((row) => {
+      const node = this.rowToNode(row);
+      // Simple scoring: count word matches
+      const text = `${node.label} ${node.content ?? ""}`.toLowerCase();
+      const score = words.reduce((s, w) => s + (text.includes(w) ? 1 : 0), 0) / words.length;
+      return { ...node, score };
+    });
+    if (!includeEvals) scored = scored.filter((n) => !this.isEvalNode(n));
+    return scored.sort((a, b) => b.score - a.score).slice(0, rawLimit);
   }
 
   // --- Bulk ---
