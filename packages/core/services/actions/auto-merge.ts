@@ -10,6 +10,18 @@ export const autoMergeAction: ActionHandler = {
   name: "auto_merge",
   async execute(app, session, action, _opts) {
     const sessionId = session.id;
+    // Precondition: a PR must exist for this session before we can merge.
+    // Without this gate, a flow whose `create_pr` step failed (or produced
+    // no URL) silently advances to `merge` and bombs out deep inside the
+    // GitHub client with "Session has no PR URL". Fail fast here so the
+    // operator sees the real cause -- no PR to merge -- at the right stage.
+    // See #475.
+    if (!session.pr_url) {
+      return {
+        ok: false,
+        message: "auto_merge: session has no PR URL -- create_pr did not produce one",
+      };
+    }
     const result = await mergeWorktreePR(app, sessionId);
     if (!result.ok) return result;
 
