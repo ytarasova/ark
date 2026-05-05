@@ -320,12 +320,27 @@ export class ArkServer {
 
         // OAuth Protected Resource Metadata (RFC 9728). MCP SDK clients
         // (Claude Code / Desktop / Cursor) probe this endpoint before
-        // completing the auth handshake to learn how the resource accepts
-        // auth. Returning text/plain here would make `JSON.parse` throw in
-        // the SDK and the whole auth flow silently fails -- bearer never
-        // gets used. Empty `authorization_servers` declares "no OAuth flow,
-        // bearer-only". See #421.
+        // completing the auth handshake.
+        //
+        // When auth IS required: return the metadata so the SDK knows the
+        // resource accepts bearer tokens. Empty `authorization_servers`
+        // declares "no OAuth flow, bearer-only". See #421.
+        //
+        // When auth is NOT required (local single-tenant mode): return
+        // 404. RFC 9728 treats absence of this endpoint as "no OAuth
+        // flow needed for this resource" -- which is the truth. Serving
+        // an empty-auth-servers metadata in this case caused some SDK
+        // clients (Claude Code's MCP client) to fall into an
+        // "SDK auth failed" branch with no actionable diagnostic, leaving
+        // the user staring at a Capabilities: none dialog while
+        // initialize+tools/list both succeed on the wire.
         if (req.method === "GET" && url.pathname.startsWith("/.well-known/oauth-protected-resource")) {
+          if (!self.auth?.requireToken) {
+            return Response.json(
+              { error: "no_oauth_flow", message: "This MCP server does not require authentication." },
+              { status: 404 },
+            );
+          }
           const subpath = url.pathname.slice("/.well-known/oauth-protected-resource".length);
           const resourcePath = subpath || "/mcp";
           const origin =
