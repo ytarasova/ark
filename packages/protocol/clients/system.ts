@@ -1,5 +1,5 @@
 /**
- * SystemClient -- config, profile, history, tools/mcp, schedule.
+ * SystemClient -- config, profile, tools, schedule.
  *
  * These RPCs don't belong to a single domain; they sit at the
  * configuration + utility edge of the protocol surface. Lifecycle
@@ -9,16 +9,8 @@
 
 import type {
   Profile,
-  ClaudeSession,
   ToolEntry,
   Schedule,
-  SearchResult,
-  HistoryListResult,
-  HistoryRefreshResult,
-  HistoryIndexResult,
-  HistorySearchResult,
-  HistoryRebuildFtsResult,
-  HistoryImportResult,
   ScheduleListResult,
   ScheduleCreateResult,
   ScheduleDeleteResult,
@@ -26,8 +18,6 @@ import type {
   ProfileCreateResult,
   ToolsListResult,
   ConfigReadResult,
-  IndexStatsResult,
-  Session,
 } from "../../types/index.js";
 import type { RpcFn } from "./rpc.js";
 
@@ -66,44 +56,7 @@ export class SystemClient {
     await this.rpc("profile/delete", { name });
   }
 
-  // ── History ─────────────────────────────────────────────────────────────────
-
-  async historyList(limit?: number): Promise<ClaudeSession[]> {
-    const { items } = await this.rpc<HistoryListResult>("history/list", { limit });
-    return items;
-  }
-
-  async historyImport(claudeSessionId: string, opts?: { name?: string; repo?: string }): Promise<Session> {
-    const { session } = await this.rpc<HistoryImportResult>("history/import", { claudeSessionId, ...opts });
-    return session;
-  }
-
-  async historyRefresh(): Promise<HistoryRefreshResult> {
-    return this.rpc<HistoryRefreshResult>("history/refresh");
-  }
-
-  async historyIndex(): Promise<HistoryIndexResult> {
-    return this.rpc<HistoryIndexResult>("history/index");
-  }
-
-  async historyRebuildFts(): Promise<HistoryRebuildFtsResult> {
-    return this.rpc<HistoryRebuildFtsResult>("history/rebuild-fts");
-  }
-
-  async historyRefreshAndIndex(): Promise<HistoryRebuildFtsResult> {
-    return this.rpc<HistoryRebuildFtsResult>("history/refresh-and-index");
-  }
-
-  async historySearch(query: string, limit?: number): Promise<SearchResult[]> {
-    const { results } = await this.rpc<HistorySearchResult>("history/search", { query, limit });
-    return results;
-  }
-
-  async indexStats(): Promise<IndexStatsResult> {
-    return this.rpc<IndexStatsResult>("history/index-stats");
-  }
-
-  // ── Tools + MCP ─────────────────────────────────────────────────────────────
+  // ── Tools ───────────────────────────────────────────────────────────────────
 
   async toolsList(projectRoot?: string): Promise<ToolEntry[]> {
     const { tools } = await this.rpc<ToolsListResult>("tools/list", { projectRoot });

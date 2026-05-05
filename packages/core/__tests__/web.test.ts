@@ -192,13 +192,6 @@ describe("web server", async () => {
     expect((result.profiles as any[]).some((p) => p.name === "default")).toBe(true);
   });
 
-  it("search/sessions requires query param", async () => {
-    server = startWebServer(getApp(), { port: 18538 });
-    const data = await rpcResult(18538, "search/sessions", {});
-    // Missing required param "query" should return an error
-    expect(data.error).toBeDefined();
-  });
-
   it("agent/list returns agents via RPC", async () => {
     server = startWebServer(getApp(), { port: 18539 });
     const data = await rpcResult(18539, "agent/list");

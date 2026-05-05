@@ -471,7 +471,7 @@ export {
 } from "./repositories/index.js";
 
 // Services
-export { SessionService, ComputeService, HistoryService } from "./services/index.js";
+export { SessionService, ComputeService } from "./services/index.js";
 
 // Resource stores
 export { type FlowStore, type FlowSummary, FileFlowStore } from "./stores/index.js";

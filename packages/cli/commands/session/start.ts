@@ -26,7 +26,6 @@ export function registerStartCommands(session: Command) {
     .option("-c, --compute <name>", "Compute name")
     .option("-g, --group <name>", "Group name")
     .option("-a, --attach", "Attach to the session's tmux pane after starting")
-    .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
     .option(
       "--max-budget <usd>",
       "Cumulative cost cap for this session in USD. Halts for_each if exceeded.",
@@ -84,10 +83,6 @@ export function registerStartCommands(session: Command) {
         client: {
           flowRead: (name) => ark.flowRead(name),
         },
-        getClaudeSession: async (id) => {
-          const app = await getInProcessApp();
-          return core.getClaudeSession(app, id);
-        },
       });
 
       let plan;
@@ -107,13 +102,6 @@ export function registerStartCommands(session: Command) {
       }
 
       const s = await ark.sessionStart(plan.request);
-
-      if (plan.claudeSessionId) {
-        await ark.sessionUpdate(s.id, { claude_session_id: plan.claudeSessionId });
-        console.log(
-          chalk.dim(`  Bound to Claude session: ${plan.claudeSessionId.slice(0, 8)} (will use --resume on dispatch)`),
-        );
-      }
 
       console.log(chalk.green(`Session ${s.id} created + dispatched`));
       console.log(`  Summary:  ${s.summary ?? "-"}`);

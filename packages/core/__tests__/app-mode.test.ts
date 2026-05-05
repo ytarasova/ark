@@ -28,7 +28,6 @@ describe("buildAppMode", () => {
     expect(mode.fsCapability).not.toBeNull();
     expect(mode.knowledgeCapability).toBeNull(); // no app arg -> knowledge needs app
     expect(mode.repoMapCapability).not.toBeNull();
-    expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).not.toBeNull();
   });
 
@@ -38,7 +37,6 @@ describe("buildAppMode", () => {
     expect(mode.fsCapability).toBeNull();
     expect(mode.knowledgeCapability).toBeNull();
     expect(mode.repoMapCapability).toBeNull();
-    expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
   });
 
@@ -73,7 +71,6 @@ describe("buildLocalAppMode(app)", () => {
   it("populates knowledge + fts-rebuild capabilities when an app is provided", () => {
     const mode = buildLocalAppMode(app);
     expect(mode.knowledgeCapability).not.toBeNull();
-    expect(mode.ftsRebuildCapability).not.toBeNull();
   });
 });
 
@@ -84,7 +81,6 @@ describe("buildHostedAppMode", () => {
     expect(mode.fsCapability).toBeNull();
     expect(mode.knowledgeCapability).toBeNull();
     expect(mode.repoMapCapability).toBeNull();
-    expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
     expect(mode.database.dialect).toBe("postgres");
     expect(mode.database.url).toBe("postgres://test");
