@@ -319,7 +319,6 @@ describe("tenant scoping", async () => {
       expect(tenantApp.sessionService).not.toBe(app.sessionService);
       expect(tenantApp.sessionHooks).not.toBe(app.sessionHooks);
       expect(tenantApp.stageAdvance).not.toBe(app.stageAdvance);
-      expect(tenantApp.historyService).not.toBe(app.historyService);
       expect(tenantApp.computeService).not.toBe(app.computeService);
 
       // Two different tenant scopes also get different service instances.

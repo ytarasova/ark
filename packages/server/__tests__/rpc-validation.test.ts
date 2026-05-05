@@ -397,11 +397,6 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: [] as unknown as Record<string, unknown>,
     sampleResponse: { counts: {} },
   },
-  "session/conversation": {
-    validRequest: { sessionId: "s-1" },
-    invalidRequest: {},
-    sampleResponse: { turns: [] },
-  },
   "message/send": {
     validRequest: { sessionId: "s-1", content: "hi" },
     invalidRequest: { sessionId: "s-1" },
@@ -438,31 +433,6 @@ const fixtures: Record<string, MethodFixture> = {
     validRequest: {},
     invalidRequest: [] as unknown as Record<string, unknown>,
     sampleResponse: { csv: "" },
-  },
-  "search/sessions": {
-    validRequest: { query: "foo" },
-    invalidRequest: {},
-    sampleResponse: { sessions: [], transcripts: [] },
-  },
-  "search/global": {
-    validRequest: { query: "foo" },
-    invalidRequest: {},
-    sampleResponse: [],
-  },
-  "history/list": {
-    validRequest: { limit: 10 },
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { items: [] },
-  },
-  "history/refresh-and-index": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { ok: true, sessionCount: 0, indexCount: 0, items: [] },
-  },
-  "history/rebuild-fts": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { ok: true },
   },
   "status/get": {
     validRequest: {},

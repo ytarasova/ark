@@ -17,8 +17,6 @@ import { RpcError } from "../../protocol/types.js";
 import { logDebug } from "../observability/structured-log.js";
 import { buildTenantScope } from "../tenant-scope.js";
 import { generateRepoMap } from "../repo-map.js";
-import { listClaudeSessions, refreshClaudeSessionsCache } from "../claude/sessions.js";
-import { indexTranscripts } from "../search/search.js";
 import type {
   AppMode,
   ComputeBootstrapCapability,
@@ -28,7 +26,6 @@ import type {
   FsDirEntry,
   KnowledgeCapability,
   RepoMapCapability,
-  FtsRebuildCapability,
   HostCommandCapability,
   TenantResolverCapability,
   TenantScopeCapability,
@@ -159,25 +156,6 @@ function makeKnowledgeCapability(app: AppContext): KnowledgeCapability {
   };
 }
 
-// ── FTS rebuild ─────────────────────────────────────────────────────────────
-
-function makeFtsRebuildCapability(app: AppContext): FtsRebuildCapability {
-  return {
-    async rebuild() {
-      const db = app.db;
-      // claude_sessions_cache + transcript_index index the local user's
-      // `~/.claude` transcripts and are NOT tenant-scoped. Wiping them is
-      // only safe in single-user local mode.
-      await db.prepare("DELETE FROM claude_sessions_cache").run();
-      await db.prepare("DELETE FROM transcript_index").run();
-      const sessionCount = await refreshClaudeSessionsCache(app, {});
-      const indexCount = await indexTranscripts(app, {});
-      const items = await listClaudeSessions(app);
-      return { sessionCount, indexCount, items };
-    },
-  };
-}
-
 // ── Host commands (kill, docker) ───────────────────────────────────────────
 
 function makeHostCommandCapability(): HostCommandCapability {
@@ -250,7 +228,6 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
   const fsCapability = makeFsCapability();
   const repoMapCapability = makeRepoMapCapability();
   const knowledgeCapability = app ? makeKnowledgeCapability(app) : null;
-  const ftsRebuildCapability = app ? makeFtsRebuildCapability(app) : null;
   const hostCommandCapability = makeHostCommandCapability();
   // Default to the user's home when no AppContext is available (bare
   // AppMode construction used by a few tests). The first real mutation
@@ -270,7 +247,6 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
     fsCapability,
     knowledgeCapability,
     repoMapCapability,
-    ftsRebuildCapability,
     hostCommandCapability,
     computeBootstrap: makeLocalComputeBootstrap(db.dialect),
     migrations: buildMigrationsCapability(db.dialect),

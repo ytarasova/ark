@@ -49,7 +49,7 @@ import type {
   LedgerRepository,
 } from "./repositories/index.js";
 import { ComputeTemplateRepository as ComputeTemplateRepositoryCtor } from "./repositories/index.js";
-import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
+import type { SessionService, ComputeService } from "./services/index.js";
 import type { SessionHooks } from "./services/session-hooks/index.js";
 import type { SessionLifecycle } from "./services/session/index.js";
 import type { SessionAttachService } from "./services/session/attach.js";
@@ -644,9 +644,6 @@ export class AppContext {
   }
   get computeService(): ComputeService {
     return this._resolve("computeService");
-  }
-  get historyService(): HistoryService {
-    return this._resolve("historyService");
   }
   get sessionHooks(): SessionHooks {
     return this._resolve("sessionHooks");

@@ -61,12 +61,6 @@ export interface KnowledgeCapability {
   import(dir: string): Promise<Record<string, unknown>>;
 }
 
-/** FTS index rebuild -- wipes the shared `claude_sessions_cache` + `transcript_index`
- * tables. Only safe in single-tenant local mode. */
-export interface FtsRebuildCapability {
-  rebuild(): Promise<{ sessionCount: number; indexCount: number; items: unknown[] }>;
-}
-
 /** Privileged host commands (kill, docker). Only safe in local single-user mode. */
 export interface HostCommandCapability {
   killProcess(pid: number): Promise<void>;
@@ -195,7 +189,6 @@ export interface AppMode {
   readonly fsCapability: FsCapability | null;
   readonly knowledgeCapability: KnowledgeCapability | null;
   readonly repoMapCapability: RepoMapCapability | null;
-  readonly ftsRebuildCapability: FtsRebuildCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;
   /** Bootstrap seed (local: insert the "local" compute row; hosted: no-op). */
   readonly computeBootstrap: ComputeBootstrapCapability;

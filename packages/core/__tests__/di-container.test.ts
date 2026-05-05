@@ -17,7 +17,6 @@ import { MessageRepository } from "../repositories/message.js";
 import { TodoRepository } from "../repositories/todo.js";
 import { SessionService } from "../services/session.js";
 import { ComputeService } from "../services/compute.js";
-import { HistoryService } from "../services/history.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext | null = null;
@@ -49,7 +48,6 @@ describe("DI container registration", async () => {
     expect(container.resolve("todos")).toBeDefined();
     expect(container.resolve("sessionService")).toBeDefined();
     expect(container.resolve("computeService")).toBeDefined();
-    expect(container.resolve("historyService")).toBeDefined();
     expect(container.resolve("flows")).toBeDefined();
     expect(container.resolve("skills")).toBeDefined();
     expect(container.resolve("agents")).toBeDefined();
@@ -85,7 +83,6 @@ describe("AppContext accessors resolve from container", async () => {
     expect(app.todos).toBe(app.container.resolve("todos"));
     expect(app.sessionService).toBe(app.container.resolve("sessionService"));
     expect(app.computeService).toBe(app.container.resolve("computeService"));
-    expect(app.historyService).toBe(app.container.resolve("historyService"));
     expect(app.flows).toBe(app.container.resolve("flows"));
     expect(app.skills).toBe(app.container.resolve("skills"));
     expect(app.agents).toBe(app.container.resolve("agents"));
@@ -129,7 +126,6 @@ describe("resolved instances have correct types", async () => {
 
     expect(app.sessionService).toBeInstanceOf(SessionService);
     expect(app.computeService).toBeInstanceOf(ComputeService);
-    expect(app.historyService).toBeInstanceOf(HistoryService);
   });
 });
 
@@ -184,18 +180,6 @@ describe("service dependency injection", async () => {
     expect(fromRepo).not.toBeNull();
     expect(providerOf(fromRepo!)).toBe("docker");
   });
-
-  it("HistoryService shares the same DB as repositories", async () => {
-    app = await AppContext.forTestAsync();
-    await app.boot();
-    setApp(app);
-
-    // Create a session via service, then search via history
-    await app.sessionService.start({ summary: "Searchable DI session" });
-    const results = await app.historyService.search("Searchable DI");
-    expect(results.length).toBe(1);
-    expect(results[0].match).toBe("Searchable DI session");
-  });
 });
 
 // ── Test isolation ──────────────────────────────────────────────────────────
@@ -211,9 +195,9 @@ describe("forTest() isolation", async () => {
     // Create session in app1
     await app1.sessionService.start({ summary: "app1 session" });
 
-    // app2 should not see it
-    const results = await app2.historyService.search("app1 session");
-    expect(results.length).toBe(0);
+    // app2 should not see it via its own session repo
+    const results = await app2.sessions.list({ limit: 100 });
+    expect(results.find((s) => s.summary === "app1 session")).toBeUndefined();
 
     // Cleanup
     await app2.shutdown();
@@ -351,7 +335,6 @@ describe("resource stores via container", async () => {
     const agents = app.agents;
     expect(typeof agents.list).toBe("function");
   });
-
 });
 
 // ── Cross-service integration ───────────────────────────────────────────────
@@ -416,10 +399,6 @@ describe("cross-service integration through container", async () => {
     // Both write to the same underlying database
     expect(await app.sessions.get(session.id)).not.toBeNull();
     expect(await app.computes.get("test-ec2")).not.toBeNull();
-
-    // History service sees the session
-    const results = await app.historyService.search("With compute");
-    expect(results.length).toBe(1);
   });
 
   it("messages sent through repo are visible via service complete()", async () => {
@@ -453,17 +432,6 @@ describe("transitive dependency sharing", async () => {
       | undefined;
     expect(row).toBeDefined();
     expect(row!.id).toBe(session.id);
-  });
-
-  it("HistoryService queries the same DB that repos write to", async () => {
-    app = await AppContext.forTestAsync();
-    await app.boot();
-    setApp(app);
-
-    await app.sessionService.start({ summary: "History transitive test" });
-
-    const results = await app.historyService.search("History transitive");
-    expect(results.length).toBe(1);
   });
 
   it("all repos resolve with the same DB instance", async () => {

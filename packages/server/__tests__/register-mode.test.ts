@@ -16,7 +16,6 @@ import { buildHostedAppMode, buildLocalAppMode } from "../../core/modes/app-mode
 
 const LOCAL_ONLY_METHODS = [
   "fs/list-dir",
-  "history/rebuild-fts",
   "repo-map/get",
   "knowledge/ingest",
   "knowledge/index",
@@ -30,9 +29,6 @@ const LOCAL_ONLY_METHODS = [
 const SHARED_METHODS = [
   "status/get",
   "config/get",
-  "search/sessions",
-  "history/list",
-  "history/search",
   "knowledge/search",
   "knowledge/stats",
   "costs/summary",

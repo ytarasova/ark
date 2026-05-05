@@ -20,7 +20,6 @@ import { handleReport } from "./report-pipeline.js";
 import { eventBus } from "../hooks.js";
 import { safeAsync } from "../safe.js";
 import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
-import { indexSession } from "../search/search.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
 
 export async function handleHookStatus(app: AppContext, req: Request, url: URL): Promise<Response> {
@@ -219,12 +218,6 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
     await scoped.sessionHooks.mediateStageHandoff(sessionId, {
       autoDispatch: result.shouldAutoDispatch,
       source: "hook_status",
-    });
-  }
-
-  if (result.shouldIndex && result.indexTranscript) {
-    await safeAsync("transcript indexing", async () => {
-      await indexSession(scoped, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
     });
   }
 
