@@ -31,20 +31,9 @@ One-hop traces for the top-N operations. Each row is module-level -- depth stops
 - **repository**: `packages/core/repositories/compute.ts`
 - **table**: `compute`
 
-## `knowledge/stats`
-
-- **route**: `packages/server/handlers/knowledge.ts`
-- **repository**: `packages/core/repositories/artifact.ts`
-- **table**: `knowledge`
-
 ## `schedule/create`
 
 - **route**: `packages/server/handlers/schedule.ts`
 - **service**: `packages/core/schedule.ts`
 - **table**: `schedules`
-
-## `memory/add`
-
-- **route**: `packages/server/handlers/memory.ts`
-- **table**: `memory`
 

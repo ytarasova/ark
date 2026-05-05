@@ -2,7 +2,7 @@
 
 > generated: 1970-01-01T00:00:00.000Z  -  regenerate with `make audit`.
 
-Total RPC methods: **225**.  Zod-validated: **102**.
+Total RPC methods: **186**.  Zod-validated: **89**.
 
 | method | handler file | line | zod | caller files |
 | --- | --- | --- | --- | --- |
@@ -48,16 +48,6 @@ Total RPC methods: **225**.  Zod-validated: **102**.
 | `agent/read` | `packages/server/handlers/resource.ts` | 28 | no | packages/protocol/clients/agent.ts |
 | `agent/update` | `packages/server/handlers/resource.ts` | 74 | yes | packages/protocol/clients/agent.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `cluster/list` | `packages/server/handlers/clusters.ts` | 34 | no | packages/protocol/clients/compute.ts |
-| `code-intel/get-context` | `packages/server/handlers/code-intel.ts` | 181 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/health` | `packages/server/handlers/code-intel.ts` | 42 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/migrate` | `packages/server/handlers/code-intel.ts` | 65 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/migration-status` | `packages/server/handlers/code-intel.ts` | 57 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/reindex` | `packages/server/handlers/code-intel.ts` | 121 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/repo/add` | `packages/server/handlers/code-intel.ts` | 88 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/repo/list` | `packages/server/handlers/code-intel.ts` | 114 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/reset` | `packages/server/handlers/code-intel.ts` | 72 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/search` | `packages/server/handlers/code-intel.ts` | 166 | no | packages/protocol/clients/code-intel.ts |
-| `code-intel/tenant/list` | `packages/server/handlers/code-intel.ts` | 82 | no | packages/protocol/clients/code-intel.ts |
 | `compute/capabilities` | `packages/server/handlers/resource-compute.ts` | 187 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `compute/clean` | `packages/server/handlers/resource-compute.ts` | 325 | no | packages/protocol/clients/compute.ts |
 | `compute/clean-zombies` | `packages/server/handlers/resource-compute.ts` | 400 | no | packages/protocol/clients/compute.ts |
@@ -79,18 +69,16 @@ Total RPC methods: **225**.  Zod-validated: **102**.
 | `compute/template/get` | `packages/server/handlers/resource-compute.ts` | 429 | no | packages/protocol/clients/compute.ts |
 | `compute/template/list` | `packages/server/handlers/resource-compute.ts` | 406 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `compute/update` | `packages/server/handlers/resource-compute.ts` | 168 | no | packages/protocol/clients/compute.ts |
-| `conductor/bridge` | `packages/server/handlers/conductor.ts` | 98 | no | packages/protocol/clients/observability.ts |
-| `conductor/learn` | `packages/server/handlers/conductor.ts` | 69 | no | packages/protocol/clients/observability.ts |
-| `conductor/learnings` | `packages/server/handlers/conductor.ts` | 62 | no | packages/protocol/clients/observability.ts |
-| `conductor/notify` | `packages/server/handlers/conductor.ts` | 119 | no | packages/protocol/clients/observability.ts |
-| `conductor/status` | `packages/server/handlers/conductor.ts` | 55 | no | packages/protocol/clients/observability.ts |
-| `config/get` | `packages/server/handlers/web.ts` | 65 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `conductor/bridge` | `packages/server/handlers/conductor.ts` | 39 | no | packages/protocol/clients/observability.ts |
+| `conductor/notify` | `packages/server/handlers/conductor.ts` | 59 | no | packages/protocol/clients/observability.ts |
+| `conductor/status` | `packages/server/handlers/conductor.ts` | 28 | no | packages/protocol/clients/observability.ts |
+| `config/get` | `packages/server/handlers/web.ts` | 62 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `config/read` | `packages/server/handlers/config.ts` | 9 | no | packages/protocol/clients/system.ts |
 | `config/write` | `packages/server/handlers/config.ts` | 10 | no | packages/protocol/clients/system.ts |
 | `connectors/get` | `packages/server/handlers/connectors.ts` | 105 | no | packages/protocol/clients/tickets.ts |
 | `connectors/list` | `packages/server/handlers/connectors.ts` | 99 | no | packages/protocol/clients/tickets.ts<br>packages/web/src/hooks/useApi.ts |
 | `connectors/test` | `packages/server/handlers/connectors.ts` | 112 | no | packages/protocol/clients/tickets.ts<br>packages/web/src/hooks/useApi.ts |
-| `cost/export` | `packages/server/handlers/web.ts` | 73 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `cost/export` | `packages/server/handlers/web.ts` | 70 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `costs/export` | `packages/server/handlers/costs.ts` | 39 | no | packages/protocol/clients/observability.ts |
 | `costs/read` | `packages/server/handlers/metrics.ts` | 40 | yes | packages/protocol/clients/observability.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `costs/record` | `packages/server/handlers/metrics.ts` | 88 | no | packages/protocol/clients/observability.ts |
@@ -98,11 +86,8 @@ Total RPC methods: **225**.  Zod-validated: **102**.
 | `costs/summary` | `packages/server/handlers/metrics.ts` | 48 | no | packages/protocol/clients/observability.ts |
 | `costs/sync` | `packages/server/handlers/costs.ts` | 33 | no | packages/protocol/clients/observability.ts |
 | `costs/trend` | `packages/server/handlers/metrics.ts` | 62 | no | packages/protocol/clients/observability.ts |
-| `daemon/status` | `packages/server/handlers/web.ts` | 48 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `daemon/status` | `packages/server/handlers/web.ts` | 45 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `dashboard/summary` | `packages/server/handlers/dashboard.ts` | 6 | yes | packages/protocol/clients/observability.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `eval/drift` | `packages/server/handlers/eval.ts` | 12 | no | packages/protocol/clients/observability.ts |
-| `eval/list` | `packages/server/handlers/eval.ts` | 19 | no | packages/protocol/clients/observability.ts |
-| `eval/stats` | `packages/server/handlers/eval.ts` | 6 | no | packages/protocol/clients/observability.ts |
 | `flow/create` | `packages/server/handlers/resource.ts` | 115 | yes | packages/protocol/clients/flow.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `flow/delete` | `packages/server/handlers/resource.ts` | 141 | yes | packages/protocol/clients/flow.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `flow/list` | `packages/server/handlers/resource.ts` | 98 | yes | packages/protocol/clients/flow.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
@@ -113,37 +98,20 @@ Total RPC methods: **225**.  Zod-validated: **102**.
 | `group/create` | `packages/server/handlers/resource.ts` | 201 | no | packages/protocol/clients/compute.ts |
 | `group/delete` | `packages/server/handlers/resource.ts` | 206 | no | packages/protocol/clients/compute.ts |
 | `group/list` | `packages/server/handlers/resource.ts` | 200 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `initialize` | `packages/server/register.ts` | 72 | no | packages/protocol/client.ts |
+| `initialize` | `packages/server/register.ts` | 62 | no | packages/protocol/client.ts |
 | `input/read` | `packages/server/handlers/session.ts` | 78 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `input/upload` | `packages/server/handlers/session.ts` | 67 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `integrations/list` | `packages/server/handlers/integrations.ts` | 47 | no | packages/protocol/clients/tickets.ts<br>packages/web/src/hooks/useApi.ts |
 | `k8s/discover` | `packages/server/handlers/resource-compute.ts` | 128 | no | packages/protocol/clients/compute.ts |
-| `knowledge/codebase/status` | `packages/server/handlers/knowledge.ts` | 61 | no | packages/web/src/hooks/useApi.ts |
-| `knowledge/export` | `packages/server/handlers/knowledge-local.ts` | 32 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `knowledge/import` | `packages/server/handlers/knowledge-local.ts` | 38 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `knowledge/index` | `packages/server/handlers/knowledge-local.ts` | 21 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `knowledge/ingest` | `packages/server/handlers/web-local.ts` | 30 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `knowledge/recall` | `packages/server/handlers/knowledge-rpc.ts` | 60 | no | packages/protocol/clients/knowledge.ts |
-| `knowledge/remember` | `packages/server/handlers/knowledge-rpc.ts` | 33 | no | packages/protocol/clients/knowledge.ts |
-| `knowledge/search` | `packages/server/handlers/knowledge.ts` | 17 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `knowledge/stats` | `packages/server/handlers/knowledge.ts` | 23 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `learning/add` | `packages/server/handlers/web.ts` | 95 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `learning/list` | `packages/server/handlers/web.ts` | 83 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `memory/add` | `packages/server/handlers/memory.ts` | 57 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `memory/clear` | `packages/server/handlers/memory.ts` | 74 | no | packages/protocol/clients/knowledge.ts |
-| `memory/forget` | `packages/server/handlers/memory.ts` | 49 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `memory/list` | `packages/server/handlers/memory.ts` | 29 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `memory/recall` | `packages/server/handlers/memory.ts` | 38 | yes | packages/protocol/clients/knowledge.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `message/markRead` | `packages/server/handlers/messaging.ts` | 29 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `message/send` | `packages/server/handlers/messaging.ts` | 8 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `metrics/snapshot` | `packages/server/handlers/metrics.ts` | 20 | yes | packages/protocol/clients/compute.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `model/list` | `packages/server/handlers/resource.ts` | 196 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `openapi/spec` | `packages/server/handlers/web.ts` | 180 | no | _(no caller found)_ |
+| `openapi/spec` | `packages/server/handlers/web.ts` | 129 | no | _(no caller found)_ |
 | `profile/create` | `packages/server/handlers/config.ts` | 23 | yes | packages/protocol/clients/system.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `profile/delete` | `packages/server/handlers/config.ts` | 29 | yes | packages/protocol/clients/system.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `profile/list` | `packages/server/handlers/config.ts` | 13 | yes | packages/protocol/clients/system.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `profile/set` | `packages/server/handlers/config.ts` | 17 | no | packages/protocol/clients/system.ts |
-| `repo-map/get` | `packages/server/handlers/web-local.ts` | 25 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `runtime/kinds` | `packages/server/handlers/resource-compute.ts` | 166 | no | packages/web/src/hooks/useApi.ts |
 | `runtime/list` | `packages/server/handlers/resource.ts` | 186 | yes | packages/protocol/clients/agent.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `runtime/read` | `packages/server/handlers/resource.ts` | 187 | yes | packages/protocol/clients/agent.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
@@ -170,12 +138,12 @@ Total RPC methods: **225**.  Zod-validated: **102**.
 | `session/delete` | `packages/server/handlers/session.ts` | 133 | yes | packages/protocol/clients/session.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `session/events` | `packages/server/handlers/session.ts` | 245 | yes | packages/protocol/clients/session.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `session/export` | `packages/server/handlers/session.ts` | 629 | no | packages/protocol/clients/session-interact.ts |
-| `session/export-data` | `packages/server/handlers/web.ts` | 172 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `session/export-data` | `packages/server/handlers/web.ts` | 121 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `session/fan-out` | `packages/server/handlers/session.ts` | 343 | no | packages/protocol/clients/session-interact.ts |
 | `session/flowStages` | `packages/server/handlers/session.ts` | 393 | no | packages/web/src/hooks/useApi.ts |
 | `session/fork` | `packages/server/handlers/session.ts` | 150 | yes | packages/protocol/clients/session.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `session/handoff` | `packages/server/handlers/session.ts` | 311 | no | packages/protocol/clients/session-interact.ts |
-| `session/import` | `packages/server/handlers/web.ts` | 143 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `session/import` | `packages/server/handlers/web.ts` | 92 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `session/inject` | `packages/server/handlers/session.ts` | 677 | yes | packages/protocol/rpc-schemas.ts |
 | `session/interrupt` | `packages/server/handlers/session.ts` | 435 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `session/join` | `packages/server/handlers/session.ts` | 320 | no | packages/protocol/clients/session-interact.ts |
@@ -203,7 +171,7 @@ Total RPC methods: **225**.  Zod-validated: **102**.
 | `skill/list` | `packages/server/handlers/resource.ts` | 151 | yes | packages/protocol/clients/agent.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `skill/read` | `packages/server/handlers/resource.ts` | 152 | no | packages/protocol/clients/agent.ts |
 | `skill/save` | `packages/server/handlers/resource.ts` | 161 | yes | packages/protocol/clients/agent.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `status/get` | `packages/server/handlers/web.ts` | 38 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `status/get` | `packages/server/handlers/web.ts` | 35 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `todo/add` | `packages/server/handlers/session.ts` | 600 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `todo/delete` | `packages/server/handlers/session.ts` | 613 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `todo/list` | `packages/server/handlers/session.ts` | 594 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
@@ -219,18 +187,11 @@ Total RPC methods: **225**.  Zod-validated: **102**.
 | `trigger/sources` | `packages/server/handlers/triggers.ts` | 101 | no | packages/protocol/clients/tickets.ts<br>packages/web/src/hooks/useApi.ts |
 | `trigger/test` | `packages/server/handlers/triggers.ts` | 114 | no | packages/protocol/clients/tickets.ts<br>packages/web/src/hooks/useApi.ts |
 | `verify/run` | `packages/server/handlers/session.ts` | 621 | yes | packages/protocol/clients/session-interact.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `workspace/add-repo` | `packages/server/handlers/workspace.ts` | 136 | no | packages/protocol/clients/workspace.ts |
-| `workspace/create` | `packages/server/handlers/workspace.ts` | 77 | no | packages/protocol/clients/workspace.ts |
-| `workspace/delete` | `packages/server/handlers/workspace.ts` | 102 | no | packages/protocol/clients/workspace.ts |
-| `workspace/get` | `packages/server/handlers/workspace.ts` | 53 | no | packages/protocol/clients/workspace.ts |
-| `workspace/list` | `packages/server/handlers/workspace.ts` | 33 | no | packages/protocol/clients/workspace.ts |
-| `workspace/remove-repo` | `packages/server/handlers/workspace.ts` | 156 | no | packages/protocol/clients/workspace.ts |
-| `workspace/status` | `packages/server/handlers/workspace.ts` | 117 | no | packages/protocol/clients/workspace.ts |
-| `worktree/cleanup` | `packages/server/handlers/web.ts` | 137 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `worktree/cleanup` | `packages/server/handlers/web.ts` | 86 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `worktree/create-pr` | `packages/server/handlers/session.ts` | 567 | yes | packages/protocol/clients/session.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `worktree/diff` | `packages/server/handlers/session.ts` | 561 | yes | packages/protocol/clients/session.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 | `worktree/finish` | `packages/server/handlers/session.ts` | 582 | yes | packages/protocol/clients/session.ts<br>packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
-| `worktree/list` | `packages/server/handlers/web.ts` | 131 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
+| `worktree/list` | `packages/server/handlers/web.ts` | 80 | yes | packages/protocol/rpc-schemas.ts<br>packages/web/src/hooks/useApi.ts |
 
 ## Dynamic registrations
 

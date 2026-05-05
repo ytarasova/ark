@@ -189,10 +189,8 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **25**.
   - `updated_at` (text, NOT NULL DEFAULT)
 - writers (0):
 - readers (0):
-- migration history (3):
+- migration history (1):
   - `packages/core/migrations/013_eval_session_type.ts`
-  - `packages/core/migrations/013_eval_session_type_postgres.ts`
-  - `packages/core/migrations/013_eval_session_type_sqlite.ts`
 
 ## `knowledge_edges`
 
@@ -354,7 +352,7 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **25**.
 - readers (2):
   - `packages/core/auth/tenant-policy.ts`
   - `packages/core/repositories/session.ts`
-- migration history (9):
+- migration history (8):
   - `packages/core/migrations/003_tenants_teams.ts`
   - `packages/core/migrations/003_tenants_teams_postgres.ts`
   - `packages/core/migrations/003_tenants_teams_sqlite.ts`
@@ -363,7 +361,6 @@ Source: `packages/core/drizzle/schema/sqlite.ts`.  Total tables: **25**.
   - `packages/core/migrations/011_session_orchestrator.ts`
   - `packages/core/migrations/011_session_orchestrator_postgres.ts`
   - `packages/core/migrations/011_session_orchestrator_sqlite.ts`
-  - `packages/core/migrations/013_eval_session_type.ts`
 
 ## `stage_operations`
 
