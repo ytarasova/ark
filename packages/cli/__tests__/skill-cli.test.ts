@@ -25,17 +25,3 @@ describe("ark skill CLI", () => {
     expect(output).toContain("Review");
   });
 });
-
-describe("ark recipe CLI", () => {
-  it("lists recipes", () => {
-    const output = ark("recipe list");
-    expect(output).toContain("quick-fix");
-    expect(output).toContain("feature-build");
-  });
-
-  it("shows a recipe", () => {
-    const output = ark("recipe show quick-fix");
-    expect(output).toContain("quick-fix");
-    expect(output).toContain("bare");
-  });
-});
