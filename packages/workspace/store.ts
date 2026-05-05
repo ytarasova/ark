@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from "crypto";
-import type { DatabaseAdapter } from "../database/index.js";
+import type { DatabaseAdapter } from "../core/database/index.js";
 import type { Repo, Workspace } from "./types.js";
 
 export const WORKSPACES_TABLE = "workspaces";

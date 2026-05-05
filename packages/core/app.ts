@@ -56,7 +56,7 @@ import type { SessionAttachService } from "./services/session/attach.js";
 import type { DispatchService } from "./services/dispatch/index.js";
 import type { StageAdvanceService } from "./services/stage-advance/index.js";
 import type { FlowStore, SkillStore, AgentStore, RuntimeStore, ModelStore } from "./stores/index.js";
-import type { WorkspaceStore } from "./workspace/store.js";
+import type { WorkspaceStore } from "../workspace/store.js";
 import { ComputeRegistries } from "./compute-registries.js";
 import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";

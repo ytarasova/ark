@@ -31,10 +31,10 @@ import { promisify } from "util";
 import { execFile } from "child_process";
 import { randomBytes } from "crypto";
 
-import type { AppContext } from "../app.js";
-import type { Session } from "../../types/index.js";
+import type { AppContext } from "../core/app.js";
+import type { Session } from "../types/index.js";
 import type { Repo, Workspace } from "./types.js";
-import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
+import { logDebug, logInfo, logWarn } from "../core/observability/structured-log.js";
 
 const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 import {

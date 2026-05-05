@@ -1,3 +1,5 @@
 // packages/workspace/index.ts
-// Populated by subsequent tasks.
-export {};
+export { WorkspaceStore, WORKSPACES_TABLE, REPOS_TABLE } from "./store.js";
+export type { Workspace, Repo } from "./types.js";
+export { provisionWorkspaceWorkdir } from "./provisioner.js";
+export { readManifest, writeManifest } from "./manifest.js";

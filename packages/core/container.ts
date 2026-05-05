@@ -32,7 +32,7 @@ import type { SkillStore } from "./stores/skill-store.js";
 import type { AgentStore } from "./stores/agent-store.js";
 import type { RuntimeStore } from "./stores/runtime-store.js";
 import type { ModelStore } from "./stores/model-store.js";
-import type { WorkspaceStore } from "./workspace/store.js";
+import type { WorkspaceStore } from "../workspace/store.js";
 import type { PricingRegistry } from "./observability/pricing.js";
 import type { UsageRecorder } from "./observability/usage.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";

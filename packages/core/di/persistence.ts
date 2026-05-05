@@ -36,7 +36,7 @@ import {
 } from "../stores/index.js";
 import type { ModelStore } from "../stores/model-store.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
-import { WorkspaceStore } from "../workspace/store.js";
+import { WorkspaceStore } from "../../workspace/store.js";
 
 /**
  * Register the database under `db`. The DB is provided by the caller because

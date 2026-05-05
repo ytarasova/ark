@@ -14,7 +14,7 @@ import { join } from "path";
 import { promisify } from "util";
 import { execFile } from "child_process";
 
-import { AppContext } from "../../app.js";
+import { AppContext } from "../../core/app.js";
 import {
   ensureRepoCloned,
   listWorkspaceRepoSlugs,
