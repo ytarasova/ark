@@ -137,8 +137,6 @@ export { discoverTools, removeMcpServer, removeCommand, getCommand, addCommand, 
 export { buildReplay, type ReplayStep } from "./session/replay.js";
 
 // Tool drivers
-export type { ToolDriver } from "./tool-driver.js";
-export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
 // Cost helpers -- read from usage_records (written by UsageRecorder)
 export {
