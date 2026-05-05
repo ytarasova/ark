@@ -31,7 +31,7 @@ import YAML from "yaml";
 
 /** One repo entry inside a workspace manifest. */
 export interface WorkspaceManifestRepo {
-  /** FK to `code_intel_repos.id`. */
+  /** FK to `workspace_repos.id`. */
   repo_id: string;
   /** Directory name under the session workdir (= the repo's slug/name). */
   slug: string;
@@ -49,7 +49,7 @@ export interface WorkspaceManifestRepo {
 export interface WorkspaceManifest {
   /** Ark session id (also the workdir leaf under `~/.ark/workspaces/`). */
   session_id: string;
-  /** FK to `code_intel_workspaces.id`. */
+  /** FK to `workspaces.id`. */
   workspace_id: string;
   /** Every repo in the workspace at session creation time. */
   repos: WorkspaceManifestRepo[];
