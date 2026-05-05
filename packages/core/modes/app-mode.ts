@@ -49,18 +49,6 @@ export interface FsListDirResult {
   entries: FsDirEntry[];
 }
 
-/** Repo-map generation (reads arbitrary local directories). */
-export interface RepoMapCapability {
-  generate(dir: string): Promise<Record<string, unknown>>;
-}
-
-/** Knowledge-graph filesystem operations (index/export/import). */
-export interface KnowledgeCapability {
-  index(repoPath: string): Promise<Record<string, unknown>>;
-  export(dir: string): Promise<Record<string, unknown>>;
-  import(dir: string): Promise<Record<string, unknown>>;
-}
-
 /** Privileged host commands (kill, docker). Only safe in local single-user mode. */
 export interface HostCommandCapability {
   killProcess(pid: number): Promise<void>;
@@ -187,8 +175,6 @@ export type TenantResolverResult = { ok: true; tenantId: string } | { ok: false;
 export interface AppMode {
   readonly kind: "local" | "hosted";
   readonly fsCapability: FsCapability | null;
-  readonly knowledgeCapability: KnowledgeCapability | null;
-  readonly repoMapCapability: RepoMapCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;
   /** Bootstrap seed (local: insert the "local" compute row; hosted: no-op). */
   readonly computeBootstrap: ComputeBootstrapCapability;

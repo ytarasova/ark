@@ -1,7 +1,6 @@
 import chalk from "chalk";
 import { resolve } from "path";
 import { existsSync, statSync } from "fs";
-import { DEFAULT_TENANT_ID } from "../core/code-intel/constants.js";
 import type { AppContext } from "../core/app.js";
 
 export interface ExecOpts {
@@ -19,13 +18,20 @@ export interface ExecOpts {
   /** key=value pairs. */
   params?: string[];
   /**
-   * Workspace slug for workspace-scoped dispatch. Resolves via
-   * `CodeIntelStore.getWorkspaceBySlug`. When set with `--repo`, the repo
-   * becomes the primary entry-point and the session still gets a
-   * multi-repo workdir. Wave 2b-1 supports LOCAL compute only.
+   * Workspace slug for multi-repo dispatch. The session's workdir is the
+   * workspace tree (`~/.ark/workspaces/<session_id>/`) instead of a single
+   * repo dir. Resolves via `app.workspaces.getWorkspaceBySlug` against the
+   * configured default tenant.
    */
   workspace?: string;
 }
+
+/**
+ * Default tenant id for local-mode workspace lookups. Workspace rows still
+ * carry a tenant_id column (so the table generalises to hosted), but local
+ * single-tenant mode uses this fixed UUID for every workspace.
+ */
+const DEFAULT_WORKSPACE_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 export function parsePair(pair: string, flag: string): [string, string] {
   const eq = pair.indexOf("=");
@@ -66,38 +72,32 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
   const output = opts.output ?? "text";
   const log = output === "text" ? (msg: string) => process.stderr.write(chalk.dim(msg) + "\n") : () => {};
 
-  // Resolve workspace (Wave 2b-1). Tenant defaults to the caller's default
-  // when not otherwise scoped. Resolution fails loudly so the operator
-  // knows the slug was wrong before a session row is created.
+  // Resolve workspace if --workspace was passed. The session's workdir gets
+  // assigned by the workspace provisioner inside sessionLifecycle.start;
+  // here we just resolve the slug to a workspace_id.
   let workspace_id: string | null = null;
   if (opts.workspace) {
-    const tenantSlug = app.config.authSection.defaultTenant;
-    let tenantId = DEFAULT_TENANT_ID;
-    if (tenantSlug) {
-      const t = await app.codeIntel.getTenantBySlug(tenantSlug);
-      if (t) tenantId = t.id;
-    }
-    const ws = await app.codeIntel.getWorkspaceBySlug(tenantId, opts.workspace);
+    const ws = await app.workspaces.getWorkspaceBySlug(DEFAULT_WORKSPACE_TENANT_ID, opts.workspace);
     if (!ws) {
-      console.error(chalk.red(`Workspace '${opts.workspace}' not found in tenant '${tenantSlug ?? "default"}'.`));
+      console.error(chalk.red(`Workspace '${opts.workspace}' not found.`));
       return 1;
     }
     workspace_id = ws.id;
   }
 
-  // Resolve repo. When `--workspace` is passed alone (no --repo), we skip
-  // the repo-dir resolution entirely -- the session's workdir will be the
-  // multi-repo workspace tree. Otherwise preserve legacy semantics:
-  // absolute repo path becomes the workdir.
+  // Resolve repo. Absolute repo path becomes the workdir.
+  const repoArg = opts.repo ?? ".";
+  let repo: string | undefined = repoArg;
   let workdir: string | undefined;
-  let repo: string | undefined = opts.repo;
   if (!workspace_id || opts.repo) {
-    repo = opts.repo ?? ".";
-    const rp = resolve(repo);
+    const rp = resolve(repoArg);
     if (existsSync(rp)) {
       workdir = rp;
-      if (repo === "." || repo === "./") repo = rp;
+      if (repoArg === "." || repoArg === "./") repo = rp;
     }
+  } else {
+    // Workspace-only dispatch: the provisioner picks workdir.
+    repo = undefined;
   }
 
   // Sanitize summary
@@ -124,8 +124,8 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
     flow: opts.flow ?? "bare",
     compute_name: opts.compute,
     group_name: opts.group,
+    workspace_id: workspace_id ?? undefined,
     inputs,
-    workspace_id,
   });
 
   // Dispatch

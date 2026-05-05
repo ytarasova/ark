@@ -13,9 +13,6 @@
  *   - ComputeClient        (compute / template / cluster / group / k8s + agent-G)
  *   - AgentClient          (agent / skill / recipe / runtime + agent-C)
  *   - FlowClient           (flow / execution)
- *   - KnowledgeClient      (memory + knowledge graph + agent-D remember/recall)
- *   - CodeIntelClient      (code-intel v2, agent-D code-intel half)
- *   - WorkspaceClient      (workspace CRUD, agent-D workspace half)
  *   - AdminTenantClient    (tenant CRUD + agent-F tenant auth bindings)
  *   - AdminTeamClient      (team / user / tenant policy / api-key + agent-B)
  *   - SecretsClient        (secret / secret-blob, agent-F blob half)
@@ -42,9 +39,6 @@ import { SessionInteractClient } from "./clients/session-interact.js";
 import { ComputeClient } from "./clients/compute.js";
 import { AgentClient } from "./clients/agent.js";
 import { FlowClient } from "./clients/flow.js";
-import { KnowledgeClient } from "./clients/knowledge.js";
-import { CodeIntelClient } from "./clients/code-intel.js";
-import { WorkspaceClient } from "./clients/workspace.js";
 import { AdminTenantClient } from "./clients/admin-tenant.js";
 import { AdminTeamClient } from "./clients/admin-team.js";
 import { SecretsClient } from "./clients/secrets.js";
@@ -83,9 +77,6 @@ export interface ArkClient
     ComputeClient,
     AgentClient,
     FlowClient,
-    KnowledgeClient,
-    CodeIntelClient,
-    WorkspaceClient,
     AdminTenantClient,
     AdminTeamClient,
     SecretsClient,
@@ -244,9 +235,6 @@ applyMixins(ArkClient, [
   ComputeClient,
   AgentClient,
   FlowClient,
-  KnowledgeClient,
-  CodeIntelClient,
-  WorkspaceClient,
   AdminTenantClient,
   AdminTeamClient,
   SecretsClient,

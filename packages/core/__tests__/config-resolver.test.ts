@@ -139,10 +139,8 @@ describe("readEnv", () => {
 
   it("parses truthy/falsy booleans for feature flags", () => {
     process.env.ARK_AUTO_REBASE = "true";
-    process.env.ARK_CODEGRAPH = "0";
     const out = readEnv();
     expect(out.features.autoRebase).toBe(true);
-    expect(out.features.codegraph).toBe(false);
   });
 
   it("accepts ARK_DIR and falls back to ARK_TEST_DIR", () => {

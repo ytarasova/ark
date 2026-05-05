@@ -26,13 +26,8 @@ import { registerConfigHandlers } from "./handlers/config.js";
 import { registerToolsHandlers } from "./handlers/tools.js";
 import { registerMetricsHandlers } from "./handlers/metrics.js";
 import { registerMetricsLocalHandlers } from "./handlers/metrics-local.js";
-import { registerMemoryHandlers } from "./handlers/memory.js";
 import { registerScheduleHandlers } from "./handlers/schedule.js";
 import { registerWebHandlers } from "./handlers/web.js";
-import { registerWebLocalHandlers } from "./handlers/web-local.js";
-import { registerKnowledgeHandlers } from "./handlers/knowledge.js";
-import { registerKnowledgeLocalHandlers } from "./handlers/knowledge-local.js";
-import { registerEvalHandlers } from "./handlers/eval.js";
 import { registerDashboardHandlers } from "./handlers/dashboard.js";
 import { registerFsHandlers } from "./handlers/fs.js";
 import { registerTriggerHandlers } from "./handlers/triggers.js";
@@ -51,11 +46,6 @@ import { registerResourceCrudHandlers } from "./handlers/resource-crud.js";
 import { registerConductorHandlers } from "./handlers/conductor.js";
 import { registerCostsAdminHandlers } from "./handlers/costs.js";
 // --- END agent-E ---
-// --- BEGIN agent-D: knowledge + code-intel + workspace ---
-import { registerKnowledgeRpcHandlers } from "./handlers/knowledge-rpc.js";
-import { registerCodeIntelHandlers } from "./handlers/code-intel.js";
-import { registerWorkspaceHandlers } from "./handlers/workspace.js";
-// --- END agent-D ---
 // --- BEGIN agent-F: tenant-auth ---
 import { registerTenantAuthHandlers } from "./handlers/tenant-auth.js";
 // --- END agent-F ---
@@ -90,11 +80,8 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerConfigHandlers(router, app);
   registerToolsHandlers(router, app);
   registerMetricsHandlers(router, app);
-  registerMemoryHandlers(router, app);
   registerScheduleHandlers(router, app);
   registerWebHandlers(router, app);
-  registerKnowledgeHandlers(router, app);
-  registerEvalHandlers(router, app);
   registerDashboardHandlers(router, app);
   registerTriggerHandlers(router, app);
   registerConnectorHandlers(router, app);
@@ -119,16 +106,6 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerCostsAdminHandlers(router, app);
   // --- END agent-E ---
 
-  // --- BEGIN agent-D: knowledge + code-intel + workspace ---
-  // knowledge-rpc adds knowledge/remember + knowledge/recall on top of the
-  // existing shared knowledge handlers. code-intel + workspace put their
-  // namespaces on the wire for the first time -- the CLI was previously
-  // reaching into app.codeIntel via getInProcessApp().
-  registerKnowledgeRpcHandlers(router, app);
-  registerCodeIntelHandlers(router, app);
-  registerWorkspaceHandlers(router, app);
-  // --- END agent-D ---
-
   // --- BEGIN agent-F: tenant-auth ---
   registerTenantAuthHandlers(router, app);
   // --- END agent-F ---
@@ -147,12 +124,6 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
 export function registerLocalOnlyHandlers(router: Router, app: AppContext): void {
   if (app.mode.fsCapability) {
     registerFsHandlers(router, app);
-  }
-  if (app.mode.knowledgeCapability && app.mode.repoMapCapability) {
-    registerWebLocalHandlers(router, app);
-  }
-  if (app.mode.knowledgeCapability) {
-    registerKnowledgeLocalHandlers(router, app);
   }
   if (app.mode.hostCommandCapability) {
     registerMetricsLocalHandlers(router, app);

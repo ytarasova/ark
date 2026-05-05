@@ -49,21 +49,6 @@ export interface ExtractSubtasksCb {
   (session: Session): Promise<{ name: string; task: string }[]>;
 }
 
-/** Index the session repo into the knowledge graph (best-effort, may noop). */
-export interface IndexRepoCb {
-  (session: Session, log: (msg: string) => void): Promise<void>;
-}
-
-/** Prepend knowledge-graph context above the agent's task text. */
-export interface InjectKnowledgeCb {
-  (session: Session, task: string): Promise<string>;
-}
-
-/** Prepend an ASCII repo map above the agent's task text. */
-export interface InjectRepoMapCb {
-  (session: Session, task: string): string;
-}
-
 /** Materialize tenant-level claude auth into launch env + optional k8s Secret. */
 export interface MaterializeClaudeAuthCb {
   (session: Session, compute: Compute | null): Promise<ClaudeAuthMaterialization>;
@@ -208,9 +193,6 @@ export interface DispatchDeps {
   getStageAction: GetStageActionCb;
   buildTask: BuildTaskCb;
   extractSubtasks: ExtractSubtasksCb;
-  indexRepo: IndexRepoCb;
-  injectKnowledge: InjectKnowledgeCb;
-  injectRepoMap: InjectRepoMapCb;
   materializeClaudeAuth: MaterializeClaudeAuthCb;
   resolveAgent: ResolveAgentCb;
   buildClaudeArgs: BuildClaudeArgsCb;

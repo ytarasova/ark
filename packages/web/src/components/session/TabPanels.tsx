@@ -10,7 +10,6 @@ import { DiffTab } from "./tabs/DiffTab.js";
 import { ErrorsTab } from "./tabs/ErrorsTab.js";
 import { FlowTab } from "./tabs/FlowTab.js";
 import { CostTab } from "./tabs/CostTab.js";
-import { KnowledgeTab } from "./tabs/KnowledgeTab.js";
 
 interface TabPanelsProps {
   activeTab: string;
@@ -136,7 +135,6 @@ export function TabPanels(props: TabPanelsProps) {
       {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => onToggleTodo(Number(id))} />}
       {activeTab === "flow" && <FlowTab session={session} stages={stages ?? []} />}
       {activeTab === "cost" && <CostTab session={session} cost={cost} />}
-      {activeTab === "knowledge" && <KnowledgeTab session={session} />}
       {activeTab === "errors" && <ErrorsTab session={session} errorEvents={errorEvents} />}
     </div>
   );

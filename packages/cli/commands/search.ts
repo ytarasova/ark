@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../../core/index.js";
-import { getArkClient, getInProcessApp } from "../app-client.js";
+import { getArkClient } from "../app-client.js";
 
 export function registerSearchCommands(program: Command) {
   program
@@ -11,7 +11,6 @@ export function registerSearchCommands(program: Command) {
     .option("-l, --limit <n>", "Max results", "20")
     .option("-t, --transcripts", "Also search Claude transcripts (slower)")
     .option("--index", "Rebuild transcript search index before searching")
-    .option("--hybrid", "Use hybrid search (memory + knowledge + transcripts with LLM re-ranking)")
     .action(async (query, opts) => {
       const ark = await getArkClient();
       if (opts.index) {
@@ -27,31 +26,6 @@ export function registerSearchCommands(program: Command) {
       if (opts.transcripts) {
         const transcriptResults = await ark.historySearch(query, limit);
         results.push(...transcriptResults);
-      }
-
-      if (opts.hybrid) {
-        const app = await getInProcessApp();
-        const knowledgeResults = await app.knowledge.search(query, { limit });
-        if (knowledgeResults.length === 0) {
-          console.log(chalk.yellow("No knowledge search results found."));
-          return;
-        }
-        console.log(chalk.bold(`Found ${knowledgeResults.length} result(s) via knowledge search for "${query}":\n`));
-        for (const r of knowledgeResults) {
-          const sourceColor =
-            r.type === "memory"
-              ? chalk.blue
-              : r.type === "learning"
-                ? chalk.cyan
-                : r.type === "session"
-                  ? chalk.magenta
-                  : chalk.green;
-          const score = chalk.dim(`(${r.score.toFixed(2)})`);
-          const text = r.content ?? r.label;
-          const content = text.length > 120 ? text.slice(0, 120) + "..." : text;
-          console.log(`  ${sourceColor(`[${r.type}]`)} ${score}  ${content}`);
-        }
-        return;
       }
 
       if (results.length === 0) {

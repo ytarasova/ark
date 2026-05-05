@@ -266,11 +266,6 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: { id: "one" },
     sampleResponse: { todo: sampleTodo },
   },
-  "knowledge/stats": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { nodes: 0, edges: 0, by_node_type: {}, by_edge_type: {} },
-  },
   "todo/list": {
     validRequest: { sessionId: "s-1" },
     invalidRequest: {},
@@ -558,76 +553,6 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: [] as unknown as Record<string, unknown>,
     sampleResponse: { ok: true },
   },
-  "learning/list": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { learnings: [] },
-  },
-  "learning/add": {
-    validRequest: { title: "t", description: "d" },
-    invalidRequest: {},
-    sampleResponse: {
-      ok: true,
-      learning: { title: "t", description: "d", recurrence: 1, lastSeen: new Date().toISOString() },
-      promoted: false,
-    },
-  },
-  "memory/list": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { memories: [] },
-  },
-  "memory/recall": {
-    validRequest: { query: "foo" },
-    invalidRequest: {},
-    sampleResponse: { results: [] },
-  },
-  "memory/add": {
-    validRequest: { content: "c" },
-    invalidRequest: {},
-    sampleResponse: {
-      memory: {
-        id: "m1",
-        content: "c",
-        tags: [],
-        scope: "global",
-        importance: 1,
-        createdAt: new Date().toISOString(),
-        accessedAt: new Date().toISOString(),
-        accessCount: 0,
-      },
-    },
-  },
-  "memory/forget": {
-    validRequest: { id: "m1" },
-    invalidRequest: {},
-    sampleResponse: { ok: true },
-  },
-  "knowledge/ingest": {
-    validRequest: { path: "/tmp/x" },
-    invalidRequest: {},
-    sampleResponse: { ok: true },
-  },
-  "knowledge/search": {
-    validRequest: { query: "foo" },
-    invalidRequest: {},
-    sampleResponse: { results: [] },
-  },
-  "knowledge/index": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { ok: true },
-  },
-  "knowledge/export": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { ok: true },
-  },
-  "knowledge/import": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { ok: true },
-  },
   "schedule/delete": {
     validRequest: { id: "sch-1" },
     invalidRequest: {},
@@ -687,11 +612,6 @@ const fixtures: Record<string, MethodFixture> = {
     validRequest: {},
     invalidRequest: [] as unknown as Record<string, unknown>,
     sampleResponse: { templates: [] },
-  },
-  "repo-map/get": {
-    validRequest: {},
-    invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: {},
   },
   "fs/list-dir": {
     validRequest: {},

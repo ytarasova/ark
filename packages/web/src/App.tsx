@@ -23,7 +23,6 @@ const AgentsPage = lazy(() => import("./pages/AgentsPage.js").then((m) => ({ def
 const FlowsPage = lazy(() => import("./pages/FlowsPage.js").then((m) => ({ default: m.FlowsPage })));
 const ComputePage = lazy(() => import("./pages/ComputePage.js").then((m) => ({ default: m.ComputePage })));
 const SchedulesPage = lazy(() => import("./pages/SchedulesPage.js").then((m) => ({ default: m.SchedulesPage })));
-const MemoryPage = lazy(() => import("./pages/MemoryPage.js").then((m) => ({ default: m.MemoryPage })));
 const CostsPage = lazy(() => import("./pages/CostsPage.js").then((m) => ({ default: m.CostsPage })));
 const IntegrationsPage = lazy(() =>
   import("./pages/IntegrationsPage.js").then((m) => ({ default: m.IntegrationsPage })),
@@ -82,7 +81,6 @@ function App() {
       { id: "nav-history", label: "Go to History", section: "Navigation", onSelect: () => onNavigate("history") },
       { id: "nav-compute", label: "Go to Compute", section: "Navigation", onSelect: () => onNavigate("compute") },
       { id: "nav-schedules", label: "Go to Schedules", section: "Navigation", onSelect: () => onNavigate("schedules") },
-      { id: "nav-memory", label: "Go to Memory", section: "Navigation", onSelect: () => onNavigate("memory") },
       { id: "nav-costs", label: "Go to Costs", section: "Navigation", onSelect: () => onNavigate("costs") },
       { id: "nav-admin", label: "Go to Admin", section: "Navigation", onSelect: () => onNavigate("admin") },
       { id: "nav-settings", label: "Go to Settings", section: "Navigation", onSelect: () => onNavigate("settings") },
@@ -178,15 +176,6 @@ function App() {
           )}
           {view === "schedules" && (
             <SchedulesPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-          )}
-          {view === "memory" && (
-            <MemoryPage
-              view={view}
-              onNavigate={onNavigate}
-              readOnly={readOnly}
-              daemonStatus={daemonStatus}
-              onToast={showToast}
-            />
           )}
           {view === "costs" && (
             <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />

@@ -174,9 +174,6 @@ export { ClaudeTranscriptParser } from "./runtimes/claude/parser.js";
 export { CodexTranscriptParser } from "./runtimes/codex/parser.js";
 export { GeminiTranscriptParser } from "./runtimes/gemini/parser.js";
 
-// Conductor learnings (migrated to KnowledgeStore -- kept as type re-exports for backward compat)
-// recordLearning, getLearnings, getPolicies removed -- use app.knowledge directly
-
 // Reliable send
 export { sendReliable, hasPasteMarker, isReadyForInput, type SendOptions } from "./send-reliable.js";
 
@@ -279,10 +276,6 @@ export { TenantPolicyManager, type TenantComputePolicy, type ComputePoolRef } fr
 // Compute pools
 export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute/pool.js";
 
-// Runtime evals (knowledge-backed agent performance tracking)
-export { evaluateSession, getAgentStats, detectDrift, listEvals } from "./knowledge/evals.js";
-export type { AgentEvalResult } from "./knowledge/evals.js";
-
 // Observability hooks
 export {
   configureObservability,
@@ -379,13 +372,6 @@ export {
 // Callers: `app.flowStates.*` instead of the old free functions.
 export { FlowStateRepository, type FlowState, type StageResult } from "./repositories/flow-state.js";
 
-// Cross-session memory (migrated to KnowledgeStore -- old file-based memory removed)
-// remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt removed -- use app.knowledge directly
-
-// Knowledge graph store
-export { KnowledgeStore } from "./knowledge/index.js";
-export type { KnowledgeNode, KnowledgeEdge, ContextPackage, NodeType, EdgeRelation } from "./knowledge/index.js";
-
 // TensorZero LLM gateway
 export { generateTensorZeroConfig, TensorZeroManager } from "./router/index.js";
 export type { TensorZeroConfigOpts, TensorZeroManagerOpts } from "./router/index.js";
@@ -412,12 +398,6 @@ export {
   type LedgerEntryType,
   type LedgerEntryStatus,
 } from "./repositories/ledger.js";
-
-// Repository map generation
-export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type RepoMapEntry } from "./repo-map.js";
-
-// Hybrid search (migrated to KnowledgeStore -- old hybrid-search removed)
-// hybridSearch, mergeAndDeduplicate removed -- use app.knowledge.search() directly
 
 // Types from packages/types -- stricter domain types (aliased to avoid collision with store types)
 export type {

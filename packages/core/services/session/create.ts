@@ -158,17 +158,17 @@ export class SessionCreator {
     // Workspace-scoped dispatch: lay out ~/.ark/workspaces/<session_id>/.
     if (mergedOpts.workspace_id) {
       const wsId = mergedOpts.workspace_id as string;
-      const ws = await d.getCodeIntel().getWorkspace(wsId);
+      const ws = await d.workspaces.getWorkspace(wsId);
       if (!ws) {
         throw new Error(`workspace ${wsId} not found; cannot dispatch session ${session.id}`);
       }
-      const reposInWs = opts.repo ? await d.getCodeIntel().listReposInWorkspace(ws.tenant_id, ws.id) : [];
+      const reposInWs = opts.repo ? await d.workspaces.listReposInWorkspace(ws.tenant_id, ws.id) : [];
       const primaryRepoId =
         opts.repo && ws
           ? (reposInWs.find((r) => r.name === opts.repo || r.local_path === opts.repo || r.repo_url === opts.repo)
               ?.id ?? null)
           : null;
-      const wsWorkdir = await d.provisionWorkspaceWorkdir(session, ws as any, { primaryRepoId });
+      const wsWorkdir = await d.provisionWorkspaceWorkdir(session, ws, { primaryRepoId });
       await d.sessions.update(session.id, { workdir: wsWorkdir });
       (session as { workdir: string | null }).workdir = wsWorkdir;
     }

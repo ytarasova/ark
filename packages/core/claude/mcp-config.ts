@@ -11,7 +11,6 @@ import { join, resolve } from "path";
 
 import { DEFAULT_CONDUCTOR_URL } from "../constants.js";
 import { channelLaunchSpec } from "../install-paths.js";
-import { findCodebaseMemoryBinary } from "../knowledge/codebase-memory-finder.js";
 import { logDebug } from "../observability/structured-log.js";
 
 // ── Channel MCP config ──────────────────────────────────────────────────────
@@ -154,20 +153,8 @@ export interface BuildChannelConfigOpts {
   runtimeMcpServers?: (string | Record<string, unknown>)[];
   /** Directory holding `<name>.json` files referenced by string entries. */
   mcpConfigsDir?: string;
-  /**
-   * When true, additionally inject the unified `ark-code-intel` MCP server
-   * alongside the legacy `codebase-memory` entry. Gated by
-   * `config.features.codeIntelV2`.
-   */
-  enableCodeIntelV2?: boolean;
   /** Pre-parsed existing `.mcp.json` to merge with (writeChannelConfig fills this). */
   existing?: Record<string, any>;
-  /**
-   * When false, skip the host-local `findCodebaseMemoryBinary()` probe.
-   * Set false for remote launchers -- the local conductor's vendored binary
-   * path is irrelevant on EC2/k8s.
-   */
-  includeLocalCodebaseMemory?: boolean;
 }
 
 /**
@@ -181,8 +168,6 @@ export interface BuildChannelConfigOpts {
  *   2. `originalRepoDir/.mcp.json` (skip `ark-channel`, don't overwrite)
  *   3. runtime-declared MCP servers (skip `ark-channel`, don't overwrite)
  *   4. `ark-channel` (always overwritten)
- *   5. `codebase-memory` (only when `includeLocalCodebaseMemory !== false`
- *       AND the local conductor's vendored binary is present)
  */
 export function buildChannelConfig(
   sessionId: string,
@@ -234,26 +219,6 @@ export function buildChannelConfig(
   // 4. ark-channel always wins
   if (!existing.mcpServers) existing.mcpServers = {};
   existing.mcpServers["ark-channel"] = config;
-
-  // 5. codebase-memory: only inject if the local conductor's vendored binary
-  //    is on disk AND the caller hasn't asked us to skip this probe (remote
-  //    launchers do; the path doesn't translate).
-  if (opts?.includeLocalCodebaseMemory !== false) {
-    const cbmBin = findCodebaseMemoryBinary();
-    const cbmAvailable = cbmBin !== "codebase-memory-mcp" && existsSync(cbmBin);
-    if (cbmAvailable && !existing.mcpServers["codebase-memory"]) {
-      existing.mcpServers["codebase-memory"] = {
-        command: cbmBin,
-        args: [],
-        env: { CBM_UI_ENABLED: "false" },
-      };
-    }
-  }
-
-  // codeIntelV2 entry is reserved -- the MCP server binary doesn't ship yet.
-  if (opts?.enableCodeIntelV2 && !existing.mcpServers["ark-code-intel"]) {
-    void existing;
-  }
 
   return { object: existing, content: JSON.stringify(existing, null, 2) };
 }
@@ -316,14 +281,8 @@ export function removeChannelConfig(workdir: string): void {
   }
 
   if (config.mcpServers && typeof config.mcpServers === "object") {
-    // Remove every entry ark auto-injected via writeChannelConfig so the
-    // .mcp.json ends up in the same state it was in before dispatch. If we
-    // only scrub `ark-channel`, a laptop with `codebase-memory-mcp` installed
-    // leaves a `codebase-memory` entry behind and the file never gets
-    // cleaned up.
-    for (const name of ["ark-channel", "codebase-memory", "ark-code-intel"]) {
-      delete config.mcpServers[name];
-    }
+    // Remove ark-injected entries so .mcp.json returns to its pre-dispatch state.
+    delete config.mcpServers["ark-channel"];
     if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
   }
 

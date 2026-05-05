@@ -5,7 +5,7 @@
  * passthrough both feed reports through `handleReport`. This module owns
  * that pipeline: log events, persist messages, emit bus events, apply
  * store updates, run stage handoff, and trigger completion side-effects
- * (notifications, artifact tracking, knowledge indexing, auto-PR).
+ * (notifications, artifact tracking, auto-PR).
  */
 
 import type { AppContext } from "../../app.js";
@@ -120,17 +120,6 @@ export async function handleReport(app: AppContext, sessionId: string, report: O
     }
   } catch {
     logDebug("conductor", "best-effort artifact tracking");
-  }
-
-  if (report.type === "completed" && app.knowledge) {
-    try {
-      const { indexSessionCompletion } = await import("../../knowledge/indexer.js");
-      const s = await app.sessions.get(sessionId);
-      const changedFiles = ((report as unknown as Record<string, unknown>).filesChanged as string[] | undefined) ?? [];
-      await indexSessionCompletion(app.knowledge, sessionId, s?.summary ?? "", "completed", changedFiles);
-    } catch {
-      logDebug("conductor", "best-effort knowledge indexing");
-    }
   }
 
   if (report.type === "completed" && !result.prUrl) {

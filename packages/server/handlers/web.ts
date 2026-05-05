@@ -2,14 +2,11 @@
  * Shared web handlers (local + hosted) -- RPC routes that were previously
  * REST endpoints on the web server.
  *
- * Local-mode-only web handlers (mcp/attach-by-dir, mcp/detach-by-dir,
- * repo-map/get, knowledge/ingest) live in `web-local.ts` and are registered
- * conditionally in `register.ts`. The bodies below never inspect a mode flag.
+ * The bodies below never inspect a mode flag.
  */
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import type { KnowledgeNode } from "../../core/knowledge/types.js";
 import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
 import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/costs.js";
@@ -77,54 +74,6 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       return { csv: await exportCostsCsv(app, sessions) };
     }
     return await getAllSessionCosts(app, sessions);
-  });
-
-  // ── Conductor learnings ──────────────────────────────────────────────────
-  router.handle("learning/list", async (_p) => {
-    const nodes = await app.knowledge.listNodes({ type: "learning" });
-    return {
-      learnings: nodes.map((n: KnowledgeNode) => ({
-        title: n.label,
-        description: n.content ?? "",
-        recurrence: (n.metadata.recurrence as number) ?? 1,
-        lastSeen: n.updated_at,
-      })),
-    };
-  });
-
-  router.handle("learning/add", async (p) => {
-    const { title, description } = extract<{ title: string; description: string; dir?: string }>(p, [
-      "title",
-      "description",
-    ]);
-    // Check for existing learning with same label and increment recurrence
-    const existing = await app.knowledge.search(title, { types: ["learning"], limit: 5 });
-    const match = existing.find((n) => n.label === title);
-    if (match) {
-      const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
-      await app.knowledge.updateNode(match.id, {
-        content: description || match.content,
-        metadata: { ...match.metadata, recurrence },
-      });
-      const updated = (await app.knowledge.getNode(match.id))!;
-      return {
-        ok: true,
-        learning: { title: updated.label, description: updated.content, recurrence, lastSeen: updated.updated_at },
-        promoted: recurrence >= 3,
-      };
-    }
-    const id = await app.knowledge.addNode({
-      type: "learning",
-      label: title,
-      content: description,
-      metadata: { recurrence: 1 },
-    });
-    const node = (await app.knowledge.getNode(id))!;
-    return {
-      ok: true,
-      learning: { title: node.label, description: node.content, recurrence: 1, lastSeen: node.updated_at },
-      promoted: false,
-    };
   });
 
   // ── Worktree list & cleanup ──────────────────────────────────────────────

@@ -100,13 +100,6 @@ export interface RouterSettings {
   autoStart: boolean;
 }
 
-export interface KnowledgeSettings {
-  /** Auto-index codebase on first dispatch for a repo. */
-  autoIndex: boolean;
-  /** Run incremental re-index on subsequent dispatches. */
-  incrementalIndex: boolean;
-}
-
 export interface TensorZeroSettings {
   /** Enable TensorZero as the LLM dispatch backend. */
   enabled: boolean;
@@ -169,8 +162,6 @@ export interface ArkConfig {
   theme?: string;
   notifications?: boolean;
   auth?: AuthConfig;
-  /** Knowledge graph settings (auto-index, etc.). */
-  knowledge?: KnowledgeSettings;
   /** TensorZero LLM gateway settings. */
   tensorZero?: TensorZeroSettings;
   /** Predefined compute templates (local mode). */
@@ -292,7 +283,7 @@ export function loadConfig(overrides: LoadConfigOptions = {}): ArkConfig {
     ports: { conductor: 19100, arkd: 19300, server: 19400, web: 8420 },
     channels: { basePort: 19200, range: 10000 },
     auth: { requireToken: profile === "control-plane", defaultTenant: null },
-    features: { autoRebase: profile === "control-plane", codegraph: false, codeIntelV2: false },
+    features: { autoRebase: profile === "control-plane" },
     observability: { logLevel: profile === "test" ? "error" : "info" },
     storage: { blobBackend: profile === "control-plane" ? "s3" : "local" },
   };
@@ -344,8 +335,6 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   };
   const features: FeaturesConfig = {
     autoRebase: merged.features.autoRebase ?? defaults.features.autoRebase,
-    codegraph: merged.features.codegraph ?? defaults.features.codegraph,
-    codeIntelV2: merged.features.codeIntelV2 ?? defaults.features.codeIntelV2 ?? false,
   };
   // DATABASE_URL takes precedence; fall back to assembling from DB_* parts
   // (host/port/user/password/name). The latter is ergonomic for k8s where
@@ -445,11 +434,6 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
       url: ((legacyYaml.router as Record<string, unknown>)?.url as string) ?? DEFAULT_ROUTER_URL,
       policy: ((legacyYaml.router as Record<string, unknown>)?.policy as "quality" | "balanced" | "cost") ?? "balanced",
       autoStart: (legacyYaml.router as Record<string, unknown>)?.auto_start === true,
-    },
-    knowledge: {
-      autoIndex:
-        (legacyYaml.knowledge as Record<string, unknown>)?.auto_index === true || process.env.ARK_AUTO_INDEX === "1",
-      incrementalIndex: (legacyYaml.knowledge as Record<string, unknown>)?.incremental_index !== false,
     },
     default_compute: process.env.ARK_DEFAULT_COMPUTE ?? (legacyYaml.default_compute as string) ?? null,
     hotkeys: legacyYaml.hotkeys as Record<string, string | null> | undefined,

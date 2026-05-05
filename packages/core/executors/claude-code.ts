@@ -224,9 +224,6 @@ export const claudeCodeExecutor: Executor = {
         // `Compute.prepareWorkspace` (driven from `runTargetLifecycle`).
         runtimeMcpServers,
         mcpConfigsDir: resolveMcpConfigsDir(),
-        // codebase-memory binary lives on the conductor's filesystem; the
-        // path won't exist on EC2/k8s. Skip the probe.
-        includeLocalCodebaseMemory: false,
       });
       mcpJsonContent = channel.content;
       const hasChannel = !!channel.object?.mcpServers?.["ark-channel"];

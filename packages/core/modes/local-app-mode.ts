@@ -4,7 +4,7 @@
  * "Local" means the server has a stable local filesystem, no multi-tenancy,
  * and the process owner is the same user whose `~/.ark` / `~/.claude` trees
  * we're touching. Every capability that depends on filesystem stability
- * (fs/knowledge/mcp-by-dir/repo-map/fts-rebuild) is available here.
+ * (fs / host-command) is available here.
  */
 
 import { readdirSync, existsSync, statSync } from "fs";
@@ -16,7 +16,6 @@ import type { AppContext } from "../app.js";
 import { RpcError } from "../../protocol/types.js";
 import { logDebug } from "../observability/structured-log.js";
 import { buildTenantScope } from "../tenant-scope.js";
-import { generateRepoMap } from "../repo-map.js";
 import type {
   AppMode,
   ComputeBootstrapCapability,
@@ -24,8 +23,6 @@ import type {
   FsCapability,
   FsListDirResult,
   FsDirEntry,
-  KnowledgeCapability,
-  RepoMapCapability,
   HostCommandCapability,
   TenantResolverCapability,
   TenantScopeCapability,
@@ -126,36 +123,6 @@ function makeFsCapability(): FsCapability {
   };
 }
 
-// ── Repo map ───────────────────────────────────────────────────────────────
-
-function makeRepoMapCapability(): RepoMapCapability {
-  return {
-    async generate(dir) {
-      return generateRepoMap(dir) as unknown as Record<string, unknown>;
-    },
-  };
-}
-
-// ── Knowledge graph ────────────────────────────────────────────────────────
-
-function makeKnowledgeCapability(app: AppContext): KnowledgeCapability {
-  return {
-    async index(repoPath) {
-      const { indexCodebase } = await import("../knowledge/indexer.js");
-      const result = await indexCodebase(repoPath, app.knowledge, { incremental: true });
-      return result as unknown as Record<string, unknown>;
-    },
-    async export(dir) {
-      const { exportToMarkdown } = await import("../knowledge/export.js");
-      return exportToMarkdown(app.knowledge, dir) as unknown as Record<string, unknown>;
-    },
-    async import(dir) {
-      const { importFromMarkdown } = await import("../knowledge/export.js");
-      return importFromMarkdown(app.knowledge, dir) as unknown as Record<string, unknown>;
-    },
-  };
-}
-
 // ── Host commands (kill, docker) ───────────────────────────────────────────
 
 function makeHostCommandCapability(): HostCommandCapability {
@@ -219,15 +186,13 @@ function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBoots
 
 /**
  * Build a `LocalAppMode` instance bound to the given app context. Uses a
- * deferred-resolution strategy for capabilities that reach into `app.knowledge`
- * or `app.db`: the capability closure is constructed lazily on first use so it
- * can run before `AppContext.boot()` wires the knowledge/db cradle entries
- * (tests + container-building callers).
+ * deferred-resolution strategy for capabilities that reach into `app.db`:
+ * the capability closure is constructed lazily on first use so it can run
+ * before `AppContext.boot()` wires the db cradle entries (tests +
+ * container-building callers).
  */
 export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): AppMode {
   const fsCapability = makeFsCapability();
-  const repoMapCapability = makeRepoMapCapability();
-  const knowledgeCapability = app ? makeKnowledgeCapability(app) : null;
   const hostCommandCapability = makeHostCommandCapability();
   // Default to the user's home when no AppContext is available (bare
   // AppMode construction used by a few tests). The first real mutation
@@ -245,8 +210,6 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
   return {
     kind: "local",
     fsCapability,
-    knowledgeCapability,
-    repoMapCapability,
     hostCommandCapability,
     computeBootstrap: makeLocalComputeBootstrap(db.dialect),
     migrations: buildMigrationsCapability(db.dialect),

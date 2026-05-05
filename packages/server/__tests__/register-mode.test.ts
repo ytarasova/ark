@@ -14,26 +14,9 @@ import { Router } from "../router.js";
 import { registerAllHandlers } from "../register.js";
 import { buildHostedAppMode, buildLocalAppMode } from "../../core/modes/app-mode.js";
 
-const LOCAL_ONLY_METHODS = [
-  "fs/list-dir",
-  "repo-map/get",
-  "knowledge/ingest",
-  "knowledge/index",
-  "knowledge/export",
-  "knowledge/import",
-  "compute/kill-process",
-  "compute/docker-logs",
-  "compute/docker-action",
-];
+const LOCAL_ONLY_METHODS = ["fs/list-dir", "compute/kill-process", "compute/docker-logs", "compute/docker-action"];
 
-const SHARED_METHODS = [
-  "status/get",
-  "config/get",
-  "knowledge/search",
-  "knowledge/stats",
-  "costs/summary",
-  "costs/record",
-];
+const SHARED_METHODS = ["status/get", "config/get", "costs/summary", "costs/record"];
 
 let app: AppContext;
 

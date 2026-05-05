@@ -96,10 +96,6 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
   if (isObj(features)) {
     const ar = pickBool(features.autoRebase ?? features.auto_rebase);
     if (ar !== undefined) out.features.autoRebase = ar;
-    const cg = pickBool(features.codegraph);
-    if (cg !== undefined) out.features.codegraph = cg;
-    const civ2 = pickBool(features.codeIntelV2 ?? features.code_intel_v2);
-    if (civ2 !== undefined) out.features.codeIntelV2 = civ2;
   }
 
   const storage = chunk.storage;

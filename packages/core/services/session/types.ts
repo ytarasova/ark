@@ -18,11 +18,12 @@ import type { TodoRepository } from "../../repositories/todo.js";
 import type { ComputeRepository } from "../../repositories/compute.js";
 import type { FlowStore } from "../../stores/flow-store.js";
 import type { RuntimeStore } from "../../stores/runtime-store.js";
+import type { WorkspaceStore } from "../../workspace/store.js";
+import type { Workspace } from "../../workspace/types.js";
 import type { UsageRecorder } from "../../observability/usage.js";
 import type { StatusPollerRegistry } from "../../executors/status-poller.js";
 import type { ComputeProvider } from "../../../compute/types.js";
 import type { ComputeTarget } from "../../../compute/core/compute-target.js";
-import type { CodeIntelStore } from "../../code-intel/store.js";
 
 // ── Callbacks for helpers that still take AppContext ────────────────────────
 // These wrap free functions that themselves take `app: AppContext` and reach
@@ -99,11 +100,7 @@ export interface SessionLifecycleDeps {
   // Stores -- flow / runtime lookups needed by start + verify + usage
   flows: FlowStore;
   runtimes: RuntimeStore;
-
-  // Code-intel (workspace resolution on start). Resolved lazily -- tests
-  // swap the backing store via `AppContext.codeIntel` getter, so we must
-  // not snapshot the instance at container-resolve time.
-  getCodeIntel: () => CodeIntelStore;
+  workspaces: WorkspaceStore;
 
   // Config + usage recording
   config: ArkConfig;
@@ -123,7 +120,7 @@ export interface SessionLifecycleDeps {
   /** Workspace provisioner (takes AppContext upstream; passed as a callback). */
   provisionWorkspaceWorkdir: (
     session: Session,
-    workspace: { id: string; tenant_id: string; [k: string]: unknown },
+    workspace: Workspace,
     opts: { primaryRepoId: string | null },
   ) => Promise<string>;
 }

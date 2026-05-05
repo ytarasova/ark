@@ -43,7 +43,6 @@ import {
   FlowStateRepository,
   LedgerRepository,
 } from "./repositories/index.js";
-import { KnowledgeStore } from "./knowledge/store.js";
 import { DbResourceStore } from "./stores/db-resource-store.js";
 import { UsageRecorder } from "./observability/usage.js";
 import type { PricingRegistry } from "./observability/pricing.js";
@@ -52,7 +51,7 @@ import { registerServices } from "./di/services.js";
 /**
  * Build a tenant-scoped AppContext. The returned object shadows every
  * tenant-aware registration (repos, usage recorder, compute service,
- * knowledge store, hosted resource stores) through a child scope of the
+ * hosted resource stores) through a child scope of the
  * parent container. All other services (providers, infra launchers,
  * pricing, transcript parsers, plugins) resolve from the parent scope.
  */
@@ -137,14 +136,6 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
         const repo = new LedgerRepository(c.db);
         repo.setTenant(tenantId);
         return repo;
-      },
-      { lifetime: Lifetime.SCOPED },
-    ),
-    knowledge: asFunction(
-      (c: { db: DatabaseAdapter }) => {
-        const store = new KnowledgeStore(c.db);
-        store.setTenant(tenantId);
-        return store;
       },
       { lifetime: Lifetime.SCOPED },
     ),

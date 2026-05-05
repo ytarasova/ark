@@ -285,9 +285,6 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
   await initPoolSchema(db);
   await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)");
 
-  // Knowledge graph tables
-  await initKnowledgeSchema(db);
-
   // Usage records table (universal cost tracking)
   await initUsageSchema(db);
 
@@ -337,45 +334,6 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
   // the runner).
   await safeExec(db, "ALTER TABLE tenant_policies ADD COLUMN compute_config_yaml TEXT");
   // --- END agent-G ---
-}
-
-export async function initKnowledgeSchema(db: DatabaseAdapter): Promise<void> {
-  await safeExec(
-    db,
-    `
-    CREATE TABLE IF NOT EXISTS knowledge (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      label TEXT NOT NULL,
-      content TEXT,
-      metadata TEXT DEFAULT '{}',
-      tenant_id TEXT NOT NULL DEFAULT 'default',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-  `,
-  );
-  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge(tenant_id, type)");
-  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_label ON knowledge(tenant_id, label)");
-
-  await safeExec(
-    db,
-    `
-    CREATE TABLE IF NOT EXISTS knowledge_edges (
-      source_id TEXT NOT NULL,
-      target_id TEXT NOT NULL,
-      relation TEXT NOT NULL,
-      weight REAL DEFAULT 1.0,
-      metadata TEXT DEFAULT '{}',
-      tenant_id TEXT NOT NULL DEFAULT 'default',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      PRIMARY KEY (source_id, target_id, relation)
-    )
-  `,
-  );
-  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_source ON knowledge_edges(tenant_id, source_id)");
-  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_target ON knowledge_edges(tenant_id, target_id)");
-  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_relation ON knowledge_edges(relation)");
 }
 
 export async function initUsageSchema(db: DatabaseAdapter): Promise<void> {

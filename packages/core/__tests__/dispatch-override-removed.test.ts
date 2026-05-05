@@ -43,11 +43,6 @@ describe("dispatch / executor no longer read session.config.runtime_override", (
     expect(src).not.toMatch(/model_override:/);
   });
 
-  it("evals.ts does not read runtime_override off session.config", () => {
-    const src = read("packages/core/knowledge/evals.ts");
-    expect(src).not.toMatch(/runtime_override/);
-  });
-
   it("SessionConfig type no longer declares model_override", () => {
     const src = read("packages/types/session.ts");
     expect(src).not.toMatch(/model_override/);

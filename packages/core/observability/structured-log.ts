@@ -17,7 +17,6 @@ export type LogComponent =
   | "general"
   | "triggers"
   | "connectors"
-  | "code-intel"
   | "workspace"
   | "handoff"
   | "compute-pool"
