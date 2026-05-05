@@ -72,7 +72,7 @@ export async function localDefaults(): Promise<ProfileDefaults> {
     },
     channels: { basePort: 19200, range: 10000 },
     auth: { requireToken: false, defaultTenant: null },
-    features: { autoRebase: false, codegraph: false, codeIntelV2: false },
+    features: { autoRebase: false },
     observability: { logLevel: "info" },
     storage: { blobBackend: "local" },
   };
@@ -90,7 +90,7 @@ export async function controlPlaneDefaults(): Promise<ProfileDefaults> {
     },
     channels: { basePort: 19200, range: 10000 },
     auth: { requireToken: true, defaultTenant: null },
-    features: { autoRebase: true, codegraph: false, codeIntelV2: false },
+    features: { autoRebase: true },
     observability: { logLevel: "info" },
     storage: { blobBackend: "s3" },
   };
@@ -118,7 +118,7 @@ export async function testDefaults(): Promise<ProfileDefaults> {
     ports: { conductor, arkd, server, web },
     channels: { basePort: channelsBase, range: 1000 },
     auth: { requireToken: false, defaultTenant: null },
-    features: { autoRebase: false, codegraph: false, codeIntelV2: false },
+    features: { autoRebase: false },
     observability: { logLevel: "error" }, // quiet tests
     storage: { blobBackend: "local" },
   };

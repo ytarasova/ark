@@ -84,8 +84,6 @@ export function buildHostedAppMode(database: DatabaseMode, config?: ArkConfig): 
   return {
     kind: "hosted",
     fsCapability: null,
-    knowledgeCapability: null,
-    repoMapCapability: null,
     ftsRebuildCapability: null,
     hostCommandCapability: null,
     computeBootstrap: makeNoopComputeBootstrap(),

@@ -17,7 +17,6 @@ import { registerWebCommand } from "./web.js";
 import { registerOpenApiCommand } from "./openapi.js";
 import { registerMcpProxyCommand } from "./mcp-proxy.js";
 import { registerAcpCommand } from "./acp.js";
-import { registerRepoMapCommand } from "./repo-map.js";
 import { registerInitCommand } from "./init.js";
 
 export function registerMiscCommands(program: Command): void {
@@ -33,7 +32,6 @@ export function registerMiscCommands(program: Command): void {
   registerOpenApiCommand(program);
   registerMcpProxyCommand(program);
   registerAcpCommand(program);
-  registerRepoMapCommand(program);
   registerInitCommand(program);
 }
 

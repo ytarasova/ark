@@ -174,4 +174,3 @@ describe("skill/* yaml CRUD", () => {
     expect(err(res).message).toContain("builtin");
   });
 });
-

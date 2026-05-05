@@ -351,7 +351,6 @@ describe("resource stores via container", async () => {
     const agents = app.agents;
     expect(typeof agents.list).toBe("function");
   });
-
 });
 
 // ── Cross-service integration ───────────────────────────────────────────────

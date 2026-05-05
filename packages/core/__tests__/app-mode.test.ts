@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { buildAppMode, buildLocalAppMode, buildHostedAppMode } from "../modes/app-mode.js";
+import { buildAppMode, buildHostedAppMode } from "../modes/app-mode.js";
 
 let app: AppContext;
 
@@ -26,8 +26,6 @@ describe("buildAppMode", () => {
     const mode = buildAppMode({ database: { url: undefined } } as any);
     expect(mode.kind).toBe("local");
     expect(mode.fsCapability).not.toBeNull();
-    expect(mode.knowledgeCapability).toBeNull(); // no app arg -> knowledge needs app
-    expect(mode.repoMapCapability).not.toBeNull();
     expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).not.toBeNull();
   });
@@ -36,8 +34,6 @@ describe("buildAppMode", () => {
     const mode = buildAppMode({ database: { url: "postgres://fake/ark" } } as any);
     expect(mode.kind).toBe("hosted");
     expect(mode.fsCapability).toBeNull();
-    expect(mode.knowledgeCapability).toBeNull();
-    expect(mode.repoMapCapability).toBeNull();
     expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
   });
@@ -69,21 +65,11 @@ describe("buildAppMode", () => {
   });
 });
 
-describe("buildLocalAppMode(app)", () => {
-  it("populates knowledge + fts-rebuild capabilities when an app is provided", () => {
-    const mode = buildLocalAppMode(app);
-    expect(mode.knowledgeCapability).not.toBeNull();
-    expect(mode.ftsRebuildCapability).not.toBeNull();
-  });
-});
-
 describe("buildHostedAppMode", () => {
   it("nulls every filesystem/local-mode capability + stamps the database descriptor", () => {
     const mode = buildHostedAppMode({ dialect: "postgres", url: "postgres://test" });
     expect(mode.kind).toBe("hosted");
     expect(mode.fsCapability).toBeNull();
-    expect(mode.knowledgeCapability).toBeNull();
-    expect(mode.repoMapCapability).toBeNull();
     expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
     expect(mode.database.dialect).toBe("postgres");

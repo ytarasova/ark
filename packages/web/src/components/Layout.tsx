@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { IconRail } from "./ui/IconRail.js";
 import type { IconRailItem } from "./ui/IconRail.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
-import { Play, Bot, Zap, Monitor, Clock, BookOpen, DollarSign, Cog, Wrench, Calendar, Plug } from "lucide-react";
+import { Play, Bot, Zap, Monitor, Clock, DollarSign, Cog, Wrench, Calendar, Plug } from "lucide-react";
 
 interface LayoutProps {
   view: string;
@@ -27,7 +27,6 @@ const BASE_NAV_ITEMS: IconRailItem[] = [
   { id: "flows", icon: <Zap size={18} strokeWidth={1.5} />, label: "Flows", shortcut: "F" },
   { id: "compute", icon: <Monitor size={18} strokeWidth={1.5} />, label: "Compute", shortcut: "C" },
   { id: "history", icon: <Clock size={18} strokeWidth={1.5} />, label: "History", shortcut: "H" },
-  { id: "memory", icon: <BookOpen size={18} strokeWidth={1.5} />, label: "Knowledge", shortcut: "M" },
   { id: "tools", icon: <Wrench size={18} strokeWidth={1.5} />, label: "Tools", shortcut: "T" },
   { id: "schedules", icon: <Calendar size={18} strokeWidth={1.5} />, label: "Schedules" },
   { id: "integrations", icon: <Plug size={18} strokeWidth={1.5} />, label: "Integrations", shortcut: "I" },
@@ -47,7 +46,6 @@ const SHORTCUTS: Record<string, string> = {
   f: "flows",
   c: "compute",
   h: "history",
-  m: "memory",
   t: "tools",
   i: "integrations",
   $: "costs",

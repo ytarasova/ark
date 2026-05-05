@@ -7,7 +7,6 @@
  * raw-event drawer directly, so a dedicated Events tab was duplication.
  * "Files" is the rebadged Diff tab (the standalone Files list was redundant
  * since DiffViewer's internal file picker already enumerates them).
- * Knowledge is not top-level (URL-only).
  *
  * SSR-renders a tiny probe component that calls the hook and stamps the
  * resulting tab ids into the DOM, then asserts on the markup -- same

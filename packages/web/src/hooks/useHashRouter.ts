@@ -6,7 +6,6 @@ const VALID_VIEWS = new Set([
   "flows",
   "compute",
   "history",
-  "memory",
   "tools",
   "schedules",
   "costs",

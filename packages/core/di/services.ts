@@ -20,6 +20,7 @@ import type { TodoRepository } from "../repositories/todo.js";
 import type { FlowStateRepository } from "../repositories/flow-state.js";
 import type { FlowStore } from "../stores/flow-store.js";
 import type { RuntimeStore } from "../stores/runtime-store.js";
+import type { WorkspaceStore } from "../workspace/store.js";
 import type { ModelStore } from "../stores/model-store.js";
 import { ModelService } from "../models/ModelService.js";
 import type { UsageRecorder } from "../observability/usage.js";
@@ -41,7 +42,6 @@ import { saveCheckpoint } from "../session/checkpoint.js";
 import { provisionWorkspaceWorkdir } from "../workspace/provisioner.js";
 import * as flow from "../state/flow.js";
 import { buildTaskWithHandoff, extractSubtasks } from "../services/task-builder.js";
-import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "../services/dispatch-context.js";
 import * as agentRegistry from "../agent/agent.js";
 import { getExecutor } from "../executor.js";
 import { startStatusPoller } from "../executors/status-poller.js";
@@ -126,6 +126,7 @@ export function registerServices(
         computes: ComputeRepository;
         flows: FlowStore;
         runtimes: RuntimeStore;
+        workspaces: WorkspaceStore;
         usageRecorder: UsageRecorder;
         statusPollers: StatusPollerRegistry;
         config: ArkConfig;
@@ -139,7 +140,7 @@ export function registerServices(
           computes: c.computes,
           flows: c.flows,
           runtimes: c.runtimes,
-          getCodeIntel: () => c.app.codeIntel,
+          workspaces: c.workspaces,
           config: c.config,
           usageRecorder: c.usageRecorder,
           statusPollers: c.statusPollers,
@@ -150,7 +151,7 @@ export function registerServices(
           resolveProvider: (session) => c.app.resolveProvider(session),
           resolveComputeTarget: (session) => c.app.resolveComputeTarget(session),
           advance: (id, force) => c.app.stageAdvance.advance(id, force),
-          provisionWorkspaceWorkdir: (session, ws, opts) => provisionWorkspaceWorkdir(c.app, session, ws as any, opts),
+          provisionWorkspaceWorkdir: (session, ws, opts) => provisionWorkspaceWorkdir(c.app, session, ws, opts),
         }),
       { lifetime },
     ),
@@ -204,9 +205,6 @@ export function registerServices(
           getStageAction: (flowName, stageName) => flow.getStageAction(c.app, flowName, stageName),
           buildTask: (session, stage, agentName) => buildTaskWithHandoff(c.app, session, stage, agentName),
           extractSubtasks: (session) => extractSubtasks(c.app, session),
-          indexRepo: (session, log) => indexRepoForDispatch(c.app, session, log),
-          injectKnowledge: (session, task) => injectKnowledgeContext(c.app, session, task),
-          injectRepoMap: (session, task) => injectRepoMap(session, task),
           materializeClaudeAuth: (session, compute) => materializeClaudeAuthForDispatch(c.app, session, compute),
           resolveAgent: (agentName, sessionVars, opts) =>
             agentRegistry.resolveAgentWithRuntime(c.app, agentName, sessionVars, opts),

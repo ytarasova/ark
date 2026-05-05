@@ -33,9 +33,10 @@ import { randomBytes } from "crypto";
 
 import type { AppContext } from "../app.js";
 import type { Session } from "../../types/index.js";
-import type { Repo, Workspace } from "../code-intel/store.js";
-import { DEFAULT_TENANT_ID } from "../code-intel/constants.js";
+import type { Repo, Workspace } from "./types.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
+
+const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 import {
   MANIFEST_FILENAME,
   manifestPath,
@@ -118,7 +119,7 @@ export async function provisionWorkspaceWorkdir(
   const workdir = workspaceWorkdir(app, session.id);
   mkdirSync(workdir, { recursive: true });
 
-  const repos = await app.codeIntel.listReposInWorkspace(workspace.tenant_id, workspace.id);
+  const repos = await app.workspaces.listReposInWorkspace(workspace.tenant_id, workspace.id);
   const fresh = buildInitialRepoRows(repos, session.id, workdir);
 
   // Preserve any existing clone state from a prior provisioning pass.
@@ -189,10 +190,7 @@ async function resolveBranchForRepo(repoDir: string, baseBranch: string): Promis
 function cloneSourceForRepo(repo: Repo): string {
   if (repo.local_path && existsSync(repo.local_path)) return repo.local_path;
   if (repo.repo_url) return repo.repo_url;
-  throw new Error(
-    `workspace repo ${repo.id} (${repo.name}) has no local_path or repo_url; cannot clone. ` +
-      `Add one via \`ark code-intel repo add\`.`,
-  );
+  throw new Error(`workspace repo ${repo.id} (${repo.name}) has no local_path or repo_url; cannot clone.`);
 }
 
 /**
@@ -249,10 +247,10 @@ export async function ensureRepoCloned(
   if (!session) throw new Error(`session ${sessionId} not found`);
   const tenantId = session.tenant_id ?? DEFAULT_TENANT_ID;
 
-  const repoRow = await app.codeIntel.getRepo(tenantId, entry.repo_id);
+  const repoRow = await app.workspaces.getRepo(tenantId, entry.repo_id);
   if (!repoRow) {
     throw new Error(
-      `workspace repo ${entry.repo_id} (slug=${repoSlug}) missing from code_intel_repos for tenant ${tenantId}`,
+      `workspace repo ${entry.repo_id} (slug=${repoSlug}) missing from workspace_repos for tenant ${tenantId}`,
     );
   }
 

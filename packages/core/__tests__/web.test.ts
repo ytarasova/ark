@@ -206,13 +206,6 @@ describe("web server", async () => {
     expect(Array.isArray(result.agents)).toBe(true);
   });
 
-  it("memory/list returns memories via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18540 });
-    const data = await rpcResult(18540, "memory/list");
-    const result = data.result as Record<string, unknown>;
-    expect(Array.isArray(result.memories)).toBe(true);
-  });
-
   it("compute/list returns computes via RPC", async () => {
     server = startWebServer(getApp(), { port: 18541 });
     const data = await rpcResult(18541, "compute/list");

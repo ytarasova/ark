@@ -12,20 +12,7 @@ import type { DiffFile } from "../components/ui/DiffViewer.js";
 import type { TodoItem } from "../components/ui/TodoList.js";
 import type { TabDef } from "../components/ui/ContentTabs.js";
 
-// "knowledge" is still a valid hash-router target so deep links survive,
-// but it no longer gets top-level tab strip real estate (low-frequency,
-// low-density panel; reachable via direct URL only).
-const VALID_TABS = new Set([
-  "conversation",
-  "logs",
-  "terminal",
-  "diff",
-  "cost",
-  "todos",
-  "errors",
-  "flow",
-  "knowledge",
-]);
+const VALID_TABS = new Set(["conversation", "logs", "terminal", "diff", "cost", "todos", "errors", "flow"]);
 
 /**
  * Bundles all of the server state + derived data + view-local state that

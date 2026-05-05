@@ -785,19 +785,6 @@ export type TodoToggleRequest = z.infer<typeof todoToggleRequest>;
 export const todoToggleResponse = z.object({ todo: todoSchema.nullable() });
 export type TodoToggleResponse = z.infer<typeof todoToggleResponse>;
 
-// ── knowledge/stats ─────────────────────────────────────────────────────────
-
-export const knowledgeStatsRequest = z.object({}).loose();
-export type KnowledgeStatsRequest = z.infer<typeof knowledgeStatsRequest>;
-
-export const knowledgeStatsResponse = z.object({
-  nodes: z.number(),
-  edges: z.number(),
-  by_node_type: z.record(z.string(), z.number()),
-  by_edge_type: z.record(z.string(), z.number()),
-});
-export type KnowledgeStatsResponse = z.infer<typeof knowledgeStatsResponse>;
-
 // ── session/output ──────────────────────────────────────────────────────────
 
 export const sessionOutputRequest = z.object({
@@ -1622,174 +1609,6 @@ export type WorktreeCleanupRequest = z.infer<typeof worktreeCleanupRequest>;
 export const worktreeCleanupResponse = z.object({ ok: z.boolean() }).loose();
 export type WorktreeCleanupResponse = z.infer<typeof worktreeCleanupResponse>;
 
-// ── learning/list ───────────────────────────────────────────────────────────
-
-const learningEntrySchema = z
-  .object({
-    title: z.string(),
-    description: z.string(),
-    recurrence: z.number(),
-    lastSeen: z.string(),
-  })
-  .loose();
-
-export const learningListRequest = z.object({}).loose();
-export type LearningListRequest = z.infer<typeof learningListRequest>;
-
-export const learningListResponse = z.object({ learnings: z.array(learningEntrySchema) });
-export type LearningListResponse = z.infer<typeof learningListResponse>;
-
-// ── learning/add ────────────────────────────────────────────────────────────
-
-export const learningAddRequest = z.object({
-  title: z.string().min(1),
-  description: z.string(),
-});
-export type LearningAddRequest = z.infer<typeof learningAddRequest>;
-
-export const learningAddResponse = z
-  .object({
-    ok: z.boolean(),
-    learning: learningEntrySchema,
-    promoted: z.boolean(),
-  })
-  .loose();
-export type LearningAddResponse = z.infer<typeof learningAddResponse>;
-
-// ── memory/list ─────────────────────────────────────────────────────────────
-
-const memoryEntrySchema = z
-  .object({
-    id: z.string(),
-    content: z.string(),
-    tags: z.array(z.string()),
-    scope: z.string(),
-    importance: z.number(),
-    createdAt: z.string(),
-    accessedAt: z.string(),
-    accessCount: z.number(),
-  })
-  .loose();
-
-export const memoryListRequest = z.object({ scope: z.string().optional() }).loose();
-export type MemoryListRequest = z.infer<typeof memoryListRequest>;
-
-export const memoryListResponse = z.object({ memories: z.array(memoryEntrySchema) });
-export type MemoryListResponse = z.infer<typeof memoryListResponse>;
-
-// ── memory/recall ───────────────────────────────────────────────────────────
-
-export const memoryRecallRequest = z.object({
-  query: z.string(),
-  scope: z.string().optional(),
-  limit: z.number().optional(),
-});
-export type MemoryRecallRequest = z.infer<typeof memoryRecallRequest>;
-
-export const memoryRecallResponse = z.object({ results: z.array(memoryEntrySchema) });
-export type MemoryRecallResponse = z.infer<typeof memoryRecallResponse>;
-
-// ── memory/add ──────────────────────────────────────────────────────────────
-
-export const memoryAddRequest = z
-  .object({
-    content: z.string(),
-    tags: z.array(z.string()).optional(),
-    scope: z.string().optional(),
-    importance: z.number().optional(),
-  })
-  .loose();
-export type MemoryAddRequest = z.infer<typeof memoryAddRequest>;
-
-export const memoryAddResponse = z.object({ memory: memoryEntrySchema });
-export type MemoryAddResponse = z.infer<typeof memoryAddResponse>;
-
-// ── memory/forget ───────────────────────────────────────────────────────────
-
-export const memoryForgetRequest = z.object({ id: z.string().min(1) });
-export type MemoryForgetRequest = z.infer<typeof memoryForgetRequest>;
-
-export const memoryForgetResponse = z.object({ ok: z.boolean() });
-export type MemoryForgetResponse = z.infer<typeof memoryForgetResponse>;
-
-// ── knowledge/ingest ────────────────────────────────────────────────────────
-
-export const knowledgeIngestRequest = z
-  .object({
-    path: z.string().min(1),
-    directory: z.boolean().optional(),
-    scope: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    recursive: z.boolean().optional(),
-  })
-  .loose();
-export type KnowledgeIngestRequest = z.infer<typeof knowledgeIngestRequest>;
-
-export const knowledgeIngestResponse = z
-  .object({
-    ok: z.boolean(),
-    files: z.number().optional(),
-    chunks: z.number().optional(),
-    error: z.string().optional(),
-  })
-  .loose();
-export type KnowledgeIngestResponse = z.infer<typeof knowledgeIngestResponse>;
-
-// ── knowledge/search ────────────────────────────────────────────────────────
-
-const knowledgeNodeSchema = z
-  .object({
-    id: z.string(),
-    type: z.string(),
-    label: z.string(),
-    content: z.string().nullable().optional(),
-    metadata: z.record(z.string(), z.unknown()),
-    created_at: z.string(),
-    updated_at: z.string(),
-  })
-  .loose();
-
-export const knowledgeSearchRequest = z
-  .object({
-    query: z.string(),
-    types: z.array(z.string()).optional(),
-    limit: z.number().optional(),
-  })
-  .loose();
-export type KnowledgeSearchRequest = z.infer<typeof knowledgeSearchRequest>;
-
-export const knowledgeSearchResponse = z.object({ results: z.array(knowledgeNodeSchema) });
-export type KnowledgeSearchResponse = z.infer<typeof knowledgeSearchResponse>;
-
-// ── knowledge/index ─────────────────────────────────────────────────────────
-
-export const knowledgeIndexRequest = z.object({ repo: z.string().optional() }).loose();
-export type KnowledgeIndexRequest = z.infer<typeof knowledgeIndexRequest>;
-
-export const knowledgeIndexResponse = z
-  .object({
-    ok: z.boolean(),
-    error: z.string().optional(),
-  })
-  .loose();
-export type KnowledgeIndexResponse = z.infer<typeof knowledgeIndexResponse>;
-
-// ── knowledge/export ────────────────────────────────────────────────────────
-
-export const knowledgeExportRequest = z.object({ dir: z.string().optional() }).loose();
-export type KnowledgeExportRequest = z.infer<typeof knowledgeExportRequest>;
-
-export const knowledgeExportResponse = z.object({ ok: z.boolean() }).loose();
-export type KnowledgeExportResponse = z.infer<typeof knowledgeExportResponse>;
-
-// ── knowledge/import ────────────────────────────────────────────────────────
-
-export const knowledgeImportRequest = z.object({ dir: z.string().optional() }).loose();
-export type KnowledgeImportRequest = z.infer<typeof knowledgeImportRequest>;
-
-export const knowledgeImportResponse = z.object({ ok: z.boolean() }).loose();
-export type KnowledgeImportResponse = z.infer<typeof knowledgeImportResponse>;
-
 // ── schedule/delete ─────────────────────────────────────────────────────────
 
 export const scheduleDeleteRequest = z.object({ id: z.string().min(1) });
@@ -1911,15 +1730,6 @@ export type ComputeTemplateListRequest = z.infer<typeof computeTemplateListReque
 export const computeTemplateListResponse = z.object({ templates: z.array(computeTemplateSchema) });
 export type ComputeTemplateListResponse = z.infer<typeof computeTemplateListResponse>;
 
-// ── repo-map/get ────────────────────────────────────────────────────────────
-
-export const repoMapGetRequest = z.object({ dir: z.string().optional() }).loose();
-export type RepoMapGetRequest = z.infer<typeof repoMapGetRequest>;
-
-// repoMap.generate returns an opaque shape -- accept any object.
-export const repoMapGetResponse = z.record(z.string(), z.unknown());
-export type RepoMapGetResponse = z.infer<typeof repoMapGetResponse>;
-
 // ── fs/list-dir ─────────────────────────────────────────────────────────────
 
 const fsEntrySchema = z
@@ -1988,7 +1798,6 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "todo/list": { request: todoListRequest, response: todoListResponse },
   "todo/delete": { request: todoDeleteRequest, response: todoDeleteResponse },
   "verify/run": { request: verifyRunRequest, response: verifyRunResponse },
-  "knowledge/stats": { request: knowledgeStatsRequest, response: knowledgeStatsResponse },
   "session/output": { request: sessionOutputRequest, response: sessionOutputResponse },
   "session/recording": { request: sessionRecordingRequest, response: sessionRecordingResponse },
   "session/stdio": { request: sessionStdioRequest, response: sessionStdioResponse },
@@ -2041,17 +1850,6 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "worktree/finish": { request: worktreeFinishRequest, response: worktreeFinishResponse },
   "worktree/create-pr": { request: worktreeCreatePrRequest, response: worktreeCreatePrResponse },
   "worktree/cleanup": { request: worktreeCleanupRequest, response: worktreeCleanupResponse },
-  "learning/list": { request: learningListRequest, response: learningListResponse },
-  "learning/add": { request: learningAddRequest, response: learningAddResponse },
-  "memory/list": { request: memoryListRequest, response: memoryListResponse },
-  "memory/recall": { request: memoryRecallRequest, response: memoryRecallResponse },
-  "memory/add": { request: memoryAddRequest, response: memoryAddResponse },
-  "memory/forget": { request: memoryForgetRequest, response: memoryForgetResponse },
-  "knowledge/ingest": { request: knowledgeIngestRequest, response: knowledgeIngestResponse },
-  "knowledge/search": { request: knowledgeSearchRequest, response: knowledgeSearchResponse },
-  "knowledge/index": { request: knowledgeIndexRequest, response: knowledgeIndexResponse },
-  "knowledge/export": { request: knowledgeExportRequest, response: knowledgeExportResponse },
-  "knowledge/import": { request: knowledgeImportRequest, response: knowledgeImportResponse },
   "schedule/delete": { request: scheduleDeleteRequest, response: scheduleDeleteResponse },
   "schedule/enable": { request: scheduleEnableRequest, response: scheduleEnableResponse },
   "schedule/disable": { request: scheduleDisableRequest, response: scheduleDisableResponse },
@@ -2064,7 +1862,6 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "compute/docker-logs": { request: computeDockerLogsRequest, response: computeDockerLogsResponse },
   "compute/docker-action": { request: computeDockerActionRequest, response: computeDockerActionResponse },
   "compute/template/list": { request: computeTemplateListRequest, response: computeTemplateListResponse },
-  "repo-map/get": { request: repoMapGetRequest, response: repoMapGetResponse },
   "fs/list-dir": { request: fsListDirRequest, response: fsListDirResponse },
 };
 

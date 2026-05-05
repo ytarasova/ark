@@ -158,29 +158,6 @@ import type {
   TodoDeleteResponse,
   VerifyRunRequest,
   VerifyRunResponse,
-  LearningListResponse,
-  LearningAddRequest,
-  LearningAddResponse,
-  MemoryListRequest,
-  MemoryListResponse,
-  MemoryRecallRequest,
-  MemoryRecallResponse,
-  MemoryAddRequest,
-  MemoryAddResponse,
-  MemoryForgetRequest,
-  MemoryForgetResponse,
-  KnowledgeStatsRequest,
-  KnowledgeStatsResponse,
-  KnowledgeIngestRequest,
-  KnowledgeIngestResponse,
-  KnowledgeSearchRequest,
-  KnowledgeSearchResponse,
-  KnowledgeIndexRequest,
-  KnowledgeIndexResponse,
-  KnowledgeExportRequest,
-  KnowledgeExportResponse,
-  KnowledgeImportRequest,
-  KnowledgeImportResponse,
   WorktreeListResponse,
   WorktreeDiffRequest,
   WorktreeDiffResponse,
@@ -189,8 +166,6 @@ import type {
   WorktreeCreatePrRequest,
   WorktreeCreatePrResponse,
   WorktreeCleanupResponse,
-  RepoMapGetRequest,
-  RepoMapGetResponse,
   FsListDirRequest,
   FsListDirResponse,
 } from "../../../../protocol/rpc-schemas.js";
@@ -449,41 +424,6 @@ export function makeApi(transport: WebTransport) {
     recordLearning: (title: string, desc: string) =>
       rpc<LearningAddResponse>("learning/add", { title, description: desc } satisfies LearningAddRequest),
 
-    // ── Memory ───────────────────────────────────────────────────────────────
-    getMemories: (scope?: string) =>
-      rpc<MemoryListResponse>("memory/list", { scope } satisfies MemoryListRequest).then((r) => r.memories),
-    recallMemory: (q: string) =>
-      rpc<MemoryRecallResponse>("memory/recall", { query: q } satisfies MemoryRecallRequest).then((r) => r.results),
-    addMemory: (content: string, opts?: Omit<MemoryAddRequest, "content">) =>
-      rpc<MemoryAddResponse>("memory/add", { content, ...opts } satisfies MemoryAddRequest).then((r) => ({
-        ok: true as const,
-        entry: r.memory,
-      })),
-    forgetMemory: (id: string) =>
-      rpc<MemoryForgetResponse>("memory/forget", { id } satisfies MemoryForgetRequest).then((r) => ({
-        ok: r.ok,
-        message: r.ok ? "Forgotten" : "Not found",
-      })),
-
-    // ── Knowledge ────────────────────────────────────────────────────────────
-    ingestKnowledge: (path: string, opts?: Omit<KnowledgeIngestRequest, "path">) =>
-      rpc<KnowledgeIngestResponse>("knowledge/ingest", { path, ...opts } satisfies KnowledgeIngestRequest),
-    knowledgeSearch: (query: string, opts?: { types?: string[]; limit?: number }) =>
-      rpc<KnowledgeSearchResponse>("knowledge/search", { query, ...opts } satisfies KnowledgeSearchRequest).then(
-        (r) => r.results,
-      ),
-    knowledgeStats: () => rpc<KnowledgeStatsResponse>("knowledge/stats", {} satisfies KnowledgeStatsRequest),
-    knowledgeIndex: (repo?: string) =>
-      rpc<KnowledgeIndexResponse>("knowledge/index", { repo } satisfies KnowledgeIndexRequest),
-    knowledgeExport: (dir?: string) =>
-      rpc<KnowledgeExportResponse>("knowledge/export", { dir } satisfies KnowledgeExportRequest),
-    knowledgeImport: (dir?: string) =>
-      rpc<KnowledgeImportResponse>("knowledge/import", { dir } satisfies KnowledgeImportRequest),
-    codebaseMemoryStatus: () =>
-      rpc<{ available: boolean; path: string | null; version: string | null; tools?: string[] }>(
-        "knowledge/codebase/status",
-      ),
-
     // ── Schedules ────────────────────────────────────────────────────────────
     getSchedules: () =>
       rpc<ScheduleListResponse>("schedule/list", {} satisfies ScheduleListRequest).then((r) => r.schedules),
@@ -546,9 +486,6 @@ export function makeApi(transport: WebTransport) {
     // ── Compute / Runtime kinds ──────────────────────────────────────────────
     listComputeKinds: () => rpc<{ kinds: string[] }>("compute/kinds"),
     listRuntimeKinds: () => rpc<{ kinds: string[] }>("runtime/kinds"),
-
-    // ── Repo Map ─────────────────────────────────────────────────────────────
-    getRepoMap: (dir?: string) => rpc<RepoMapGetResponse>("repo-map/get", { dir } satisfies RepoMapGetRequest),
 
     // ── Filesystem (local mode only) ─────────────────────────────────────────
     listDir: (path?: string) =>

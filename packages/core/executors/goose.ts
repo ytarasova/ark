@@ -28,8 +28,6 @@ import { recordingPath } from "../recordings.js";
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as tmux from "../infra/tmux.js";
 import * as claude from "../claude/claude.js";
-import { findCodebaseMemoryBinary } from "../knowledge/codebase-memory-finder.js";
-import { existsSync } from "fs";
 
 /** Single-quote a string for safe bash interpolation (no expansion). */
 const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -68,15 +66,6 @@ export function buildGooseCommand(opts: GooseCommandOpts): string[] {
   if (opts.channelExtension) {
     const extCmd = [opts.channelExtension.command, ...opts.channelExtension.args].join(" ");
     args.push("--with-extension", extCmd);
-  }
-
-  // Inject codebase-memory-mcp as a second extension when the vendored
-  // binary is available. Gives goose the same 14 code-intelligence tools
-  // Claude Code gets via .mcp.json. Upstream auto-detects Claude/Codex/Gemini/etc
-  // but not Goose, so we wire it manually (consistent with channel extension).
-  const cbmBin = findCodebaseMemoryBinary();
-  if (cbmBin !== "codebase-memory-mcp" && existsSync(cbmBin)) {
-    args.push("--with-extension", cbmBin);
   }
 
   // Interactive mode: -s keeps goose alive after task delivery (manual gate).

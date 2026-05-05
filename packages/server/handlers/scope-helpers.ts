@@ -15,7 +15,6 @@
 import { findProjectRoot } from "../../core/agent/agent.js";
 import type { AppContext } from "../../core/app.js";
 import type { TenantContext } from "../../core/auth/context.js";
-import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
 import { RpcError, ErrorCodes } from "../../protocol/types.js";
 
 export type Scope = "global" | "project";
@@ -118,22 +117,4 @@ export function resolveTenantId(app: AppContext, ctx: TenantContext): string {
 export function resolveTenantApp(app: AppContext, ctx: TenantContext): AppContext {
   const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? null;
   return tenantId ? app.forTenant(tenantId) : app;
-}
-
-/**
- * Resolve the tenant id from the code-intel schema (which keys tenants
- * by slug). Does a DB lookup via `app.codeIntel.getTenantBySlug`; falls
- * back to `DEFAULT_TENANT_ID` when the slug is unknown.
- *
- * Distinct from `resolveTenantId` -- the code-intel schema uses its own
- * tenant table keyed by slug rather than the string id consumed elsewhere.
- * Previously duplicated across workspace/code-intel handlers.
- */
-export async function resolveCodeIntelTenantId(app: AppContext, ctx: TenantContext): Promise<string> {
-  const slug = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
-  if (slug) {
-    const found = await app.codeIntel.getTenantBySlug(slug);
-    if (found) return found.id;
-  }
-  return DEFAULT_TENANT_ID;
 }

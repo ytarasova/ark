@@ -36,7 +36,7 @@ import {
 } from "../stores/index.js";
 import type { ModelStore } from "../stores/model-store.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
-import { KnowledgeStore } from "../knowledge/store.js";
+import { WorkspaceStore } from "../workspace/store.js";
 
 /**
  * Register the database under `db`. The DB is provided by the caller because
@@ -94,9 +94,6 @@ export function registerRepositories(container: AppContainer): void {
       lifetime: Lifetime.SINGLETON,
     }),
     ledger: asFunction((c: { db: DatabaseAdapter }) => new LedgerRepository(c.db), { lifetime: Lifetime.SINGLETON }),
-
-    // Knowledge graph is persistence-adjacent -- keep it here with the repos.
-    knowledge: asFunction((c: { db: DatabaseAdapter }) => new KnowledgeStore(c.db), { lifetime: Lifetime.SINGLETON }),
 
     // Auth managers -- all six share the same shape: `new X(db)`. Registering
     // them as singletons means handler bodies resolve via `app.container.cradle.X`
@@ -157,6 +154,9 @@ export function registerResourceStores(container: AppContainer): void {
       { lifetime: Lifetime.SINGLETON },
     ),
     models: asFunction((c: { config: ArkConfig }) => makeModelStore(c.config), { lifetime: Lifetime.SINGLETON }),
+    workspaces: asFunction((c: { db: DatabaseAdapter }) => new WorkspaceStore(c.db), {
+      lifetime: Lifetime.SINGLETON,
+    }),
   });
 }
 

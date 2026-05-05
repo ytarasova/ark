@@ -204,14 +204,6 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
       emitStageSpanEnd(sessionId, { status: result.newStatus });
       emitSessionSpanEnd(sessionId, { status: result.newStatus });
       flushSpans();
-
-      try {
-        const { evaluateSession } = await import("../knowledge/evals.js");
-        const freshSession = await scoped.sessions.get(sessionId);
-        if (freshSession) await evaluateSession(scoped, freshSession);
-      } catch {
-        logDebug("conductor", "skip eval on error");
-      }
     }
   }
 
