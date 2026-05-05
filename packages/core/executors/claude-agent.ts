@@ -261,7 +261,11 @@ export const claudeAgentExecutor: Executor = {
             const t0 = Date.now();
             const res = await provider.spawnProcess!(compute, refreshed, {
               handle,
-              cmd: "bash",
+              // Absolute path: arkd-on-EC2 runs under a systemd unit with
+              // a restrictive PATH and bare `bash` ENOENTs at posix_spawn
+              // before it resolves. /bin/bash exists on Amazon Linux 2023
+              // (via /bin -> usr/bin symlink) and Ubuntu. See #473.
+              cmd: "/bin/bash",
               args: [workerLauncherPath],
               workdir: workerWorkdir || "/tmp",
               logPath: workerLogPath,

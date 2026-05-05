@@ -18,7 +18,7 @@
  * one-handle-per-session shape every runtime uses today.
  */
 
-import { mkdir, appendFile } from "fs/promises";
+import { mkdir, appendFile, stat } from "fs/promises";
 import { dirname } from "path";
 import { json, requireSafeTmuxName, SAFE_TMUX_NAME_RE, type RouteCtx } from "../internal.js";
 import { logDebug, logInfo, logWarn } from "../../core/observability/structured-log.js";
@@ -135,19 +135,44 @@ async function spawnProcess(req: ProcessSpawnReq): Promise<ProcessSpawnRes> {
     throw new Error("`workdir` must be a non-empty string");
   }
 
+  // Validate cwd up front. Bun.spawn surfaces a missing cwd as
+  // `ENOENT posix_spawn '<cmd>'`, which makes us blame the executable
+  // when the real cause is the working directory. Stat first so the
+  // failure mode is unambiguous. See #473.
+  try {
+    const st = await stat(req.workdir);
+    if (!st.isDirectory()) {
+      throw new Error(`workdir is not a directory: ${req.workdir}`);
+    }
+  } catch (e: any) {
+    if (e?.code === "ENOENT") {
+      throw new Error(`workdir does not exist: ${req.workdir}`);
+    }
+    throw e;
+  }
+
   // Pre-create the log directory so the pump can append without race.
   if (req.logPath) {
     await mkdir(dirname(req.logPath), { recursive: true });
   }
 
   const wantPipes = Boolean(req.logPath);
-  const child = Bun.spawn({
-    cmd: [req.cmd, ...req.args],
-    cwd: req.workdir,
-    env: { ...process.env, ...(req.env ?? {}) } as Record<string, string>,
-    stdout: wantPipes ? "pipe" : "ignore",
-    stderr: wantPipes ? "pipe" : "ignore",
-  });
+  let child: SpawnedProc;
+  try {
+    child = Bun.spawn({
+      cmd: [req.cmd, ...req.args],
+      cwd: req.workdir,
+      env: { ...process.env, ...(req.env ?? {}) } as Record<string, string>,
+      stdout: wantPipes ? "pipe" : "ignore",
+      stderr: wantPipes ? "pipe" : "ignore",
+    });
+  } catch (e: any) {
+    // Capture errno + syscall + the resolved exec name so the conductor
+    // sees what actually went wrong, not just `posix_spawn '<cmd>'`. See #473.
+    const errno = e?.errno ?? e?.code ?? "unknown";
+    const syscall = e?.syscall ?? "spawn";
+    throw new Error(`${syscall} failed (${errno}) cmd=${req.cmd} workdir=${req.workdir}: ${e?.message ?? String(e)}`);
+  }
 
   const entry: ProcessEntry = {
     pid: child.pid,
