@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import * as flow from "../state/flow.js";
+import * as flow from "../services/flow.js";
 
 let app: AppContext;
 

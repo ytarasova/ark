@@ -13,7 +13,7 @@
 import { describe, it, expect } from "bun:test";
 import { FanOutDispatcher } from "../services/dispatch/dispatch-fanout.js";
 import type { Session } from "../../types/index.js";
-import type { StageDefinition } from "../state/flow.js";
+import type { StageDefinition } from "../services/flow.js";
 
 function makeStubSession(overrides?: Partial<Session>): Session {
   return {

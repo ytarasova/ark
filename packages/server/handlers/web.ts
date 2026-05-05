@@ -13,7 +13,7 @@ import type { KnowledgeNode } from "../../core/knowledge/types.js";
 import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
 import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/costs.js";
-import { getActiveProfile } from "../../core/state/profiles.js";
+import { getActiveProfile } from "../../core/services/profile.js";
 import { cleanupWorktrees } from "../../core/services/worktree/index.js";
 import { exportSession } from "../../core/session/share.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";

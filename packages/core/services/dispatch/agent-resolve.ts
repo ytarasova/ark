@@ -11,7 +11,7 @@
 import type { DispatchDeps } from "./types.js";
 import type { AgentDefinition } from "../../agent/agent.js";
 import type { Session } from "../../../types/index.js";
-import type { StageDefinition } from "../../state/flow.js";
+import type { StageDefinition } from "../flow.js";
 import { sessionAsVars } from "../task-builder.js";
 
 export type AgentRef = StageDefinition["agent"];

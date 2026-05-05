@@ -18,7 +18,7 @@ import type {
 
 // FlowDefinition from `types/flow.ts` is the protocol shape; we only use it
 // for the request body type below. The runtime FlowDefinition expected by
-// app.flows.save() lives in core/state/flow.ts -- we cast across the boundary
+// app.flows.save() lives in core/services/flow.ts -- we cast across the boundary
 // in flow/create where the two definitions meet.
 
 export function registerResourceHandlers(router: Router, app: AppContext): void {
@@ -126,7 +126,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (summary && summary.source !== "builtin") {
       throw new RpcError(`Flow '${params.name}' already exists.`, ErrorCodes.INVALID_PARAMS);
     }
-    // The runtime FlowDefinition (core/state/flow.ts) is the right shape for
+    // The runtime FlowDefinition (core/services/flow.ts) is the right shape for
     // app.flows.save(); we cast through unknown because the protocol type
     // (types/flow.ts) is structurally compatible but not the same identity.
     const flow = {

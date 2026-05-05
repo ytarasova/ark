@@ -12,7 +12,7 @@ import { join } from "path";
 import YAML from "yaml";
 import { AppContext } from "../app.js";
 import { buildArgs, writeSettings, removeSettings } from "../claude/claude.js";
-import { resolveFlow } from "../state/flow.js";
+import { resolveFlow } from "../services/flow.js";
 import { buildClaudeArgs } from "../agent/agent.js";
 import { buildSessionVars } from "../template.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";

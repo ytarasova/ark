@@ -24,7 +24,7 @@ import type { ArkConfig } from "../../config.js";
 import type { SecretsCapability } from "../../secrets/types.js";
 import type { Session, Compute } from "../../../types/index.js";
 import type { SessionScheduler } from "../../hosted/scheduler.js";
-import type { StageDefinition, StageAction } from "../../state/flow.js";
+import type { StageDefinition, StageAction } from "../flow.js";
 import type { ClaudeAuthMaterialization } from "../dispatch-claude-auth.js";
 
 // ── Callbacks wrapping free-functions that still take AppContext ────────────

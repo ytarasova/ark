@@ -9,7 +9,7 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { AppContext } from "../app.js";
-import { resolveFlow } from "../state/flow.js";
+import { resolveFlow } from "../services/flow.js";
 import { resolveAgent } from "../agent/agent.js";
 import { substituteVars, buildSessionVars } from "../template.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";

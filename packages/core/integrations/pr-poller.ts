@@ -10,7 +10,7 @@ import { promisify } from "util";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 
-import * as flow from "../state/flow.js";
+import * as flow from "../services/flow.js";
 import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
 import { safeAsync } from "../safe.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";

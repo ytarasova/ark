@@ -19,7 +19,7 @@
 
 import { CoreDispatcher } from "./dispatch-core.js";
 import type { DispatchDeps, DispatchResult } from "./types.js";
-import type { StageDefinition } from "../../state/flow.js";
+import type { StageDefinition } from "../flow.js";
 
 export type { DispatchDeps, DispatchResult } from "./types.js";
 

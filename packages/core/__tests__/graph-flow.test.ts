@@ -8,7 +8,7 @@ import {
   topologicalSort,
   validateGraphFlow,
   resolveNextStages,
-} from "../state/graph-flow.js";
+} from "../services/flow-graph.js";
 
 describe("graph flow", () => {
   const flow = parseGraphFlow({

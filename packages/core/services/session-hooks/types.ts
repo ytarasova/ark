@@ -16,7 +16,7 @@ import type { FlowStore } from "../../stores/flow-store.js";
 import type { UsageRecorder } from "../../observability/usage.js";
 import type { TranscriptParserRegistry } from "../../runtimes/transcript-parser.js";
 import type { Session, MessageRole, MessageType } from "../../../types/index.js";
-import type { StageDefinition, StageAction } from "../../state/flow.js";
+import type { StageDefinition, StageAction } from "../flow.js";
 import type { DispatchResult } from "../dispatch/types.js";
 
 // ── Callbacks for helpers that still take AppContext ────────────────────────

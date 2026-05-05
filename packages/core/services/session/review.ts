@@ -7,7 +7,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 
 import type { SessionLifecycleDeps, VerificationResult, VerifyScriptRunner } from "./types.js";
-import * as flow from "../../state/flow.js";
+import * as flow from "../flow.js";
 import { loadRepoConfig } from "../../repo-config.js";
 import { substituteVars, buildSessionVars } from "../../template.js";
 

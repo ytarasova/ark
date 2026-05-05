@@ -6,7 +6,7 @@ import {
   getActiveProfile,
   setActiveProfile,
   profileGroupPrefix,
-} from "../state/profiles.js";
+} from "../services/profile.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

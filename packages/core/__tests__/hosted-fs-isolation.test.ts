@@ -5,7 +5,7 @@
  *
  *   H1 -- `_initFilesystem` no-ops in hosted mode
  *   H2 -- `setLogArkDir` is never called in hosted mode (=> no JSONL writes)
- *   H3 -- `state/profiles` mutators throw + listProfiles returns []
+ *   H3 -- `services/profile` mutators throw + listProfiles returns []
  *   H4 -- `claude/trust.{trustWorktree,trustDirectory}` no-op in hosted mode
  *   H6 -- `di/storage` rejects local blob backend in hosted mode
  *   H7 -- `di/runtime.snapshotStore` rejects FS backend in hosted mode
@@ -36,7 +36,7 @@ import { buildHostedAppMode } from "../modes/app-mode.js";
 import { FileSecretsProvider } from "../secrets/file-provider.js";
 import { AwsSecretsProvider } from "../secrets/aws-provider.js";
 import { setLogArkDir } from "../observability/structured-log.js";
-import { setProfilesArkDir } from "../state/profiles.js";
+import { setProfilesArkDir } from "../services/profile.js";
 
 // Ensure each test runs against a fresh module-level state. The
 // structured-log + profiles modules cache an arkDir as a singleton; tests
@@ -122,7 +122,7 @@ describe("H3 -- profiles store is unavailable in hosted mode", () => {
 
     // The hosted-mode boot path skips setProfilesArkDir, so the module-level
     // _arkDir stays null -- profile mutators surface a clear error.
-    const profiles = await import("../state/profiles.js");
+    const profiles = await import("../services/profile.js");
 
     expect(profiles.listProfiles()).toEqual([]);
     expect(() => profiles.createProfile("tenant-a")).toThrow(/profiles unavailable in hosted mode/i);

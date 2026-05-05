@@ -9,7 +9,7 @@ import { join } from "path";
 import { withTestContext } from "./test-helpers.js";
 import { worktreeDiff, createWorktreePR, mergeWorktreePR } from "../services/worktree/index.js";
 import { executeAction } from "../services/actions/index.js";
-import { getStageDefinition } from "../state/flow.js";
+import { getStageDefinition } from "../services/flow.js";
 import { loadRepoConfig } from "../repo-config.js";
 import { getApp } from "./test-helpers.js";
 
