@@ -48,7 +48,7 @@ export class DbResourceStore<T extends { name: string }> {
   // every `list()` call + every `save()`/`delete()`, and used by the sync
   // `get()` path below. Without this cache, hosted-mode callers that use
   // the sync FlowStore/AgentStore contract (see
-  // `state/flow.ts::getFirstStage`) receive a pending Promise which they
+  // `services/flow.ts::getFirstStage`) receive a pending Promise which they
   // treat as a FlowDefinition, deref `.stages`, and silently get
   // `undefined` -- which is exactly how single-stage `e2e-noop` flows used
   // to hang forever at `status: pending`.
@@ -87,7 +87,7 @@ export class DbResourceStore<T extends { name: string }> {
   /**
    * Return a resource by name. The method signature is
    * `T | null | Promise<T | null>` so both async and sync callers work --
-   * async paths `await` as before, sync paths (`state/flow.ts`) consult
+   * async paths `await` as before, sync paths (`services/flow.ts`) consult
    * the in-memory cache populated by `list()` / `save()`.
    *
    * Sync callers that miss the cache get `null` and should trigger an

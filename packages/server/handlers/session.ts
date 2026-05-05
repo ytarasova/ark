@@ -3,7 +3,6 @@ import { join } from "path";
 import { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { searchSessions, getSessionConversation, searchSessionConversation } from "../../core/search/search.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { resolveTenantApp } from "./scope-helpers.js";
 import type {
@@ -14,7 +13,6 @@ import type {
   SessionUpdateParams,
   SessionEventsParams,
   SessionMessagesParams,
-  SessionSearchParams,
   SessionOutputParams,
   SessionHandoffParams,
   SessionJoinParams,
@@ -258,27 +256,6 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { messages };
   });
 
-  router.handle("session/search", async (params, _notify, ctx) => {
-    const { query } = extract<SessionSearchParams>(params, ["query"]);
-    const scoped = resolveTenantApp(app, ctx);
-    const results = await searchSessions(scoped, query);
-    return { results };
-  });
-
-  router.handle("session/conversation", async (params, _notify, ctx) => {
-    const { sessionId, limit } = extract<{ sessionId: string; limit?: number }>(params, ["sessionId"]);
-    const scoped = resolveTenantApp(app, ctx);
-    const turns = await getSessionConversation(scoped, sessionId, { limit });
-    return { turns };
-  });
-
-  router.handle("session/search-conversation", async (params, _notify, ctx) => {
-    const { sessionId, query } = extract<{ sessionId: string; query: string }>(params, ["sessionId", "query"]);
-    const scoped = resolveTenantApp(app, ctx);
-    const results = await searchSessionConversation(scoped, sessionId, query);
-    return { results };
-  });
-
   router.handle("session/output", async (params, _notify, ctx) => {
     const { sessionId, lines } = extract<SessionOutputParams>(params, ["sessionId"]);
     const scoped = resolveTenantApp(app, ctx);
@@ -418,7 +395,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const scoped = resolveTenantApp(app, ctx);
     const session = await scoped.sessions.get(sessionId);
     if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
-    const { getStages } = await import("../../core/state/flow.js");
+    const { getStages } = await import("../../core/services/flow.js");
     const stages = getStages(scoped, session.flow).map((s) => ({
       name: s.name,
       type: s.action ? "action" : s.agent ? "agent" : (s.type ?? "agent"),

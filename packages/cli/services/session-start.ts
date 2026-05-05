@@ -33,7 +33,6 @@ export interface SessionStartOpts {
   compute?: string;
   group?: string;
   attach?: boolean;
-  claudeSession?: string;
   runtime?: string;
   model?: string;
   maxBudget?: number;
@@ -48,8 +47,6 @@ export interface SessionStartClient {
 
 export interface SessionStartEnv {
   client: SessionStartClient;
-  /** Looks up a Claude Code session on disk. Only invoked when `opts.claudeSession` is set. */
-  getClaudeSession?: (id: string) => Promise<{ sessionId: string; summary?: string | null; project: string } | null>;
   /** Returns an AppContext for the rare lookups that still need one. */
   getApp?: () => Promise<AppContext>;
 }
@@ -59,8 +56,6 @@ export type PlanNote = { kind: "info" | "warn"; message: string };
 export interface SessionStartPlan {
   /** Fully-resolved RPC payload ready for `ark.sessionStart()`. */
   request: Record<string, unknown>;
-  /** Post-hoc bind target for the session once created (claude import). */
-  claudeSessionId: string | null;
   /** Whether the CLI should attach after dispatch. */
   attach: boolean;
   /** Echo lines the CLI surfaces to the user (non-blocking information). */
@@ -98,28 +93,6 @@ export class SessionStartService {
         workdir = rp;
         repo = rp;
       }
-    }
-
-    // ── Claude session import ────────────────────────────────────────
-    let claudeSessionId: string | null = null;
-    if (opts.claudeSession) {
-      if (!this.env.getClaudeSession) {
-        throw new SessionStartPlanError("Claude session import is not available in this context.");
-      }
-      const cs = await this.env.getClaudeSession(opts.claudeSession);
-      if (!cs) {
-        throw new SessionStartPlanError(
-          `Claude session '${opts.claudeSession}' not found. Run 'ark claude list' to see available sessions.`,
-        );
-      }
-      claudeSessionId = cs.sessionId;
-      if (!opts.summary) opts.summary = cs.summary?.slice(0, 100) || `Imported from ${cs.sessionId.slice(0, 8)}`;
-      if (!repo) repo = cs.project;
-      if (!workdir) workdir = cs.project;
-      notes.push({
-        kind: "info",
-        message: `Importing Claude session ${cs.sessionId.slice(0, 8)} from ${cs.project}`,
-      });
     }
 
     // ── Session config overrides ────────────────────────────────────
@@ -253,7 +226,6 @@ export class SessionStartService {
 
     return {
       request,
-      claudeSessionId,
       attach: Boolean(opts.attach),
       notes,
     };

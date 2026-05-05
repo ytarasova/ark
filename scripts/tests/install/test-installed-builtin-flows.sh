@@ -10,8 +10,8 @@
 # Root cause being guarded against:
 #   packages/core/app.ts computes `storeBaseDir` from `import.meta.url`. In a
 #   Bun-compiled binary that path resolves to /$bunfs/root, NOT to the
-#   <prefix> the binary actually lives in. So all five resource stores
-#   (flows, skills, agents, recipes, runtimes) silently lose their builtin
+#   <prefix> the binary actually lives in. So all four resource stores
+#   (flows, skills, agents, runtimes) silently lose their builtin
 #   tier and only return user/project content. The user sees `~/.ark/flows/`
 #   files but nothing from `~/.ark/flows/definitions/` even though the tarball
 #   shipped them.
@@ -94,7 +94,7 @@ done
 
 # Also stage the OTHER resource dirs as empty placeholders so the AppContext
 # boot doesn't fail trying to scan a missing dir for skills/agents/etc.
-mkdir -p "$PREFIX/skills" "$PREFIX/agents" "$PREFIX/recipes" "$PREFIX/runtimes"
+mkdir -p "$PREFIX/skills" "$PREFIX/agents" "$PREFIX/runtimes"
 
 # -----------------------------------------------------------------------------
 # Hermetic env: empty $HOME so user-tier flows are guaranteed empty. The

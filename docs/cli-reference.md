@@ -2,7 +2,7 @@
 
 > Auto-generated from the Commander.js tree. Run `make docs-cli` to regenerate.
 
-> Version: 0.21.30
+> Version: 0.21.41
 
 ## Usage
 
@@ -27,7 +27,6 @@ ark [options] <command>
 | [`ark agent`](#ark-agent) | Manage agent definitions |
 | [`ark flow`](#ark-flow) | Manage flows |
 | [`ark skill`](#ark-skill) | Manage skills |
-| [`ark recipe`](#ark-recipe) | Manage recipes |
 | [`ark schedule`](#ark-schedule) | Manage scheduled recurring sessions |
 | [`ark trigger`](#ark-trigger) | Manage trigger configurations (webhook / schedule / poll) |
 | [`ark worktree`](#ark-worktree) | Git worktree operations |
@@ -66,7 +65,6 @@ ark [options] <command>
 | [`ark web`](#ark-web) | Start web dashboard |
 | [`ark openapi`](#ark-openapi) | Generate OpenAPI spec |
 | [`ark mcp-proxy`](#ark-mcp-proxy) | Bridge stdin/stdout to a pooled MCP socket (internal) |
-| [`ark acp`](#ark-acp) | Start headless ACP server on stdin/stdout (JSON-RPC) |
 | [`ark repo-map`](#ark-repo-map) | Generate repository structure map |
 | [`ark init`](#ark-init) | Initialize Ark for this repository |
 | [`ark db`](#ark-db) | Schema migrations + status |
@@ -104,7 +102,6 @@ Start a new session
 | `-g, --group <name>` |  | Group name |
 | `-a, --attach` |  | Attach to the session's tmux pane after starting |
 | `--claude-session <id>` |  | Create from an existing Claude Code session (use 'ark claude list' to find IDs) |
-| `--recipe <name>` |  | Create session from a recipe template |
 | `--max-budget <usd>` |  | Cumulative cost cap for this session in USD. Halts for_each if exceeded. |
 | `--with-mcp <name>` | `[]` | Mount an additional MCP server into the session (repeatable). Resolves against shipped mcp-configs/<name>.json or an inline path. |
 | `--file <role=path>` | `{}` | Attach a named file input (repeatable). Path is resolved absolute and exposed to agents + flows as {inputs.files.<role>}. |
@@ -1089,63 +1086,6 @@ Delete a skill (global or project only)
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `name` | yes | Skill name |
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-s, --scope <scope>` | `"global"` | Scope: global or project |
-
-## `ark recipe`
-
-Manage recipes
-
-**Synopsis:** `ark recipe`
-
-### `ark recipe list`
-
-List available recipes
-
-**Synopsis:** `ark recipe list`
-
-### `ark recipe show`
-
-Show recipe details
-
-**Synopsis:** `ark recipe show <name>`
-
-**Arguments:**
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `name` | yes | Recipe name |
-
-### `ark recipe create`
-
-Create a new recipe
-
-**Synopsis:** `ark recipe create [options]`
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--from <file>` |  | Create from YAML file |
-| `--from-session <id>` |  | Create from existing session |
-| `-n, --name <name>` |  | Recipe name (required with --from-session) |
-| `-s, --scope <scope>` | `"global"` | Scope: global or project |
-
-### `ark recipe delete`
-
-Delete a recipe (global or project only)
-
-**Synopsis:** `ark recipe delete [options] <name>`
-
-**Arguments:**
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `name` | yes | Recipe name |
 
 **Options:**
 
@@ -2989,12 +2929,6 @@ Bridge stdin/stdout to a pooled MCP socket (internal)
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `socket-path` | yes |  |
-
-## `ark acp`
-
-Start headless ACP server on stdin/stdout (JSON-RPC)
-
-**Synopsis:** `ark acp`
 
 ## `ark repo-map`
 

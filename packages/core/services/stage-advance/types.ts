@@ -24,7 +24,7 @@
  *   - capturePlanMd / gcComputeIfTemplate: orchestration-side helpers that
  *     still take AppContext upstream. Wrapped at registration time.
  *   - getStage / getStageAction / resolveNextStage / evaluateGate:
- *     the flow-state helpers in `state/flow.ts` take AppContext today
+ *     the flow-state helpers in `services/flow.ts` take AppContext today
  *     (for resource-store lookups). Wrapped as narrow callbacks so the
  *     class bodies stay `app`-free.
  */
@@ -41,7 +41,7 @@ import type { RuntimeStore } from "../../stores/runtime-store.js";
 import type { UsageRecorder } from "../../observability/usage.js";
 import type { TranscriptParserRegistry } from "../../runtimes/transcript-parser.js";
 import type { DatabaseAdapter } from "../../database/index.js";
-import type { StageDefinition, StageAction } from "../../state/flow.js";
+import type { StageDefinition, StageAction } from "../flow.js";
 
 // ── Callbacks ───────────────────────────────────────────────────────────────
 
@@ -129,7 +129,7 @@ export interface StageAdvanceDeps {
   gcComputeIfTemplate: GcComputeIfTemplateCb;
   saveCheckpoint: SaveCheckpointCb;
 
-  // Flow-engine callbacks (state/flow.ts helpers take AppContext today).
+  // Flow-engine callbacks (services/flow.ts helpers take AppContext today).
   getStage: GetStageCb;
   getStageAction: GetStageActionCb;
   resolveNextStage: ResolveNextStageCb;

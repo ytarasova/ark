@@ -297,13 +297,6 @@ export class HookStatusApplier {
       } catch (e: any) {
         logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) });
       }
-
-      // Index transcript for FTS5 search -- only if the transcript belongs to THIS session's agent
-      const hookClaudeSession = payload.session_id as string | undefined;
-      if (hookClaudeSession && session.claude_session_id && transcriptPath.includes(hookClaudeSession)) {
-        result.shouldIndex = true;
-        result.indexTranscript = { transcriptPath, sessionId: session.id };
-      }
     }
 
     // agent-sdk emits Stop / SessionEnd with the cost + usage attached

@@ -4,17 +4,7 @@ import type { Event } from "./event.js";
 import type { Message } from "./message.js";
 import type { AgentDefinition, SkillDefinition, RuntimeDefinition } from "./agent.js";
 import type { FlowDefinition } from "./flow.js";
-import type {
-  ComputeSnapshot,
-  Profile,
-  ClaudeSession,
-  ToolEntry,
-  MemoryEntry,
-  Schedule,
-  SessionCost,
-  ConversationTurn,
-  SearchResult,
-} from "./common.js";
+import type { ComputeSnapshot, Profile, ToolEntry, MemoryEntry, Schedule, SessionCost } from "./common.js";
 
 // ── Session ─────────────────────────────────────────────────────────────────
 
@@ -114,29 +104,6 @@ export interface SessionMessagesParams {
 }
 export interface SessionMessagesResult {
   messages: Message[];
-}
-
-export interface SessionSearchParams {
-  query: string;
-}
-export interface SessionSearchResult {
-  results: SearchResult[];
-}
-
-export interface SessionConversationParams {
-  sessionId: string;
-  limit?: number;
-}
-export interface SessionConversationResult {
-  turns: ConversationTurn[];
-}
-
-export interface SessionSearchConversationParams {
-  sessionId: string;
-  query: string;
-}
-export interface SessionSearchConversationResult {
-  results: SearchResult[];
 }
 
 export interface SessionResumeParams {
@@ -300,48 +267,6 @@ export interface ProfileSetParams {
 }
 export interface ProfileDeleteParams {
   name: string;
-}
-
-// ── History ─────────────────────────────────────────────────────────────────
-
-export interface HistoryListParams {
-  limit?: number;
-}
-export interface HistoryListResult {
-  items: ClaudeSession[];
-}
-export interface HistoryImportParams {
-  claudeSessionId: string;
-  name?: string;
-  repo?: string;
-}
-export interface HistoryImportResult {
-  session: Session;
-}
-export interface HistoryRefreshResult {
-  ok: boolean;
-  count: number;
-  sessionCount?: number;
-}
-export interface HistoryIndexResult {
-  ok: boolean;
-  count: number;
-}
-export interface HistorySearchParams {
-  query: string;
-  limit?: number;
-}
-export interface HistorySearchResult {
-  results: SearchResult[];
-}
-export interface HistoryRebuildFtsResult {
-  ok: boolean;
-  sessionCount: number;
-  indexCount: number;
-  items: ClaudeSession[];
-}
-export interface IndexStatsResult {
-  stats: Record<string, unknown>;
 }
 
 // ── Tools ───────────────────────────────────────────────────────────────────

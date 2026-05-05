@@ -1041,25 +1041,6 @@ export type SessionUnreadCountsRequest = z.infer<typeof sessionUnreadCountsReque
 export const sessionUnreadCountsResponse = z.object({ counts: z.record(z.string(), z.number()) });
 export type SessionUnreadCountsResponse = z.infer<typeof sessionUnreadCountsResponse>;
 
-// ── session/conversation ────────────────────────────────────────────────────
-
-const conversationTurnSchema = z
-  .object({
-    role: z.string(),
-    content: z.string(),
-    timestamp: z.string(),
-  })
-  .loose();
-
-export const sessionConversationRequest = z.object({
-  sessionId: z.string().min(1),
-  limit: z.number().optional(),
-});
-export type SessionConversationRequest = z.infer<typeof sessionConversationRequest>;
-
-export const sessionConversationResponse = z.object({ turns: z.array(conversationTurnSchema) }).loose();
-export type SessionConversationResponse = z.infer<typeof sessionConversationResponse>;
-
 // ── message/send ────────────────────────────────────────────────────────────
 
 export const messageSendRequest = z.object({
@@ -1178,95 +1159,6 @@ export const costExportResponse = z
   })
   .loose();
 export type CostExportResponse = z.infer<typeof costExportResponse>;
-
-// ── search/sessions ─────────────────────────────────────────────────────────
-
-const searchResultSchema = z
-  .object({
-    sessionId: z.string(),
-    source: z.enum(["metadata", "event", "message", "transcript"]),
-    match: z.string(),
-    timestamp: z.string().optional(),
-  })
-  .loose();
-
-export const searchSessionsRequest = z.object({
-  query: z.string(),
-  limit: z.number().optional(),
-});
-export type SearchSessionsRequest = z.infer<typeof searchSessionsRequest>;
-
-export const searchSessionsResponse = z
-  .object({
-    sessions: z.array(searchResultSchema),
-    transcripts: z.array(searchResultSchema),
-  })
-  .loose();
-export type SearchSessionsResponse = z.infer<typeof searchSessionsResponse>;
-
-// ── search/global ───────────────────────────────────────────────────────────
-
-const globalSearchResultSchema = z
-  .object({
-    projectPath: z.string(),
-    projectName: z.string(),
-    fileName: z.string(),
-    matchLine: z.string(),
-    lineNumber: z.number(),
-    modifiedAt: z.unknown(),
-  })
-  .loose();
-
-export const searchGlobalRequest = z.object({ query: z.string() });
-export type SearchGlobalRequest = z.infer<typeof searchGlobalRequest>;
-
-// `searchAllConversations` returns a bare array; the handler forwards it verbatim.
-export const searchGlobalResponse = z.array(globalSearchResultSchema);
-export type SearchGlobalResponse = z.infer<typeof searchGlobalResponse>;
-
-// ── history/list ────────────────────────────────────────────────────────────
-
-const claudeSessionSchema = z
-  .object({
-    sessionId: z.string(),
-    project: z.string(),
-    projectDir: z.string(),
-    transcriptPath: z.string(),
-    summary: z.string(),
-    messageCount: z.number(),
-    timestamp: z.string(),
-    lastActivity: z.string(),
-  })
-  .loose();
-
-export const historyListRequest = z.object({ limit: z.number().optional() }).loose();
-export type HistoryListRequest = z.infer<typeof historyListRequest>;
-
-export const historyListResponse = z.object({ items: z.array(claudeSessionSchema) });
-export type HistoryListResponse = z.infer<typeof historyListResponse>;
-
-// ── history/refresh-and-index ───────────────────────────────────────────────
-
-export const historyRefreshAndIndexRequest = z.object({}).loose();
-export type HistoryRefreshAndIndexRequest = z.infer<typeof historyRefreshAndIndexRequest>;
-
-export const historyRefreshAndIndexResponse = z
-  .object({
-    ok: z.boolean(),
-    sessionCount: z.number(),
-    indexCount: z.number(),
-    items: z.array(claudeSessionSchema),
-  })
-  .loose();
-export type HistoryRefreshAndIndexResponse = z.infer<typeof historyRefreshAndIndexResponse>;
-
-// ── history/rebuild-fts ─────────────────────────────────────────────────────
-
-export const historyRebuildFtsRequest = z.object({}).loose();
-export type HistoryRebuildFtsRequest = z.infer<typeof historyRebuildFtsRequest>;
-
-export const historyRebuildFtsResponse = z.object({ ok: z.boolean() }).loose();
-export type HistoryRebuildFtsResponse = z.infer<typeof historyRebuildFtsResponse>;
 
 // ── status/get ──────────────────────────────────────────────────────────────
 
@@ -1815,18 +1707,12 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "session/complete": { request: sessionCompleteRequest, response: sessionCompleteResponse },
   "session/spawn": { request: sessionSpawnRequest, response: sessionSpawnResponse },
   "session/unread-counts": { request: sessionUnreadCountsRequest, response: sessionUnreadCountsResponse },
-  "session/conversation": { request: sessionConversationRequest, response: sessionConversationResponse },
   "message/send": { request: messageSendRequest, response: messageSendResponse },
   "message/markRead": { request: messageMarkReadRequest, response: messageMarkReadResponse },
   "gate/approve": { request: gateApproveRequest, response: gateApproveResponse },
   "gate/reject": { request: gateRejectRequest, response: gateRejectResponse },
   "costs/session": { request: costsSessionRequest, response: costsSessionResponse },
   "cost/export": { request: costExportRequest, response: costExportResponse },
-  "search/sessions": { request: searchSessionsRequest, response: searchSessionsResponse },
-  "search/global": { request: searchGlobalRequest, response: searchGlobalResponse },
-  "history/list": { request: historyListRequest, response: historyListResponse },
-  "history/refresh-and-index": { request: historyRefreshAndIndexRequest, response: historyRefreshAndIndexResponse },
-  "history/rebuild-fts": { request: historyRebuildFtsRequest, response: historyRebuildFtsResponse },
   "status/get": { request: statusGetRequest, response: statusGetResponse },
   "daemon/status": { request: daemonStatusRequest, response: daemonStatusResponse },
   "group/list": { request: groupListRequest, response: groupListResponse },

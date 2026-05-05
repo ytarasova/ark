@@ -4,7 +4,7 @@
  * "Local" means the server has a stable local filesystem, no multi-tenancy,
  * and the process owner is the same user whose `~/.ark` / `~/.claude` trees
  * we're touching. Every capability that depends on filesystem stability
- * (fs / fts-rebuild / host-command) is available here.
+ * (fs / host-command) is available here.
  */
 
 import { readdirSync, existsSync, statSync } from "fs";
@@ -16,8 +16,6 @@ import type { AppContext } from "../app.js";
 import { RpcError } from "../../protocol/types.js";
 import { logDebug } from "../observability/structured-log.js";
 import { buildTenantScope } from "../tenant-scope.js";
-import { listClaudeSessions, refreshClaudeSessionsCache } from "../claude/sessions.js";
-import { indexTranscripts } from "../search/search.js";
 import type {
   AppMode,
   ComputeBootstrapCapability,
@@ -25,7 +23,6 @@ import type {
   FsCapability,
   FsListDirResult,
   FsDirEntry,
-  FtsRebuildCapability,
   HostCommandCapability,
   TenantResolverCapability,
   TenantScopeCapability,
@@ -126,25 +123,6 @@ function makeFsCapability(): FsCapability {
   };
 }
 
-// ── FTS rebuild ─────────────────────────────────────────────────────────────
-
-function makeFtsRebuildCapability(app: AppContext): FtsRebuildCapability {
-  return {
-    async rebuild() {
-      const db = app.db;
-      // claude_sessions_cache + transcript_index index the local user's
-      // `~/.claude` transcripts and are NOT tenant-scoped. Wiping them is
-      // only safe in single-user local mode.
-      await db.prepare("DELETE FROM claude_sessions_cache").run();
-      await db.prepare("DELETE FROM transcript_index").run();
-      const sessionCount = await refreshClaudeSessionsCache(app, {});
-      const indexCount = await indexTranscripts(app, {});
-      const items = await listClaudeSessions(app);
-      return { sessionCount, indexCount, items };
-    },
-  };
-}
-
 // ── Host commands (kill, docker) ───────────────────────────────────────────
 
 function makeHostCommandCapability(): HostCommandCapability {
@@ -215,7 +193,6 @@ function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBoots
  */
 export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): AppMode {
   const fsCapability = makeFsCapability();
-  const ftsRebuildCapability = app ? makeFtsRebuildCapability(app) : null;
   const hostCommandCapability = makeHostCommandCapability();
   // Default to the user's home when no AppContext is available (bare
   // AppMode construction used by a few tests). The first real mutation
@@ -233,7 +210,6 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
   return {
     kind: "local",
     fsCapability,
-    ftsRebuildCapability,
     hostCommandCapability,
     computeBootstrap: makeLocalComputeBootstrap(db.dialect),
     migrations: buildMigrationsCapability(db.dialect),

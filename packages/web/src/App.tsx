@@ -21,7 +21,6 @@ const SessionsPage = lazy(() => import("./pages/SessionsPage.js").then((m) => ({
 const ToolsPage = lazy(() => import("./pages/ToolsPage.js").then((m) => ({ default: m.ToolsPage })));
 const AgentsPage = lazy(() => import("./pages/AgentsPage.js").then((m) => ({ default: m.AgentsPage })));
 const FlowsPage = lazy(() => import("./pages/FlowsPage.js").then((m) => ({ default: m.FlowsPage })));
-const HistoryPage = lazy(() => import("./pages/HistoryPage.js").then((m) => ({ default: m.HistoryPage })));
 const ComputePage = lazy(() => import("./pages/ComputePage.js").then((m) => ({ default: m.ComputePage })));
 const SchedulesPage = lazy(() => import("./pages/SchedulesPage.js").then((m) => ({ default: m.SchedulesPage })));
 const CostsPage = lazy(() => import("./pages/CostsPage.js").then((m) => ({ default: m.CostsPage })));
@@ -163,9 +162,6 @@ function App() {
               initialSelectedId={subId}
               onSelectedChange={setSubId}
             />
-          )}
-          {view === "history" && (
-            <HistoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
           )}
           {view === "compute" && (
             <ComputePage

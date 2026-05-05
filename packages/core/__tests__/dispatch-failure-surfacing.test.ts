@@ -175,7 +175,7 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
         }),
       });
 
-      const { handleReport } = await import("../conductor/report-pipeline.js");
+      const { handleReport } = await import("../conductor/server/report-pipeline.js");
       await handleReport(app, session.id, {
         type: "error",
         sessionId: session.id,
@@ -226,7 +226,7 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
         status: "running",
       });
 
-      const { handleReport } = await import("../conductor/report-pipeline.js");
+      const { handleReport } = await import("../conductor/server/report-pipeline.js");
       await handleReport(app, session.id, {
         type: "error",
         sessionId: session.id,

@@ -15,7 +15,7 @@
  */
 
 import type { DispatchDeps, DispatchResult } from "./types.js";
-import type { StageDefinition } from "../../state/flow.js";
+import type { StageDefinition } from "../flow.js";
 
 export class FanOutDispatcher {
   constructor(

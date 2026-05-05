@@ -26,7 +26,7 @@ import { ModelService } from "../models/ModelService.js";
 import type { UsageRecorder } from "../observability/usage.js";
 import type { TranscriptParserRegistry } from "../runtimes/transcript-parser.js";
 import type { StatusPollerRegistry } from "../executors/status-poller.js";
-import { SessionService, ComputeService, HistoryService } from "../services/index.js";
+import { SessionService, ComputeService } from "../services/index.js";
 import { SessionHooks } from "../services/session-hooks/index.js";
 import { SessionLifecycle } from "../services/session/index.js";
 import { SessionAttachService } from "../services/session/attach.js";
@@ -40,7 +40,7 @@ import { garbageCollectComputeIfTemplate } from "../services/compute-lifecycle.j
 import { capturePlanMdIfPresent } from "../services/plan-artifact.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { provisionWorkspaceWorkdir } from "../workspace/provisioner.js";
-import * as flow from "../state/flow.js";
+import * as flow from "../services/flow.js";
 import { buildTaskWithHandoff, extractSubtasks } from "../services/task-builder.js";
 import * as agentRegistry from "../agent/agent.js";
 import { getExecutor } from "../executor.js";
@@ -78,10 +78,6 @@ export function registerServices(
       (c: { computes: ComputeRepository; app: AppContext }) => new ComputeService(c.computes, c.app),
       { lifetime },
     ),
-
-    historyService: asFunction((c: { db: DatabaseAdapter }) => new HistoryService(c.db), {
-      lifetime,
-    }),
 
     sessionAttach: asFunction((c: { app: AppContext }) => new SessionAttachService(c.app), { lifetime }),
 

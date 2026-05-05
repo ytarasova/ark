@@ -8,7 +8,7 @@
  */
 
 import type { DispatchDeps, DispatchResult } from "../types.js";
-import type { StageDefinition } from "../../../state/flow.js";
+import type { StageDefinition } from "../../flow.js";
 import { logDebug, logWarn } from "../../../observability/structured-log.js";
 
 import { sumPriorIterationCosts } from "./budget.js";

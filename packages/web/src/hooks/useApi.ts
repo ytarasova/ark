@@ -48,8 +48,6 @@ import type {
   SessionSpawnRequest,
   SessionSpawnResponse,
   SessionUnreadCountsResponse,
-  SessionConversationRequest,
-  SessionConversationResponse,
   MessageSendRequest,
   MessageSendResponse,
   MessageMarkReadRequest,
@@ -124,13 +122,6 @@ import type {
   CostsSessionResponse,
   CostExportRequest,
   CostExportResponse,
-  SearchSessionsRequest,
-  SearchSessionsResponse,
-  SearchGlobalRequest,
-  SearchGlobalResponse,
-  HistoryListResponse,
-  HistoryRefreshAndIndexResponse,
-  HistoryRebuildFtsResponse,
   DashboardSummaryRequest,
   DashboardSummaryResponse,
   StatusGetResponse,
@@ -303,20 +294,6 @@ export function makeApi(transport: WebTransport) {
     getSessionCost: (id: string) =>
       rpc<CostsSessionResponse>("costs/session", { sessionId: id } satisfies CostsSessionRequest),
     exportCosts: (format: string) => rpc<CostExportResponse>("cost/export", { format } satisfies CostExportRequest),
-
-    // ── Search ───────────────────────────────────────────────────────────────
-    search: (q: string) => rpc<SearchSessionsResponse>("search/sessions", { query: q } satisfies SearchSessionsRequest),
-    searchGlobal: (q: string) => rpc<SearchGlobalResponse>("search/global", { query: q } satisfies SearchGlobalRequest),
-
-    // ── History (Claude Code transcripts) ────────────────────────────────────
-    getClaudeSessions: () => rpc<HistoryListResponse>("history/list").then((r) => r.items),
-    getConversation: (sessionId: string, limit = 50) =>
-      rpc<SessionConversationResponse>("session/conversation", {
-        sessionId,
-        limit,
-      } satisfies SessionConversationRequest).then((r) => r.turns || []),
-    refreshHistory: () => rpc<HistoryRefreshAndIndexResponse>("history/refresh-and-index"),
-    rebuildHistory: () => rpc<HistoryRebuildFtsResponse>("history/rebuild-fts"),
 
     // ── Dashboard ────────────────────────────────────────────────────────────
     getDashboardSummary: () => rpc<DashboardSummaryResponse>("dashboard/summary", {} satisfies DashboardSummaryRequest),

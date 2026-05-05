@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { getStage, getNextStage, resolveNextStage, validateDAG, type StageDefinition } from "../state/flow.js";
+import { getStage, getNextStage, resolveNextStage, validateDAG, type StageDefinition } from "../services/flow.js";
 import { AppContext } from "../app.js";
 
 let app: AppContext;

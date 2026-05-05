@@ -14,7 +14,7 @@ import YAML from "yaml";
 import { AppContext } from "../app.js";
 import { FileModelStore } from "../stores/model-store.js";
 import { resolveStage } from "../resolution/resolve-stage.js";
-import type { StageDefinition } from "../state/flow.js";
+import type { StageDefinition } from "../services/flow.js";
 import type { Session } from "../../types/index.js";
 
 // Shared helpers

@@ -113,7 +113,7 @@ export function resolveAgent(
 
 // ── Inline agents ───────────────────────────────────────────────────────────
 
-import type { InlineAgentSpec } from "../state/flow.js";
+import type { InlineAgentSpec } from "../services/flow.js";
 
 /**
  * Build an AgentDefinition from an inline spec (e.g. from a stage's `agent:`

@@ -23,7 +23,6 @@ import type { LedgerRepository } from "./repositories/ledger.js";
 import type { StatusPollerRegistry } from "./executors/status-poller.js";
 import type { SessionService } from "./services/session.js";
 import type { ComputeService } from "./services/compute.js";
-import type { HistoryService } from "./services/history.js";
 import type { SessionHooks } from "./services/session-hooks/index.js";
 import type { SessionLifecycle } from "./services/session/index.js";
 import type { DispatchService } from "./services/dispatch/index.js";
@@ -112,7 +111,6 @@ export interface Cradle {
   // Services
   sessionService: SessionService;
   computeService: ComputeService;
-  historyService: HistoryService;
   sessionHooks: SessionHooks;
   sessionLifecycle: SessionLifecycle;
   dispatchService: DispatchService;

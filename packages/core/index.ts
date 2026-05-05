@@ -26,7 +26,7 @@ export type { HookStatusResult, ReportResult } from "./services/session-hooks/in
 export type { SessionOpResult } from "./services/session/types.js";
 
 // Flow
-export * from "./state/flow.js";
+export * from "./services/flow.js";
 
 // Template
 export { substituteVars, buildSessionVars } from "./template.js";
@@ -70,20 +70,6 @@ export * from "./infra/tmux.js";
 // Event bus
 export * from "./hooks.js";
 
-// Search
-export {
-  searchSessions,
-  searchTranscripts,
-  indexTranscripts,
-  indexSession,
-  getIndexStats,
-  getSessionConversation,
-  searchSessionConversation,
-  ftsTableExists,
-  type SearchResult,
-  type SearchOpts,
-} from "./search/search.js";
-
 // GitHub PR utilities (lookup, formatting)
 export { findSessionByPR, formatReviewPrompt, extractComments } from "./integrations/github-pr.js";
 
@@ -101,16 +87,9 @@ export {
 } from "./integrations/issue-poller.js";
 
 // Conductor
-export { startConductor } from "./conductor/conductor.js";
+export { startConductor } from "./conductor/server/conductor.js";
 
 // Claude sessions
-export {
-  listClaudeSessions,
-  getClaudeSession,
-  refreshClaudeSessionsCache,
-  type ClaudeSession,
-} from "./claude/sessions.js";
-
 // Repo-scoped config
 export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 
@@ -158,8 +137,6 @@ export { discoverTools, removeMcpServer, removeCommand, getCommand, addCommand, 
 export { buildReplay, type ReplayStep } from "./session/replay.js";
 
 // Tool drivers
-export type { ToolDriver } from "./tool-driver.js";
-export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
 // Cost helpers -- read from usage_records (written by UsageRecorder)
 export {
@@ -237,22 +214,16 @@ export {
   profileGroupPrefix,
   setProfilesArkDir,
   type Profile,
-} from "./state/profiles.js";
+} from "./services/profile.js";
 
 // Notification daemon
 export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./infra/notify-daemon.js";
-
-// Global search
-export { searchAllConversations, type GlobalSearchResult } from "./search/global-search.js";
 
 // Multi-instance coordination
 export { registerInstance, activeInstanceCount } from "./infra/instance-lock.js";
 
 // Theme
 export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from "./theme.js";
-
-// UI state persistence
-export { loadUiState, saveUiState, type UiState } from "./state/ui-state.js";
 
 // MCP Socket Pool
 export {
@@ -381,7 +352,7 @@ export {
   type GraphFlow,
   type FlowNode,
   type FlowEdge,
-} from "./state/graph-flow.js";
+} from "./services/flow-graph.js";
 
 // Composable termination conditions
 export {
@@ -428,9 +399,6 @@ export {
   type LedgerEntryStatus,
 } from "./repositories/ledger.js";
 
-// Agent Client Protocol (headless JSON-RPC)
-export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } from "./acp.js";
-
 // Types from packages/types -- stricter domain types (aliased to avoid collision with store types)
 export type {
   Session as SessionDomain,
@@ -475,7 +443,7 @@ export {
 } from "./repositories/index.js";
 
 // Services
-export { SessionService, ComputeService, HistoryService } from "./services/index.js";
+export { SessionService, ComputeService } from "./services/index.js";
 
 // Resource stores
 export { type FlowStore, type FlowSummary, FileFlowStore } from "./stores/index.js";

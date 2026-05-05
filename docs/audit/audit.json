@@ -341,7 +341,7 @@
     {
       "method": "agent/create",
       "file": "packages/server/handlers/resource.ts",
-      "line": 44,
+      "line": 41,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -352,7 +352,7 @@
     {
       "method": "agent/delete",
       "file": "packages/server/handlers/resource.ts",
-      "line": 90,
+      "line": 87,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -363,7 +363,7 @@
     {
       "method": "agent/list",
       "file": "packages/server/handlers/resource.ts",
-      "line": 28,
+      "line": 25,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -374,7 +374,7 @@
     {
       "method": "agent/read",
       "file": "packages/server/handlers/resource.ts",
-      "line": 31,
+      "line": 28,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/agent.ts"
@@ -383,7 +383,7 @@
     {
       "method": "agent/update",
       "file": "packages/server/handlers/resource.ts",
-      "line": 77,
+      "line": 74,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -743,7 +743,7 @@
     {
       "method": "config/get",
       "file": "packages/server/handlers/web.ts",
-      "line": 80,
+      "line": 65,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -800,7 +800,7 @@
     {
       "method": "cost/export",
       "file": "packages/server/handlers/web.ts",
-      "line": 88,
+      "line": 73,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -877,7 +877,7 @@
     {
       "method": "daemon/status",
       "file": "packages/server/handlers/web.ts",
-      "line": 50,
+      "line": 48,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -925,7 +925,7 @@
     {
       "method": "flow/create",
       "file": "packages/server/handlers/resource.ts",
-      "line": 118,
+      "line": 115,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/flow.ts",
@@ -936,7 +936,7 @@
     {
       "method": "flow/delete",
       "file": "packages/server/handlers/resource.ts",
-      "line": 144,
+      "line": 141,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/flow.ts",
@@ -947,7 +947,7 @@
     {
       "method": "flow/list",
       "file": "packages/server/handlers/resource.ts",
-      "line": 101,
+      "line": 98,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/flow.ts",
@@ -958,7 +958,7 @@
     {
       "method": "flow/read",
       "file": "packages/server/handlers/resource.ts",
-      "line": 102,
+      "line": 99,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/flow.ts",
@@ -1001,7 +1001,7 @@
     {
       "method": "group/create",
       "file": "packages/server/handlers/resource.ts",
-      "line": 231,
+      "line": 201,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/compute.ts"
@@ -1010,7 +1010,7 @@
     {
       "method": "group/delete",
       "file": "packages/server/handlers/resource.ts",
-      "line": 236,
+      "line": 206,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/compute.ts"
@@ -1019,7 +1019,7 @@
     {
       "method": "group/list",
       "file": "packages/server/handlers/resource.ts",
-      "line": 230,
+      "line": 200,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/compute.ts",
@@ -1028,87 +1028,9 @@
       ]
     },
     {
-      "method": "history/import",
-      "file": "packages/server/handlers/history.ts",
-      "line": 24,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts"
-      ]
-    },
-    {
-      "method": "history/index",
-      "file": "packages/server/handlers/history.ts",
-      "line": 50,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts"
-      ]
-    },
-    {
-      "method": "history/index-stats",
-      "file": "packages/server/handlers/history.ts",
-      "line": 64,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts"
-      ]
-    },
-    {
-      "method": "history/list",
-      "file": "packages/server/handlers/history.ts",
-      "line": 17,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts",
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "history/rebuild-fts",
-      "file": "packages/server/handlers/history-local.ts",
-      "line": 18,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts",
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "history/refresh",
-      "file": "packages/server/handlers/history.ts",
-      "line": 41,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts"
-      ]
-    },
-    {
-      "method": "history/refresh-and-index",
-      "file": "packages/server/handlers/history.ts",
-      "line": 56,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts",
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "history/search",
-      "file": "packages/server/handlers/history.ts",
-      "line": 70,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts"
-      ]
-    },
-    {
       "method": "initialize",
       "file": "packages/server/register.ts",
-      "line": 74,
+      "line": 72,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/client.ts"
@@ -1117,7 +1039,7 @@
     {
       "method": "input/read",
       "file": "packages/server/handlers/session.ts",
-      "line": 81,
+      "line": 78,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1128,7 +1050,7 @@
     {
       "method": "input/upload",
       "file": "packages/server/handlers/session.ts",
-      "line": 70,
+      "line": 67,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1200,7 +1122,7 @@
     {
       "method": "knowledge/ingest",
       "file": "packages/server/handlers/web-local.ts",
-      "line": 48,
+      "line": 30,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1250,7 +1172,7 @@
     {
       "method": "learning/add",
       "file": "packages/server/handlers/web.ts",
-      "line": 110,
+      "line": 95,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1260,45 +1182,7 @@
     {
       "method": "learning/list",
       "file": "packages/server/handlers/web.ts",
-      "line": 98,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "mcp/attach",
-      "file": "packages/server/handlers/tools.ts",
-      "line": 94,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts"
-      ]
-    },
-    {
-      "method": "mcp/attach-by-dir",
-      "file": "packages/server/handlers/web-local.ts",
-      "line": 27,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "mcp/detach",
-      "file": "packages/server/handlers/tools.ts",
-      "line": 102,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/system.ts"
-      ]
-    },
-    {
-      "method": "mcp/detach-by-dir",
-      "file": "packages/server/handlers/web-local.ts",
-      "line": 37,
+      "line": 83,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1394,7 +1278,7 @@
     {
       "method": "model/list",
       "file": "packages/server/handlers/resource.ts",
-      "line": 199,
+      "line": 196,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1404,7 +1288,7 @@
     {
       "method": "openapi/spec",
       "file": "packages/server/handlers/web.ts",
-      "line": 195,
+      "line": 180,
       "hasZodSchema": false,
       "callerFiles": []
     },
@@ -1451,49 +1335,9 @@
       ]
     },
     {
-      "method": "recipe/delete",
-      "file": "packages/server/handlers/resource.ts",
-      "line": 220,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/clients/agent.ts",
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "recipe/list",
-      "file": "packages/server/handlers/resource.ts",
-      "line": 203,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/clients/agent.ts",
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "recipe/read",
-      "file": "packages/server/handlers/resource.ts",
-      "line": 204,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/agent.ts"
-      ]
-    },
-    {
-      "method": "recipe/use",
-      "file": "packages/server/handlers/resource.ts",
-      "line": 211,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/agent.ts"
-      ]
-    },
-    {
       "method": "repo-map/get",
       "file": "packages/server/handlers/web-local.ts",
-      "line": 43,
+      "line": 25,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1512,7 +1356,7 @@
     {
       "method": "runtime/list",
       "file": "packages/server/handlers/resource.ts",
-      "line": 189,
+      "line": 186,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -1523,7 +1367,7 @@
     {
       "method": "runtime/read",
       "file": "packages/server/handlers/resource.ts",
-      "line": 190,
+      "line": 187,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -1582,26 +1426,6 @@
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/system.ts",
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "search/global",
-      "file": "packages/server/handlers/web.ts",
-      "line": 71,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "search/sessions",
-      "file": "packages/server/handlers/web.ts",
-      "line": 64,
-      "hasZodSchema": true,
-      "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
         "packages/web/src/hooks/useApi.ts"
       ]
@@ -1684,7 +1508,7 @@
     {
       "method": "session/advance",
       "file": "packages/server/handlers/session.ts",
-      "line": 108,
+      "line": 105,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1695,7 +1519,7 @@
     {
       "method": "session/archive",
       "file": "packages/server/handlers/session.ts",
-      "line": 554,
+      "line": 530,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1706,21 +1530,21 @@
     {
       "method": "session/artifacts/list",
       "file": "packages/server/handlers/session.ts",
-      "line": 723,
+      "line": 644,
       "hasZodSchema": false,
       "callerFiles": []
     },
     {
       "method": "session/artifacts/query",
       "file": "packages/server/handlers/session.ts",
-      "line": 730,
+      "line": 651,
       "hasZodSchema": false,
       "callerFiles": []
     },
     {
       "method": "session/attach-command",
       "file": "packages/server/handlers/session.ts",
-      "line": 580,
+      "line": 551,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1731,7 +1555,7 @@
     {
       "method": "session/clone",
       "file": "packages/server/handlers/session.ts",
-      "line": 168,
+      "line": 165,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1742,18 +1566,7 @@
     {
       "method": "session/complete",
       "file": "packages/server/handlers/session.ts",
-      "line": 123,
-      "hasZodSchema": true,
-      "callerFiles": [
-        "packages/protocol/clients/session.ts",
-        "packages/protocol/rpc-schemas.ts",
-        "packages/web/src/hooks/useApi.ts"
-      ]
-    },
-    {
-      "method": "session/conversation",
-      "file": "packages/server/handlers/session.ts",
-      "line": 269,
+      "line": 120,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1764,7 +1577,7 @@
     {
       "method": "session/delete",
       "file": "packages/server/handlers/session.ts",
-      "line": 136,
+      "line": 133,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1775,7 +1588,7 @@
     {
       "method": "session/events",
       "file": "packages/server/handlers/session.ts",
-      "line": 248,
+      "line": 245,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1786,7 +1599,7 @@
     {
       "method": "session/export",
       "file": "packages/server/handlers/session.ts",
-      "line": 708,
+      "line": 629,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1795,7 +1608,7 @@
     {
       "method": "session/export-data",
       "file": "packages/server/handlers/web.ts",
-      "line": 187,
+      "line": 172,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1805,7 +1618,7 @@
     {
       "method": "session/fan-out",
       "file": "packages/server/handlers/session.ts",
-      "line": 367,
+      "line": 343,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1814,7 +1627,7 @@
     {
       "method": "session/flowStages",
       "file": "packages/server/handlers/session.ts",
-      "line": 417,
+      "line": 393,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/web/src/hooks/useApi.ts"
@@ -1823,7 +1636,7 @@
     {
       "method": "session/fork",
       "file": "packages/server/handlers/session.ts",
-      "line": 153,
+      "line": 150,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1834,7 +1647,7 @@
     {
       "method": "session/handoff",
       "file": "packages/server/handlers/session.ts",
-      "line": 335,
+      "line": 311,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1843,7 +1656,7 @@
     {
       "method": "session/import",
       "file": "packages/server/handlers/web.ts",
-      "line": 158,
+      "line": 143,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1853,7 +1666,7 @@
     {
       "method": "session/inject",
       "file": "packages/server/handlers/session.ts",
-      "line": 756,
+      "line": 677,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts"
@@ -1862,7 +1675,7 @@
     {
       "method": "session/interrupt",
       "file": "packages/server/handlers/session.ts",
-      "line": 459,
+      "line": 435,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1873,7 +1686,7 @@
     {
       "method": "session/join",
       "file": "packages/server/handlers/session.ts",
-      "line": 344,
+      "line": 320,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1882,7 +1695,7 @@
     {
       "method": "session/kill",
       "file": "packages/server/handlers/session.ts",
-      "line": 501,
+      "line": 477,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts"
@@ -1891,7 +1704,7 @@
     {
       "method": "session/list",
       "file": "packages/server/handlers/session.ts",
-      "line": 193,
+      "line": 190,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1903,7 +1716,7 @@
     {
       "method": "session/list_children",
       "file": "packages/server/handlers/session.ts",
-      "line": 206,
+      "line": 203,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/web/src/hooks/useApi.ts"
@@ -1912,7 +1725,7 @@
     {
       "method": "session/messages",
       "file": "packages/server/handlers/session.ts",
-      "line": 255,
+      "line": 252,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1923,7 +1736,7 @@
     {
       "method": "session/output",
       "file": "packages/server/handlers/session.ts",
-      "line": 283,
+      "line": 259,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1934,7 +1747,7 @@
     {
       "method": "session/pause",
       "file": "packages/server/handlers/session.ts",
-      "line": 432,
+      "line": 408,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1945,7 +1758,7 @@
     {
       "method": "session/read",
       "file": "packages/server/handlers/session.ts",
-      "line": 229,
+      "line": 226,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -1956,7 +1769,7 @@
     {
       "method": "session/recording",
       "file": "packages/server/handlers/session.ts",
-      "line": 327,
+      "line": 303,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -1966,7 +1779,7 @@
     {
       "method": "session/replay",
       "file": "packages/server/handlers/session.ts",
-      "line": 739,
+      "line": 660,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts"
@@ -1975,7 +1788,7 @@
     {
       "method": "session/restore",
       "file": "packages/server/handlers/session.ts",
-      "line": 562,
+      "line": 538,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1986,7 +1799,7 @@
     {
       "method": "session/resume",
       "file": "packages/server/handlers/session.ts",
-      "line": 384,
+      "line": 360,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -1995,27 +1808,9 @@
       ]
     },
     {
-      "method": "session/search",
-      "file": "packages/server/handlers/session.ts",
-      "line": 262,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/session.ts"
-      ]
-    },
-    {
-      "method": "session/search-conversation",
-      "file": "packages/server/handlers/session.ts",
-      "line": 276,
-      "hasZodSchema": false,
-      "callerFiles": [
-        "packages/protocol/clients/session.ts"
-      ]
-    },
-    {
       "method": "session/spawn",
       "file": "packages/server/handlers/session.ts",
-      "line": 351,
+      "line": 327,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2026,7 +1821,7 @@
     {
       "method": "session/start",
       "file": "packages/server/handlers/session.ts",
-      "line": 36,
+      "line": 33,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2037,7 +1832,7 @@
     {
       "method": "session/stdio",
       "file": "packages/server/handlers/session.ts",
-      "line": 296,
+      "line": 272,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -2047,7 +1842,7 @@
     {
       "method": "session/stop",
       "file": "packages/server/handlers/session.ts",
-      "line": 98,
+      "line": 95,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2058,7 +1853,7 @@
     {
       "method": "session/transcript",
       "file": "packages/server/handlers/session.ts",
-      "line": 314,
+      "line": 290,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -2068,7 +1863,7 @@
     {
       "method": "session/tree",
       "file": "packages/server/handlers/session.ts",
-      "line": 213,
+      "line": 210,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/web/src/hooks/useApi.ts"
@@ -2077,7 +1872,7 @@
     {
       "method": "session/undelete",
       "file": "packages/server/handlers/session.ts",
-      "line": 144,
+      "line": 141,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2098,7 +1893,7 @@
     {
       "method": "session/update",
       "file": "packages/server/handlers/session.ts",
-      "line": 180,
+      "line": 177,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/session.ts"
@@ -2107,7 +1902,7 @@
     {
       "method": "skill/delete",
       "file": "packages/server/handlers/resource.ts",
-      "line": 179,
+      "line": 176,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -2118,7 +1913,7 @@
     {
       "method": "skill/list",
       "file": "packages/server/handlers/resource.ts",
-      "line": 154,
+      "line": 151,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -2129,7 +1924,7 @@
     {
       "method": "skill/read",
       "file": "packages/server/handlers/resource.ts",
-      "line": 155,
+      "line": 152,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/agent.ts"
@@ -2138,7 +1933,7 @@
     {
       "method": "skill/save",
       "file": "packages/server/handlers/resource.ts",
-      "line": 164,
+      "line": 161,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/agent.ts",
@@ -2149,7 +1944,7 @@
     {
       "method": "status/get",
       "file": "packages/server/handlers/web.ts",
-      "line": 40,
+      "line": 38,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -2159,7 +1954,7 @@
     {
       "method": "todo/add",
       "file": "packages/server/handlers/session.ts",
-      "line": 679,
+      "line": 600,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2170,7 +1965,7 @@
     {
       "method": "todo/delete",
       "file": "packages/server/handlers/session.ts",
-      "line": 692,
+      "line": 613,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2181,7 +1976,7 @@
     {
       "method": "todo/list",
       "file": "packages/server/handlers/session.ts",
-      "line": 673,
+      "line": 594,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2192,7 +1987,7 @@
     {
       "method": "todo/toggle",
       "file": "packages/server/handlers/session.ts",
-      "line": 685,
+      "line": 606,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2203,7 +1998,7 @@
     {
       "method": "tools/delete",
       "file": "packages/server/handlers/tools.ts",
-      "line": 41,
+      "line": 35,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/system.ts"
@@ -2212,7 +2007,7 @@
     {
       "method": "tools/list",
       "file": "packages/server/handlers/tools.ts",
-      "line": 35,
+      "line": 29,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/system.ts",
@@ -2223,7 +2018,7 @@
     {
       "method": "tools/read",
       "file": "packages/server/handlers/tools.ts",
-      "line": 77,
+      "line": 71,
       "hasZodSchema": false,
       "callerFiles": [
         "packages/protocol/clients/system.ts"
@@ -2301,7 +2096,7 @@
     {
       "method": "verify/run",
       "file": "packages/server/handlers/session.ts",
-      "line": 700,
+      "line": 621,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session-interact.ts",
@@ -2375,7 +2170,7 @@
     {
       "method": "worktree/cleanup",
       "file": "packages/server/handlers/web.ts",
-      "line": 152,
+      "line": 137,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -2385,7 +2180,7 @@
     {
       "method": "worktree/create-pr",
       "file": "packages/server/handlers/session.ts",
-      "line": 646,
+      "line": 567,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2396,7 +2191,7 @@
     {
       "method": "worktree/diff",
       "file": "packages/server/handlers/session.ts",
-      "line": 640,
+      "line": 561,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2407,7 +2202,7 @@
     {
       "method": "worktree/finish",
       "file": "packages/server/handlers/session.ts",
-      "line": 661,
+      "line": 582,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/clients/session.ts",
@@ -2418,7 +2213,7 @@
     {
       "method": "worktree/list",
       "file": "packages/server/handlers/web.ts",
-      "line": 146,
+      "line": 131,
       "hasZodSchema": true,
       "callerFiles": [
         "packages/protocol/rpc-schemas.ts",
@@ -2440,7 +2235,7 @@
         "packages/compute/isolation/docker.ts",
         "packages/compute/providers/arkd-backed.ts",
         "packages/core/claude/channel-delivery.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/services/dispatch/dispatch-hosted.ts",
         "packages/core/services/worktree/pr.ts",
         "packages/server/index.ts"
@@ -2453,7 +2248,7 @@
         "packages/cli/commands/daemon.ts",
         "packages/cli/commands/misc/arkd.ts",
         "packages/cli/services/web-probe.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/executors/claude-agent.ts",
         "packages/core/runtimes/claude-agent/user-message-stream.ts"
       ]
@@ -2633,13 +2428,11 @@
         "packages/cli/commands/db.ts",
         "packages/cli/commands/exec-try.ts",
         "packages/cli/commands/knowledge.ts",
-        "packages/cli/commands/misc/acp.ts",
         "packages/cli/commands/misc/claude.ts",
         "packages/cli/commands/misc/config.ts",
         "packages/cli/commands/misc/pr.ts",
         "packages/cli/commands/misc/watch.ts",
         "packages/cli/commands/misc/web.ts",
-        "packages/cli/commands/recipe.ts",
         "packages/cli/commands/runtime.ts",
         "packages/cli/commands/search.ts",
         "packages/cli/commands/secrets.ts",
@@ -2901,16 +2694,6 @@
       ]
     },
     {
-      "path": "packages/cli/commands/misc/acp.ts",
-      "imports": [
-        "packages/cli/app-client.ts",
-        "packages/core/index.ts"
-      ],
-      "importedBy": [
-        "packages/cli/commands/misc/index.ts"
-      ]
-    },
-    {
       "path": "packages/cli/commands/misc/arkd.ts",
       "imports": [
         "packages/arkd/index.ts",
@@ -2923,7 +2706,7 @@
     {
       "path": "packages/cli/commands/misc/channel.ts",
       "imports": [
-        "packages/core/conductor/channel.ts"
+        "packages/core/conductor/client/channel.ts"
       ],
       "importedBy": [
         "packages/cli/commands/misc/index.ts"
@@ -2960,7 +2743,6 @@
     {
       "path": "packages/cli/commands/misc/index.ts",
       "imports": [
-        "packages/cli/commands/misc/acp.ts",
         "packages/cli/commands/misc/arkd.ts",
         "packages/cli/commands/misc/channel.ts",
         "packages/cli/commands/misc/claude.ts",
@@ -3067,16 +2849,6 @@
       ]
     },
     {
-      "path": "packages/cli/commands/recipe.ts",
-      "imports": [
-        "packages/cli/app-client.ts",
-        "packages/core/index.ts"
-      ],
-      "importedBy": [
-        "packages/cli/index.ts"
-      ]
-    },
-    {
       "path": "packages/cli/commands/router.ts",
       "imports": [
         "packages/core/config.ts",
@@ -3113,9 +2885,7 @@
         "packages/cli/app-client.ts",
         "packages/core/index.ts"
       ],
-      "importedBy": [
-        "packages/cli/index.ts"
-      ]
+      "importedBy": []
     },
     {
       "path": "packages/cli/commands/secrets.ts",
@@ -3228,8 +2998,8 @@
         "packages/cli/app-client.ts",
         "packages/cli/formatters.ts",
         "packages/cli/helpers.ts",
-        "packages/core/config.ts",
         "packages/core/index.ts",
+        "packages/core/services/session/attach.ts",
         "packages/types/index.ts"
       ],
       "importedBy": [
@@ -3378,11 +3148,9 @@
         "packages/cli/commands/memory.ts",
         "packages/cli/commands/misc.ts",
         "packages/cli/commands/profile.ts",
-        "packages/cli/commands/recipe.ts",
         "packages/cli/commands/router.ts",
         "packages/cli/commands/runtime.ts",
         "packages/cli/commands/schedule.ts",
-        "packages/cli/commands/search.ts",
         "packages/cli/commands/secrets.ts",
         "packages/cli/commands/server.ts",
         "packages/cli/commands/session/index.ts",
@@ -3413,8 +3181,7 @@
       "path": "packages/cli/services/session-start.ts",
       "imports": [
         "packages/cli/helpers.ts",
-        "packages/core/app.ts",
-        "packages/core/index.ts"
+        "packages/core/app.ts"
       ],
       "importedBy": [
         "packages/cli/commands/session/start.ts"
@@ -3425,7 +3192,7 @@
       "imports": [
         "packages/arkd/index.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/constants.ts",
         "packages/core/observability/structured-log.ts"
       ],
@@ -3462,7 +3229,7 @@
         "packages/cli/commands/compute/create.ts",
         "packages/cli/commands/compute/lifecycle.ts",
         "packages/core/compute-resolver.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/hosted/scheduler.ts",
         "packages/core/repositories/compute-template.ts",
         "packages/core/repositories/compute.ts",
@@ -3471,9 +3238,9 @@
         "packages/core/services/dispatch-claude-auth.ts",
         "packages/core/services/dispatch/compute-resolve.ts",
         "packages/core/services/dispatch/launch.ts",
+        "packages/core/services/session/attach.ts",
         "packages/server/handlers/metrics.ts",
         "packages/server/handlers/resource-compute.ts",
-        "packages/server/handlers/session.ts",
         "packages/server/index.ts",
         "packages/server/mcp/tools/compute.ts"
       ]
@@ -3512,6 +3279,7 @@
       "imports": [
         "packages/compute/core/types.ts",
         "packages/compute/core/workspace-clone.ts",
+        "packages/compute/providers/ec2/aws-creds.ts",
         "packages/compute/providers/ec2/cloud-init.ts",
         "packages/compute/providers/ec2/constants.ts",
         "packages/compute/providers/ec2/placement-ctx.ts",
@@ -3519,7 +3287,7 @@
         "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/util.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/config/port-allocator.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/secrets/placement-types.ts",
@@ -3637,7 +3405,7 @@
         "packages/compute/core/types.ts",
         "packages/compute/providers/local-placement-ctx.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/arkd-events-consumer.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts"
       ],
       "importedBy": [
         "packages/compute/adapters/legacy.ts",
@@ -3806,7 +3574,7 @@
       "importedBy": [
         "packages/cli/commands/compute/create.ts",
         "packages/cli/commands/compute/view.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/infra/compute-providers-boot.ts",
         "packages/core/infra/metrics-poller.ts",
         "packages/core/services/compute-lifecycle.ts",
@@ -3942,6 +3710,18 @@
       ]
     },
     {
+      "path": "packages/compute/providers/ec2/aws-creds.ts",
+      "imports": [
+        "packages/core/observability/structured-log.ts"
+      ],
+      "importedBy": [
+        "packages/compute/core/ec2.ts",
+        "packages/compute/providers/ec2/provision.ts",
+        "packages/compute/providers/ec2/ssm.ts",
+        "packages/compute/providers/remote-arkd.ts"
+      ]
+    },
+    {
       "path": "packages/compute/providers/ec2/clipboard.ts",
       "imports": [
         "packages/compute/providers/ec2/shell-escape.ts",
@@ -4023,7 +3803,9 @@
     },
     {
       "path": "packages/compute/providers/ec2/provision.ts",
-      "imports": [],
+      "imports": [
+        "packages/compute/providers/ec2/aws-creds.ts"
+      ],
       "importedBy": [
         "packages/compute/core/ec2.ts",
         "packages/compute/flag-specs/ec2.ts",
@@ -4059,6 +3841,7 @@
     {
       "path": "packages/compute/providers/ec2/ssm.ts",
       "imports": [
+        "packages/compute/providers/ec2/aws-creds.ts",
         "packages/compute/providers/ec2/shell-escape.ts",
         "packages/core/observability/structured-log.ts"
       ],
@@ -4152,6 +3935,7 @@
       "path": "packages/compute/providers/remote-arkd.ts",
       "imports": [
         "packages/compute/providers/arkd-backed.ts",
+        "packages/compute/providers/ec2/aws-creds.ts",
         "packages/compute/providers/ec2/cloud-init.ts",
         "packages/compute/providers/ec2/cost.ts",
         "packages/compute/providers/ec2/placement-ctx.ts",
@@ -4162,7 +3946,7 @@
         "packages/compute/providers/ec2/sync.ts",
         "packages/compute/types.ts",
         "packages/compute/util.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/constants.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/safe.ts",
@@ -4210,238 +3994,6 @@
       ]
     },
     {
-      "path": "packages/core/acp.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/services/session-output.ts"
-      ],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/adapters/local/clock.ts",
-      "imports": [
-        "packages/core/ports/clock.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/compute-store.ts",
-      "imports": [
-        "packages/core/ports/compute-store.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/event-bus.ts",
-      "imports": [
-        "packages/core/ports/event-bus.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/event-store.ts",
-      "imports": [
-        "packages/core/database/index.ts",
-        "packages/core/ports/event-store.ts",
-        "packages/core/repositories/event.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/index.ts",
-      "imports": [
-        "packages/core/adapters/local/clock.ts",
-        "packages/core/adapters/local/compute-store.ts",
-        "packages/core/adapters/local/event-bus.ts",
-        "packages/core/adapters/local/event-store.ts",
-        "packages/core/adapters/local/logger.ts",
-        "packages/core/adapters/local/process-runner.ts",
-        "packages/core/adapters/local/secret-store.ts",
-        "packages/core/adapters/local/session-store.ts",
-        "packages/core/adapters/local/tracer.ts",
-        "packages/core/adapters/local/workspace.ts",
-        "packages/core/ports/index.ts"
-      ],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/adapters/local/logger.ts",
-      "imports": [
-        "packages/core/ports/logger.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/process-runner.ts",
-      "imports": [
-        "packages/core/ports/process-runner.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/secret-store.ts",
-      "imports": [
-        "packages/core/ports/secret-store.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/session-store.ts",
-      "imports": [
-        "packages/core/ports/session-store.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/tracer.ts",
-      "imports": [
-        "packages/core/ports/tracer.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/local/workspace.ts",
-      "imports": [
-        "packages/core/ports/workspace.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/clock.ts",
-      "imports": [
-        "packages/core/ports/clock.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/compute-store.ts",
-      "imports": [
-        "packages/core/ports/compute-store.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/event-bus.ts",
-      "imports": [
-        "packages/core/ports/event-bus.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/event-store.ts",
-      "imports": [
-        "packages/core/ports/event-store.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/index.ts",
-      "imports": [
-        "packages/core/adapters/test/clock.ts",
-        "packages/core/adapters/test/compute-store.ts",
-        "packages/core/adapters/test/event-bus.ts",
-        "packages/core/adapters/test/event-store.ts",
-        "packages/core/adapters/test/logger.ts",
-        "packages/core/adapters/test/process-runner.ts",
-        "packages/core/adapters/test/secret-store.ts",
-        "packages/core/adapters/test/session-store.ts",
-        "packages/core/adapters/test/tracer.ts",
-        "packages/core/adapters/test/workspace.ts",
-        "packages/core/ports/index.ts"
-      ],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/adapters/test/logger.ts",
-      "imports": [
-        "packages/core/ports/logger.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/process-runner.ts",
-      "imports": [
-        "packages/core/ports/process-runner.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/secret-store.ts",
-      "imports": [
-        "packages/core/ports/secret-store.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/session-store.ts",
-      "imports": [
-        "packages/core/ports/session-store.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/tracer.ts",
-      "imports": [
-        "packages/core/ports/tracer.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/adapters/test/workspace.ts",
-      "imports": [
-        "packages/core/ports/workspace.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
       "path": "packages/core/agent/agent.ts",
       "imports": [
         "packages/core/app.ts",
@@ -4460,32 +4012,6 @@
         "packages/core/services/task-builder.ts",
         "packages/core/stores/agent-store.ts",
         "packages/server/handlers/scope-helpers.ts"
-      ]
-    },
-    {
-      "path": "packages/core/agent/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/agent/recipe.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/stores/recipe-store.ts",
-        "packages/server/handlers/resource.ts"
-      ]
-    },
-    {
-      "path": "packages/core/agent/skill-extractor.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": [
-        "packages/core/di/services.ts"
       ]
     },
     {
@@ -4509,7 +4035,7 @@
         "packages/core/code-intel/store.ts",
         "packages/core/compute-registries.ts",
         "packages/core/compute-resolver.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/config.ts",
         "packages/core/container.ts",
         "packages/core/database/index.ts",
@@ -4538,6 +4064,7 @@
         "packages/core/services/dispatch/index.ts",
         "packages/core/services/index.ts",
         "packages/core/services/session-hooks/index.ts",
+        "packages/core/services/session/attach.ts",
         "packages/core/services/session/index.ts",
         "packages/core/services/stage-advance/index.ts",
         "packages/core/state/profiles.ts",
@@ -4564,27 +4091,23 @@
         "packages/compute/isolation/docker.ts",
         "packages/compute/providers/arkd-backed.ts",
         "packages/compute/providers/k8s.ts",
-        "packages/core/acp.ts",
         "packages/core/agent/agent.ts",
-        "packages/core/agent/recipe.ts",
-        "packages/core/agent/skill-extractor.ts",
-        "packages/core/claude/sessions.ts",
         "packages/core/code-intel/deployment.ts",
         "packages/core/code-intel/store.ts",
         "packages/core/compute-resolver.ts",
         "packages/core/compute/pool.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/llm-proxy.ts",
-        "packages/core/conductor/pollers.ts",
-        "packages/core/conductor/pr-merge-webhook.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/rest-api-handler.ts",
-        "packages/core/conductor/tenant-policy-handlers.ts",
-        "packages/core/conductor/tenant.ts",
-        "packages/core/conductor/worker-handlers.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/llm-proxy.ts",
+        "packages/core/conductor/server/pollers.ts",
+        "packages/core/conductor/server/pr-merge-webhook.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
+        "packages/core/conductor/server/tenant-policy-handlers.ts",
+        "packages/core/conductor/server/tenant.ts",
+        "packages/core/conductor/server/worker-handlers.ts",
         "packages/core/config/clusters.ts",
         "packages/core/connectors/resolve.ts",
         "packages/core/connectors/types.ts",
@@ -4625,7 +4148,6 @@
         "packages/core/observability/log-manager.ts",
         "packages/core/resolution/resolve-stage.ts",
         "packages/core/schedule.ts",
-        "packages/core/search/search.ts",
         "packages/core/secrets/placement.ts",
         "packages/core/services/actions/index.ts",
         "packages/core/services/actions/types.ts",
@@ -4643,6 +4165,7 @@
         "packages/core/services/session-output.ts",
         "packages/core/services/session-snapshot.ts",
         "packages/core/services/session.ts",
+        "packages/core/services/session/attach.ts",
         "packages/core/services/session/cleanup.ts",
         "packages/core/services/subagents.ts",
         "packages/core/services/task-builder.ts",
@@ -4657,7 +4180,6 @@
         "packages/core/tools.ts",
         "packages/core/triggers/dispatcher.ts",
         "packages/core/workspace/provisioner.ts",
-        "packages/core/worktree-merge.ts",
         "packages/server/handlers/admin-apikey.ts",
         "packages/server/handlers/admin-policy.ts",
         "packages/server/handlers/admin.ts",
@@ -4670,8 +4192,6 @@
         "packages/server/handlers/dashboard.ts",
         "packages/server/handlers/eval.ts",
         "packages/server/handlers/fs.ts",
-        "packages/server/handlers/history-local.ts",
-        "packages/server/handlers/history.ts",
         "packages/server/handlers/integrations.ts",
         "packages/server/handlers/knowledge-local.ts",
         "packages/server/handlers/knowledge-rpc.ts",
@@ -4840,15 +4360,8 @@
         "packages/core/executors/goose.ts",
         "packages/core/infra/boot-cleanup.ts",
         "packages/core/services/session/terminate.ts",
-        "packages/core/services/worktree/setup.ts",
-        "packages/core/tools/claude-driver.ts",
-        "packages/core/tools/gemini-driver.ts"
+        "packages/core/services/worktree/setup.ts"
       ]
-    },
-    {
-      "path": "packages/core/claude/index.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/core/claude/launcher.ts",
@@ -4879,16 +4392,6 @@
       "imports": [],
       "importedBy": [
         "packages/core/claude/settings.ts"
-      ]
-    },
-    {
-      "path": "packages/core/claude/sessions.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": [
-        "packages/core/modes/local-app-mode.ts"
       ]
     },
     {
@@ -5014,11 +4517,6 @@
       "importedBy": []
     },
     {
-      "path": "packages/core/code-intel/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
       "path": "packages/core/code-intel/interfaces/deployment.ts",
       "imports": [
         "packages/core/code-intel/interfaces/executor.ts",
@@ -5113,7 +4611,6 @@
         "packages/core/code-intel/interfaces/ranker.ts",
         "packages/core/code-intel/policy/allow-all.ts",
         "packages/core/code-intel/queries/get-context.ts",
-        "packages/core/code-intel/queries/index.ts",
         "packages/core/code-intel/queries/search.ts"
       ]
     },
@@ -5249,18 +4746,8 @@
         "packages/core/code-intel/store.ts"
       ],
       "importedBy": [
-        "packages/core/code-intel/queries/index.ts",
         "packages/server/handlers/code-intel.ts"
       ]
-    },
-    {
-      "path": "packages/core/code-intel/queries/index.ts",
-      "imports": [
-        "packages/core/code-intel/interfaces/query.ts",
-        "packages/core/code-intel/queries/get-context.ts",
-        "packages/core/code-intel/queries/search.ts"
-      ],
-      "importedBy": []
     },
     {
       "path": "packages/core/code-intel/queries/search.ts",
@@ -5268,7 +4755,6 @@
         "packages/core/code-intel/interfaces/query.ts"
       ],
       "importedBy": [
-        "packages/core/code-intel/queries/index.ts",
         "packages/server/handlers/code-intel.ts"
       ]
     },
@@ -5687,11 +5173,6 @@
       ]
     },
     {
-      "path": "packages/core/compute/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
       "path": "packages/core/compute/pool.ts",
       "imports": [
         "packages/core/app.ts",
@@ -5704,14 +5185,38 @@
       ]
     },
     {
-      "path": "packages/core/conductor/arkd-events-consumer.ts",
+      "path": "packages/core/conductor/client/channel.ts",
+      "imports": [
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/constants.ts",
+        "packages/core/observability/structured-log.ts"
+      ],
+      "importedBy": [
+        "packages/cli/commands/misc/channel.ts"
+      ]
+    },
+    {
+      "path": "packages/core/conductor/common/channel-types.ts",
+      "imports": [],
+      "importedBy": [
+        "packages/core/conductor/client/channel.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/services/session-hooks/index.ts",
+        "packages/core/services/session-hooks/report.ts"
+      ]
+    },
+    {
+      "path": "packages/core/conductor/server/arkd-events-consumer.ts",
       "imports": [
         "packages/arkd/index.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/observability/structured-log.ts",
         "packages/types/index.ts"
       ],
@@ -5723,44 +5228,20 @@
       ]
     },
     {
-      "path": "packages/core/conductor/channel-types.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/channel.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/services/session-hooks/index.ts",
-        "packages/core/services/session-hooks/report.ts"
-      ]
-    },
-    {
-      "path": "packages/core/conductor/channel.ts",
-      "imports": [
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/constants.ts",
-        "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": [
-        "packages/cli/commands/misc/channel.ts"
-      ]
-    },
-    {
-      "path": "packages/core/conductor/conductor.ts",
+      "path": "packages/core/conductor/server/conductor.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/llm-proxy.ts",
-        "packages/core/conductor/pollers.ts",
-        "packages/core/conductor/pr-merge-webhook.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/rest-api-handler.ts",
-        "packages/core/conductor/tenant-policy-handlers.ts",
-        "packages/core/conductor/tenant.ts",
-        "packages/core/conductor/worker-handlers.ts",
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/llm-proxy.ts",
+        "packages/core/conductor/server/pollers.ts",
+        "packages/core/conductor/server/pr-merge-webhook.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
+        "packages/core/conductor/server/tenant-policy-handlers.ts",
+        "packages/core/conductor/server/tenant.ts",
+        "packages/core/conductor/server/worker-handlers.ts",
         "packages/core/constants.ts",
         "packages/core/observability/structured-log.ts",
         "packages/types/index.ts"
@@ -5773,7 +5254,7 @@
       ]
     },
     {
-      "path": "packages/core/conductor/deliver-to-channel.ts",
+      "path": "packages/core/conductor/server/deliver-to-channel.ts",
       "imports": [
         "packages/arkd/client.ts",
         "packages/compute/adapters/provider-map.ts",
@@ -5784,47 +5265,40 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/hook-status-handler.ts",
+      "path": "packages/core/conductor/server/hook-status-handler.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/tenant.ts",
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/tenant.ts",
         "packages/core/hooks.ts",
         "packages/core/knowledge/evals.ts",
         "packages/core/observability/otlp.ts",
         "packages/core/observability/structured-log.ts",
-        "packages/core/safe.ts",
-        "packages/core/search/search.ts",
         "packages/core/services/session/cleanup.ts",
         "packages/core/session/guardrails.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/conductor/llm-proxy.ts",
+      "path": "packages/core/conductor/server/llm-proxy.ts",
       "imports": [
         "packages/core/app.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/pollers.ts",
+      "path": "packages/core/conductor/server/pollers.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/integrations/issue-poller.ts",
@@ -5834,25 +5308,25 @@
         "packages/core/schedule.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/pr-merge-webhook.ts",
+      "path": "packages/core/conductor/server/pr-merge-webhook.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/integrations/rollback.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/report-pipeline.ts",
+      "path": "packages/core/conductor/server/report-pipeline.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
+        "packages/core/conductor/common/channel-types.ts",
         "packages/core/hooks.ts",
         "packages/core/knowledge/indexer.ts",
         "packages/core/notify.ts",
@@ -5863,52 +5337,52 @@
         "packages/core/services/worktree/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/hook-status-handler.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/hook-status-handler.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/rest-api-handler.ts",
+      "path": "packages/core/conductor/server/rest-api-handler.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/tenant.ts",
+        "packages/core/conductor/server/tenant.ts",
         "packages/core/hooks.ts",
         "packages/core/services/session-forensic.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/tenant-policy-handlers.ts",
+      "path": "packages/core/conductor/server/tenant-policy-handlers.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/tenant.ts",
+      "path": "packages/core/conductor/server/tenant.ts",
       "imports": [
         "packages/core/app.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/rest-api-handler.ts"
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/rest-api-handler.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/worker-handlers.ts",
+      "path": "packages/core/conductor/server/worker-handlers.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
@@ -5927,7 +5401,6 @@
         "packages/cli/commands/router.ts",
         "packages/cli/commands/server-daemon.ts",
         "packages/cli/commands/server.ts",
-        "packages/cli/commands/session/view.ts",
         "packages/cli/commands/token.ts",
         "packages/cli/commands/workspace.ts",
         "packages/core/app.ts",
@@ -6127,9 +5600,9 @@
         "packages/compute/providers/remote-arkd.ts",
         "packages/core/claude/channel-delivery.ts",
         "packages/core/claude/mcp-config.ts",
-        "packages/core/conductor/channel.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/client/channel.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/config.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/goose.ts",
@@ -6184,7 +5657,6 @@
         "packages/core/runtimes/transcript-parser.ts",
         "packages/core/services/compute.ts",
         "packages/core/services/dispatch/index.ts",
-        "packages/core/services/history.ts",
         "packages/core/services/session-hooks/index.ts",
         "packages/core/services/session.ts",
         "packages/core/services/session/index.ts",
@@ -6193,7 +5665,6 @@
         "packages/core/stores/agent-store.ts",
         "packages/core/stores/flow-store.ts",
         "packages/core/stores/model-store.ts",
-        "packages/core/stores/recipe-store.ts",
         "packages/core/stores/runtime-store.ts",
         "packages/core/stores/skill-store.ts",
         "packages/core/tickets/registry.ts"
@@ -6215,7 +5686,6 @@
       "path": "packages/core/database/index.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/adapters/local/event-store.ts",
         "packages/core/app.ts",
         "packages/core/auth/api-keys.ts",
         "packages/core/auth/teams.ts",
@@ -6262,6 +5732,8 @@
         "packages/core/migrations/011_session_orchestrator_sqlite.ts",
         "packages/core/migrations/012_isolation_kind_rename_postgres.ts",
         "packages/core/migrations/012_isolation_kind_rename_sqlite.ts",
+        "packages/core/migrations/013_eval_session_type_postgres.ts",
+        "packages/core/migrations/013_eval_session_type_sqlite.ts",
         "packages/core/migrations/runner.ts",
         "packages/core/migrations/types.ts",
         "packages/core/modes/migrations-capability.ts",
@@ -6282,7 +5754,6 @@
         "packages/core/repositories/tenants.ts",
         "packages/core/repositories/todo.ts",
         "packages/core/repositories/users.ts",
-        "packages/core/services/history.ts",
         "packages/core/services/idempotency.ts",
         "packages/core/services/stage-advance/types.ts",
         "packages/core/stores/db-resource-store.ts",
@@ -6434,7 +5905,6 @@
       "path": "packages/core/di/services.ts",
       "imports": [
         "packages/core/agent/agent.ts",
-        "packages/core/agent/skill-extractor.ts",
         "packages/core/app.ts",
         "packages/core/config.ts",
         "packages/core/container.ts",
@@ -6442,7 +5912,6 @@
         "packages/core/executor.ts",
         "packages/core/executors/status-poller.ts",
         "packages/core/models/ModelService.ts",
-        "packages/core/observability/structured-log.ts",
         "packages/core/observability/usage.ts",
         "packages/core/plugins/registry.ts",
         "packages/core/repositories/compute.ts",
@@ -6452,7 +5921,6 @@
         "packages/core/repositories/session.ts",
         "packages/core/repositories/todo.ts",
         "packages/core/runtimes/transcript-parser.ts",
-        "packages/core/search/search.ts",
         "packages/core/services/actions/index.ts",
         "packages/core/services/compute-lifecycle.ts",
         "packages/core/services/compute.ts",
@@ -6464,6 +5932,7 @@
         "packages/core/services/plan-artifact.ts",
         "packages/core/services/session-hooks/index.ts",
         "packages/core/services/session-output.ts",
+        "packages/core/services/session/attach.ts",
         "packages/core/services/session/index.ts",
         "packages/core/services/stage-advance/index.ts",
         "packages/core/services/task-builder.ts",
@@ -6543,11 +6012,6 @@
       "importedBy": [
         "packages/core/app.ts"
       ]
-    },
-    {
-      "path": "packages/core/drizzle/schema/index.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/core/drizzle/schema/postgres.ts",
@@ -6767,9 +6231,9 @@
       "imports": [],
       "importedBy": [
         "packages/core/app.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/rest-api-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
         "packages/core/hosted/web.ts",
         "packages/core/infra/service-wiring.ts",
         "packages/core/integrations/rollback.ts"
@@ -6888,22 +6352,18 @@
       "importedBy": [
         "packages/cli/commands/costs.ts",
         "packages/cli/commands/exec-try.ts",
-        "packages/cli/commands/misc/acp.ts",
         "packages/cli/commands/misc/mcp-proxy.ts",
         "packages/cli/commands/misc/openapi.ts",
         "packages/cli/commands/misc/pr.ts",
         "packages/cli/commands/misc/repo-map.ts",
         "packages/cli/commands/misc/web.ts",
-        "packages/cli/commands/recipe.ts",
         "packages/cli/commands/search.ts",
         "packages/cli/commands/server.ts",
         "packages/cli/commands/session/export-import.ts",
         "packages/cli/commands/session/start.ts",
         "packages/cli/commands/session/view.ts",
         "packages/cli/index.ts",
-        "packages/cli/services/session-start.ts",
         "packages/server/handlers/config.ts",
-        "packages/server/handlers/history.ts",
         "packages/server/handlers/schedule.ts",
         "packages/server/handlers/tools.ts"
       ]
@@ -6960,7 +6420,7 @@
       "path": "packages/core/infra/conductor-launcher.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/config.ts",
         "packages/core/safe.ts"
       ],
@@ -6968,11 +6428,6 @@
         "packages/core/container.ts",
         "packages/core/di/runtime.ts"
       ]
-    },
-    {
-      "path": "packages/core/infra/index.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/core/infra/instance-lock.ts",
@@ -7113,11 +6568,11 @@
         "packages/core/infra/tmux-notify.ts",
         "packages/core/prereqs.ts",
         "packages/core/send-reliable.ts",
+        "packages/core/services/session/attach.ts",
         "packages/core/services/session/suspend.ts",
         "packages/core/services/session/terminate.ts",
         "packages/core/session/checkpoint.ts",
-        "packages/server/handlers/resource-compute.ts",
-        "packages/server/handlers/session.ts"
+        "packages/server/handlers/resource-compute.ts"
       ]
     },
     {
@@ -7161,7 +6616,7 @@
       "path": "packages/core/integrations/github-pr.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/constants.ts",
         "packages/core/safe.ts",
         "packages/core/util.ts",
@@ -7182,11 +6637,6 @@
       ]
     },
     {
-      "path": "packages/core/integrations/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
       "path": "packages/core/integrations/issue-poller.ts",
       "imports": [
         "packages/core/app.ts",
@@ -7195,7 +6645,7 @@
       ],
       "importedBy": [
         "packages/cli/commands/misc/watch.ts",
-        "packages/core/conductor/pollers.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
@@ -7206,14 +6656,14 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pollers.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
       "path": "packages/core/integrations/pr-poller.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/constants.ts",
         "packages/core/integrations/github-pr.ts",
         "packages/core/observability/structured-log.ts",
@@ -7223,7 +6673,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pollers.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
@@ -7245,7 +6695,7 @@
         "packages/core/hooks.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pr-merge-webhook.ts"
+        "packages/core/conductor/server/pr-merge-webhook.ts"
       ]
     },
     {
@@ -7259,11 +6709,6 @@
         "packages/core/executors/goose.ts",
         "packages/server/handlers/knowledge.ts"
       ]
-    },
-    {
-      "path": "packages/core/knowledge/codegraph-shim.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/core/knowledge/context.ts",
@@ -7282,7 +6727,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
         "packages/server/handlers/eval.ts"
       ]
     },
@@ -7309,7 +6754,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/modes/local-app-mode.ts",
         "packages/core/services/dispatch-context.ts"
       ]
@@ -7736,6 +7181,35 @@
       ]
     },
     {
+      "path": "packages/core/migrations/013_eval_session_type.ts",
+      "imports": [
+        "packages/core/migrations/013_eval_session_type_postgres.ts",
+        "packages/core/migrations/013_eval_session_type_sqlite.ts",
+        "packages/core/migrations/types.ts"
+      ],
+      "importedBy": [
+        "packages/core/migrations/registry.ts"
+      ]
+    },
+    {
+      "path": "packages/core/migrations/013_eval_session_type_postgres.ts",
+      "imports": [
+        "packages/core/database/index.ts"
+      ],
+      "importedBy": [
+        "packages/core/migrations/013_eval_session_type.ts"
+      ]
+    },
+    {
+      "path": "packages/core/migrations/013_eval_session_type_sqlite.ts",
+      "imports": [
+        "packages/core/database/index.ts"
+      ],
+      "importedBy": [
+        "packages/core/migrations/013_eval_session_type.ts"
+      ]
+    },
+    {
       "path": "packages/core/migrations/index.ts",
       "imports": [],
       "importedBy": [
@@ -7757,6 +7231,7 @@
         "packages/core/migrations/010_stage_operations.ts",
         "packages/core/migrations/011_session_orchestrator.ts",
         "packages/core/migrations/012_isolation_kind_rename.ts",
+        "packages/core/migrations/013_eval_session_type.ts",
         "packages/core/migrations/types.ts"
       ],
       "importedBy": [
@@ -7793,6 +7268,7 @@
         "packages/core/migrations/010_stage_operations.ts",
         "packages/core/migrations/011_session_orchestrator.ts",
         "packages/core/migrations/012_isolation_kind_rename.ts",
+        "packages/core/migrations/013_eval_session_type.ts",
         "packages/core/migrations/registry.ts",
         "packages/core/migrations/runner.ts"
       ]
@@ -7872,7 +7348,6 @@
       "path": "packages/core/modes/local-app-mode.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/claude/sessions.ts",
         "packages/core/knowledge/export.ts",
         "packages/core/knowledge/indexer.ts",
         "packages/core/modes/app-mode.ts",
@@ -7881,12 +7356,10 @@
         "packages/core/repo-map.ts",
         "packages/core/repositories/schema-postgres.ts",
         "packages/core/repositories/schema.ts",
-        "packages/core/search/search.ts",
         "packages/core/secrets/aws-provider.ts",
         "packages/core/secrets/file-provider.ts",
         "packages/core/secrets/types.ts",
         "packages/core/tenant-scope.ts",
-        "packages/core/tools.ts",
         "packages/protocol/types.ts"
       ],
       "importedBy": [
@@ -7911,7 +7384,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/executors/status-poller.ts"
       ]
     },
@@ -7941,11 +7414,6 @@
       ]
     },
     {
-      "path": "packages/core/observability/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
       "path": "packages/core/observability/log-manager.ts",
       "imports": [
         "packages/core/app.ts",
@@ -7961,7 +7429,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
         "packages/core/infra/service-wiring.ts",
         "packages/core/services/session/create.ts",
         "packages/core/services/session/terminate.ts",
@@ -8010,6 +7478,7 @@
         "packages/compute/isolation/docker.ts",
         "packages/compute/providers/docker/compose.ts",
         "packages/compute/providers/docker/helpers.ts",
+        "packages/compute/providers/ec2/aws-creds.ts",
         "packages/compute/providers/ec2/clipboard.ts",
         "packages/compute/providers/ec2/placement-ctx.ts",
         "packages/compute/providers/ec2/pool.ts",
@@ -8017,7 +7486,6 @@
         "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/providers/k8s.ts",
         "packages/compute/providers/remote-arkd.ts",
-        "packages/core/agent/skill-extractor.ts",
         "packages/core/app.ts",
         "packages/core/auth/teams.ts",
         "packages/core/auth/tenant-claude-auth.ts",
@@ -8026,22 +7494,20 @@
         "packages/core/auth/users.ts",
         "packages/core/claude/channel-delivery.ts",
         "packages/core/claude/mcp-config.ts",
-        "packages/core/claude/sessions.ts",
         "packages/core/claude/settings.ts",
         "packages/core/code-intel/observability/stderr.ts",
         "packages/core/compute/pool.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/channel.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/pr-merge-webhook.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/tenant-policy-handlers.ts",
-        "packages/core/conductor/worker-handlers.ts",
+        "packages/core/conductor/client/channel.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/pr-merge-webhook.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/tenant-policy-handlers.ts",
+        "packages/core/conductor/server/worker-handlers.ts",
         "packages/core/di/runtime.ts",
         "packages/core/di/seed-builtins.ts",
-        "packages/core/di/services.ts",
         "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/cli-agent.ts",
@@ -8105,8 +7571,6 @@
         "packages/core/runtimes/codex/parser.ts",
         "packages/core/runtimes/gemini/parser.ts",
         "packages/core/safe.ts",
-        "packages/core/search/global-search.ts",
-        "packages/core/search/search.ts",
         "packages/core/secrets/noop-placement-ctx.ts",
         "packages/core/secrets/placement.ts",
         "packages/core/secrets/placer-helpers.ts",
@@ -8152,7 +7616,6 @@
         "packages/core/triggers/dispatcher.ts",
         "packages/core/triggers/store.ts",
         "packages/core/workspace/provisioner.ts",
-        "packages/core/worktree-merge.ts",
         "packages/protocol/transport.ts",
         "packages/server/handlers/knowledge.ts",
         "packages/server/handlers/resource-compute.ts",
@@ -8213,102 +7676,6 @@
       ]
     },
     {
-      "path": "packages/core/ports/clock.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/adapters/local/clock.ts",
-        "packages/core/adapters/test/clock.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/compute-store.ts",
-      "imports": [
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/compute-store.ts",
-        "packages/core/adapters/test/compute-store.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/event-bus.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/adapters/local/event-bus.ts",
-        "packages/core/adapters/test/event-bus.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/event-store.ts",
-      "imports": [
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/event-store.ts",
-        "packages/core/adapters/test/event-store.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/index.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/adapters/local/index.ts",
-        "packages/core/adapters/test/index.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/logger.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/adapters/local/logger.ts",
-        "packages/core/adapters/test/logger.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/process-runner.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/adapters/local/process-runner.ts",
-        "packages/core/adapters/test/process-runner.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/secret-store.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/adapters/local/secret-store.ts",
-        "packages/core/adapters/test/secret-store.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/session-store.ts",
-      "imports": [
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/session-store.ts",
-        "packages/core/adapters/test/session-store.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/tracer.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/adapters/local/tracer.ts",
-        "packages/core/adapters/test/tracer.ts"
-      ]
-    },
-    {
-      "path": "packages/core/ports/workspace.ts",
-      "imports": [
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/adapters/local/workspace.ts",
-        "packages/core/adapters/test/workspace.ts"
-      ]
-    },
-    {
       "path": "packages/core/prereqs.ts",
       "imports": [
         "packages/core/infra/tmux.ts"
@@ -8337,7 +7704,7 @@
       "path": "packages/core/repo-config.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/services/session-hooks/handoff.ts",
         "packages/core/services/session/create.ts",
         "packages/core/services/session/review.ts",
@@ -8410,7 +7777,6 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/adapters/local/event-store.ts",
         "packages/core/container.ts",
         "packages/core/di/services.ts",
         "packages/core/services/dispatch/types.ts",
@@ -8511,13 +7877,6 @@
       ]
     },
     {
-      "path": "packages/core/repositories/secrets.ts",
-      "imports": [
-        "packages/core/secrets/types.ts"
-      ],
-      "importedBy": []
-    },
-    {
       "path": "packages/core/repositories/session.ts",
       "imports": [
         "packages/core/database/index.ts",
@@ -8608,11 +7967,6 @@
       "importedBy": [
         "packages/core/auth/users.ts"
       ]
-    },
-    {
-      "path": "packages/core/resolution/index.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/core/resolution/resolve-stage.ts",
@@ -8773,9 +8127,8 @@
         "packages/compute/providers/ec2/sync.ts",
         "packages/compute/providers/local-arkd.ts",
         "packages/compute/providers/remote-arkd.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/pollers.ts",
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/pollers.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/infra/arkd-launcher.ts",
         "packages/core/infra/boot-cleanup.ts",
         "packages/core/infra/compute-providers-boot.ts",
@@ -8803,35 +8156,7 @@
         "packages/core/util/time.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pollers.ts"
-      ]
-    },
-    {
-      "path": "packages/core/search/global-search.ts",
-      "imports": [
-        "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": [
-        "packages/server/handlers/web.ts"
-      ]
-    },
-    {
-      "path": "packages/core/search/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/search/search.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/di/services.ts",
-        "packages/core/modes/local-app-mode.ts",
-        "packages/server/handlers/session.ts",
-        "packages/server/handlers/web.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
@@ -8959,7 +8284,6 @@
         "packages/core/modes/app-mode.ts",
         "packages/core/modes/hosted-app-mode.ts",
         "packages/core/modes/local-app-mode.ts",
-        "packages/core/repositories/secrets.ts",
         "packages/core/secrets/aws-provider.ts",
         "packages/core/secrets/blob.ts",
         "packages/core/secrets/file-provider.ts",
@@ -9413,7 +8737,8 @@
       ],
       "importedBy": [
         "packages/core/executors/claude-agent.ts",
-        "packages/core/executors/claude-code.ts"
+        "packages/core/executors/claude-code.ts",
+        "packages/core/services/worktree/pr.ts"
       ]
     },
     {
@@ -9492,15 +8817,6 @@
       ]
     },
     {
-      "path": "packages/core/services/history.ts",
-      "imports": [
-        "packages/core/database/index.ts"
-      ],
-      "importedBy": [
-        "packages/core/container.ts"
-      ]
-    },
-    {
       "path": "packages/core/services/idempotency.ts",
       "imports": [
         "packages/core/database/index.ts",
@@ -9567,7 +8883,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/services/fork-join.ts",
         "packages/core/services/session-hooks/handoff.ts",
         "packages/core/services/session.ts",
@@ -9578,7 +8894,7 @@
       "path": "packages/core/services/session-forensic.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/conductor/rest-api-handler.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
         "packages/server/handlers/session.ts"
       ]
     },
@@ -9611,7 +8927,7 @@
     {
       "path": "packages/core/services/session-hooks/index.ts",
       "imports": [
-        "packages/core/conductor/channel-types.ts",
+        "packages/core/conductor/common/channel-types.ts",
         "packages/core/services/session-hooks/handoff.ts",
         "packages/core/services/session-hooks/hook-status.ts",
         "packages/core/services/session-hooks/report.ts",
@@ -9627,7 +8943,7 @@
     {
       "path": "packages/core/services/session-hooks/report.ts",
       "imports": [
-        "packages/core/conductor/channel-types.ts",
+        "packages/core/conductor/common/channel-types.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/services/session-hooks/types.ts"
       ],
@@ -9668,7 +8984,6 @@
         "packages/core/session/prompt-guard.ts"
       ],
       "importedBy": [
-        "packages/core/acp.ts",
         "packages/core/di/services.ts",
         "packages/core/services/session.ts"
       ]
@@ -9708,6 +9023,20 @@
       ]
     },
     {
+      "path": "packages/core/services/session/attach.ts",
+      "imports": [
+        "packages/compute/adapters/provider-map.ts",
+        "packages/core/app.ts",
+        "packages/core/infra/tmux.ts",
+        "packages/types/index.ts"
+      ],
+      "importedBy": [
+        "packages/cli/commands/session/view.ts",
+        "packages/core/app.ts",
+        "packages/core/di/services.ts"
+      ]
+    },
+    {
       "path": "packages/core/services/session/cleanup.ts",
       "imports": [
         "packages/core/app.ts",
@@ -9716,7 +9045,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
         "packages/server/handlers/session.ts",
         "packages/server/mcp/tools/session.ts"
       ]
@@ -9926,11 +9255,6 @@
       ]
     },
     {
-      "path": "packages/core/services/stage-orchestrator.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
       "path": "packages/core/services/subagents.ts",
       "imports": [
         "packages/core/app.ts",
@@ -9976,7 +9300,7 @@
       "imports": [],
       "importedBy": [
         "packages/cli/commands/worktree.ts",
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/di/services.ts",
         "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts",
@@ -9998,6 +9322,7 @@
         "packages/core/compute-resolver.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/repo-config.ts",
+        "packages/core/services/dispatch/target-resolver.ts",
         "packages/core/services/github/rest.ts",
         "packages/core/services/worktree/git-ops.ts",
         "packages/types/index.ts"
@@ -10040,13 +9365,8 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts"
+        "packages/core/conductor/server/hook-status-handler.ts"
       ]
-    },
-    {
-      "path": "packages/core/session/index.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/core/session/prompt-guard.ts",
@@ -10124,11 +9444,6 @@
       "importedBy": [
         "packages/core/services/stage-advance/advance.ts"
       ]
-    },
-    {
-      "path": "packages/core/state/index.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/core/state/profiles.ts",
@@ -10236,15 +9551,6 @@
         "packages/core/di/services.ts",
         "packages/core/models/ModelService.ts",
         "packages/core/models/resolver.ts"
-      ]
-    },
-    {
-      "path": "packages/core/stores/recipe-store.ts",
-      "imports": [
-        "packages/core/agent/recipe.ts"
-      ],
-      "importedBy": [
-        "packages/core/container.ts"
       ]
     },
     {
@@ -10607,50 +9913,10 @@
       ]
     },
     {
-      "path": "packages/core/tool-driver.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/tools/claude-driver.ts",
-        "packages/core/tools/gemini-driver.ts",
-        "packages/core/tools/registry.ts"
-      ]
-    },
-    {
       "path": "packages/core/tools.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": [
-        "packages/core/modes/local-app-mode.ts"
-      ]
-    },
-    {
-      "path": "packages/core/tools/claude-driver.ts",
-      "imports": [
-        "packages/core/claude/claude.ts",
-        "packages/core/tool-driver.ts"
-      ],
-      "importedBy": [
-        "packages/core/tools/registry.ts"
-      ]
-    },
-    {
-      "path": "packages/core/tools/gemini-driver.ts",
-      "imports": [
-        "packages/core/claude/claude.ts",
-        "packages/core/tool-driver.ts"
-      ],
-      "importedBy": [
-        "packages/core/tools/registry.ts"
-      ]
-    },
-    {
-      "path": "packages/core/tools/registry.ts",
-      "imports": [
-        "packages/core/tool-driver.ts",
-        "packages/core/tools/claude-driver.ts",
-        "packages/core/tools/gemini-driver.ts"
       ],
       "importedBy": []
     },
@@ -10928,15 +10194,6 @@
       ]
     },
     {
-      "path": "packages/core/worktree-merge.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/observability/structured-log.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": []
-    },
-    {
       "path": "packages/protocol/client.ts",
       "imports": [
         "packages/protocol/clients/admin-team.ts",
@@ -11124,7 +10381,9 @@
     {
       "path": "packages/protocol/index.ts",
       "imports": [],
-      "importedBy": []
+      "importedBy": [
+        "packages/web/src/components/session/tabs/TerminalTab.tsx"
+      ]
     },
     {
       "path": "packages/protocol/rpc-schemas.ts",
@@ -11585,30 +10844,6 @@
       ]
     },
     {
-      "path": "packages/server/handlers/history-local.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/server/router.ts"
-      ],
-      "importedBy": [
-        "packages/server/register.ts"
-      ]
-    },
-    {
-      "path": "packages/server/handlers/history.ts",
-      "imports": [
-        "packages/core/app.ts",
-        "packages/core/index.ts",
-        "packages/server/handlers/scope-helpers.ts",
-        "packages/server/router.ts",
-        "packages/server/validate.ts",
-        "packages/types/index.ts"
-      ],
-      "importedBy": [
-        "packages/server/register.ts"
-      ]
-    },
-    {
       "path": "packages/server/handlers/integrations.ts",
       "imports": [
         "packages/core/app.ts",
@@ -11745,7 +10980,6 @@
     {
       "path": "packages/server/handlers/resource.ts",
       "imports": [
-        "packages/core/agent/recipe.ts",
         "packages/core/app.ts",
         "packages/protocol/types.ts",
         "packages/server/handlers/resource-compute.ts",
@@ -11784,7 +11018,6 @@
         "packages/server/handlers/code-intel.ts",
         "packages/server/handlers/conductor.ts",
         "packages/server/handlers/costs.ts",
-        "packages/server/handlers/history.ts",
         "packages/server/handlers/knowledge-rpc.ts",
         "packages/server/handlers/messaging.ts",
         "packages/server/handlers/resource-crud.ts",
@@ -11812,12 +11045,9 @@
     {
       "path": "packages/server/handlers/session.ts",
       "imports": [
-        "packages/compute/adapters/provider-map.ts",
         "packages/core/app.ts",
         "packages/core/executor.ts",
-        "packages/core/infra/tmux.ts",
         "packages/core/recordings.ts",
-        "packages/core/search/search.ts",
         "packages/core/services/session-forensic.ts",
         "packages/core/services/session-snapshot.ts",
         "packages/core/services/session/cleanup.ts",
@@ -11898,8 +11128,6 @@
         "packages/core/knowledge/types.ts",
         "packages/core/observability/costs.ts",
         "packages/core/openapi.ts",
-        "packages/core/search/global-search.ts",
-        "packages/core/search/search.ts",
         "packages/core/services/worktree/index.ts",
         "packages/core/session/share.ts",
         "packages/core/state/profiles.ts",
@@ -11962,7 +11190,6 @@
         "packages/server/mcp/tools/agent.ts",
         "packages/server/mcp/tools/compute.ts",
         "packages/server/mcp/tools/flow.ts",
-        "packages/server/mcp/tools/recipe.ts",
         "packages/server/mcp/tools/secrets.ts",
         "packages/server/mcp/tools/session.ts",
         "packages/server/mcp/tools/skill.ts"
@@ -11982,7 +11209,6 @@
         "packages/server/mcp/tools/agent.ts",
         "packages/server/mcp/tools/compute.ts",
         "packages/server/mcp/tools/flow.ts",
-        "packages/server/mcp/tools/recipe.ts",
         "packages/server/mcp/tools/secrets.ts",
         "packages/server/mcp/tools/session.ts",
         "packages/server/mcp/tools/skill.ts",
@@ -12025,16 +11251,6 @@
     },
     {
       "path": "packages/server/mcp/tools/flow.ts",
-      "imports": [
-        "packages/server/mcp/registry.ts",
-        "packages/server/mcp/transport.ts"
-      ],
-      "importedBy": [
-        "packages/server/mcp/index.ts"
-      ]
-    },
-    {
-      "path": "packages/server/mcp/tools/recipe.ts",
       "imports": [
         "packages/server/mcp/registry.ts",
         "packages/server/mcp/transport.ts"
@@ -12088,7 +11304,6 @@
         "packages/server/mcp/tools/agent.ts",
         "packages/server/mcp/tools/compute.ts",
         "packages/server/mcp/tools/flow.ts",
-        "packages/server/mcp/tools/recipe.ts",
         "packages/server/mcp/tools/secrets.ts",
         "packages/server/mcp/tools/session.ts",
         "packages/server/mcp/tools/skill.ts"
@@ -12111,8 +11326,6 @@
         "packages/server/handlers/dashboard.ts",
         "packages/server/handlers/eval.ts",
         "packages/server/handlers/fs.ts",
-        "packages/server/handlers/history-local.ts",
-        "packages/server/handlers/history.ts",
         "packages/server/handlers/integrations.ts",
         "packages/server/handlers/knowledge-local.ts",
         "packages/server/handlers/knowledge-rpc.ts",
@@ -12161,8 +11374,6 @@
         "packages/server/handlers/dashboard.ts",
         "packages/server/handlers/eval.ts",
         "packages/server/handlers/fs.ts",
-        "packages/server/handlers/history-local.ts",
-        "packages/server/handlers/history.ts",
         "packages/server/handlers/integrations.ts",
         "packages/server/handlers/knowledge-local.ts",
         "packages/server/handlers/knowledge-rpc.ts",
@@ -12203,7 +11414,6 @@
         "packages/server/handlers/config.ts",
         "packages/server/handlers/connectors.ts",
         "packages/server/handlers/eval.ts",
-        "packages/server/handlers/history.ts",
         "packages/server/handlers/knowledge-local.ts",
         "packages/server/handlers/knowledge-rpc.ts",
         "packages/server/handlers/knowledge.ts",
@@ -12286,24 +11496,15 @@
         "packages/cli/commands/compute/template.ts",
         "packages/cli/commands/session/view.ts",
         "packages/compute/types.ts",
-        "packages/core/adapters/local/compute-store.ts",
-        "packages/core/adapters/local/event-store.ts",
-        "packages/core/adapters/local/session-store.ts",
-        "packages/core/adapters/local/workspace.ts",
-        "packages/core/adapters/test/compute-store.ts",
-        "packages/core/adapters/test/event-store.ts",
-        "packages/core/adapters/test/session-store.ts",
-        "packages/core/adapters/test/workspace.ts",
-        "packages/core/agent/recipe.ts",
         "packages/core/app.ts",
         "packages/core/auth/api-keys.ts",
         "packages/core/auth/context.ts",
         "packages/core/auth/middleware.ts",
         "packages/core/compute-resolver.ts",
         "packages/core/compute/pool.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/connectors/resolve.ts",
         "packages/core/executors/resolve.ts",
         "packages/core/hosted/scheduler.ts",
@@ -12315,10 +11516,6 @@
         "packages/core/integrations/pr-poller.ts",
         "packages/core/knowledge/evals.ts",
         "packages/core/observability/costs.ts",
-        "packages/core/ports/compute-store.ts",
-        "packages/core/ports/event-store.ts",
-        "packages/core/ports/session-store.ts",
-        "packages/core/ports/workspace.ts",
         "packages/core/repositories/artifact.ts",
         "packages/core/repositories/compute-template.ts",
         "packages/core/repositories/compute.ts",
@@ -12347,6 +11544,7 @@
         "packages/core/services/session-hooks/index.ts",
         "packages/core/services/session-hooks/types.ts",
         "packages/core/services/session.ts",
+        "packages/core/services/session/attach.ts",
         "packages/core/services/session/cleanup.ts",
         "packages/core/services/session/create.ts",
         "packages/core/services/session/index.ts",
@@ -12365,7 +11563,6 @@
         "packages/core/stores/runtime-store.ts",
         "packages/core/termination.ts",
         "packages/core/workspace/provisioner.ts",
-        "packages/core/worktree-merge.ts",
         "packages/protocol/clients/agent.ts",
         "packages/protocol/clients/compute.ts",
         "packages/protocol/clients/flow.ts",
@@ -12376,7 +11573,6 @@
         "packages/protocol/clients/system.ts",
         "packages/server/handlers/admin-apikey.ts",
         "packages/server/handlers/config.ts",
-        "packages/server/handlers/history.ts",
         "packages/server/handlers/memory.ts",
         "packages/server/handlers/messaging.ts",
         "packages/server/handlers/metrics.ts",
@@ -12462,7 +11658,6 @@
         "packages/web/src/pages/CostsPage.tsx",
         "packages/web/src/pages/DesignPreviewPage.tsx",
         "packages/web/src/pages/FlowsPage.tsx",
-        "packages/web/src/pages/HistoryPage.tsx",
         "packages/web/src/pages/IntegrationsPage.tsx",
         "packages/web/src/pages/LoginPage.tsx",
         "packages/web/src/pages/MemoryPage.tsx",
@@ -12513,7 +11708,6 @@
         "packages/web/src/components/compute/ComputeDetailPanel.tsx",
         "packages/web/src/components/compute/NewComputeForm.tsx",
         "packages/web/src/components/compute/helpers.ts",
-        "packages/web/src/components/compute/types.ts",
         "packages/web/src/components/ui/ListRow.tsx",
         "packages/web/src/components/ui/badge.tsx",
         "packages/web/src/hooks/useApi.ts",
@@ -12586,19 +11780,6 @@
       ]
     },
     {
-      "path": "packages/web/src/components/HistoryView.tsx",
-      "imports": [
-        "packages/web/src/components/history/HistoryList.tsx",
-        "packages/web/src/components/history/detail/SessionDetail.tsx",
-        "packages/web/src/components/history/detail/TranscriptDetail.tsx",
-        "packages/web/src/components/history/useHistorySearch.ts",
-        "packages/web/src/hooks/useHistoryQueries.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/pages/HistoryPage.tsx"
-      ]
-    },
-    {
       "path": "packages/web/src/components/Layout.tsx",
       "imports": [
         "packages/web/src/components/ui/IconRail.tsx",
@@ -12610,7 +11791,6 @@
         "packages/web/src/pages/ComputePage.tsx",
         "packages/web/src/pages/CostsPage.tsx",
         "packages/web/src/pages/FlowsPage.tsx",
-        "packages/web/src/pages/HistoryPage.tsx",
         "packages/web/src/pages/IntegrationsPage.tsx",
         "packages/web/src/pages/MemoryPage.tsx",
         "packages/web/src/pages/SchedulesPage.tsx",
@@ -12666,7 +11846,6 @@
         "packages/web/src/pages/ComputePage.tsx",
         "packages/web/src/pages/CostsPage.tsx",
         "packages/web/src/pages/FlowsPage.tsx",
-        "packages/web/src/pages/HistoryPage.tsx",
         "packages/web/src/pages/IntegrationsPage.tsx",
         "packages/web/src/pages/MemoryPage.tsx",
         "packages/web/src/pages/SchedulesPage.tsx",
@@ -12784,10 +11963,7 @@
       "imports": [
         "packages/web/src/lib/utils.ts"
       ],
-      "importedBy": [
-        "packages/web/src/components/history/HistoryList.tsx",
-        "packages/web/src/components/history/detail/SessionDetail.tsx"
-      ]
+      "importedBy": []
     },
     {
       "path": "packages/web/src/components/Toast.tsx",
@@ -12815,7 +11991,6 @@
       "path": "packages/web/src/components/admin/TeamsTab.tsx",
       "imports": [
         "packages/web/src/components/admin/adminApi.ts",
-        "packages/web/src/components/admin/types.ts",
         "packages/web/src/components/ui/button.tsx"
       ],
       "importedBy": [
@@ -12826,7 +12001,6 @@
       "path": "packages/web/src/components/admin/TenantsTab.tsx",
       "imports": [
         "packages/web/src/components/admin/adminApi.ts",
-        "packages/web/src/components/admin/types.ts",
         "packages/web/src/components/ui/button.tsx"
       ],
       "importedBy": [
@@ -12837,7 +12011,6 @@
       "path": "packages/web/src/components/admin/UsersTab.tsx",
       "imports": [
         "packages/web/src/components/admin/adminApi.ts",
-        "packages/web/src/components/admin/types.ts",
         "packages/web/src/components/ui/button.tsx"
       ],
       "importedBy": [
@@ -12847,7 +12020,6 @@
     {
       "path": "packages/web/src/components/admin/adminApi.ts",
       "imports": [
-        "packages/web/src/components/admin/types.ts",
         "packages/web/src/transport/TransportContext.tsx",
         "packages/web/src/transport/types.ts"
       ],
@@ -12855,16 +12027,6 @@
         "packages/web/src/components/admin/TeamsTab.tsx",
         "packages/web/src/components/admin/TenantsTab.tsx",
         "packages/web/src/components/admin/UsersTab.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/components/admin/types.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/web/src/components/admin/TeamsTab.tsx",
-        "packages/web/src/components/admin/TenantsTab.tsx",
-        "packages/web/src/components/admin/UsersTab.tsx",
-        "packages/web/src/components/admin/adminApi.ts"
       ]
     },
     {
@@ -12926,7 +12088,6 @@
         "packages/web/src/components/compute/MetricSparkline.tsx",
         "packages/web/src/components/compute/MetricsSkeleton.tsx",
         "packages/web/src/components/compute/helpers.ts",
-        "packages/web/src/components/compute/types.ts",
         "packages/web/src/components/ui/badge.tsx",
         "packages/web/src/components/ui/card.tsx",
         "packages/web/src/hooks/useApi.ts",
@@ -12940,7 +12101,6 @@
       "path": "packages/web/src/components/compute/ComputeDrawer.tsx",
       "imports": [
         "packages/web/src/components/compute/helpers.ts",
-        "packages/web/src/components/compute/types.ts",
         "packages/web/src/components/ui/badge.tsx",
         "packages/web/src/components/ui/button.tsx",
         "packages/web/src/hooks/useApi.ts",
@@ -12963,7 +12123,6 @@
     {
       "path": "packages/web/src/components/compute/MetricSparkline.tsx",
       "imports": [
-        "packages/web/src/components/compute/types.ts",
         "packages/web/src/components/ui/chart.tsx"
       ],
       "importedBy": [
@@ -13001,17 +12160,6 @@
         "packages/web/src/components/compute/ComputeDetailPanel.tsx",
         "packages/web/src/components/compute/ComputeDrawer.tsx",
         "packages/web/src/components/compute/MetricBar.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/components/compute/types.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/web/src/components/ComputeView.tsx",
-        "packages/web/src/components/compute/ComputeDetailPanel.tsx",
-        "packages/web/src/components/compute/ComputeDrawer.tsx",
-        "packages/web/src/components/compute/MetricSparkline.tsx",
-        "packages/web/src/hooks/useComputeQueries.ts"
       ]
     },
     {
@@ -13063,11 +12211,6 @@
       ]
     },
     {
-      "path": "packages/web/src/components/flow-editor/index.ts",
-      "imports": [],
-      "importedBy": []
-    },
-    {
       "path": "packages/web/src/components/flows/FlowForm.tsx",
       "imports": [
         "packages/web/src/components/ui/RichSelect.tsx",
@@ -13095,65 +12238,6 @@
       ],
       "importedBy": [
         "packages/web/src/components/FlowsView.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/components/history/HistoryList.tsx",
-      "imports": [
-        "packages/web/src/components/StatusDot.tsx",
-        "packages/web/src/components/history/useHistorySearch.ts",
-        "packages/web/src/components/ui/badge.tsx",
-        "packages/web/src/components/ui/input.tsx",
-        "packages/web/src/lib/utils.ts",
-        "packages/web/src/util.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/components/HistoryView.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/components/history/TranscriptMessages.tsx",
-      "imports": [
-        "packages/web/src/hooks/useApi.ts",
-        "packages/web/src/lib/utils.ts",
-        "packages/web/src/util.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/components/history/detail/TranscriptDetail.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/components/history/detail/SessionDetail.tsx",
-      "imports": [
-        "packages/web/src/components/StatusDot.tsx",
-        "packages/web/src/components/ui/badge.tsx",
-        "packages/web/src/components/ui/button.tsx",
-        "packages/web/src/util.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/components/HistoryView.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/components/history/detail/TranscriptDetail.tsx",
-      "imports": [
-        "packages/web/src/components/history/TranscriptMessages.tsx",
-        "packages/web/src/components/ui/badge.tsx",
-        "packages/web/src/components/ui/button.tsx",
-        "packages/web/src/util.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/components/HistoryView.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/components/history/useHistorySearch.ts",
-      "imports": [
-        "packages/web/src/hooks/useApi.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/components/HistoryView.tsx",
-        "packages/web/src/components/history/HistoryList.tsx"
       ]
     },
     {
@@ -13335,11 +12419,6 @@
       "importedBy": [
         "packages/web/src/components/pipeline/PipelineViewer.tsx"
       ]
-    },
-    {
-      "path": "packages/web/src/components/pipeline/index.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/web/src/components/pipeline/layout.ts",
@@ -13729,9 +12808,11 @@
     {
       "path": "packages/web/src/components/session/tabs/TerminalTab.tsx",
       "imports": [
+        "packages/protocol/index.ts",
         "packages/web/src/components/StaticTerminal.tsx",
         "packages/web/src/components/session/CopyAttachCommandButton.tsx",
-        "packages/web/src/components/session/LiveTerminalPanel.tsx"
+        "packages/web/src/components/session/LiveTerminalPanel.tsx",
+        "packages/web/src/hooks/useApi.ts"
       ],
       "importedBy": [
         "packages/web/src/components/session/TabPanels.tsx"
@@ -14176,9 +13257,6 @@
         "packages/web/src/components/compute/ComputeDetailPanel.tsx",
         "packages/web/src/components/compute/ComputeDrawer.tsx",
         "packages/web/src/components/flows/FlowStageList.tsx",
-        "packages/web/src/components/history/HistoryList.tsx",
-        "packages/web/src/components/history/detail/SessionDetail.tsx",
-        "packages/web/src/components/history/detail/TranscriptDetail.tsx",
         "packages/web/src/components/session/ForEachRollup.tsx",
         "packages/web/src/pages/IntegrationsPage.tsx"
       ]
@@ -14206,8 +13284,6 @@
         "packages/web/src/components/compute/ComputeDrawer.tsx",
         "packages/web/src/components/compute/NewComputeForm.tsx",
         "packages/web/src/components/flows/FlowForm.tsx",
-        "packages/web/src/components/history/detail/SessionDetail.tsx",
-        "packages/web/src/components/history/detail/TranscriptDetail.tsx",
         "packages/web/src/components/mode/hosted-file-input-add-editor.tsx",
         "packages/web/src/components/mode/local-file-input-add-editor.tsx",
         "packages/web/src/components/secrets/NewSecretForm.tsx",
@@ -14273,7 +13349,6 @@
         "packages/web/src/components/agents/AgentForm.tsx",
         "packages/web/src/components/compute/NewComputeForm.tsx",
         "packages/web/src/components/flows/FlowForm.tsx",
-        "packages/web/src/components/history/HistoryList.tsx",
         "packages/web/src/components/secrets/NewSecretForm.tsx",
         "packages/web/src/pages/IntegrationsPage.tsx",
         "packages/web/src/pages/LoginPage.tsx"
@@ -14370,21 +13445,19 @@
         "packages/web/src/components/compute/ComputeDetailPanel.tsx",
         "packages/web/src/components/compute/ComputeDrawer.tsx",
         "packages/web/src/components/compute/NewComputeForm.tsx",
-        "packages/web/src/components/history/TranscriptMessages.tsx",
-        "packages/web/src/components/history/useHistorySearch.ts",
         "packages/web/src/components/session/CopyAttachCommandButton.tsx",
         "packages/web/src/components/session/FlowTreePanel.tsx",
         "packages/web/src/components/session/InputsSection.tsx",
         "packages/web/src/components/session/RestartDialog.tsx",
         "packages/web/src/components/session/SdkTranscriptPanel.tsx",
         "packages/web/src/components/session/tabs/LogsTab.tsx",
+        "packages/web/src/components/session/tabs/TerminalTab.tsx",
         "packages/web/src/hooks/useAgentQueries.ts",
         "packages/web/src/hooks/useComputeQueries.ts",
         "packages/web/src/hooks/useCostQueries.ts",
         "packages/web/src/hooks/useDaemonStatus.ts",
         "packages/web/src/hooks/useDashboardQuery.ts",
         "packages/web/src/hooks/useFlowQueries.ts",
-        "packages/web/src/hooks/useHistoryQueries.ts",
         "packages/web/src/hooks/useIntegrationQueries.ts",
         "packages/web/src/hooks/useMemoryQueries.ts",
         "packages/web/src/hooks/useMessages.ts",
@@ -14406,7 +13479,6 @@
     {
       "path": "packages/web/src/hooks/useComputeQueries.ts",
       "imports": [
-        "packages/web/src/components/compute/types.ts",
         "packages/web/src/hooks/useApi.ts"
       ],
       "importedBy": [
@@ -14439,7 +13511,6 @@
         "packages/web/src/pages/ComputePage.tsx",
         "packages/web/src/pages/CostsPage.tsx",
         "packages/web/src/pages/FlowsPage.tsx",
-        "packages/web/src/pages/HistoryPage.tsx",
         "packages/web/src/pages/IntegrationsPage.tsx",
         "packages/web/src/pages/MemoryPage.tsx",
         "packages/web/src/pages/SchedulesPage.tsx",
@@ -14480,15 +13551,6 @@
       "imports": [],
       "importedBy": [
         "packages/web/src/App.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/hooks/useHistoryQueries.ts",
-      "imports": [
-        "packages/web/src/hooks/useApi.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/components/HistoryView.tsx"
       ]
     },
     {
@@ -14540,11 +13602,6 @@
       "importedBy": [
         "packages/web/src/components/session/new/RichTaskInput.tsx"
       ]
-    },
-    {
-      "path": "packages/web/src/hooks/useQueries.ts",
-      "imports": [],
-      "importedBy": []
     },
     {
       "path": "packages/web/src/hooks/useRuntimeQueries.ts",
@@ -14706,8 +13763,6 @@
         "packages/web/src/components/compute/ComputeDrawer.tsx",
         "packages/web/src/components/compute/MetricBar.tsx",
         "packages/web/src/components/compute/NewComputeForm.tsx",
-        "packages/web/src/components/history/HistoryList.tsx",
-        "packages/web/src/components/history/TranscriptMessages.tsx",
         "packages/web/src/components/mode/file-input-row-shell.tsx",
         "packages/web/src/components/mode/hosted-file-input-add-editor.tsx",
         "packages/web/src/components/mode/hosted-file-input-row.tsx",
@@ -14780,7 +13835,6 @@
         "packages/web/src/components/ui/textarea.tsx",
         "packages/web/src/components/ui/toggle.tsx",
         "packages/web/src/components/ui/tooltip.tsx",
-        "packages/web/src/pages/HistoryPage.tsx",
         "packages/web/src/pages/ToolsPage.tsx"
       ]
     },
@@ -14859,19 +13913,6 @@
         "packages/web/src/components/PageShell.tsx",
         "packages/web/src/components/ui/button.tsx",
         "packages/web/src/hooks/useDaemonStatus.ts"
-      ],
-      "importedBy": [
-        "packages/web/src/App.tsx"
-      ]
-    },
-    {
-      "path": "packages/web/src/pages/HistoryPage.tsx",
-      "imports": [
-        "packages/web/src/components/HistoryView.tsx",
-        "packages/web/src/components/Layout.tsx",
-        "packages/web/src/components/PageShell.tsx",
-        "packages/web/src/hooks/useDaemonStatus.ts",
-        "packages/web/src/lib/utils.ts"
       ],
       "importedBy": [
         "packages/web/src/App.tsx"
@@ -15109,10 +14150,6 @@
         "packages/web/src/components/SessionDetail.tsx",
         "packages/web/src/components/SessionList.tsx",
         "packages/web/src/components/SessionRowWithChildren.tsx",
-        "packages/web/src/components/history/HistoryList.tsx",
-        "packages/web/src/components/history/TranscriptMessages.tsx",
-        "packages/web/src/components/history/detail/SessionDetail.tsx",
-        "packages/web/src/components/history/detail/TranscriptDetail.tsx",
         "packages/web/src/components/mode/repo-picker-shell.tsx",
         "packages/web/src/components/session/BudgetBar.tsx",
         "packages/web/src/components/session/FlowTreePanel.tsx",
@@ -15758,7 +14795,11 @@
       ],
       "writers": [],
       "readers": [],
-      "migrationHistory": []
+      "migrationHistory": [
+        "packages/core/migrations/013_eval_session_type.ts",
+        "packages/core/migrations/013_eval_session_type_postgres.ts",
+        "packages/core/migrations/013_eval_session_type_sqlite.ts"
+      ]
     },
     {
       "name": "knowledge_edges",
@@ -16431,7 +15472,8 @@
         "packages/core/migrations/007_tenant_claude_auth.ts",
         "packages/core/migrations/011_session_orchestrator.ts",
         "packages/core/migrations/011_session_orchestrator_postgres.ts",
-        "packages/core/migrations/011_session_orchestrator_sqlite.ts"
+        "packages/core/migrations/011_session_orchestrator_sqlite.ts",
+        "packages/core/migrations/013_eval_session_type.ts"
       ]
     },
     {

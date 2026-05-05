@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { ForEachDispatcher } from "../services/dispatch/dispatch-foreach.js";
-import type { StageDefinition } from "../state/flow.js";
+import type { StageDefinition } from "../services/flow.js";
 import { buildSessionVars } from "../template.js";
 
 let app: AppContext;

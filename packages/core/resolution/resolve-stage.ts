@@ -26,7 +26,7 @@ import type { AppContext } from "../app.js";
 import type { Session } from "../../types/index.js";
 import type { AgentDefinition, RuntimeDefinition } from "../../types/agent.js";
 import type { ModelDefinition } from "../../types/model.js";
-import type { StageDefinition, InlineAgentSpec } from "../state/flow.js";
+import type { StageDefinition, InlineAgentSpec } from "../services/flow.js";
 
 // ── Inline types ────────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ export type InlineModelSpec = Omit<ModelDefinition, "_source" | "_path">;
 
 /**
  * Inline agent definition accepted on `stage.agent`. Extends the existing
- * `InlineAgentSpec` shape from state/flow.ts with support for inline runtime
+ * `InlineAgentSpec` shape from services/flow.ts with support for inline runtime
  * and inline model objects. Uses the same "name OR object" convention.
  */
 export interface ExtendedInlineAgentSpec extends Omit<InlineAgentSpec, "runtime" | "model"> {

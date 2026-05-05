@@ -11,8 +11,6 @@ import type {
   Event,
   Message,
   SessionOpResult,
-  ConversationTurn,
-  SearchResult,
   SessionStartResult,
   SessionListParams,
   SessionListResult,
@@ -20,9 +18,6 @@ import type {
   SessionUpdateResult,
   SessionEventsResult,
   SessionMessagesResult,
-  SessionSearchResult,
-  SessionConversationResult,
-  SessionSearchConversationResult,
   SessionForkResult,
   SessionCloneResult,
 } from "../../types/index.js";
@@ -131,24 +126,6 @@ export class SessionClient {
   async sessionMessages(sessionId: string, limit?: number): Promise<Message[]> {
     const { messages } = await this.rpc<SessionMessagesResult>("session/messages", { sessionId, limit });
     return messages;
-  }
-
-  async sessionSearch(query: string): Promise<SearchResult[]> {
-    const { results } = await this.rpc<SessionSearchResult>("session/search", { query });
-    return results;
-  }
-
-  async sessionConversation(sessionId: string, limit?: number): Promise<ConversationTurn[]> {
-    const { turns } = await this.rpc<SessionConversationResult>("session/conversation", { sessionId, limit });
-    return turns;
-  }
-
-  async sessionSearchConversation(sessionId: string, query: string): Promise<SearchResult[]> {
-    const { results } = await this.rpc<SessionSearchConversationResult>("session/search-conversation", {
-      sessionId,
-      query,
-    });
-    return results;
   }
 
   // ── Worktree ────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@
 import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import type { FlowDefinition } from "../state/flow.js";
+import type { FlowDefinition } from "../services/flow.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

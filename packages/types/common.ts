@@ -7,19 +7,6 @@ export interface Profile {
   createdAt: string;
 }
 
-// ── Claude session history ────────────────────────────────────────────────────
-
-export interface ClaudeSession {
-  sessionId: string;
-  project: string;
-  projectDir: string;
-  transcriptPath: string;
-  summary: string;
-  messageCount: number;
-  timestamp: string;
-  lastActivity: string;
-}
-
 // ── Tool entry ────────────────────────────────────────────────────────────────
 
 export interface ToolEntry {
@@ -75,21 +62,6 @@ export interface SessionCost {
   model: string | null;
   usage: TokenUsage | null;
   cost: number;
-}
-
-// ── Conversation ──────────────────────────────────────────────────────────────
-
-export interface ConversationTurn {
-  role: string;
-  content: string;
-  timestamp: string;
-}
-
-export interface SearchResult {
-  sessionId: string;
-  source: "metadata" | "event" | "message" | "transcript";
-  match: string;
-  timestamp?: string;
 }
 
 export interface SessionOpResult {

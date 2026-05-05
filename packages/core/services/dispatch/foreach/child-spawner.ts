@@ -14,7 +14,7 @@
  */
 
 import type { DispatchDeps } from "../types.js";
-import type { FlowDefinition, InlineFlowSpec } from "../../../state/flow.js";
+import type { FlowDefinition, InlineFlowSpec } from "../../flow.js";
 
 /** Milliseconds between polls when waiting for a child session to finish. */
 const CHILD_POLL_INTERVAL_MS = 250;

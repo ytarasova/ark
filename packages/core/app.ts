@@ -36,7 +36,7 @@ import type { SnapshotStore } from "../compute/core/snapshot-store.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
-import { setProfilesArkDir } from "./state/profiles.js";
+import { setProfilesArkDir } from "./services/profile.js";
 import type {
   SessionRepository,
   ComputeRepository,
@@ -49,7 +49,7 @@ import type {
   LedgerRepository,
 } from "./repositories/index.js";
 import { ComputeTemplateRepository as ComputeTemplateRepositoryCtor } from "./repositories/index.js";
-import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
+import type { SessionService, ComputeService } from "./services/index.js";
 import type { SessionHooks } from "./services/session-hooks/index.js";
 import type { SessionLifecycle } from "./services/session/index.js";
 import type { SessionAttachService } from "./services/session/attach.js";
@@ -285,7 +285,7 @@ export class AppContext {
       for (const session of running) {
         const cp = (session.config as Record<string, unknown> | null)?.for_each_checkpoint;
         if (!cp || typeof cp !== "object") continue;
-        const cpTyped = cp as import("./state/flow.js").ForEachCheckpoint;
+        const cpTyped = cp as import("./services/flow.js").ForEachCheckpoint;
 
         li(
           "boot",
@@ -336,7 +336,7 @@ export class AppContext {
       for (const session of sessions) {
         const inlineFlow = (session.config as Record<string, unknown> | null)?.inline_flow;
         if (!inlineFlow || typeof inlineFlow !== "object") continue;
-        const def = inlineFlow as import("./state/flow.js").FlowDefinition;
+        const def = inlineFlow as import("./services/flow.js").FlowDefinition;
         if (!def.name || !Array.isArray(def.stages)) continue;
         this.flows.registerInline?.(def.name, def);
       }
@@ -437,7 +437,7 @@ export class AppContext {
         if (!provider) continue;
         const arkdUrl = (provider as { getArkdUrl?: (c: typeof compute) => string }).getArkdUrl?.(compute);
         if (!arkdUrl) continue;
-        const { startArkdEventsConsumer } = await import("./conductor/arkd-events-consumer.js");
+        const { startArkdEventsConsumer } = await import("./conductor/server/arkd-events-consumer.js");
         startArkdEventsConsumer(tenantApp, computeName, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
         consumers++;
       } catch (err: any) {
@@ -630,9 +630,6 @@ export class AppContext {
   }
   get computeService(): ComputeService {
     return this._resolve("computeService");
-  }
-  get historyService(): HistoryService {
-    return this._resolve("historyService");
   }
   get sessionHooks(): SessionHooks {
     return this._resolve("sessionHooks");

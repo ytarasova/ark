@@ -10,7 +10,7 @@ import { promisify } from "util";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 
-import * as flow from "../state/flow.js";
+import * as flow from "../services/flow.js";
 import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
 import { safeAsync } from "../safe.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
@@ -143,7 +143,7 @@ export async function processReviewFeedback(
   const channelPort = await app.sessions.channelPort(session.id);
   const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
   const delivered = await safeAsync(`pr-poller: deliverToChannel for ${session.id}`, async () => {
-    const { deliverToChannel } = await import("../conductor/conductor.js");
+    const { deliverToChannel } = await import("../conductor/server/conductor.js");
     await deliverToChannel(app, session, channelPort, steerPayload);
   });
   if (delivered) return;

@@ -49,12 +49,6 @@ export interface FsListDirResult {
   entries: FsDirEntry[];
 }
 
-/** FTS index rebuild -- wipes the shared `claude_sessions_cache` + `transcript_index`
- * tables. Only safe in single-tenant local mode. */
-export interface FtsRebuildCapability {
-  rebuild(): Promise<{ sessionCount: number; indexCount: number; items: unknown[] }>;
-}
-
 /** Privileged host commands (kill, docker). Only safe in local single-user mode. */
 export interface HostCommandCapability {
   killProcess(pid: number): Promise<void>;
@@ -181,7 +175,6 @@ export type TenantResolverResult = { ok: true; tenantId: string } | { ok: false;
 export interface AppMode {
   readonly kind: "local" | "hosted";
   readonly fsCapability: FsCapability | null;
-  readonly ftsRebuildCapability: FtsRebuildCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;
   /** Bootstrap seed (local: insert the "local" compute row; hosted: no-op). */
   readonly computeBootstrap: ComputeBootstrapCapability;

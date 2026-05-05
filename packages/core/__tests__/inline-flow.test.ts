@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { setApp, clearApp } from "./test-helpers.js";
 import { ForEachDispatcher } from "../services/dispatch/dispatch-foreach.js";
-import type { StageDefinition, InlineFlowSpec } from "../state/flow.js";
+import type { StageDefinition, InlineFlowSpec } from "../services/flow.js";
 import { buildSessionVars } from "../template.js";
 import type { DispatchDeps } from "../services/dispatch/types.js";
 
@@ -317,7 +317,7 @@ describe("inline flow -- daemon restart rehydration", () => {
     expect((inlineFlow as any).name).toBe(`inline-${childId}`);
 
     // Simulate rehydration: manually call registerInline (what boot does)
-    const def = inlineFlow as import("../state/flow.js").FlowDefinition;
+    const def = inlineFlow as import("../services/flow.js").FlowDefinition;
     const freshName = `rehydrated-${childId}`;
     def.name = freshName;
     app.flows.registerInline?.(freshName, def);

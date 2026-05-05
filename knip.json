@@ -1,0 +1,43 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "packages/cli/index.ts",
+    "packages/cli/run.ts",
+    "packages/cli/commands/**/*.ts",
+    "packages/server/index.ts",
+    "packages/arkd/index.ts",
+    "packages/arkd/server.ts",
+    "packages/router/index.ts",
+    "packages/web/build.ts",
+    "packages/web/src/App.tsx",
+    "packages/web/src/index.html",
+    "packages/web/vite.config.ts",
+    "packages/web/playwright.config.ts",
+    "packages/desktop/main.js",
+    "packages/desktop/preload.js",
+    "packages/desktop/playwright.config.ts",
+    "packages/e2e/playwright.config.ts",
+    "packages/e2e/fixtures/global-teardown.ts",
+    "packages/core/migrations/registry.ts",
+    "packages/core/migrations/0*.ts",
+    "packages/core/migrations/01*.ts",
+    "packages/server/mcp/tools/**/*.ts",
+    "packages/core/connectors/definitions/**/*.ts",
+    "packages/core/executors/**/*.ts",
+    "packages/compute/providers/**/*.ts",
+    "packages/compute/core/**/index.ts",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "scripts/**/*.ts"
+  ],
+  "project": ["packages/**/*.{ts,tsx}", "scripts/**/*.{ts,tsx}"],
+  "ignore": ["**/node_modules/**", ".infra/spikes/**", "docs/**"],
+  "ignoreDependencies": [
+    "@optave/codegraph",
+    "@radix-ui/react-tooltip",
+    "@radix-ui/react-separator",
+    "@xyflow/react",
+    "recharts",
+    "tailwindcss"
+  ]
+}

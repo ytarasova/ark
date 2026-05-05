@@ -12,7 +12,7 @@
 import { logWarn } from "../../observability/structured-log.js";
 import type { DispatchDeps } from "./types.js";
 import type { Session } from "../../../types/index.js";
-import type { StageDefinition } from "../../state/flow.js";
+import type { StageDefinition } from "../flow.js";
 
 export class StageSecretResolver {
   constructor(private readonly deps: Pick<DispatchDeps, "runtimes" | "secrets" | "config">) {}

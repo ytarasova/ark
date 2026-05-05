@@ -69,7 +69,7 @@ import { REMOTE_HOME } from "../providers/ec2/constants.js";
 import { cloneWorkspaceViaArkd } from "./workspace-clone.js";
 import { logDebug, logInfo } from "../../core/observability/structured-log.js";
 import { provisionStep } from "../../core/services/provisioning-steps.js";
-import { startArkdEventsConsumer } from "../../core/conductor/arkd-events-consumer.js";
+import { startArkdEventsConsumer } from "../../core/conductor/server/arkd-events-consumer.js";
 import { EC2PlacementCtx } from "../providers/ec2/placement-ctx.js";
 import type { PlacementCtx } from "../../core/secrets/placement-types.js";
 

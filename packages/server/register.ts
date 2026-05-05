@@ -23,8 +23,6 @@ import { registerSessionHandlers } from "./handlers/session.js";
 import { registerResourceHandlers } from "./handlers/resource.js";
 import { registerMessagingHandlers } from "./handlers/messaging.js";
 import { registerConfigHandlers } from "./handlers/config.js";
-import { registerHistoryHandlers } from "./handlers/history.js";
-import { registerHistoryLocalHandlers } from "./handlers/history-local.js";
 import { registerToolsHandlers } from "./handlers/tools.js";
 import { registerMetricsHandlers } from "./handlers/metrics.js";
 import { registerMetricsLocalHandlers } from "./handlers/metrics-local.js";
@@ -80,7 +78,6 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerResourceHandlers(router, app);
   registerMessagingHandlers(router, app);
   registerConfigHandlers(router, app);
-  registerHistoryHandlers(router, app);
   registerToolsHandlers(router, app);
   registerMetricsHandlers(router, app);
   registerScheduleHandlers(router, app);
@@ -127,9 +124,6 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
 export function registerLocalOnlyHandlers(router: Router, app: AppContext): void {
   if (app.mode.fsCapability) {
     registerFsHandlers(router, app);
-  }
-  if (app.mode.ftsRebuildCapability) {
-    registerHistoryLocalHandlers(router, app);
   }
   if (app.mode.hostCommandCapability) {
     registerMetricsLocalHandlers(router, app);

@@ -7,9 +7,9 @@ import { execFileSync } from "child_process";
 
 import type { Session } from "../../../types/index.js";
 import type { LifecycleHooks, SessionLifecycleDeps, StartSessionOpts } from "./types.js";
-import * as flow from "../../state/flow.js";
+import * as flow from "../flow.js";
 import { loadRepoConfig } from "../../repo-config.js";
-import { profileGroupPrefix } from "../../state/profiles.js";
+import { profileGroupPrefix } from "../profile.js";
 import { logDebug, logError, logWarn } from "../../observability/structured-log.js";
 import { track } from "../../observability/telemetry.js";
 import { emitSessionSpanStart, emitStageSpanStart } from "../../observability/otlp.js";
@@ -54,7 +54,7 @@ export class SessionCreator {
     // the definition on the ephemeral overlay + persist it to session.config
     // for daemon-restart rehydration (mirrors the for_each spawn pattern).
     let resolvedFlowName: string | undefined;
-    let inlineFlowDef: import("../../state/flow.js").FlowDefinition | undefined;
+    let inlineFlowDef: import("../flow.js").FlowDefinition | undefined;
     const flowRef = opts.flow ?? repoConfig.flow;
     if (typeof flowRef === "object" && flowRef !== null) {
       const raw = flowRef as import("../../../types/index.js").InlineFlowInput;
@@ -64,7 +64,7 @@ export class SessionCreator {
       inlineFlowDef = {
         name: raw.name ?? "inline",
         description: raw.description,
-        stages: raw.stages as unknown as import("../../state/flow.js").StageDefinition[],
+        stages: raw.stages as unknown as import("../flow.js").StageDefinition[],
       };
       resolvedFlowName = inlineFlowDef.name;
     } else {
@@ -99,9 +99,9 @@ export class SessionCreator {
           stages: [
             {
               name: "main",
-              agent: opts.agent as unknown as import("../../state/flow.js").InlineAgentSpec,
+              agent: opts.agent as unknown as import("../flow.js").InlineAgentSpec,
               gate: "auto",
-            } as import("../../state/flow.js").StageDefinition,
+            } as import("../flow.js").StageDefinition,
           ],
         };
         resolvedFlowName = inlineFlowDef.name;
@@ -148,7 +148,7 @@ export class SessionCreator {
     // in `app.ts` can re-register it after a daemon restart.
     if (inlineFlowDef) {
       const syntheticName = `inline-${session.id}`;
-      const finalDef: import("../../state/flow.js").FlowDefinition = { ...inlineFlowDef, name: syntheticName };
+      const finalDef: import("../flow.js").FlowDefinition = { ...inlineFlowDef, name: syntheticName };
       d.flows.registerInline?.(syntheticName, finalDef);
       await d.sessions.update(session.id, { flow: syntheticName });
       await d.sessions.mergeConfig?.(session.id, { inline_flow: finalDef });
@@ -198,7 +198,7 @@ export class SessionCreator {
       logDebug("session", "flow prefetch failed -- continue and rely on legacy sync path");
     }
 
-    // state/flow still reads app.flows via AppContext; lifecycle is called
+    // services/flow still reads app.flows via AppContext; lifecycle is called
     // from the container path where the FlowStore is warmed above, so the
     // sync getFirstStage path works. We shim a tiny AppContext-alike to
     // satisfy the existing helpers' signature.

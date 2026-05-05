@@ -9,7 +9,7 @@ import { join } from "path";
 import YAML from "yaml";
 
 import { approveReviewGate } from "../services/review-gate.js";
-import { evaluateGate } from "../state/flow.js";
+import { evaluateGate } from "../services/flow.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

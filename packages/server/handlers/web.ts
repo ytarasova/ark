@@ -7,12 +7,10 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { searchSessions, searchTranscripts } from "../../core/search/search.js";
-import { searchAllConversations } from "../../core/search/global-search.js";
 import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
 import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/costs.js";
-import { getActiveProfile } from "../../core/state/profiles.js";
+import { getActiveProfile } from "../../core/services/profile.js";
 import { cleanupWorktrees } from "../../core/services/worktree/index.js";
 import { exportSession } from "../../core/session/share.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
@@ -55,19 +53,6 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       arkd: { online: arkd, url: arkdUrl },
       router: { online: app.config.router.enabled },
     };
-  });
-
-  // ── Search ───────────────────────────────────────────────────────────────
-  router.handle("search/sessions", async (p) => {
-    const { query, limit } = extract<{ query: string; limit?: number }>(p, ["query"]);
-    const sessions = await searchSessions(app, query, { limit: limit ?? 50 });
-    const transcripts = await searchTranscripts(app, query, { limit: limit ?? 50 });
-    return { sessions, transcripts };
-  });
-
-  router.handle("search/global", async (p) => {
-    const { query } = extract<{ query: string }>(p, ["query"]);
-    return searchAllConversations(query);
   });
 
   // ── Config (combined hotkeys + theme + profile + mode) ───────────────────

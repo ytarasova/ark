@@ -352,7 +352,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const { destroyStack } = await import("./ec2/provision.js");
     const { destroyPool } = await import("./ec2/pool.js");
     const { teardownForwardTunnel } = await import("./ec2/ports.js");
-    const { stopArkdEventsConsumer } = await import("../../core/conductor/arkd-events-consumer.js");
+    const { stopArkdEventsConsumer } = await import("../../core/conductor/server/arkd-events-consumer.js");
 
     const cfg = compute.config as RemoteConfig;
     if (cfg.instance_id) {
@@ -457,7 +457,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     // rides over this tunnel.
     if (cfg.instance_id) {
       const { teardownForwardTunnel } = await import("./ec2/ports.js");
-      const { stopArkdEventsConsumer } = await import("../../core/conductor/arkd-events-consumer.js");
+      const { stopArkdEventsConsumer } = await import("../../core/conductor/server/arkd-events-consumer.js");
       stopArkdEventsConsumer(compute.name);
       await safeAsync(`[remote] stop: teardown arkd forward tunnel for ${compute.name}`, async () => {
         await teardownForwardTunnel(cfg.instance_id!, ARKD_REMOTE_PORT);

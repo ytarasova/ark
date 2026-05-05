@@ -3,7 +3,7 @@
  *
  * Adds a dialect-neutral `orchestrator TEXT NOT NULL DEFAULT 'custom'` column
  * to `sessions`. Today the only legal value is `'custom'` (the in-tree state
- * machine in `packages/core/state/flow.ts`); the Temporal-backed orchestrator
+ * machine in `packages/core/services/flow.ts`); the Temporal-backed orchestrator
  * tracked in #374 will land as a second enum value in a later migration.
  *
  * Introducing the column now means Phase 2 of the temporal cutover doesn't

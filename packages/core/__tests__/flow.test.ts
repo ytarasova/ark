@@ -15,7 +15,7 @@ import {
   evaluateGate,
   getStageAction,
   resolveFlow,
-} from "../state/flow.js";
+} from "../services/flow.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

@@ -12,7 +12,7 @@
  */
 
 import type { FlowStore, FlowSummary } from "./flow-store.js";
-import type { FlowDefinition } from "../state/flow.js";
+import type { FlowDefinition } from "../services/flow.js";
 
 export class EphemeralFlowStore implements FlowStore {
   /** In-memory overlay: ephemeral name -> definition. */

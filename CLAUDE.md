@@ -56,7 +56,7 @@ No workspaces -- packages coordinated via relative imports.
 - `session-orchestration.ts` -- all orchestration. Every function takes `app: AppContext` as first arg
 - MCP server (`packages/server/mcp/`) -- HTTP MCP at `:19400/mcp`. 27 tools (read + Tier 1/2 write). See `docs/mcp.md`.
 
-**Orchestration (current + future).** Ark uses a custom session/flow state machine today (`packages/core/state/flow.ts` + `packages/core/services/*-orchestration.ts`). A Temporal-backed replacement is in design (`docs/temporal.md`); phases tracked in #374. Local Temporal cluster for Phase 1+ dev is `make dev-temporal` (see `docs/temporal-local-dev.md`). Nothing under `packages/core/state/` or `packages/core/services/*-orchestration.ts` changes until Phase 2 lands.
+**Orchestration (current + future).** Ark uses a custom session/flow state machine today, all under `packages/core/services/` (`flow.ts`, `session.ts`, `session/`, `dispatch/`, `stage-advance/`). A Temporal-backed replacement is in design (`docs/temporal.md`); phases tracked in #374. Local Temporal cluster for Phase 1+ dev is `make dev-temporal` (see `docs/temporal-local-dev.md`). The legacy engine stays semantically frozen until Phase 2 lands.
 
 ## Key Gotchas
 

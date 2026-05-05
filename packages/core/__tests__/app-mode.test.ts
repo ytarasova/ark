@@ -26,7 +26,6 @@ describe("buildAppMode", () => {
     const mode = buildAppMode({ database: { url: undefined } } as any);
     expect(mode.kind).toBe("local");
     expect(mode.fsCapability).not.toBeNull();
-    expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).not.toBeNull();
   });
 
@@ -34,7 +33,6 @@ describe("buildAppMode", () => {
     const mode = buildAppMode({ database: { url: "postgres://fake/ark" } } as any);
     expect(mode.kind).toBe("hosted");
     expect(mode.fsCapability).toBeNull();
-    expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
   });
 
@@ -70,7 +68,6 @@ describe("buildHostedAppMode", () => {
     const mode = buildHostedAppMode({ dialect: "postgres", url: "postgres://test" });
     expect(mode.kind).toBe("hosted");
     expect(mode.fsCapability).toBeNull();
-    expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
     expect(mode.database.dialect).toBe("postgres");
     expect(mode.database.url).toBe("postgres://test");

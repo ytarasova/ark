@@ -16,7 +16,7 @@ import type { FlowStore } from "../../stores/flow-store.js";
 import type { UsageRecorder } from "../../observability/usage.js";
 import type { TranscriptParserRegistry } from "../../runtimes/transcript-parser.js";
 import type { Session, MessageRole, MessageType } from "../../../types/index.js";
-import type { StageDefinition, StageAction } from "../../state/flow.js";
+import type { StageDefinition, StageAction } from "../flow.js";
 import type { DispatchResult } from "../dispatch/types.js";
 
 // ── Callbacks for helpers that still take AppContext ────────────────────────
@@ -82,14 +82,11 @@ export interface SessionHooksDeps {
 
 export interface HookStatusResult {
   newStatus?: string;
-  shouldIndex?: boolean;
   claudeSessionId?: string;
   /** Store updates to apply */
   updates?: Partial<Session>;
   /** Events to log */
   events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
-  /** Transcript indexing info */
-  indexTranscript?: { transcriptPath: string; sessionId: string };
   /** Whether to call advance() after applying updates (auto-gate SessionEnd fallback) */
   shouldAdvance?: boolean;
   /** Whether to auto-dispatch next stage after advance */

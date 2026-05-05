@@ -6,7 +6,7 @@
 
 import { execFileSync } from "child_process";
 
-import type { OutboundMessage } from "../../conductor/channel-types.js";
+import type { OutboundMessage } from "../../conductor/common/channel-types.js";
 import { logInfo } from "../../observability/structured-log.js";
 import type { ReportResult, SessionHooksDeps } from "./types.js";
 import { parseOnFailure } from "./types.js";

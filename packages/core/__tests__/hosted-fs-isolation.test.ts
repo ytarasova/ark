@@ -5,12 +5,12 @@
  *
  *   H1 -- `_initFilesystem` no-ops in hosted mode
  *   H2 -- `setLogArkDir` is never called in hosted mode (=> no JSONL writes)
- *   H3 -- `state/profiles` mutators throw + listProfiles returns []
+ *   H3 -- `services/profile` mutators throw + listProfiles returns []
  *   H4 -- `claude/trust.{trustWorktree,trustDirectory}` no-op in hosted mode
  *   H6 -- `di/storage` rejects local blob backend in hosted mode
  *   H7 -- `di/runtime.snapshotStore` rejects FS backend in hosted mode
  *
- *   M1 -- `claude/sessions.refreshClaudeSessionsCache` returns 0 in hosted
+ *   (M1 was the Claude-session-cache hosted-mode guard; the cache itself
  *   M2 -- `infra/boot-cleanup` skips cwd sweeps in hosted mode
  *   M3 -- `services/dispatch/guards.cloneRemoteRepoIfNeeded` skips in hosted
  *   M5 -- `modes/hosted-app-mode` plumbs config through (file backend opt-in)
@@ -36,7 +36,7 @@ import { buildHostedAppMode } from "../modes/app-mode.js";
 import { FileSecretsProvider } from "../secrets/file-provider.js";
 import { AwsSecretsProvider } from "../secrets/aws-provider.js";
 import { setLogArkDir } from "../observability/structured-log.js";
-import { setProfilesArkDir } from "../state/profiles.js";
+import { setProfilesArkDir } from "../services/profile.js";
 
 // Ensure each test runs against a fresh module-level state. The
 // structured-log + profiles modules cache an arkDir as a singleton; tests
@@ -122,7 +122,7 @@ describe("H3 -- profiles store is unavailable in hosted mode", () => {
 
     // The hosted-mode boot path skips setProfilesArkDir, so the module-level
     // _arkDir stays null -- profile mutators surface a clear error.
-    const profiles = await import("../state/profiles.js");
+    const profiles = await import("../services/profile.js");
 
     expect(profiles.listProfiles()).toEqual([]);
     expect(() => profiles.createProfile("tenant-a")).toThrow(/profiles unavailable in hosted mode/i);
@@ -240,30 +240,6 @@ describe("H7 -- hosted mode rejects FsSnapshotStore", () => {
     await ctx.boot();
     expect(ctx.snapshotStore.constructor.name).toBe("FsSnapshotStore");
     await ctx.shutdown();
-  });
-});
-
-// ── M1 ─ refreshClaudeSessionsCache ─────────────────────────────────────────
-
-describe("M1 -- refreshClaudeSessionsCache returns 0 in hosted mode", () => {
-  it("does not scan ~/.claude/projects/ in hosted mode", async () => {
-    // We don't need a successful boot for this -- the function's hosted guard
-    // fires on the AppContext alone. Build a minimal hosted ctx and call.
-    const ctx = await forHostedTestAsync({
-      storage: { blobBackend: "s3", s3: { bucket: "b", region: "us-east-1", prefix: "p" } },
-    });
-    // Boot will throw (H7), so rely on the pre-boot mode for the assertion.
-    expect(ctx.mode.kind).toBe("hosted");
-    const { refreshClaudeSessionsCache } = await import("../claude/sessions.js");
-    // Pass a baseDir that DOES exist so the only thing protecting us is the
-    // hosted-mode guard. Use a temp dir; the function will only scan when
-    // local-mode wins.
-    const dummyDir = mkdtempSync(join(tmpdir(), "ark-fake-claude-"));
-    const n = await refreshClaudeSessionsCache(ctx, { baseDir: dummyDir });
-    expect(n).toBe(0);
-
-    await ctx.shutdown().catch(() => undefined);
-    delete process.env.ARK_MODE;
   });
 });
 

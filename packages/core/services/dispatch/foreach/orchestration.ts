@@ -8,7 +8,7 @@
  */
 
 import type { DispatchDeps, DispatchResult } from "../types.js";
-import type { ForEachCheckpoint } from "../../../state/flow.js";
+import type { ForEachCheckpoint } from "../../flow.js";
 import { logInfo } from "../../../observability/structured-log.js";
 
 import { sumPriorIterationCosts } from "./budget.js";
