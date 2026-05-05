@@ -14,7 +14,6 @@
 .PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down claude-tfy web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
-        audit audit-check \
         docs-cli \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
@@ -210,14 +209,6 @@ format: ## Format code with Prettier
 
 format-check: ## Check code formatting (CI gate)
 	npx prettier --check "packages/**/*.{ts,tsx,js,jsx,json,css}"
-
-# ── Audit ────────────────────────────────────────────────────────────────────
-
-audit: ## Regenerate docs/architecture/* + docs/audit/audit.json (deterministic)
-	$(BUN) run scripts/audit-codebase.ts generate
-
-audit-check: ## CI gate: regenerate audit and diff against committed copy (non-zero on drift)
-	$(BUN) run scripts/audit-codebase.ts check
 
 docs-cli: ## Generate docs/cli-reference.md from the Commander.js command tree
 	$(BUN) run scripts/generate-cli-docs.ts

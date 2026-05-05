@@ -8,7 +8,14 @@ on:
 
 jobs:
   test:
-    runs-on: macos-latest
+    # Ubuntu runners are ~2-3x faster than macos-latest and don't suffer
+    # the macOS-CI CPU-starvation that consistently failed our 10s
+    # status-poller assertions (Gemini/Codex/Goose autonomous-flow tests
+    # all timed out at exactly 10000-10300ms). The tests don't have any
+    # macOS-specific dependencies -- tmux is installable on both. Darwin
+    # coverage continues via build (darwin-*), install.sh matrix, and
+    # desktop-e2e (macos-latest).
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
@@ -19,7 +26,7 @@ jobs:
           bun-version: latest
 
       - name: Install tmux
-        run: brew install tmux
+        run: sudo apt-get update && sudo apt-get install -y tmux
 
       - name: Start tmux server
         run: tmux new-session -d -s ci-init
