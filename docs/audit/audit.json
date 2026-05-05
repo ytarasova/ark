@@ -2235,7 +2235,7 @@
         "packages/compute/isolation/docker.ts",
         "packages/compute/providers/arkd-backed.ts",
         "packages/core/claude/channel-delivery.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/services/dispatch/dispatch-hosted.ts",
         "packages/core/services/worktree/pr.ts",
         "packages/server/index.ts"
@@ -2248,7 +2248,7 @@
         "packages/cli/commands/daemon.ts",
         "packages/cli/commands/misc/arkd.ts",
         "packages/cli/services/web-probe.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/executors/claude-agent.ts",
         "packages/core/runtimes/claude-agent/user-message-stream.ts"
       ]
@@ -2706,7 +2706,7 @@
     {
       "path": "packages/cli/commands/misc/channel.ts",
       "imports": [
-        "packages/core/conductor/channel.ts"
+        "packages/core/conductor/client/channel.ts"
       ],
       "importedBy": [
         "packages/cli/commands/misc/index.ts"
@@ -3192,7 +3192,7 @@
       "imports": [
         "packages/arkd/index.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/constants.ts",
         "packages/core/observability/structured-log.ts"
       ],
@@ -3229,7 +3229,7 @@
         "packages/cli/commands/compute/create.ts",
         "packages/cli/commands/compute/lifecycle.ts",
         "packages/core/compute-resolver.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/hosted/scheduler.ts",
         "packages/core/repositories/compute-template.ts",
         "packages/core/repositories/compute.ts",
@@ -3287,7 +3287,7 @@
         "packages/compute/providers/ec2/ssm.ts",
         "packages/compute/util.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/config/port-allocator.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/secrets/placement-types.ts",
@@ -3405,7 +3405,7 @@
         "packages/compute/core/types.ts",
         "packages/compute/providers/local-placement-ctx.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/arkd-events-consumer.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts"
       ],
       "importedBy": [
         "packages/compute/adapters/legacy.ts",
@@ -3574,7 +3574,7 @@
       "importedBy": [
         "packages/cli/commands/compute/create.ts",
         "packages/cli/commands/compute/view.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/infra/compute-providers-boot.ts",
         "packages/core/infra/metrics-poller.ts",
         "packages/core/services/compute-lifecycle.ts",
@@ -3946,7 +3946,7 @@
         "packages/compute/providers/ec2/sync.ts",
         "packages/compute/types.ts",
         "packages/compute/util.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/constants.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/safe.ts",
@@ -4035,7 +4035,7 @@
         "packages/core/code-intel/store.ts",
         "packages/core/compute-registries.ts",
         "packages/core/compute-resolver.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
         "packages/core/config.ts",
         "packages/core/container.ts",
         "packages/core/database/index.ts",
@@ -4096,18 +4096,18 @@
         "packages/core/code-intel/store.ts",
         "packages/core/compute-resolver.ts",
         "packages/core/compute/pool.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/llm-proxy.ts",
-        "packages/core/conductor/pollers.ts",
-        "packages/core/conductor/pr-merge-webhook.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/rest-api-handler.ts",
-        "packages/core/conductor/tenant-policy-handlers.ts",
-        "packages/core/conductor/tenant.ts",
-        "packages/core/conductor/worker-handlers.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/llm-proxy.ts",
+        "packages/core/conductor/server/pollers.ts",
+        "packages/core/conductor/server/pr-merge-webhook.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
+        "packages/core/conductor/server/tenant-policy-handlers.ts",
+        "packages/core/conductor/server/tenant.ts",
+        "packages/core/conductor/server/worker-handlers.ts",
         "packages/core/config/clusters.ts",
         "packages/core/connectors/resolve.ts",
         "packages/core/connectors/types.ts",
@@ -4360,9 +4360,7 @@
         "packages/core/executors/goose.ts",
         "packages/core/infra/boot-cleanup.ts",
         "packages/core/services/session/terminate.ts",
-        "packages/core/services/worktree/setup.ts",
-        "packages/core/tools/claude-driver.ts",
-        "packages/core/tools/gemini-driver.ts"
+        "packages/core/services/worktree/setup.ts"
       ]
     },
     {
@@ -5187,14 +5185,38 @@
       ]
     },
     {
-      "path": "packages/core/conductor/arkd-events-consumer.ts",
+      "path": "packages/core/conductor/client/channel.ts",
+      "imports": [
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/constants.ts",
+        "packages/core/observability/structured-log.ts"
+      ],
+      "importedBy": [
+        "packages/cli/commands/misc/channel.ts"
+      ]
+    },
+    {
+      "path": "packages/core/conductor/common/channel-types.ts",
+      "imports": [],
+      "importedBy": [
+        "packages/core/conductor/client/channel.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/services/session-hooks/index.ts",
+        "packages/core/services/session-hooks/report.ts"
+      ]
+    },
+    {
+      "path": "packages/core/conductor/server/arkd-events-consumer.ts",
       "imports": [
         "packages/arkd/index.ts",
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/observability/structured-log.ts",
         "packages/types/index.ts"
       ],
@@ -5206,44 +5228,20 @@
       ]
     },
     {
-      "path": "packages/core/conductor/channel-types.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/channel.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/services/session-hooks/index.ts",
-        "packages/core/services/session-hooks/report.ts"
-      ]
-    },
-    {
-      "path": "packages/core/conductor/channel.ts",
-      "imports": [
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/constants.ts",
-        "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": [
-        "packages/cli/commands/misc/channel.ts"
-      ]
-    },
-    {
-      "path": "packages/core/conductor/conductor.ts",
+      "path": "packages/core/conductor/server/conductor.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/llm-proxy.ts",
-        "packages/core/conductor/pollers.ts",
-        "packages/core/conductor/pr-merge-webhook.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/rest-api-handler.ts",
-        "packages/core/conductor/tenant-policy-handlers.ts",
-        "packages/core/conductor/tenant.ts",
-        "packages/core/conductor/worker-handlers.ts",
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/llm-proxy.ts",
+        "packages/core/conductor/server/pollers.ts",
+        "packages/core/conductor/server/pr-merge-webhook.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
+        "packages/core/conductor/server/tenant-policy-handlers.ts",
+        "packages/core/conductor/server/tenant.ts",
+        "packages/core/conductor/server/worker-handlers.ts",
         "packages/core/constants.ts",
         "packages/core/observability/structured-log.ts",
         "packages/types/index.ts"
@@ -5256,7 +5254,7 @@
       ]
     },
     {
-      "path": "packages/core/conductor/deliver-to-channel.ts",
+      "path": "packages/core/conductor/server/deliver-to-channel.ts",
       "imports": [
         "packages/arkd/client.ts",
         "packages/compute/adapters/provider-map.ts",
@@ -5267,41 +5265,40 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/hook-status-handler.ts",
+      "path": "packages/core/conductor/server/hook-status-handler.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/tenant.ts",
+        "packages/core/conductor/common/channel-types.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/tenant.ts",
         "packages/core/hooks.ts",
         "packages/core/knowledge/evals.ts",
         "packages/core/observability/otlp.ts",
         "packages/core/observability/structured-log.ts",
-        "packages/core/safe.ts",
         "packages/core/services/session/cleanup.ts",
         "packages/core/session/guardrails.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/llm-proxy.ts",
+      "path": "packages/core/conductor/server/llm-proxy.ts",
       "imports": [
         "packages/core/app.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/pollers.ts",
+      "path": "packages/core/conductor/server/pollers.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/integrations/issue-poller.ts",
@@ -5311,25 +5308,25 @@
         "packages/core/schedule.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/pr-merge-webhook.ts",
+      "path": "packages/core/conductor/server/pr-merge-webhook.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/integrations/rollback.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/report-pipeline.ts",
+      "path": "packages/core/conductor/server/report-pipeline.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/channel-types.ts",
+        "packages/core/conductor/common/channel-types.ts",
         "packages/core/hooks.ts",
         "packages/core/knowledge/indexer.ts",
         "packages/core/notify.ts",
@@ -5340,52 +5337,52 @@
         "packages/core/services/worktree/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/hook-status-handler.ts"
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/hook-status-handler.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/rest-api-handler.ts",
+      "path": "packages/core/conductor/server/rest-api-handler.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/tenant.ts",
+        "packages/core/conductor/server/tenant.ts",
         "packages/core/hooks.ts",
         "packages/core/services/session-forensic.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/tenant-policy-handlers.ts",
+      "path": "packages/core/conductor/server/tenant-policy-handlers.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/tenant.ts",
+      "path": "packages/core/conductor/server/tenant.ts",
       "imports": [
         "packages/core/app.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/rest-api-handler.ts"
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/rest-api-handler.ts"
       ]
     },
     {
-      "path": "packages/core/conductor/worker-handlers.ts",
+      "path": "packages/core/conductor/server/worker-handlers.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/conductor.ts"
+        "packages/core/conductor/server/conductor.ts"
       ]
     },
     {
@@ -5603,9 +5600,9 @@
         "packages/compute/providers/remote-arkd.ts",
         "packages/core/claude/channel-delivery.ts",
         "packages/core/claude/mcp-config.ts",
-        "packages/core/conductor/channel.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/client/channel.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/config.ts",
         "packages/core/executors/claude-code.ts",
         "packages/core/executors/goose.ts",
@@ -6234,9 +6231,9 @@
       "imports": [],
       "importedBy": [
         "packages/core/app.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/rest-api-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
         "packages/core/hosted/web.ts",
         "packages/core/infra/service-wiring.ts",
         "packages/core/integrations/rollback.ts"
@@ -6423,7 +6420,7 @@
       "path": "packages/core/infra/conductor-launcher.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/config.ts",
         "packages/core/safe.ts"
       ],
@@ -6619,7 +6616,7 @@
       "path": "packages/core/integrations/github-pr.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/constants.ts",
         "packages/core/safe.ts",
         "packages/core/util.ts",
@@ -6648,7 +6645,7 @@
       ],
       "importedBy": [
         "packages/cli/commands/misc/watch.ts",
-        "packages/core/conductor/pollers.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
@@ -6659,14 +6656,14 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pollers.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
       "path": "packages/core/integrations/pr-poller.ts",
       "imports": [
         "packages/core/app.ts",
-        "packages/core/conductor/conductor.ts",
+        "packages/core/conductor/server/conductor.ts",
         "packages/core/constants.ts",
         "packages/core/integrations/github-pr.ts",
         "packages/core/observability/structured-log.ts",
@@ -6676,7 +6673,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pollers.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
@@ -6698,7 +6695,7 @@
         "packages/core/hooks.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pr-merge-webhook.ts"
+        "packages/core/conductor/server/pr-merge-webhook.ts"
       ]
     },
     {
@@ -6730,7 +6727,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
         "packages/server/handlers/eval.ts"
       ]
     },
@@ -6757,7 +6754,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/modes/local-app-mode.ts",
         "packages/core/services/dispatch-context.ts"
       ]
@@ -7387,7 +7384,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/executors/status-poller.ts"
       ]
     },
@@ -7432,7 +7429,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
         "packages/core/infra/service-wiring.ts",
         "packages/core/services/session/create.ts",
         "packages/core/services/session/terminate.ts",
@@ -7500,15 +7497,15 @@
         "packages/core/claude/settings.ts",
         "packages/core/code-intel/observability/stderr.ts",
         "packages/core/compute/pool.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/channel.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/pr-merge-webhook.ts",
-        "packages/core/conductor/report-pipeline.ts",
-        "packages/core/conductor/tenant-policy-handlers.ts",
-        "packages/core/conductor/worker-handlers.ts",
+        "packages/core/conductor/client/channel.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
+        "packages/core/conductor/server/pr-merge-webhook.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
+        "packages/core/conductor/server/tenant-policy-handlers.ts",
+        "packages/core/conductor/server/worker-handlers.ts",
         "packages/core/di/runtime.ts",
         "packages/core/di/seed-builtins.ts",
         "packages/core/executors/claude-agent.ts",
@@ -7707,7 +7704,7 @@
       "path": "packages/core/repo-config.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/services/session-hooks/handoff.ts",
         "packages/core/services/session/create.ts",
         "packages/core/services/session/review.ts",
@@ -8130,9 +8127,8 @@
         "packages/compute/providers/ec2/sync.ts",
         "packages/compute/providers/local-arkd.ts",
         "packages/compute/providers/remote-arkd.ts",
-        "packages/core/conductor/hook-status-handler.ts",
-        "packages/core/conductor/pollers.ts",
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/pollers.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/infra/arkd-launcher.ts",
         "packages/core/infra/boot-cleanup.ts",
         "packages/core/infra/compute-providers-boot.ts",
@@ -8160,7 +8156,7 @@
         "packages/core/util/time.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/pollers.ts"
+        "packages/core/conductor/server/pollers.ts"
       ]
     },
     {
@@ -8887,7 +8883,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/services/fork-join.ts",
         "packages/core/services/session-hooks/handoff.ts",
         "packages/core/services/session.ts",
@@ -8898,7 +8894,7 @@
       "path": "packages/core/services/session-forensic.ts",
       "imports": [],
       "importedBy": [
-        "packages/core/conductor/rest-api-handler.ts",
+        "packages/core/conductor/server/rest-api-handler.ts",
         "packages/server/handlers/session.ts"
       ]
     },
@@ -8931,7 +8927,7 @@
     {
       "path": "packages/core/services/session-hooks/index.ts",
       "imports": [
-        "packages/core/conductor/channel-types.ts",
+        "packages/core/conductor/common/channel-types.ts",
         "packages/core/services/session-hooks/handoff.ts",
         "packages/core/services/session-hooks/hook-status.ts",
         "packages/core/services/session-hooks/report.ts",
@@ -8947,7 +8943,7 @@
     {
       "path": "packages/core/services/session-hooks/report.ts",
       "imports": [
-        "packages/core/conductor/channel-types.ts",
+        "packages/core/conductor/common/channel-types.ts",
         "packages/core/observability/structured-log.ts",
         "packages/core/services/session-hooks/types.ts"
       ],
@@ -9049,7 +9045,7 @@
         "packages/types/index.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts",
+        "packages/core/conductor/server/hook-status-handler.ts",
         "packages/server/handlers/session.ts",
         "packages/server/mcp/tools/session.ts"
       ]
@@ -9304,7 +9300,7 @@
       "imports": [],
       "importedBy": [
         "packages/cli/commands/worktree.ts",
-        "packages/core/conductor/report-pipeline.ts",
+        "packages/core/conductor/server/report-pipeline.ts",
         "packages/core/di/services.ts",
         "packages/core/executors/claude-agent.ts",
         "packages/core/executors/claude-code.ts",
@@ -9369,7 +9365,7 @@
         "packages/core/observability/structured-log.ts"
       ],
       "importedBy": [
-        "packages/core/conductor/hook-status-handler.ts"
+        "packages/core/conductor/server/hook-status-handler.ts"
       ]
     },
     {
@@ -9917,48 +9913,10 @@
       ]
     },
     {
-      "path": "packages/core/tool-driver.ts",
-      "imports": [],
-      "importedBy": [
-        "packages/core/tools/claude-driver.ts",
-        "packages/core/tools/gemini-driver.ts",
-        "packages/core/tools/registry.ts"
-      ]
-    },
-    {
       "path": "packages/core/tools.ts",
       "imports": [
         "packages/core/app.ts",
         "packages/core/observability/structured-log.ts"
-      ],
-      "importedBy": []
-    },
-    {
-      "path": "packages/core/tools/claude-driver.ts",
-      "imports": [
-        "packages/core/claude/claude.ts",
-        "packages/core/tool-driver.ts"
-      ],
-      "importedBy": [
-        "packages/core/tools/registry.ts"
-      ]
-    },
-    {
-      "path": "packages/core/tools/gemini-driver.ts",
-      "imports": [
-        "packages/core/claude/claude.ts",
-        "packages/core/tool-driver.ts"
-      ],
-      "importedBy": [
-        "packages/core/tools/registry.ts"
-      ]
-    },
-    {
-      "path": "packages/core/tools/registry.ts",
-      "imports": [
-        "packages/core/tool-driver.ts",
-        "packages/core/tools/claude-driver.ts",
-        "packages/core/tools/gemini-driver.ts"
       ],
       "importedBy": []
     },
@@ -11544,9 +11502,9 @@
         "packages/core/auth/middleware.ts",
         "packages/core/compute-resolver.ts",
         "packages/core/compute/pool.ts",
-        "packages/core/conductor/arkd-events-consumer.ts",
-        "packages/core/conductor/conductor.ts",
-        "packages/core/conductor/deliver-to-channel.ts",
+        "packages/core/conductor/server/arkd-events-consumer.ts",
+        "packages/core/conductor/server/conductor.ts",
+        "packages/core/conductor/server/deliver-to-channel.ts",
         "packages/core/connectors/resolve.ts",
         "packages/core/executors/resolve.ts",
         "packages/core/hosted/scheduler.ts",
