@@ -27,7 +27,10 @@ describe("Compute.ensureReachable", () => {
     >[0];
     const c = new LocalCompute(stubApp);
     if (c.ensureReachable) {
-      await c.ensureReachable({ kind: "local", name: "local", meta: {} }, { app: stubApp as never, sessionId: "s-test" });
+      await c.ensureReachable(
+        { kind: "local", name: "local", meta: {} },
+        { app: stubApp as never, sessionId: "s-test" },
+      );
     }
     // No throw -- consumer is already running for "local" (or freshly
     // started) and the call returned. We don't assert on the global
