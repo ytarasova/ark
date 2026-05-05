@@ -267,7 +267,7 @@ package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 
 	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
 	  mkdir -p dist/ark-$$plat/bin; \
 	  cp dist/bin/ark-$$plat dist/ark-$$plat/bin/ark; \
-	  cp -r agents runtimes flows skills recipes mcp-configs dist/ark-$$plat/; \
+	  cp -r agents runtimes flows skills mcp-configs dist/ark-$$plat/; \
 	  if [ -f dist/vendor/tmux-$$plat ]; then cp dist/vendor/tmux-$$plat dist/ark-$$plat/bin/tmux; fi; \
 	  if [ -f dist/vendor/tensorzero-$$plat ]; then cp dist/vendor/tensorzero-$$plat dist/ark-$$plat/bin/tensorzero-gateway; fi; \
 	  if [ -f dist/vendor/codegraph-$$plat ]; then cp dist/vendor/codegraph-$$plat dist/ark-$$plat/bin/codegraph; fi; \
