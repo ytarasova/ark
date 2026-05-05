@@ -293,6 +293,33 @@ export function isGithubPrUrl(url: string | null | undefined): boolean {
 }
 
 /**
+ * Resolve the GitHub token for this session's tenant.
+ *
+ * Resolution order:
+ *   1. Tenant-scoped `GITHUB_TOKEN` in the secrets store. The right place
+ *      for a credential -- it's per-tenant, never logged, redacted at
+ *      every boundary.
+ *   2. `process.env.GITHUB_TOKEN`. Conductor-process fallback for legacy
+ *      deployments that pass the token via env at daemon startup.
+ *   3. null. The action stage falls back to the legacy `gh` CLI path
+ *      (local dispatch only) and surfaces a clear error elsewhere.
+ *
+ * This helper centralises the lookup so the three call sites in this
+ * file (push origin auth, REST createPullRequest, REST mergePullRequest)
+ * stay consistent. Adding gh-app or fine-grained-PAT support later
+ * means one function change instead of three.
+ */
+async function resolveGithubToken(app: AppContext, session: Session): Promise<string | undefined> {
+  try {
+    const fromStore = await app.secrets.get(session.tenant_id, "GITHUB_TOKEN");
+    if (fromStore) return fromStore;
+  } catch {
+    // Secret store unavailable -- fall through to env fallback.
+  }
+  return process.env.GITHUB_TOKEN || undefined;
+}
+
+/**
  * Read the `origin` remote URL via the same dispatcher used for push/rebase.
  * Returns null on any error (not a git repo, no origin, network failure on
  * remote, etc.).
@@ -409,7 +436,7 @@ export async function createWorktreePR(
     // end restores the original URL so we don't leak the token into the
     // worker's git config.
     let originalOriginUrl: string | null = null;
-    const githubToken = process.env.GITHUB_TOKEN;
+    const githubToken = await resolveGithubToken(app, session);
     if (routing.remote && githubToken) {
       const probe = await readOriginUrl(app, session);
       if (probe && probe.startsWith("https://github.com/")) {
@@ -489,7 +516,7 @@ export async function createWorktreePR(
       // because it talks to api.github.com over HTTPS instead of shelling
       // `gh` on the worker. Auth is `GITHUB_TOKEN`; the worker doesn't
       // need `gh` installed and we don't depend on stdout parsing.
-      const githubToken = process.env.GITHUB_TOKEN;
+      const githubToken = await resolveGithubToken(app, session);
       const ownerRepo = parseGithubOwnerRepoFromUrl(originUrl);
       if (githubToken && ownerRepo) {
         const restDeps: GithubDeps = { token: githubToken };
@@ -658,7 +685,7 @@ export async function mergeWorktreePR(
   // authenticated on the worker, surfaces typed errors instead of stdout
   // soup. Falls back to the legacy `gh pr merge` only when no
   // GITHUB_TOKEN is available.
-  const githubToken = process.env.GITHUB_TOKEN;
+  const githubToken = await resolveGithubToken(app, session);
   if (githubToken) {
     const result = await mergePullRequest(
       { pr_url: prUrl, method, delete_branch: deleteAfter },
