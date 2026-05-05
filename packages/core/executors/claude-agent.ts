@@ -255,13 +255,18 @@ export const claudeAgentExecutor: Executor = {
             logInfo("session", "claude-agent.launch: invoking provider.spawnProcess", {
               sessionId: session.id,
               handle,
-              cmd: `bash ${workerLauncherPath}`,
+              cmd: `/bin/bash ${workerLauncherPath}`,
               workdir: workerWorkdir || "/tmp",
             });
             const t0 = Date.now();
+            // Use an absolute interpreter path. arkd spawns via Bun.spawn, which
+            // resolves unqualified `cmd` through the child's PATH -- and on EC2
+            // arkd runs as a systemd unit that only sets HOME, so PATH can be
+            // empty or minimal and bash lookup fails with ENOENT. /bin/bash is
+            // the canonical location on every Linux distro we target.
             const res = await provider.spawnProcess!(compute, refreshed, {
               handle,
-              cmd: "bash",
+              cmd: "/bin/bash",
               args: [workerLauncherPath],
               workdir: workerWorkdir || "/tmp",
               logPath: workerLogPath,

@@ -9,7 +9,7 @@ import { mkdirSync, readFileSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../server.js";
-import { _resetForTests } from "../routes/process.js";
+import { _resetForTests, buildSpawnEnv, DEFAULT_SPAWN_PATH } from "../routes/process.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let server: { stop(): void };
@@ -250,5 +250,79 @@ describe("validation", () => {
       handle: "bad handle",
     });
     expect(r.status).toBe(400);
+  });
+});
+
+// ─── buildSpawnEnv + default-PATH fallback ───────────────────────────────────
+//
+// On EC2 arkd runs as a systemd unit that sets only HOME; process.env.PATH
+// can therefore be empty. A caller that spawns "bash" (unqualified) would
+// fail with ENOENT because Bun.spawn resolves the cmd via the CHILD env's
+// PATH. buildSpawnEnv injects a POSIX default so unqualified commands keep
+// working, and callers that DO set PATH (parent or request) always win.
+
+describe("buildSpawnEnv", () => {
+  test("injects DEFAULT_SPAWN_PATH when neither parent nor request env has PATH", () => {
+    const out = buildSpawnEnv({}, {});
+    expect(out.PATH).toBe(DEFAULT_SPAWN_PATH);
+  });
+
+  test("injects DEFAULT_SPAWN_PATH when parent PATH is empty string", () => {
+    const out = buildSpawnEnv({ PATH: "" } as NodeJS.ProcessEnv, undefined);
+    expect(out.PATH).toBe(DEFAULT_SPAWN_PATH);
+  });
+
+  test("preserves parent PATH when no override is supplied", () => {
+    const out = buildSpawnEnv({ PATH: "/opt/custom/bin" } as NodeJS.ProcessEnv, {});
+    expect(out.PATH).toBe("/opt/custom/bin");
+  });
+
+  test("request PATH wins over parent PATH", () => {
+    const out = buildSpawnEnv({ PATH: "/inherited" } as NodeJS.ProcessEnv, { PATH: "/from/request" });
+    expect(out.PATH).toBe("/from/request");
+  });
+
+  test("merges non-PATH keys from both sources, request overrides on conflict", () => {
+    const out = buildSpawnEnv({ FOO: "parent", BAR: "parent" } as NodeJS.ProcessEnv, { BAR: "req", BAZ: "req" });
+    expect(out.FOO).toBe("parent");
+    expect(out.BAR).toBe("req");
+    expect(out.BAZ).toBe("req");
+    expect(out.PATH).toBe(DEFAULT_SPAWN_PATH);
+  });
+});
+
+describe("/process/spawn PATH propagation", () => {
+  test("caller-supplied env without PATH still produces a child that can resolve shell utilities", async () => {
+    // Use an absolute interpreter so the spawn itself doesn't depend on the
+    // host's PATH. We want to verify what PATH the CHILD ends up with -- if
+    // buildSpawnEnv is missing, a child env assembled from an empty request
+    // override could strand the PATH as "" in some Bun versions.
+    const logPath = join(workDir, "p-path-echo.out");
+    if (existsSync(logPath)) rmSync(logPath);
+
+    const spawn = await postJson<{ ok: boolean; pid: number }>("/process/spawn", {
+      handle: "p-path-echo",
+      cmd: "/bin/sh",
+      args: ["-c", "echo PATH=$PATH"],
+      workdir: workDir,
+      env: { ARK_SPAWN_TEST: "1" },
+      logPath,
+    });
+    expect(spawn.status).toBe(200);
+    expect(spawn.data.ok).toBe(true);
+
+    const exited = await pollUntil(async () => {
+      const s = await postJson<{ running: boolean; exitCode?: number }>("/process/status", {
+        handle: "p-path-echo",
+      });
+      return s.data.running === false && typeof s.data.exitCode === "number";
+    });
+    expect(exited).toBe(true);
+
+    await pollUntil(() => existsSync(logPath) && readFileSync(logPath, "utf8").includes("PATH="));
+    const out = readFileSync(logPath, "utf8");
+    // Either inherited (has /bin or /usr/bin) or the DEFAULT_SPAWN_PATH fallback
+    // -- both contain "/bin", which is what bash/sh lookup needs.
+    expect(out).toMatch(/PATH=.*\/bin/);
   });
 });
