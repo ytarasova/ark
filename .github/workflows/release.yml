@@ -5,6 +5,16 @@ on:
     tags: ["v*"]
     branches: [main]
 
+# Serialize Release runs per ref so two pushes to main don't fight over
+# the rolling `latest` release's asset uploads. Without this, two
+# concurrent runs both call `gh release upload --clobber` and one of
+# them gets HTTP 422 "ReleaseAsset.name already exists" -- the asset
+# upload API is not atomic across parallel uploaders.
+# Tag pushes get their own group so they don't cancel a main run.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Build Ark binary - cross-target, runs anywhere
   build-ark:
