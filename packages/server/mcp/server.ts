@@ -5,7 +5,7 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 import type { AppContext } from "../../core/app.js";
 import type { TenantContext } from "../../core/auth/context.js";
 import type { ToolRegistry } from "./registry.js";
@@ -18,7 +18,11 @@ export function createMcpServer(registry: ToolRegistry, app: AppContext, ctx: Te
     tools: registry.list().map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: zodToJsonSchema(t.inputSchema, { target: "openApi3" }) as Record<string, unknown>,
+      // Zod 4's native converter. The old `zod-to-json-schema` package walks
+      // `_def.typeName` (a Zod 3 internal) and emits `{}` for every Zod 4
+      // schema -- which made Claude Code's MCP client reject every tool
+      // because `inputSchema` lacked `type: "object"`.
+      inputSchema: z.toJSONSchema(t.inputSchema) as Record<string, unknown>,
     })),
   }));
 

@@ -95,5 +95,16 @@ describe("POST /mcp", () => {
     }
     expect(payload).toBeTruthy();
     expect(Array.isArray(payload?.result?.tools)).toBe(true);
+
+    // Every tool MUST ship a JSON-Schema object with `type: "object"`. Without
+    // this, Claude Code's MCP UI silently filters every tool out and shows
+    // "no tools" + "SDK auth failed". Regression guard: a Zod-major upgrade
+    // can break the converter and re-introduce empty `{}` schemas.
+    const tools = payload?.result?.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
+    expect(tools.length).toBeGreaterThan(0);
+    for (const tool of tools) {
+      expect(tool.inputSchema, `${tool.name} inputSchema`).toBeTruthy();
+      expect(tool.inputSchema.type, `${tool.name} inputSchema.type`).toBe("object");
+    }
   });
 });
