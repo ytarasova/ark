@@ -442,9 +442,6 @@ export {
   type LedgerEntryStatus,
 } from "./repositories/ledger.js";
 
-// Agent Client Protocol (headless JSON-RPC)
-export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } from "./acp.js";
-
 // Repository map generation
 export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type RepoMapEntry } from "./repo-map.js";
 
