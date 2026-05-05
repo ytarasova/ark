@@ -71,10 +71,17 @@ export class SessionCreator {
       resolvedFlowName = flowRef;
     }
 
+    // compute_name fallback chain: explicit arg > per-repo config > "local".
+    // Without the trailing "local" default, sessions dispatched with no
+    // explicit compute landed in the DB with NULL compute_name even though
+    // the rest of the system implicitly resolves them to local. The compute
+    // panel's "Sessions on this compute" filter then matched them against
+    // every compute (NULL == NULL trick or fallback-on-null), so one
+    // session appeared under multiple compute panels. See #472.
     const mergedOpts: Record<string, unknown> = {
       ...opts,
       flow: resolvedFlowName,
-      compute_name: opts.compute_name ?? repoConfig.compute,
+      compute_name: opts.compute_name ?? repoConfig.compute ?? "local",
       group_name: groupName,
       workspace_id: opts.workspace_id ?? null,
     };
