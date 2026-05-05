@@ -34,7 +34,13 @@ afterEach(() => {
 
 describe("sweepOrphanAttachFifos", () => {
   it("unlinks every arkd-attach-*.fifo it finds in tmpdir", async () => {
-    const fakes = ["arkd-attach-zzz1-test.fifo", "arkd-attach-zzz2-test.fifo"];
+    // Filenames must be unique per test run -- the sweep operates on the
+    // real system tmpdir and `make test` runs files in parallel
+    // (--concurrency 4). Fixed names like `arkd-attach-zzz1-test.fifo`
+    // race between workers (one writes, another sweeps before the first
+    // asserts), and the test fails non-deterministically.
+    const tag = `${process.pid}-${Date.now().toString(36)}`;
+    const fakes = [`arkd-attach-zzzA-${tag}.fifo`, `arkd-attach-zzzB-${tag}.fifo`];
     for (const name of fakes) writeFileSync(join(tmpdir(), name), "");
 
     const result = await sweepOrphanAttachFifos();

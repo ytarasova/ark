@@ -167,7 +167,10 @@ describe("end-to-end: server + client", async () => {
 
     const s1 = await client.sessionStart({ summary: "all-test-1", repo: ".", flow: "bare" });
     const s2 = await client.sessionStart({ summary: "all-test-2", repo: ".", flow: "bare" });
-    await client.sessionUpdate(s1.id, { status: "running" });
+    // SessionRepository invariant: status="running" requires session_id to be
+    // set in the same update delta. The test only cares that s1 is in a
+    // non-default state; pass both fields together to satisfy the contract.
+    await client.sessionUpdate(s1.id, { status: "running", session_id: `ark-${s1.id}` });
 
     // List without filter should include both
     const all = await client.sessionList();
