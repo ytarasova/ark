@@ -55,28 +55,19 @@ export function ComputeDetailPanel({
   const m = snapshot?.metrics;
   const arkProcs = (snapshot?.processes ?? []).filter((p) => isArkProcess(p.command));
   const otherProcs = (snapshot?.processes ?? []).filter((p) => !isArkProcess(p.command));
-  // Sessions explicitly dispatched to this compute, plus unattached ones
-  // (compute_name == null). The unattached bucket is a server-side gap --
-  // the dispatcher only writes `compute_name` when a stage resolves to a
-  // compute template (see packages/core/services/dispatch.ts around the
-  // `stageCompute` branch); sessions that run against the implicit local
-  // host never get attributed. Until that gap is fixed on the server,
-  // render them here rather than silently drop them, but don't pretend
-  // they belong to any specific provider.
-  // Show only sessions that are actually live on this compute. Filter on:
-  // 1. compute_name matches the panel's compute (or local computes pick up
-  //    sessions with no compute_name set).
-  // 2. Status is non-terminal AND the session has dispatched. Sessions in
-  //    `pending` / `ready` / orphaned-`running` rows that never got a
-  //    session_id (e.g. dispatch_failed, agent stuck before launch-agent)
-  //    show up as empty Session rows in the UI -- which is the bug the
-  //    screenshot caught. Requiring `session_id` is the durable test for
-  //    "this session is actually running on a worker."
-  const TERMINAL_STATUSES = new Set(["completed", "failed", "stopped", "archived", "killed"]);
+  // Strict equality: a session belongs to exactly one compute. Sessions
+  // with `compute_name == null` are un-attributed (server bug, see #472)
+  // and show under no compute -- the dispatcher's default-to-"local"
+  // backfill should make this case empty for new sessions.
+  //
+  // Hide only fully-archived rows; failed / stopped / killed dispatches
+  // SHOULD show under the compute they targeted -- that's how the
+  // operator finds them when triaging. Same for sessions that died
+  // before launch-agent (no session_id): they still belong here.
+  const HIDDEN_STATUSES = new Set(["completed", "archived"]);
   const computeSessions = sessions.filter((s) => {
-    if (s.compute_name !== computeName && s.compute_name != null) return false;
-    if (TERMINAL_STATUSES.has(s.status)) return false;
-    if (!s.session_id) return false;
+    if (s.compute_name !== computeName) return false;
+    if (HIDDEN_STATUSES.has(s.status)) return false;
     return true;
   });
 

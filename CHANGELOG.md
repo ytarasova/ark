@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.21.41 (2026-05-05)
+
+### Fixes
+- **Knowledge graph**: proper namespace separation for eval nodes; default-exclude eval nodes at the store layer
+- **Actions**: persist `pr_url` after `create_pr` success; `auto_merge` precondition-checks `session.pr_url`
+- **Compute panel**: default `compute_name` to local with strict UI filter; hide stale sessions and show durable ark id
+- **Planner**: bump `max_turns` from 50 to 200
+- **Arkd**: use absolute `/bin/bash` path, validate cwd, and surface real errno on spawn failures
+- **MCP**: switch Zod 4 schema converter to native `z.toJSONSchema`; hide OAuth metadata in local mode
+- **Action stage**: resolve `GITHUB_TOKEN` from the secrets store (not just env); use `resolveTargetAndHandle` instead of a stub meta object
+- **EC2**: write tunnel port to `compute.config` so metrics survive across sessions; self-refreshing AWS credentials
+
+### Features
+- **Web terminal**: show wall-clock timestamps on tool-block headers; route all traffic through ark (no transport leak)
+
+### Refactor
+- **Session attach**: `SessionAttachService` owns the decision -- one model, one path
+
 ## v0.18.0 (2026-04-17)
 
 ### Web UI Redesign

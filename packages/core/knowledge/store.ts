@@ -207,6 +207,11 @@ export class KnowledgeStore {
   }
 
   // --- Search ---
+  // NOTE: callers searching production context (e.g. `buildContext` in
+  // context.ts) should NOT pass `eval_session` in `types`. Eval nodes
+  // belong to a separate type by design (#480) -- if a future caller
+  // wants to mix them with production search, that's a deliberate opt-in
+  // by listing both types in the `types` filter.
   async search(
     query: string,
     opts?: { types?: NodeType[]; limit?: number },
@@ -222,6 +227,11 @@ export class KnowledgeStore {
     if (opts?.types?.length) {
       sql += ` AND type IN (${opts.types.map(() => "?").join(", ")})`;
       params.push(...opts.types);
+    } else {
+      // No type filter passed: a search-the-whole-store call. Exclude
+      // eval_session by default since these never belong in production
+      // dispatch context. Callers wanting evals must list types explicitly.
+      sql += ` AND type != 'eval_session'`;
     }
     // LIKE-based search (works for both SQLite and Postgres)
     const likeClauses = words.map(() => "(LOWER(label) LIKE ? OR LOWER(content) LIKE ?)");

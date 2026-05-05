@@ -95,6 +95,9 @@ export async function buildContext(
         break;
       case "session":
         if (ctx.sessions.length < maxSessions) {
+          // Eval-flagged session nodes are now filtered at the store
+          // layer (search/listNodes default-exclude `metadata.eval ===
+          // true`). No output-side filter needed here.
           ctx.sessions.push({
             id: node.id.replace("session:", ""),
             summary: node.label,
@@ -151,12 +154,17 @@ export function formatContextAsMarkdown(ctx: ContextPackage, opts?: { maxChars?:
   }
 
   if (ctx.sessions.length > 0) {
-    const s =
-      "## Related Past Sessions\n" +
-      ctx.sessions
-        .map((s) => `- **${s.id}**: ${s.summary} (${s.outcome}, changed: ${s.files_changed.join(", ")})`)
-        .join("\n");
-    addSection(s);
+    // Suppress empty trailing parens. When outcome + files_changed are both
+    // empty, the old format produced `(, changed: )`; build the suffix
+    // conditionally instead so signal-free rows render cleanly. See #480.
+    const lines = ctx.sessions.map((s) => {
+      const parts: string[] = [];
+      if (s.outcome) parts.push(s.outcome);
+      if (s.files_changed.length) parts.push(`changed: ${s.files_changed.join(", ")}`);
+      const suffix = parts.length ? ` (${parts.join(", ")})` : "";
+      return `- **${s.id}**: ${s.summary}${suffix}`;
+    });
+    addSection("## Related Past Sessions\n" + lines.join("\n"));
   }
 
   if (ctx.files.length > 0) {
