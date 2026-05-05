@@ -251,4 +251,19 @@ describe("validation", () => {
     });
     expect(r.status).toBe(400);
   });
+
+  // #473: missing workdir used to surface as `ENOENT posix_spawn '<cmd>'`,
+  // which made every EC2 launch-agent failure look like a bash-not-found
+  // bug. Validate cwd up front so the message points at the real cause.
+  test("rejects missing workdir with explicit message (not ENOENT-on-cmd)", async () => {
+    const r = await postJson<{ error: string }>("/process/spawn", {
+      handle: "p-no-workdir",
+      cmd: "/bin/bash",
+      args: ["-c", "true"],
+      workdir: "/this/path/definitely/does/not/exist/abc-xyz",
+    });
+    expect(r.status).toBe(400);
+    expect(r.data.error).toMatch(/workdir does not exist/);
+    expect(r.data.error).not.toMatch(/posix_spawn/);
+  });
 });
