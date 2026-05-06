@@ -114,10 +114,15 @@ dev-temporal-down: ## Stop and remove the local Temporal cluster + its data volu
 	docker compose -f .infra/docker-compose.temporal.yaml -p ark-temporal down -v
 	@echo "Ark local Temporal cluster stopped."
 
+# Pick whichever docker compose CLI is on PATH. Modern installs ship the
+# plugin (`docker compose`); older engines + the standalone v2 release
+# ship as `docker-compose`. Some laptop setups have only one of the two.
+DOCKER_COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
+
 dev-stack: ## Start local Ark dev stack (Postgres :15433 + Redis :6379) and apply bootstrap SQL
 	@command -v docker >/dev/null 2>&1 || { echo "Docker required. Install Docker Desktop."; exit 1; }
 	@echo "\033[1mStarting Ark dev stack (Postgres + Redis)...\033[0m"
-	docker compose -f .infra/docker-compose.dev.yaml -p ark-dev up -d --wait
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.dev.yaml -p ark-dev up -d --wait
 	@echo "\033[1mApplying bootstrap SQL workarounds...\033[0m"
 	docker exec -i ark-postgres psql -U ark -d ark < .infra/dev-stack-bootstrap.sql
 	@echo ""
@@ -127,7 +132,7 @@ dev-stack: ## Start local Ark dev stack (Postgres :15433 + Redis :6379) and appl
 	@echo "  Next: source .env.control-plane && bun packages/cli/index.ts server start --hosted"
 
 dev-stack-down: ## Stop and remove the local Ark dev stack + its data volumes
-	docker compose -f .infra/docker-compose.dev.yaml -p ark-dev down -v
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.dev.yaml -p ark-dev down -v
 	@echo "Ark local dev stack stopped."
 
 spike-temporal-bun: ## Run the Phase 0 Bun / Temporal worker compat spike
