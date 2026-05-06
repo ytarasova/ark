@@ -5,7 +5,7 @@
  * No new behavior -- this is a refactor that delegates to existing modules.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 import { recordingPath } from "../recordings.js";
 
@@ -13,6 +13,7 @@ import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../exec
 import * as claude from "../claude/claude.js";
 import * as tmux from "../infra/tmux.js";
 import { discoverWorkspacePorts } from "../compute/isolation/ports.js";
+import { hasDevcontainerConfig } from "../compute/isolation/devcontainer.js";
 import { logWarn } from "../observability/structured-log.js";
 
 /**
@@ -102,19 +103,6 @@ export function assertRemoteChannelConfig(
     );
   }
   return null;
-}
-
-/**
- * True when the workspace declares a devcontainer (root or `.devcontainer/`).
- * Same precedence VS Code uses: `.devcontainer/devcontainer.json` then a
- * top-level `devcontainer.json` / `.devcontainer.json`.
- */
-function hasDevcontainerConfig(workdir: string): boolean {
-  return (
-    existsSync(join(workdir, ".devcontainer", "devcontainer.json")) ||
-    existsSync(join(workdir, "devcontainer.json")) ||
-    existsSync(join(workdir, ".devcontainer.json"))
-  );
 }
 
 export const claudeCodeExecutor: Executor = {

@@ -21,29 +21,16 @@
  *     owns all session state.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
+import { mkdirSync, writeFileSync } from "fs";
 import { recordingPath } from "../recordings.js";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as tmux from "../infra/tmux.js";
 import * as claude from "../claude/claude.js";
+import { hasDevcontainerConfig } from "../compute/isolation/devcontainer.js";
 
 /** Single-quote a string for safe bash interpolation (no expansion). */
 const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-
-/**
- * True when the workspace declares a devcontainer (root or `.devcontainer/`).
- * Mirrors the helper in claude-code.ts -- duplicated rather than shared so
- * the executor module stays self-contained against a future split.
- */
-function hasDevcontainerConfig(workdir: string): boolean {
-  return (
-    existsSync(join(workdir, ".devcontainer", "devcontainer.json")) ||
-    existsSync(join(workdir, "devcontainer.json")) ||
-    existsSync(join(workdir, ".devcontainer.json"))
-  );
-}
 
 // ── Pure command-line builder (unit-testable) ──────────────────────────────
 

@@ -89,7 +89,7 @@ export function discoverComposePorts(workdir: string): PortDecl[] {
       const ports = Array.isArray((svc as { ports?: unknown[] })?.ports) ? (svc as { ports: unknown[] }).ports : [];
       for (const entry of ports) {
         const port = parseComposePort(entry);
-        if (port !== null) out.push({ port });
+        if (port !== null) out.push({ port, source: "docker-compose" });
       }
     }
     return out;
@@ -101,12 +101,30 @@ export function discoverComposePorts(workdir: string): PortDecl[] {
 function parseComposePort(entry: unknown): number | null {
   if (typeof entry === "number") return Number.isInteger(entry) ? entry : null;
   if (typeof entry === "string") {
-    // Match the trailing port (after the last colon and before any `/proto`).
-    // Handles "3000", "3000:3000", "127.0.0.1:3000:3000", "3000/tcp".
-    const m = entry.match(/(\d+)(?:\/[a-z]+)?$/);
-    return m ? parseInt(m[1], 10) : null;
+    // Compose short syntax: extract the HOST-facing port. Supported forms:
+    //   "3000"                       -- only one number, that IS the host port
+    //   "8080:3000"                  -- host:container, take 8080
+    //   "127.0.0.1:8080:3000"        -- ip:host:container, take 8080
+    //   "3000/tcp"                   -- bare port + proto, take 3000
+    //   "8080:3000/udp"              -- mapped + proto, take 8080
+    // Range forms ("3000-3005:3000-3005") are not supported -- ignore them.
+    if (entry.includes("-")) return null;
+    const stripped = entry.split("/")[0];
+    const parts = stripped.split(":");
+    // host port is the second-to-last segment when there's a mapping,
+    // otherwise the only segment.
+    const host = parts.length === 1 ? parts[0] : parts[parts.length - 2];
+    if (!host || !/^\d+$/.test(host)) return null;
+    return parseInt(host, 10);
+  }
+  if (typeof entry === "object" && entry && "published" in entry) {
+    const p = (entry as { published?: unknown }).published;
+    if (typeof p === "number") return Number.isInteger(p) ? p : null;
+    if (typeof p === "string" && /^\d+$/.test(p)) return parseInt(p, 10);
   }
   if (typeof entry === "object" && entry && "target" in entry) {
+    // Long-form without `published` falls back to `target` (container port);
+    // it's the only port we have. Compose treats this as published == target.
     const t = (entry as { target?: unknown }).target;
     return typeof t === "number" ? t : null;
   }

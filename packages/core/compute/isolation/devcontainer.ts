@@ -480,29 +480,44 @@ export interface PortDecl {
   source?: string;
 }
 
+/** Candidate paths for a devcontainer.json, in lookup precedence. */
+const DEVCONTAINER_CANDIDATES = [".devcontainer/devcontainer.json", "devcontainer.json", ".devcontainer.json"];
+
+/** Locate the workspace's devcontainer config, returning the absolute path or null. */
+export function findDevcontainerConfig(workdir: string): string | null {
+  for (const candidate of DEVCONTAINER_CANDIDATES) {
+    const path = join(workdir, candidate);
+    if (existsSync(path)) return path;
+  }
+  return null;
+}
+
+/** Quick "does this workspace declare a devcontainer?" check. Wraps `findDevcontainerConfig`. */
+export function hasDevcontainerConfig(workdir: string): boolean {
+  return findDevcontainerConfig(workdir) !== null;
+}
+
 /**
  * Read `forwardPorts` from `.devcontainer/devcontainer.json` (preferred) or
  * a top-level `devcontainer.json`/`.devcontainer.json`. Returns an empty array
  * when no devcontainer config is present or it cannot be parsed.
  *
- * The reader is intentionally lenient: VS Code's own parser tolerates JSONC
- * comments and trailing commas, so we strip comments before `JSON.parse`.
+ * `strip-json-comments` handles `//` and block comments; trailing commas will
+ * still cause `JSON.parse` to throw and the reader returns `[]` for the file.
+ * That matches our policy of "best-effort discovery" rather than strict
+ * JSONC parity with VS Code.
  */
 export function discoverDevcontainerPorts(workdir: string): PortDecl[] {
-  const candidates = [".devcontainer/devcontainer.json", "devcontainer.json", ".devcontainer.json"];
-  for (const candidate of candidates) {
-    const path = join(workdir, candidate);
-    if (!existsSync(path)) continue;
-    try {
-      const raw = readFileSync(path, "utf-8");
-      const parsed = JSON.parse(stripJsonComments(raw));
-      const ports = Array.isArray(parsed?.forwardPorts) ? parsed.forwardPorts : [];
-      return ports
-        .filter((p: unknown): p is number => typeof p === "number" && Number.isInteger(p))
-        .map((p: number) => ({ port: p }));
-    } catch {
-      return [];
-    }
+  const path = findDevcontainerConfig(workdir);
+  if (!path) return [];
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const parsed = JSON.parse(stripJsonComments(raw));
+    const ports = Array.isArray(parsed?.forwardPorts) ? parsed.forwardPorts : [];
+    return ports
+      .filter((p: unknown): p is number => typeof p === "number" && Number.isInteger(p))
+      .map((p: number) => ({ port: p, source: "devcontainer.json" }));
+  } catch {
+    return [];
   }
-  return [];
 }
