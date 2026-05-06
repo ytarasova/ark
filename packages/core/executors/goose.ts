@@ -21,7 +21,7 @@
  *     owns all session state.
  */
 
-import { mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { recordingPath } from "../recordings.js";
 
@@ -31,6 +31,19 @@ import * as claude from "../claude/claude.js";
 
 /** Single-quote a string for safe bash interpolation (no expansion). */
 const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+
+/**
+ * True when the workspace declares a devcontainer (root or `.devcontainer/`).
+ * Mirrors the helper in claude-code.ts -- duplicated rather than shared so
+ * the executor module stays self-contained against a future split.
+ */
+function hasDevcontainerConfig(workdir: string): boolean {
+  return (
+    existsSync(join(workdir, ".devcontainer", "devcontainer.json")) ||
+    existsSync(join(workdir, "devcontainer.json")) ||
+    existsSync(join(workdir, ".devcontainer.json"))
+  );
+}
 
 // ── Pure command-line builder (unit-testable) ──────────────────────────────
 
@@ -123,11 +136,13 @@ export const gooseExecutor: Executor = {
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
-    // Conductor URL (devcontainer vs host)
-    const { parseArcJson } = await import("../compute/arc-json.js");
+    // Conductor URL (devcontainer vs host). Auto-detect a devcontainer by
+    // file presence: if `.devcontainer/devcontainer.json` (or top-level
+    // variant) is present, route through `host.docker.internal` so the
+    // agent inside the container can reach the host's conductor.
     const { DEFAULT_CONDUCTOR_URL, DOCKER_CONDUCTOR_URL } = await import("../constants.js");
-    const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
-    const conductorUrl = arcJson?.devcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;
+    const usesDevcontainer = !!effectiveWorkdir && hasDevcontainerConfig(effectiveWorkdir);
+    const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;
 
     // Channel MCP -- reuse the same config builder claude uses. Goose will
     // spawn the `command + args` as a stdio extension and inherit our env.

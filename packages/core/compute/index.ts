@@ -23,9 +23,6 @@ export type {
   DockerContainer,
   PortDecl,
   PortStatus,
-  ArcJson,
-  ArcComposeConfig,
-  ArcDevcontainerConfig,
 } from "./types.js";
 
 export function getIsolationModes(providerName: string): { value: string; label: string }[] {
@@ -83,9 +80,6 @@ export { RemoteWorktreeProvider, RemoteDockerProvider, RemoteDevcontainerProvide
 // Kubernetes providers (vanilla + Kata/Firecracker)
 import { K8sProvider, KataProvider } from "./providers/k8s.js";
 export { K8sProvider, KataProvider };
-
-// arc.json
-export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
 
 // ── Compute + Isolation split ──────────────────────────────────────────────
 //

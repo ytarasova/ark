@@ -5,14 +5,14 @@
  * No new behavior -- this is a refactor that delegates to existing modules.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 import { recordingPath } from "../recordings.js";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude/claude.js";
 import * as tmux from "../infra/tmux.js";
-import { parseArcJson } from "../compute/arc-json.js";
+import { discoverWorkspacePorts } from "../compute/isolation/ports.js";
 import { logWarn } from "../observability/structured-log.js";
 
 /**
@@ -104,6 +104,19 @@ export function assertRemoteChannelConfig(
   return null;
 }
 
+/**
+ * True when the workspace declares a devcontainer (root or `.devcontainer/`).
+ * Same precedence VS Code uses: `.devcontainer/devcontainer.json` then a
+ * top-level `devcontainer.json` / `.devcontainer.json`.
+ */
+function hasDevcontainerConfig(workdir: string): boolean {
+  return (
+    existsSync(join(workdir, ".devcontainer", "devcontainer.json")) ||
+    existsSync(join(workdir, "devcontainer.json")) ||
+    existsSync(join(workdir, ".devcontainer.json"))
+  );
+}
+
 export const claudeCodeExecutor: Executor = {
   name: "claude-code",
 
@@ -135,8 +148,12 @@ export const claudeCodeExecutor: Executor = {
     // app.config so a non-default `--conductor-port` is reflected in the
     // baked-in URL (DEFAULT_CONDUCTOR_URL is hardcoded to 19100 and would
     // mismatch if the user moved the conductor).
-    const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
-    const usesDevcontainer = arcJson?.devcontainer ?? false;
+    //
+    // Devcontainer auto-detection: if the workspace declares a
+    // `.devcontainer/devcontainer.json` (root or `.devcontainer/`), the
+    // conductor URL must rewire to `host.docker.internal` so the agent
+    // running inside the container can reach the host.
+    const usesDevcontainer = !!effectiveWorkdir && hasDevcontainerConfig(effectiveWorkdir);
     const { DOCKER_CONDUCTOR_URL } = await import("../constants.js");
     const localConductorUrl = `http://localhost:${app.config.ports.conductor}`;
     const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : localConductorUrl;
@@ -375,7 +392,6 @@ export const claudeCodeExecutor: Executor = {
     if (compute && provider && !provider.supportsWorktree) {
       const { resolveTargetAndHandle } = await import("../services/dispatch/target-resolver.js");
       const { runTargetLifecycle } = await import("../services/dispatch/target-lifecycle.js");
-      const { resolvePortDecls } = await import("../compute/arc-json.js");
 
       const { target, handle } = await resolveTargetAndHandle(app, session);
       if (!target || !handle) {
@@ -404,7 +420,7 @@ export const claudeCodeExecutor: Executor = {
           : undefined,
         onFallback: (reason) => logWarn("session", `remote workdir fallback for session ${session.id}: ${reason}`),
       });
-      const ports = remoteWorkdir ? resolvePortDecls(remoteWorkdir) : [];
+      const ports = remoteWorkdir ? discoverWorkspacePorts(remoteWorkdir) : [];
       if (ports.length > 0) {
         await app.sessions.update(session.id, { config: { ...session.config, ports } });
       }

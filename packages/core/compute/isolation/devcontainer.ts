@@ -30,7 +30,11 @@
  */
 
 import { execFile } from "child_process";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import { promisify } from "util";
+
+import stripJsonComments from "strip-json-comments";
 
 import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
@@ -459,4 +463,46 @@ export class DevcontainerIsolation implements Isolation {
 function sanitize(name: string): string {
   const safe = name.replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "");
   return safe.length > 0 ? safe.toLowerCase() : "handle";
+}
+
+// ── Port discovery ──────────────────────────────────────────────────────────
+
+/**
+ * Minimal port descriptor returned by the auto-discovery helpers. The shape
+ * matches `LaunchOpts.ports` and the legacy `compute/types.ts:PortDecl`, so
+ * callers can hand discovered ports to either surface without a translation.
+ * `source` carries the format the port was lifted from (`"devcontainer.json"`,
+ * `"docker-compose"`) for diagnostic logging only.
+ */
+export interface PortDecl {
+  port: number;
+  name?: string;
+  source?: string;
+}
+
+/**
+ * Read `forwardPorts` from `.devcontainer/devcontainer.json` (preferred) or
+ * a top-level `devcontainer.json`/`.devcontainer.json`. Returns an empty array
+ * when no devcontainer config is present or it cannot be parsed.
+ *
+ * The reader is intentionally lenient: VS Code's own parser tolerates JSONC
+ * comments and trailing commas, so we strip comments before `JSON.parse`.
+ */
+export function discoverDevcontainerPorts(workdir: string): PortDecl[] {
+  const candidates = [".devcontainer/devcontainer.json", "devcontainer.json", ".devcontainer.json"];
+  for (const candidate of candidates) {
+    const path = join(workdir, candidate);
+    if (!existsSync(path)) continue;
+    try {
+      const raw = readFileSync(path, "utf-8");
+      const parsed = JSON.parse(stripJsonComments(raw));
+      const ports = Array.isArray(parsed?.forwardPorts) ? parsed.forwardPorts : [];
+      return ports
+        .filter((p: unknown): p is number => typeof p === "number" && Number.isInteger(p))
+        .map((p: number) => ({ port: p }));
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }

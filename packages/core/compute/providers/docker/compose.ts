@@ -9,8 +9,12 @@ import { basename, dirname, join } from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { COMPOSE_FILE_NAMES } from "../../arc-json.js";
 import { logDebug } from "../../../observability/structured-log.js";
+
+/** Canonical compose filename precedence. Inlined here because this file is
+ *  scheduled for deletion in compute-cleanup Task 4; the isolation layer's
+ *  copy in `isolation/docker-compose.ts` is the canonical home. */
+const COMPOSE_FILE_NAMES = ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"] as const;
 
 const execFileAsync = promisify(execFile);
 

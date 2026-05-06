@@ -2,30 +2,27 @@
  * DockerComposeIsolation -- isolation backed by docker compose.
  *
  * Provisions a session by:
- *   1. Bringing up the user's docker-compose stack (file, inline, or both).
+ *   1. Bringing up the user's docker-compose stack via the workspace's
+ *      `docker-compose.yml` (or any of the standard compose filename
+ *      variants).
  *   2. Creating a sidecar arkd container joined to the compose network.
  *   3. Bootstrapping the sidecar and starting arkd so the agent can reach
  *      user services by compose service name.
  *
- * The stack may come from three forms declared in the repo's arc.json:
- *   - `compose: true`               -> docker-compose.yml in the repo
- *   - `compose: { file: "..." }`    -> custom path
- *   - `compose: { inline: {...} }`  -> spec written to a tempfile
- *   - `compose: { file, inline }`   -> both, merged via `docker compose -f A -f B`
+ * The compose file is auto-detected: if `docker-compose.yml` (or any of the
+ * variants in `COMPOSE_FILE_NAMES`) exists at the workspace root, this
+ * isolation uses it; otherwise `prepare()` throws a clear error.
  *
  * See `.workflow/plan/compute-runtime-vision.md` and the README for the
  * rationale behind the split.
  */
 
-import { rmSync, existsSync } from "fs";
-import { isAbsolute, join, resolve as pathResolve } from "path";
+import { existsSync, readFileSync } from "fs";
 
 import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
 import { allocatePort } from "../../config/port-allocator.js";
 import { safeAsync } from "../../safe.js";
-import { parseArcJson, resolveArcCompose } from "../arc-json.js";
-import type { ArcComposeConfig } from "../types.js";
 import type {
   AgentHandle,
   Compute,
@@ -48,13 +45,73 @@ import {
   waitForArkdHealth,
   type BootstrapOpts,
 } from "../providers/docker/helpers.js";
-import {
-  composeDownWithFiles,
-  composeUpWithFiles,
-  resolveComposeNetwork,
-  writeInlineCompose,
-} from "../providers/docker/compose.js";
-import { logDebug } from "../../observability/structured-log.js";
+import { composeDownWithFiles, composeUpWithFiles, resolveComposeNetwork } from "../providers/docker/compose.js";
+import { parse as parseYaml } from "yaml";
+
+import type { PortDecl } from "./devcontainer.js";
+
+// ── Compose file detection ─────────────────────────────────────────────────
+
+/** Canonical compose filename precedence; matches docker compose's own. */
+const COMPOSE_FILE_NAMES = ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"] as const;
+
+/**
+ * Locate the compose file in `workdir`, picking the first name in
+ * `COMPOSE_FILE_NAMES` that exists. Returns the absolute path, or null when
+ * the workspace does not declare a compose stack.
+ */
+export function findComposeFile(workdir: string): string | null {
+  for (const name of COMPOSE_FILE_NAMES) {
+    const path = `${workdir}/${name}`;
+    if (existsSync(path)) return path;
+  }
+  return null;
+}
+
+/**
+ * Read service-level `ports:` declarations from the workspace's compose file.
+ * Returns an empty array when no compose file is present, the file is
+ * unparseable, or no service declares `ports`.
+ *
+ * Each compose entry can be a number (`8080`), a string (`"3000:3000"`,
+ * `"127.0.0.1:3000:3000"`, `"3000/tcp"`), or a long-form object with
+ * `target`. We collect the host-facing port; protocol and label are not
+ * propagated yet (none of our consumers need them).
+ */
+export function discoverComposePorts(workdir: string): PortDecl[] {
+  const path = findComposeFile(workdir);
+  if (!path) return [];
+  try {
+    const parsed = parseYaml(readFileSync(path, "utf-8"));
+    const services = (parsed as { services?: Record<string, unknown> } | null)?.services ?? {};
+    const out: PortDecl[] = [];
+    for (const svc of Object.values(services)) {
+      const ports = Array.isArray((svc as { ports?: unknown[] })?.ports) ? (svc as { ports: unknown[] }).ports : [];
+      for (const entry of ports) {
+        const port = parseComposePort(entry);
+        if (port !== null) out.push({ port });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function parseComposePort(entry: unknown): number | null {
+  if (typeof entry === "number") return Number.isInteger(entry) ? entry : null;
+  if (typeof entry === "string") {
+    // Match the trailing port (after the last colon and before any `/proto`).
+    // Handles "3000", "3000:3000", "127.0.0.1:3000:3000", "3000/tcp".
+    const m = entry.match(/(\d+)(?:\/[a-z]+)?$/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+  if (typeof entry === "object" && entry && "target" in entry) {
+    const t = (entry as { target?: unknown }).target;
+    return typeof t === "number" ? t : null;
+  }
+  return null;
+}
 
 // ── Test seams ──────────────────────────────────────────────────────────────
 //
@@ -72,7 +129,6 @@ export interface DockerComposeIsolationHooks {
   waitForArkdHealth?: (url: string, timeoutMs?: number) => Promise<void>;
   composeUpWithFiles?: typeof composeUpWithFiles;
   composeDownWithFiles?: typeof composeDownWithFiles;
-  writeInlineCompose?: typeof writeInlineCompose;
   resolveComposeNetwork?: typeof resolveComposeNetwork;
   connectNetwork?: (networkName: string, containerName: string) => Promise<void>;
   allocatePort?: () => Promise<number>;
@@ -92,7 +148,6 @@ export interface DockerComposeMeta {
   arkdUrl: string;
   composeFiles: string[];
   composeNetwork: string;
-  inlineTempPath: string | null;
   workdir: string;
 }
 
@@ -124,13 +179,12 @@ export class DockerComposeIsolation implements Isolation {
 
   async prepare(_compute: Compute, handle: ComputeHandle, ctx: PrepareCtx): Promise<void> {
     const workdir = ctx.workdir;
-    const arc = parseArcJson(workdir);
-    const composeCfg = resolveArcCompose(arc);
+    const composeFile = findComposeFile(workdir);
 
-    if (!composeCfg) {
+    if (!composeFile) {
       throw new Error(
-        `DockerComposeIsolation.prepare: no compose config found in ${workdir}/arc.json. ` +
-          `Set "compose": true, "compose": { "file": "..." } or "compose": { "inline": {...} }.`,
+        `DockerComposeIsolation.prepare: no docker-compose.yml found in ${workdir}. ` +
+          `Expected one of: ${COMPOSE_FILE_NAMES.join(", ")}.`,
       );
     }
 
@@ -142,27 +196,23 @@ export class DockerComposeIsolation implements Isolation {
       );
     }
 
-    const composeFiles = await this.buildComposeFileList(workdir, composeCfg, handle);
-    const inlineTempPath = composeFiles.find((p) => p.includes("compose.inline.")) ?? null;
+    const composeFiles = [composeFile];
 
     const allocate = this.hooks.allocatePort ?? allocatePort;
     const arkdHostPort = await allocate();
     const arkdUrl = `http://localhost:${arkdHostPort}`;
     const containerName = `ark-${handle.name}-compose`;
 
-    // 1. Bring the compose stack up (unless the user asked us not to).
-    if (!composeCfg.skipUp) {
-      const up = await (this.hooks.composeUpWithFiles ?? composeUpWithFiles)(workdir, composeFiles);
-      if (!up.ok) {
-        this.cleanupInlineTemp(inlineTempPath);
-        throw new Error(`docker compose up failed: ${up.error ?? "unknown"}`);
-      }
+    // 1. Bring the compose stack up.
+    const up = await (this.hooks.composeUpWithFiles ?? composeUpWithFiles)(workdir, composeFiles);
+    if (!up.ok) {
+      throw new Error(`docker compose up failed: ${up.error ?? "unknown"}`);
     }
 
     // 2. Resolve the compose network so the sidecar can join it.
     const composeNetwork = await (this.hooks.resolveComposeNetwork ?? resolveComposeNetwork)(workdir, composeFiles);
 
-    // 3. Sidecar container. Rolled back via composeDown + inline tempfile on any failure.
+    // 3. Sidecar container. Rolled back via composeDown on any failure.
     const image = this.resolveSidecarImage(handle);
     const bootstrapOpts = this.resolveBootstrapOpts(handle);
 
@@ -184,18 +234,15 @@ export class DockerComposeIsolation implements Isolation {
       await (this.hooks.startArkdInContainer ?? startArkdInContainer)(containerName, conductorUrl);
       await (this.hooks.waitForArkdHealth ?? waitForArkdHealth)(arkdUrl, 30_000);
     } catch (err) {
-      // Roll back in reverse order: sidecar first, then compose stack,
-      // then the inline tempfile. Every step is best-effort so we surface
-      // the original error rather than burying it behind cleanup noise.
+      // Roll back in reverse order: sidecar first, then compose stack. Every
+      // step is best-effort so we surface the original error rather than
+      // burying it behind cleanup noise.
       await safeAsync(`[compose] cleanup: rm sidecar ${containerName}`, async () => {
         await (this.hooks.removeContainer ?? removeContainer)(containerName);
       });
-      if (!composeCfg.skipUp) {
-        await safeAsync(`[compose] cleanup: compose down`, async () => {
-          await (this.hooks.composeDownWithFiles ?? composeDownWithFiles)(workdir, composeFiles);
-        });
-      }
-      this.cleanupInlineTemp(inlineTempPath);
+      await safeAsync(`[compose] cleanup: compose down`, async () => {
+        await (this.hooks.composeDownWithFiles ?? composeDownWithFiles)(workdir, composeFiles);
+      });
       throw err;
     }
 
@@ -205,7 +252,6 @@ export class DockerComposeIsolation implements Isolation {
       arkdUrl,
       composeFiles,
       composeNetwork,
-      inlineTempPath,
       workdir,
     };
     // Handle.meta is readonly on the interface but it's a plain object at runtime.
@@ -245,45 +291,9 @@ export class DockerComposeIsolation implements Isolation {
     await safeAsync(`[compose] shutdown: compose down`, async () => {
       await (this.hooks.composeDownWithFiles ?? composeDownWithFiles)(meta.workdir, meta.composeFiles);
     });
-
-    // 3. Delete the inline tempfile if we wrote one.
-    this.cleanupInlineTemp(meta.inlineTempPath);
   }
 
   // ── Internals ──────────────────────────────────────────────────────────
-
-  /**
-   * Build the ordered list of `-f` files for `docker compose`. Compose
-   * applies later `-f` arguments as overrides, so we pass the user's file
-   * first and the inline override second, matching compose's native merge.
-   */
-  private async buildComposeFileList(workdir: string, cfg: ArcComposeConfig, handle: ComputeHandle): Promise<string[]> {
-    const files: string[] = [];
-
-    if (cfg.file) {
-      const abs = isAbsolute(cfg.file) ? cfg.file : pathResolve(workdir, cfg.file);
-      if (!existsSync(abs)) {
-        throw new Error(`DockerComposeIsolation.prepare: compose file not found: ${abs}`);
-      }
-      files.push(abs);
-    }
-
-    if (cfg.inline) {
-      const runtimeDir = this.runtimeDir(handle);
-      const tempPath = join(runtimeDir, `compose.inline.${Date.now()}.yml`);
-      await (this.hooks.writeInlineCompose ?? writeInlineCompose)(cfg.inline, tempPath);
-      files.push(tempPath);
-    }
-
-    if (files.length === 0) {
-      throw new Error(`DockerComposeIsolation.prepare: compose config has neither file nor inline spec`);
-    }
-    return files;
-  }
-
-  private runtimeDir(handle: ComputeHandle): string {
-    return join(this.app.config.dirs.ark, "runtime", handle.name);
-  }
 
   private resolveSidecarImage(handle: ComputeHandle): string {
     const cfg = (handle.meta ?? {}) as Record<string, unknown>;
@@ -293,15 +303,6 @@ export class DockerComposeIsolation implements Isolation {
   private resolveBootstrapOpts(handle: ComputeHandle): BootstrapOpts {
     const cfg = (handle.meta ?? {}) as Record<string, unknown>;
     return ((cfg.bootstrap as BootstrapOpts) ?? {}) as BootstrapOpts;
-  }
-
-  private cleanupInlineTemp(path: string | null): void {
-    if (!path) return;
-    try {
-      rmSync(path, { force: true });
-    } catch {
-      logDebug("compute", "best-effort cleanup");
-    }
   }
 }
 
