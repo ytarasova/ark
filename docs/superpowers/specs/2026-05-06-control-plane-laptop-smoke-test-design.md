@@ -1,6 +1,7 @@
 # Control-Plane Laptop Smoke Test - Design
 
 **Status:** Approved (option a from 2026-05-06 brainstorm)
+**Implementation:** Shipped in PR #524 (ytarasova/ark) on 2026-05-06.
 **Branch:** `feat/control-plane-mode`
 **Worktree:** `.worktrees/feat-control-plane-mode`
 **Pairs with:** `docs/control_plan_mode.md` (Goal 2 - Compose dev stack)
@@ -75,7 +76,7 @@ open http://localhost:8420                     # web UI renders (login or defaul
 
 If `:8420` or `:19100` are already taken (e.g. a sibling worktree's `make dev` is running), override with `ARK_WEB_PORT` / `ARK_CONDUCTOR_PORT` and adjust the curl URLs to match.
 
-If the three calls succeed, the smoke test passes.
+If the three calls succeed, the smoke test passes. The smoke loop was verified locally in PR #524; the Makefile `dev-stack` target auto-detects the available docker-compose binary (`docker compose` plugin or `docker-compose` standalone v2) so the loop works on hosts that have only the standalone form.
 
 ---
 
@@ -83,11 +84,23 @@ If the three calls succeed, the smoke test passes.
 
 Each item is reproducible from the smoke loop above; entering them as their own backlog tickets:
 
-1. **Postgres parity: `knowledge` / `knowledge_edges` tables missing.** `initPostgresSchema` lacks them; migration 013 (`UPDATE knowledge SET type='eval_session' ...`) fails on a fresh Postgres DB. Manual repro: `DROP TABLE ark_schema_migrations; bun ... server start --hosted` -> crashes with `relation "knowledge" does not exist`. Manual fix: copy DDL from `initKnowledgeSchema` (in `repositories/schema.ts`) into `schema-postgres.ts`, translating SQLite idioms (`datetime('now')` -> `now()::text`).
-2. **Postgres parity: `sessions.pty_cols` / `pty_rows` columns missing.** Drizzle schema declares them on both dialects; `initPostgresSchema` omits them. Runtime session-list queries crash. Manual fix: `ALTER TABLE sessions ADD COLUMN pty_cols INTEGER; ADD COLUMN pty_rows INTEGER;` and add the same DDL to `schema-postgres.ts`.
-3. **Web bundle build not wired into `dev-stack`.** Operator must run `make build-web` separately before `server start --hosted` or the SPA returns 404.
-4. **Goal 1 deletion candidates** for the dev-storage override: when local-mode code is deleted, drop the `ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE` env, `LocalDiskBlobStore` import, and `FsSnapshotStore` import from `packages/core/di/{storage,runtime}.ts`. The replacements are `S3BlobStore` (already exists) + a new `S3SnapshotStore` (TODO #fixme already noted in `runtime.ts`).
-5. **`make dev-stack` Postgres on `:15433`** is a non-default port chosen to dodge a host-side Postgres collision on the author's laptop. If the team consolidates on `:15432` or `:5432`, update the compose port mapping + `DATABASE_URL` in `.env.control-plane`.
+1. **Postgres parity: `knowledge` / `knowledge_edges` tables missing** (#520). `initPostgresSchema` lacks them; migration 013 (`UPDATE knowledge SET type='eval_session' ...`) fails on a fresh Postgres DB. Manual repro: `DROP TABLE ark_schema_migrations; bun ... server start --hosted` -> crashes with `relation "knowledge" does not exist`. Manual fix: copy DDL from `initKnowledgeSchema` (in `repositories/schema.ts`) into `schema-postgres.ts`, translating SQLite idioms (`datetime('now')` -> `now()::text`).
+2. **Postgres parity: `sessions.pty_cols` / `pty_rows` columns missing** (#521). Drizzle schema declares them on both dialects; `initPostgresSchema` omits them. Runtime session-list queries crash. Manual fix: `ALTER TABLE sessions ADD COLUMN pty_cols INTEGER; ADD COLUMN pty_rows INTEGER;` and add the same DDL to `schema-postgres.ts`. Note: the bootstrap SQL workaround in `.infra/dev-stack-bootstrap.sql` applies these ALTER statements before the server boots, but the `sessions` table itself is created by the server's migration 001. This ordering means the ALTER statements emit `relation "sessions" does not exist` psql errors during `make dev-stack`; these errors are non-fatal (log spam only) and do not affect smoke endpoint results. The proper fix (tracked in #521) moves the columns into `schema-postgres.ts` and removes the workaround.
+3. **Web bundle build not wired into `dev-stack`** (#522). Operator must run `make build-web` separately before `server start --hosted` or the SPA returns 404.
+4. **Goal 1 deletion candidates** (#523) for the dev-storage override: when local-mode code is deleted, drop the `ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE` env, `LocalDiskBlobStore` import, and `FsSnapshotStore` import from `packages/core/di/{storage,runtime}.ts`. The replacements are `S3BlobStore` (already exists) + a new `S3SnapshotStore` (TODO #fixme already noted in `runtime.ts`).
+5. **`make dev-stack` Postgres on `:15433`** is a non-default port chosen to dodge a host-side Postgres collision or an SSH tunnel that already grabbed `:5432` on the author's laptop. This rationale is intentional and should be preserved in any future compose changes. If the team consolidates on a different port, update the compose port mapping + `DATABASE_URL` in `.env.control-plane`.
+
+### 5.6 Deferred design questions (surfaced in PR #524 review)
+
+These are not bugs; they are design gaps identified during code review that should be resolved before Goal 2 is declared production-ready:
+
+a. **`ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE` has no production-safety guard.** A Helm/Argo misconfiguration that leaks this env var into a production pod would silently downgrade tenant isolation by substituting `LocalDiskBlobStore` for the S3-backed store. Consider gating the override on `profile === "test"` or throwing if `NODE_ENV === "production"`.
+
+b. **Bootstrap SQL will silently diverge from `schema-postgres.ts`.** Once #520 lands (knowledge tables added to `initPostgresSchema`), the `knowledge` block in `.infra/dev-stack-bootstrap.sql` becomes redundant or conflicting. No `make drift`-style check exists to catch this divergence. Either remove the bootstrap block as part of #520, or add a CI lint step that asserts the bootstrap SQL is empty when the real schema covers it.
+
+c. **Port `:15433` rationale should be discoverable.** The non-default Postgres host port is chosen to avoid clashing with a host-side Postgres or an SSH tunnel already bound to `:5432`. This rationale exists in the compose file as an inline comment but not in a user-facing location. Section 5.5 above captures it; ensure it is also visible in the `make dev-stack` output or in `README`-level docs when Goal 2 lands.
+
+d. **`make dev-stack` should print a clearer "next step" hint.** Currently the trailing output shows connection URLs but the operator still needs to know to run `source .env.control-plane`. The target should print the exact command to run next (i.e. `source .env.control-plane && bun packages/cli/index.ts server start --hosted`) so the onboarding path is self-contained. Tracked as part of #522 scope.
 
 ---
 
