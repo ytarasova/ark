@@ -70,7 +70,14 @@ export async function startHostedServer(config: ArkConfig): Promise<{
   // listener chain doesn't reach the root dispatchService (each forTenant()
   // creates a fresh child scope with its own SessionDispatchListeners, so
   // registerDefaultDispatcher on the root app doesn't propagate). Runs every
-  // 2 seconds so the dev loop doesn't feel laggy.
+  // 10 seconds.
+  //
+  // `inFlight` guards against re-dispatching a session whose previous
+  // dispatch is still in async I/O (agent resolve / compute / launcher).
+  // The status row only flips to "running" in post-launch, which can be
+  // several seconds later -- without this set the next tick happily
+  // dispatches the same row again and we end up with N parallel agents.
+  const inFlight = new Set<string>();
   const dispatchInterval = setInterval(() => {
     void (async () => {
       try {
@@ -78,17 +85,26 @@ export async function startHostedServer(config: ArkConfig): Promise<{
         // to see sessions from all tenants.
         const ready = await app.sessions.listAcrossTenants({ status: "ready", limit: 20 });
         for (const s of ready) {
+          if (inFlight.has(s.id)) continue;
+          inFlight.add(s.id);
           const tenantApp = s.tenant_id ? app.forTenant(s.tenant_id) : app;
           // Warm agent/runtime caches for this tenant scope so resolveAgent
           // (which is sync) doesn't see a Promise instead of an AgentDefinition.
           await (tenantApp.agents as any).list?.().catch(() => {});
           await (tenantApp.runtimes as any).list?.().catch(() => {});
-          void tenantApp.dispatchService.dispatch(s.id).catch((err: Error) => {
-            logInfo("web", `dispatch poller: ${s.id} failed: ${err?.message ?? err}`);
-          });
+          void tenantApp.dispatchService
+            .dispatch(s.id)
+            .catch((err: Error) => {
+              logInfo("web", `dispatch poller: ${s.id} failed: ${err?.message ?? err}`);
+            })
+            .finally(() => {
+              inFlight.delete(s.id);
+            });
         }
       } catch (err: any) {
-        logInfo("web", `dispatch poller error: ${err?.message ?? err}`);
+        const cause = err?.cause ?? err?.original ?? null;
+        const detail = cause ? ` cause=${cause?.code ?? "?"}: ${cause?.message ?? cause}` : "";
+        logInfo("web", `dispatch poller error: ${err?.message ?? err}${detail}`);
       }
     })();
   }, 10_000);
