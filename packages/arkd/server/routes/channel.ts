@@ -37,7 +37,7 @@ import type {
 } from "../../common/types.js";
 import { json } from "../helpers.js";
 import { type RouteCtx } from "../route-ctx.js";
-import { publishOnChannel } from "./channels.js";
+import { publishOnChannel } from "../channel-bus.js";
 
 /**
  * Channel name on which agent->conductor frames (hook events, channel

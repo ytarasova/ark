@@ -1,10 +1,10 @@
-/** SHIM -- moved to server/routes/channels.ts. Will be deleted in Task 10. */
+/** SHIM -- bisected into server/channel-bus.ts + server/routes/channels.ts. Will be deleted in Task 10. */
 export {
   channelWebSocketHandler,
-  handleChannelRoutes,
   matchWsChannelPath,
   publishOnChannel,
-  SUBSCRIBED_ACK,
   _resetForTests,
-} from "../server/routes/channels.js";
-export type { ChannelWsData } from "../server/routes/channels.js";
+} from "../server/channel-bus.js";
+export type { ChannelWsData } from "../server/channel-bus.js";
+export { handleChannelRoutes } from "../server/routes/channels.js";
+export { SUBSCRIBED_ACK } from "../common/constants.js";

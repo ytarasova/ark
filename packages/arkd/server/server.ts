@@ -25,12 +25,8 @@ import { handleExecRoutes } from "./routes/exec.js";
 import { handleAgentRoutes } from "./routes/agent.js";
 import { handleMetricsSnapshotRoutes } from "./routes/metrics-snapshot.js";
 import { handleChannelRoutes } from "./routes/channel.js";
-import {
-  channelWebSocketHandler,
-  handleChannelRoutes as handleGenericChannelRoutes,
-  matchWsChannelPath,
-  type ChannelWsData,
-} from "./routes/channels.js";
+import { channelWebSocketHandler, matchWsChannelPath, type ChannelWsData } from "./channel-bus.js";
+import { handleChannelRoutes as handleGenericChannelRoutes } from "./routes/channels.js";
 import { handleMiscRoutes } from "./routes/misc.js";
 import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "./routes/attach.js";
 import { handleProcessRoutes } from "./routes/process.js";
