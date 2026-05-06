@@ -1,119 +1,55 @@
-# Plan: Update User Guide (docs/guide.md)
+# Plan: One-line note in docs/architecture.md about arkd client/server/common split
 
 ## Summary
 
-The user guide (`docs/guide.md`) is stale -- it reflects roughly the v0.8-v0.12 era and is missing features added through v0.17.0. This plan updates the guide to match the current codebase: new flows, runtimes, recipes, CLI commands, messaging bridges, daemon architecture, desktop app, profiles, schedules, and the `ark doctor`/`ark init` commands. It also corrects outdated counts (flows: 9->14, runtimes: 4->5, recipes: 8->10).
+The recent arkd refactor (commits `34d39133`..`f0311621`) split the package into three barrel-only subdirectories -- `client/`, `server/`, `common/` -- with package.json sub-path exports and an ESLint `no-restricted-imports` boundary rule. `docs/architecture.md` still describes arkd as a "Single binary (`packages/arkd/server.ts`, ~800 lines)" in section 4.1, which is now wrong. This plan adds a one-line note in section 4.1 that records the new layout so future readers don't go hunting for the old flat file.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `docs/guide.md` | Update all 20 sections plus add 5 new sections (see steps below) |
+| `docs/architecture.md` | Edit section 4.1 line 461: replace the stale "Single binary" fragment with a one-line note describing the `client/` + `server/` + `common/` split, sub-path exports, and ESLint boundary rule. |
 
-No new files needed -- this is a single-file update.
+No other files. No new files.
 
 ## Implementation steps
 
-### 1. Fix counts and add missing entries in existing sections
+1. Open `docs/architecture.md` and locate the paragraph at line 461 (under `### 4.1 What it is`):
 
-**Section 3 -- Flows** (lines 165-226):
-- Change "Builtin flows (9)" to "Builtin flows (14)"
-- Add 5 missing flows to the table:
-  - `autonomous` -- single-agent autonomous execution (no gates)
-  - `autonomous-sdlc` -- plan -> implement -> verify -> review -> PR -> merge pipeline
-  - `brainstorm` -- interactive ideation flow
-  - `conditional` -- DAG with conditional edges based on stage outcome
-  - `docs` -- documentation-focused flow
-- Add `on_outcome` field to the YAML structure docs (conditional routing)
+   ```
+   A stateless HTTP server that runs on every compute target on port 19300. Single binary (`packages/arkd/server.ts`, ~800 lines) that exposes agent lifecycle, file ops, exec, metrics, channel relay, and codegraph indexing over HTTP.
+   ```
 
-**Section 4 -- Runtimes** (lines 283-334):
-- Change "Runtimes (3 tools + 1 subscription variant)" to "Runtimes (5)"
-- Add goose runtime row to the table:
-  - `goose` | Goose CLI | api | goose
-- Update runtime YAML example or add goose example showing `task_delivery` and `transcript_parser` fields
+2. Replace the fragment `Single binary (\`packages/arkd/server.ts\`, ~800 lines)` with a one-line factual note. Proposed wording:
 
-**Section 6 -- Recipes** (lines 385-417):
-- Change "Builtin recipes (8)" to "Builtin recipes (10)"
-- Add 2 missing recipes to the table:
-  - `self-dogfood` -- use Ark to build Ark
-  - `self-quick` -- quick self-dogfooding recipe
+   > Code is split into `packages/arkd/{client,server,common}/` -- consumers import only via the sub-path barrels (`@ark/arkd/client`, `@ark/arkd/server`, `@ark/arkd/common`); an ESLint `no-restricted-imports` rule blocks cross-imports between layers and reaching past barrels.
 
-**Section 15 -- Dashboards** (lines 799-830):
-- Remove any lingering TUI references (the TUI was removed in v0.16.0)
-- Update web section: mention `--with-daemon` flag on `ark web` that auto-starts conductor + arkd
-- Mention daemon auto-detection (reuses existing daemons if already running)
+   Final paragraph after the edit (one paragraph, three sentences):
 
-### 2. Add new sections (insert after section 20, before appendices)
+   > A stateless HTTP server that runs on every compute target on port 19300. Code is split into `packages/arkd/{client,server,common}/` -- consumers import only via the sub-path barrels (`@ark/arkd/client`, `@ark/arkd/server`, `@ark/arkd/common`); an ESLint `no-restricted-imports` rule blocks cross-imports between layers and reaching past barrels. It exposes agent lifecycle, file ops, exec, metrics, channel relay, and codegraph indexing over HTTP.
 
-**Section 21 -- Daemon Architecture**
-- Explain the server daemon (`ark daemon start/stop/status`) on port 19400
-- Web and desktop connect as thin WebSocket clients
-- `ark web --with-daemon` starts conductor (:19100) + arkd (:19300) in-process
-- Desktop app uses `--with-daemon` by default for zero-config experience
+3. Save the file. No other doc updates -- the deeper section 4.x already documents endpoints/auth/etc. correctly.
 
-**Section 22 -- Messaging Bridges**
-- Telegram, Slack, Discord notification bridges
-- Config file: `~/.ark/bridge.json`
-- Bridge config structure (botToken/chatId for Telegram, webhookUrl for Slack/Discord)
-- Notifications on session events (stage completion, failures)
+4. Run `make format` (Prettier) and verify no other files changed. Markdown-only edit so lint is unaffected.
 
-**Section 23 -- Profiles**
-- `ark profile list/create/delete`
-- Stored in `~/.ark/profiles.json`
-- Profiles persist UI preferences and settings
-
-**Section 24 -- Schedules**
-- `ark schedule add/list/delete/enable/disable`
-- Cron-based recurring sessions
-- Web UI scheduling page
-
-**Section 25 -- CLI Utilities**
-- `ark doctor` -- check system prerequisites (bun, tmux, git, gh, claude)
-- `ark init` -- initialize Ark for a repo (creates `.ark.yaml`, runs prerequisite checks)
-- `ark acp` -- headless JSON-RPC server on stdin/stdout
-- `ark repo-map` -- generate repository structure map
-- `ark pr list/status` -- manage PR-bound sessions
-- `ark watch` -- watch GitHub issues with a label and auto-create sessions
-
-### 3. Update Table of Contents (lines 7-29)
-
-- Add sections 21-25 to the ToC
-- Renumber if needed
-
-### 4. Update Appendix: Key file locations (lines 1003-1020)
-
-- Add `~/.ark/bridge.json` -- messaging bridge config (Telegram/Slack/Discord)
-- Add `~/.ark/profiles.json` -- profile definitions
-
-### 5. Update Appendix: Common tasks cheat sheet (lines 1023-1053)
-
-- Add daemon start example: `ark daemon start`
-- Add doctor example: `ark doctor`
-- Add schedule example: `ark schedule add --cron "0 9 * * *" --recipe quick-fix --repo . --summary "Daily check"`
-- Add goose runtime example: `ark session start --repo . --summary "..." --runtime goose --dispatch`
-
-### 6. Update closing paragraph (line 1057)
-
-- Add messaging bridges, profiles, schedules, daemon architecture, and CLI utilities to the enumeration
+5. `git add docs/architecture.md && git commit -m "docs(architecture): note arkd client/server/common split + ESLint boundary"`.
 
 ## Testing strategy
 
-- **Manual review**: read through the updated guide end-to-end to verify accuracy against current YAML definitions in `flows/`, `runtimes/`, `agents/`, `recipes/`, `skills/`
-- **Link check**: verify all internal `#anchor` links in the ToC resolve to actual section headers
-- **Count verification**: grep flow/agent/runtime/skill/recipe directories to confirm counts match the updated text
-- **No code changes**: this is a docs-only update, no tests to run
-- **Formatting**: run `make format` to ensure Prettier compliance (120 char line width)
+- Run `make format` -- expect zero diff outside `docs/architecture.md`. The new sentence stays on one line, matching the line it replaces.
+- Run `make lint` -- expect zero warnings. The ESLint boundary rule the note describes lives in `eslint.config.js`, so `make lint` passing confirms the rule the doc references is real.
+- Visual inspection: section 4.1 should still read coherently with section 4.2 ("Why it exists") and section 4.3 ("What it runs"). No section headings move.
+- No code path changes -- skip `make test`.
 
 ## Risk assessment
 
-- **Low risk**: docs-only change, no code impact
-- **Stale again quickly**: if new features land without guide updates, this will drift. Consider adding a note in CONTRIBUTING.md about updating the guide
-- **Accuracy of new sections**: messaging bridges, profiles, and schedules sections are written from code inspection -- verify examples work by running the CLI commands if possible
-- **Desktop section**: desktop app details come from changelog entries; verify `ark web --with-daemon` flag exists in the current codebase (confirmed in `packages/cli/commands/misc.ts`)
+- **Scope creep risk:** the rest of section 4 still has minor staleness (e.g. "Single binary" framing carries over). Resist the urge to rewrite the whole section -- the task is one line. Leave any broader rewrite for a separate PR.
+- **Wording drift:** keep the package alias names as they appear in `packages/arkd/package.json` (`./client`, `./server`, `./common`). Do not invent path forms (e.g. `arkd/client/client.ts`) that the ESLint rule actually disallows when imported by consumers.
+- **Markdown formatting:** surrounding paragraphs use backticks around paths; preserve that style. No em dashes (CLAUDE.md rule); use `--`.
+- **Breaking changes:** none. Documentation only.
+- **Migration concerns:** none.
 
 ## Open questions
 
-1. **Messaging bridges depth**: should the guide include step-by-step setup for Telegram/Slack/Discord, or just reference the config format? The bridge code exists but it's unclear how well-tested the Discord path is.
-2. **Goose runtime**: the goose runtime YAML exists but should we document it at the same detail level as Claude/Codex/Gemini, or note it as experimental?
-3. **`ark watch` command**: this watches GitHub issues with a label -- is this considered stable/documented, or still experimental?
-4. **`ark eval` command**: there's an `eval.ts` CLI command file -- should this be documented in the guide or is it internal-only?
+- Truncated task title (`add-a-one-line-note-to-docs-architecture-md-mentioning-that-`) -- assumed the "that-" continuation refers to the just-landed arkd client/server/common split, since (a) `docs/architecture.md` is the only architecture doc that still names `packages/arkd/server.ts` as a single file, and (b) the last ~15 commits on the branch are exclusively that refactor. If the intended note is about something else (e.g. the legacy session/flow engine being frozen pending Temporal, or the conductor port being hardcoded), the implementer should redirect with a fresh one-liner in the same location and discard the wording above.
+- Section placement -- 4.1 is the natural spot. If a reviewer prefers a "Layout" subsection, splitting it out under `### 4.1.1 Layout` is a small cost. Defaulting to in-line, since the task asked for a one-line note.
