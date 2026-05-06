@@ -5,7 +5,7 @@ import type { DatabaseAdapter } from "../../database.js";
 import { ComputeRepository } from "../compute.js";
 import { initSchema, seedLocalCompute } from "../schema.js";
 import type { ComputeStatus, ComputeConfig } from "../../../types/index.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { legacyProviderLabel as providerOf } from "../../__tests__/_util/legacy-provider-label.js";
 
 let db: DatabaseAdapter;
 let repo: ComputeRepository;
@@ -79,21 +79,21 @@ describe("ComputeRepository", async () => {
     expect(clone.cloned_from).toBe("tmpl-1");
   });
 
-  // -- findByProvider ---------------------------------------------------
+  // -- findByKind --------------------------------------------------------
 
-  it("findByProvider returns the first matching row for the provider", async () => {
+  it("findByKind returns the first matching row for the kind", async () => {
     // "local" is seeded.
-    const found = await repo.findByProvider("local");
+    const found = await repo.findByKind("local", undefined);
     expect(found).not.toBeNull();
     expect(providerOf(found!)).toBe("local");
   });
 
-  it("findByProvider returns null when no row matches", async () => {
-    const found = await repo.findByProvider("ec2");
+  it("findByKind returns null when no row matches", async () => {
+    const found = await repo.findByKind("ec2", undefined);
     expect(found).toBeNull();
   });
 
-  it("findByProvider with excludeTemplates=true skips template rows", async () => {
+  it("findByKind with excludeTemplates=true skips template rows", async () => {
     await repo.insert({
       name: "ec2-tmpl",
       compute_kind: "ec2",
@@ -102,19 +102,19 @@ describe("ComputeRepository", async () => {
       is_template: true,
     });
     // Only a template exists -- excluding templates must return null.
-    expect(await repo.findByProvider("ec2", { excludeTemplates: true })).toBeNull();
+    expect(await repo.findByKind("ec2", undefined, { excludeTemplates: true })).toBeNull();
     // Default (no exclude) returns the template.
-    expect(await repo.findByProvider("ec2")).not.toBeNull();
+    expect(await repo.findByKind("ec2", undefined)).not.toBeNull();
   });
 
-  it("findByProvider with excludeTemplates=true returns a concrete row", async () => {
+  it("findByKind with excludeTemplates=true returns a concrete row", async () => {
     await repo.insert({
       name: "ec2-concrete",
       compute_kind: "ec2",
       isolation_kind: "direct",
       status: "stopped",
     });
-    const found = await repo.findByProvider("ec2", { excludeTemplates: true });
+    const found = await repo.findByKind("ec2", undefined, { excludeTemplates: true });
     expect(found).not.toBeNull();
     expect(found!.name).toBe("ec2-concrete");
   });
@@ -157,7 +157,7 @@ describe("ComputeRepository", async () => {
     expect(all.length).toBeGreaterThanOrEqual(2); // local + docker1
   });
 
-  it("list filters by provider", async () => {
+  it("list filters by isolation_kind", async () => {
     await repo.insert({
       name: "d1",
       compute_kind: "local",
@@ -176,7 +176,7 @@ describe("ComputeRepository", async () => {
       isolation_kind: "direct",
       status: "stopped",
     });
-    const dockers = await repo.list({ provider: "docker" });
+    const dockers = await repo.list({ isolation_kind: "docker" });
     expect(dockers.length).toBe(2);
     expect(dockers.every((c) => providerOf(c) === "docker")).toBe(true);
   });

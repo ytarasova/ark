@@ -205,7 +205,8 @@ describe("garbageCollectComputeIfTemplate", () => {
     app.registerProvider(makeStubProvider({ name: "k8s", canDelete: false }));
     await app.computeService.create({
       name: "stub-row",
-      provider: "k8s" as any,
+      compute: "k8s",
+      isolation: "direct" as any,
       compute: "k8s",
       isolation: "direct",
       config: {},

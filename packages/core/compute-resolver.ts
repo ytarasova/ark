@@ -14,7 +14,7 @@
  * `ComputeRepository.get` enforces `WHERE tenant_id = ?`.
  */
 import type { AppContext } from "./app.js";
-import type { Session, Compute, ComputeProviderName } from "../types/index.js";
+import type { Session, Compute } from "../types/index.js";
 import type { ComputeProvider } from "./compute/legacy-provider.js";
 import type { ComputeKind, IsolationKind } from "./compute/types.js";
 
@@ -37,14 +37,12 @@ export async function resolveProvider(
   const scoped = session.tenant_id && session.tenant_id !== app.tenantId ? app.forTenant(session.tenant_id) : app;
   const compute = await scoped.computes.get(computeName);
   if (!compute) return { provider: null, compute: null };
-  // Derive the legacy provider key from the two-axis (compute_kind, isolation_kind)
-  // since the `provider` field has been removed from the Compute type.
-  // ProviderRegistry is still keyed by legacy provider names.
-  const { pairToProvider } = await import("./compute/adapters/provider-map.js");
-  const providerKey =
-    pairToProvider({ compute: compute.compute_kind, isolation: compute.isolation_kind }) ??
-    (compute.compute_kind as string);
-  const provider = app.getProvider(providerKey as ComputeProviderName as string);
+  // The legacy `ComputeProvider` registry is keyed by the row's `compute_kind`
+  // axis since Task 5 of the compute cleanup. `app.getProvider` returns the
+  // operational stub for that kind; capability flags now live on
+  // `Compute.capabilities` and should be read from the new registry instead
+  // (see `app.getCompute(compute.compute_kind)`).
+  const provider = app.getProvider(compute.compute_kind);
   return { provider: provider ?? null, compute };
 }
 

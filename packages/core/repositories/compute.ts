@@ -2,15 +2,7 @@ import type { DatabaseAdapter } from "../database/index.js";
 import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
 import type { DrizzleClient } from "../drizzle/client.js";
 import { and, desc, eq, ne, sql } from "drizzle-orm";
-import type {
-  Compute,
-  ComputeStatus,
-  ComputeProviderName,
-  ComputeKindName,
-  IsolationKindName,
-  ComputeConfig,
-} from "../../types/index.js";
-import { providerToPair, pairToProvider } from "../compute/adapters/provider-map.js";
+import type { Compute, ComputeStatus, ComputeKindName, IsolationKindName, ComputeConfig } from "../../types/index.js";
 import { now } from "../util/time.js";
 
 // -- Insert contract ------------------------------------------------------
@@ -20,10 +12,6 @@ import { now } from "../util/time.js";
  * defaults, no rules, no kind inference. Callers (typically `ComputeService`)
  * are expected to apply domain rules (singleton, initialStatus, ...) before
  * reaching the repo layer.
- *
- * `provider` is an internal DB-column synthesis (derived from the two-axis
- * kinds via `pairToProvider`) so legacy indexes + migrations keep working.
- * Callers don't set it.
  */
 export interface InsertComputeRow {
   name: string;
@@ -39,7 +27,6 @@ export interface InsertComputeRow {
 
 type DrizzleSelectCompute = {
   name: string;
-  provider: string;
   computeKind: string | null;
   isolationKind: string | null;
   status: string;
@@ -63,9 +50,11 @@ function safeParseConfig(raw: unknown): ComputeConfig {
 }
 
 function rowToCompute(row: DrizzleSelectCompute): Compute {
-  const fallback = providerToPair(row.provider);
-  const compute_kind = (row.computeKind as ComputeKindName | undefined | null) ?? fallback.compute;
-  const isolation_kind = (row.isolationKind as IsolationKindName | undefined | null) ?? fallback.isolation;
+  // Both two-axis fields default to ('local', 'direct') at the schema level
+  // so a legacy row whose `compute_kind` somehow ended up null still maps
+  // to a usable (compute, isolation) pair.
+  const compute_kind = (row.computeKind as ComputeKindName | undefined | null) ?? "local";
+  const isolation_kind = (row.isolationKind as IsolationKindName | undefined | null) ?? "direct";
   return {
     name: row.name,
     compute_kind: compute_kind as ComputeKindName,
@@ -117,14 +106,8 @@ export class ComputeRepository {
   async insert(row: InsertComputeRow): Promise<Compute> {
     const ts = now();
     const d = this.d();
-    // Legacy `provider` column is still materialized for back-compat indexes
-    // + downstream readers that haven't been swept yet. Derived from the
-    // canonical (compute_kind, isolation_kind) pair.
-    const providerColumn =
-      pairToProvider({ compute: row.compute_kind, isolation: row.isolation_kind }) ?? row.compute_kind;
     await (d.db as any).insert(d.schema.compute).values({
       name: row.name,
-      provider: providerColumn,
       computeKind: row.compute_kind,
       isolationKind: row.isolation_kind,
       status: row.status,
@@ -139,18 +122,22 @@ export class ComputeRepository {
   }
 
   /**
-   * Single-row lookup by legacy provider name. Used by `ComputeService` to
-   * enforce the singleton rule. Queries the legacy `provider` column directly
-   * since that's the indexed path. `excludeTemplates` skips rows where
+   * Single-row lookup by compute kind. Used by `ComputeService` to enforce
+   * the singleton rule for `local` (one host row per tenant) and equivalent
+   * future singleton kinds. `excludeTemplates` skips rows where
    * `is_template` is true (templates are blueprints, not concrete instances).
    */
-  async findByProvider(
-    providerName: ComputeProviderName,
+  async findByKind(
+    computeKind: ComputeKindName,
+    isolationKind: IsolationKindName | undefined,
     opts?: { excludeTemplates?: boolean },
   ): Promise<Compute | null> {
     const d = this.d();
     const c = d.schema.compute;
-    const conditions: any[] = [eq(c.provider, providerName), eq(c.tenantId, this.tenantId)];
+    const conditions: any[] = [eq(c.computeKind, computeKind), eq(c.tenantId, this.tenantId)];
+    if (isolationKind !== undefined) {
+      conditions.push(eq(c.isolationKind, isolationKind));
+    }
     if (opts?.excludeTemplates) {
       // NOT is_template compiled across dialects: SQLite stores 0/1 integer,
       // Postgres stores boolean. `eq(c.isTemplate, false as any)` works for
@@ -178,11 +165,17 @@ export class ComputeRepository {
     return row ? rowToCompute(row) : null;
   }
 
-  async list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Promise<Compute[]> {
+  async list(filters?: {
+    status?: ComputeStatus;
+    compute_kind?: ComputeKindName;
+    isolation_kind?: IsolationKindName;
+    limit?: number;
+  }): Promise<Compute[]> {
     const d = this.d();
     const c = d.schema.compute;
     const conditions: any[] = [eq(c.tenantId, this.tenantId)];
-    if (filters?.provider) conditions.push(eq(c.provider, filters.provider));
+    if (filters?.compute_kind) conditions.push(eq(c.computeKind, filters.compute_kind));
+    if (filters?.isolation_kind) conditions.push(eq(c.isolationKind, filters.isolation_kind));
     if (filters?.status) conditions.push(eq(c.status, filters.status));
     const rows = await (d.db as any)
       .select()
@@ -217,23 +210,12 @@ export class ComputeRepository {
     return (rows as DrizzleSelectCompute[]).map(rowToCompute);
   }
 
-  async update(name: string, fields: Partial<Compute> & { provider?: ComputeProviderName }): Promise<Compute | null> {
+  async update(name: string, fields: Partial<Compute>): Promise<Compute | null> {
     const d = this.d();
     const c = d.schema.compute;
 
     const set: Record<string, any> = { updatedAt: now() };
-    // The legacy `provider` column is still writable for callers that want
-    // to keep the DB-indexed string in sync; it's not part of the public
-    // Compute shape anymore.
-    if (fields.provider !== undefined) set.provider = fields.provider;
-    if (fields.compute_kind !== undefined) {
-      set.computeKind = fields.compute_kind;
-      // Keep the legacy column in sync when the canonical axes change.
-      if (fields.isolation_kind !== undefined) {
-        set.provider =
-          pairToProvider({ compute: fields.compute_kind, isolation: fields.isolation_kind }) ?? fields.compute_kind;
-      }
-    }
+    if (fields.compute_kind !== undefined) set.computeKind = fields.compute_kind;
     if (fields.isolation_kind !== undefined) set.isolationKind = fields.isolation_kind;
     if (fields.status !== undefined) set.status = fields.status;
     if (fields.config !== undefined) {

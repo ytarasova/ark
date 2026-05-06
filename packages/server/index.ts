@@ -10,7 +10,6 @@ import {
 } from "../core/auth/context.js";
 import { ArkdClient } from "../arkd/client/index.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
-import { providerOf } from "../core/compute/adapters/provider-map.js";
 import { handleMcpRequest } from "./mcp/index.js";
 
 export interface ServerConnection {
@@ -675,12 +674,24 @@ async function resolveArkdForSession(
   }
   const compute = await app.computes.get(session.compute_name);
   if (!compute) return { arkdUrl: fallback, token };
-  const provider = app.getProvider(providerOf(compute));
-  if (provider?.getArkdUrl) {
-    try {
-      return { arkdUrl: provider.getArkdUrl(compute), token };
-    } catch (err: any) {
-      logDebug("web", `provider.getArkdUrl threw: ${err?.message ?? err}; falling back to default`);
+  // Resolve via the new ComputeTarget API. We keep the per-session port
+  // hint on the legacy `getArkdUrl(compute, session)` path until the new
+  // Compute interface grows a session-aware variant (#423 follow-up); for
+  // the conductor->arkd bridge here the compute-level URL is the right
+  // thing -- the bridge is per-compute, not per-session.
+  const computeImpl = app.getCompute(compute.compute_kind);
+  if (computeImpl && computeImpl.attachExistingHandle) {
+    const handle = computeImpl.attachExistingHandle({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (handle) {
+      try {
+        return { arkdUrl: computeImpl.getArkdUrl(handle), token };
+      } catch (err: any) {
+        logDebug("web", `compute.getArkdUrl threw: ${err?.message ?? err}; falling back to default`);
+      }
     }
   }
   return { arkdUrl: fallback, token };

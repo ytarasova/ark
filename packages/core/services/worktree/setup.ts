@@ -79,10 +79,20 @@ export async function setupSessionWorktree(
 
   let effectiveWorkdir = repoSource;
 
-  // Create git worktree unless provider doesn't support it or session config explicitly disables it.
-  // We worktree when repoSource is a real git repo -- even if it resolves to the current cwd
-  // (that is precisely when isolation matters most for the self-dogfood loop).
-  const wantWorktree = provider?.supportsWorktree === true && session.config?.worktree !== false;
+  // Create git worktree unless the registered Compute doesn't support it
+  // or session config explicitly disables it. We worktree when repoSource
+  // is a real git repo -- even if it resolves to the current cwd (that is
+  // precisely when isolation matters most for the self-dogfood loop).
+  //
+  // Capability lives on `Compute.capabilities.supportsWorktree` now (Task 5
+  // of the compute cleanup). The legacy `provider.supportsWorktree` flag
+  // was removed; we read off the registered Compute keyed by the row's
+  // `compute_kind`. Caller still passes a legacy provider so the signature
+  // stays back-compat, but we ignore it for capability lookups.
+  void provider; // unused: kept for back-compat; capability flag moved to Compute
+  const computeImpl = compute ? app.getCompute(compute.compute_kind) : app.getCompute("local");
+  const supportsWorktree = computeImpl?.capabilities.supportsWorktree === true;
+  const wantWorktree = supportsWorktree && session.config?.worktree !== false;
   if (wantWorktree && existsSync(join(repoSource, ".git"))) {
     log("Setting up git worktree...");
     const wt = await setupWorktree(app, repoSource, session.id, session.branch ?? undefined);

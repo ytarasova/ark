@@ -10,7 +10,10 @@
 import type { ComputeProvider } from "./legacy-provider.js";
 import type { AppContext } from "../app.js";
 
-// Legacy provider interface -- on its way out (Task 5).
+// Legacy provider interface -- on its way out. Two executors
+// (`claude-agent.ts`, `claude-code.ts`) and a handful of server handlers
+// still consult `app.getProvider(name)`; the interface stays alive until
+// those are swept (#516, #517).
 export type {
   ComputeProvider,
   IsolationMode,
@@ -18,11 +21,6 @@ export type {
   LaunchOpts as LegacyLaunchOpts,
   SyncOpts,
 } from "./legacy-provider.js";
-
-export function getIsolationModes(providerName: string): { value: string; label: string }[] {
-  const provider = getProvider(providerName);
-  return provider?.isolationModes ?? [];
-}
 
 // ── Provider registry (delegates to AppContext) ─────────────────────────────
 
@@ -97,9 +95,6 @@ export { ComputeTarget } from "./compute-target.js";
 // network helpers for the pool layer.
 export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./firecracker/compute.js";
 export type { FirecrackerComputeDeps, FirecrackerMeta } from "./firecracker/compute.js";
-
-export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
-export type { ComputeIsolationPair } from "./adapters/provider-map.js";
 
 // ── Snapshot persistence ───────────────────────────────────────────────────
 

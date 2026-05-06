@@ -4,7 +4,6 @@
  */
 
 import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../compute/legacy-provider.js";
 import type { ComputeTarget } from "../../compute/compute-target.js";
 import type { SessionLifecycleDeps } from "./types.js";
 import * as claude from "../../claude/claude.js";
@@ -17,17 +16,6 @@ import { emitSessionSpanEnd, emitStageSpanEnd, flushSpans } from "../../observab
 
 export class SessionTerminator {
   constructor(private readonly deps: SessionLifecycleDeps) {}
-
-  /** Safely run a provider method for a session. */
-  private async withProvider(
-    session: Session,
-    label: string,
-    fn: (provider: ComputeProvider, compute: Compute) => Promise<void>,
-  ): Promise<boolean> {
-    const { provider, compute } = await this.deps.resolveProvider(session);
-    if (!provider || !compute) return false;
-    return safeAsync(label, () => fn(provider, compute));
-  }
 
   /**
    * Invoke a ComputeTarget method for a session when the compute row maps to
@@ -101,13 +89,11 @@ export class SessionTerminator {
 
     // Kill the agent via the new ComputeTarget path: `target.isolation.attachAgent`
     // rebuilds an AgentHandle from the persisted session_id and calls
-    // `agent.kill()` against the live arkd. The provider-side `cleanupSession`
-    // path stays on the legacy registry until that op also moves to the
-    // new world. Local-tmux fallback below is ONLY safe when no provider
-    // resolves -- when a target exists but its kill failed (e.g. arkd
-    // unreachable on EC2), running `tmux kill-session` against the
-    // conductor's local daemon does nothing useful and silently masks the
-    // real failure (#422 / #425 family).
+    // `agent.kill()` against the live arkd. Local-tmux fallback below is
+    // ONLY safe when no provider resolves -- when a target exists but its
+    // kill failed (e.g. arkd unreachable on EC2), running `tmux kill-session`
+    // against the conductor's local daemon does nothing useful and silently
+    // masks the real failure (#422 / #425 family).
     const { provider, compute } = await d.resolveProvider(session);
     if (provider && compute) {
       const killOk = await this.killAgentViaTarget(session);
@@ -118,9 +104,6 @@ export class SessionTerminator {
             `Status will still flip to 'stopped' so the dashboard reflects operator intent.`,
         );
       }
-      await safeAsync(`stop ${sessionId}: cleanupSession`, async () => {
-        await provider.cleanupSession(compute, session);
-      });
     } else if (session.session_id) {
       // No provider resolved -- legacy local-only sessions or test fixtures.
       // Use local tmux. Safe here because absence of provider implies the
@@ -128,6 +111,11 @@ export class SessionTerminator {
       await killSessionAsync(session.session_id);
     }
 
+    // Per-session compute teardown happens via target.shutdown -- drops the
+    // isolation-side state (compose project, devcontainer, ...) and lets the
+    // compute reclaim its slot. The legacy `provider.cleanupSession` path
+    // was redundant with this and threw on every legacy stub; dropped in
+    // Task 5 of the compute cleanup.
     await this.withComputeTarget(session, `stop ${sessionId}: shutdown runtime`, async (target, c) => {
       await target.shutdown({ kind: target.compute.kind, name: c.name, meta: {} });
     });
@@ -201,8 +189,10 @@ export class SessionTerminator {
 
     // Same shape as stop(): only fall back to local tmux when there's truly
     // no provider for this session. Kill goes through the new ComputeTarget
-    // path; `cleanupSession` (worktree dir, on-host artefacts) still goes
-    // through the legacy provider until that op moves to the new world.
+    // path. The legacy `cleanupSession` path was redundant (the worktree
+    // teardown happens via `removeWorktree` below; isolation-side teardown
+    // is `target.shutdown`) and threw on every legacy stub; dropped here in
+    // Task 5 of the compute cleanup.
     const { provider, compute } = await d.resolveProvider(session);
     if (provider && compute) {
       const killOk = await this.killAgentViaTarget(session);
@@ -213,9 +203,6 @@ export class SessionTerminator {
             `DB row will still be deleted so the dashboard reflects operator intent.`,
         );
       }
-      await safeAsync(`delete ${sessionId}: cleanupSession`, async () => {
-        await provider.cleanupSession(compute, session);
-      });
     } else if (session.session_id) {
       await killSessionAsync(session.session_id);
     }
@@ -268,7 +255,11 @@ export class SessionTerminator {
     const d = this.deps;
     const session = await d.sessions.get(sessionId);
     if (!session) return;
-    await this.withProvider(session, `cleanup ${sessionId}`, (p, c) => p.cleanupSession(c, session));
+    // Legacy `provider.cleanupSession` was the lone op here; dropped in
+    // Task 5 of the compute cleanup. Compute-side teardown happens via
+    // `target.shutdown` on the stop / delete paths, and the worktree on
+    // the conductor's filesystem is removed by `removeWorktree` there.
+    // What's left here is the per-session creds Secret cleanup.
     try {
       const compute = session.compute_name ? await d.computes.get(session.compute_name) : null;
       await d.deleteCredsSecret(session, compute);

@@ -98,6 +98,14 @@ describe("KataCompute", async () => {
       pool: true,
       networkIsolation: true,
       provisionLatency: "seconds",
+      singleton: false,
+      canDelete: true,
+      canReboot: false,
+      supportsWorktree: false,
+      supportsSecretMount: true,
+      needsAuth: true,
+      initialStatus: "stopped",
+      isolationModes: [{ value: "pod", label: "Pod" }],
     });
   });
 

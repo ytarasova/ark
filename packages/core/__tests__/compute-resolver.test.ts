@@ -61,7 +61,7 @@ describe("app.resolveProvider (P1-1)", async () => {
     await app.boot();
 
     // Create an explicit compute row then register hosted mode on top.
-    await app.computeService.create({ name: "k8s-test", provider: "k8s" as any, config: {} });
+    await app.computeService.create({ name: "k8s-test", compute: "k8s", isolation: "direct" as any, config: {} });
     const hosted = buildHostedAppMode({ dialect: "postgres", url: "postgres://fake" });
     app.container.register({ mode: asValue(hosted) });
 
@@ -117,7 +117,8 @@ describe("resolveProvider cross-tenant isolation (round-3 P0-1)", async () => {
     const tenantA = app.forTenant("tenant-a");
     await tenantA.computeService.create({
       name: "prod-gpu",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       config: { image: "tenant-a-image:latest" } as any,
     });
 
@@ -163,7 +164,7 @@ describe("resolveProvider cross-tenant isolation (round-3 P0-1)", async () => {
     await app.boot();
 
     const scoped = app.forTenant("tenant-c");
-    await scoped.computeService.create({ name: "ci-runner", provider: "docker" });
+    await scoped.computeService.create({ name: "ci-runner", compute: "local", isolation: "docker" });
 
     const session = mockSession({ id: "sess-c", tenant_id: "tenant-c", compute_name: "ci-runner" });
     const resolved = await scoped.resolveProvider(session);
@@ -184,7 +185,7 @@ describe("resolveProvider cross-tenant isolation (round-3 P0-1)", async () => {
     const { getOutput } = await import("../services/session-output.js");
 
     const tenantB = app.forTenant("tenant-b");
-    await tenantB.computeService.create({ name: "gpu-worker", provider: "docker" });
+    await tenantB.computeService.create({ name: "gpu-worker", compute: "local", isolation: "docker" });
 
     const sess = await tenantB.sessions.create({ summary: "tb" });
     await tenantB.sessions.update(sess.id, { compute_name: "gpu-worker" });

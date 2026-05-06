@@ -23,16 +23,14 @@ export function registerViewCommands(computeCmd: Command) {
         return;
       }
       console.log(
-        `  ${"NAME".padEnd(20)} ${"KIND".padEnd(9)} ${"COMPUTE".padEnd(12)} ${"ISOLATION".padEnd(12)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`,
+        `  ${"NAME".padEnd(20)} ${"KIND".padEnd(9)} ${"COMPUTE".padEnd(12)} ${"ISOLATION".padEnd(12)} ${"STATUS".padEnd(14)} IP`,
       );
       for (const h of computes) {
         const ip = (h.config as { ip?: string })?.ip ?? "-";
         const ck = String(h.compute ?? h.compute_kind ?? "-").padEnd(12);
         const ik = String(h.isolation ?? h.isolation_kind ?? "-").padEnd(12);
         const kind = (h.is_template ? "template" : "compute").padEnd(9);
-        console.log(
-          `  ${String(h.name).padEnd(20)} ${kind} ${ck} ${ik} ${String(h.provider).padEnd(10)} ${String(h.status).padEnd(14)} ${ip}`,
-        );
+        console.log(`  ${String(h.name).padEnd(20)} ${kind} ${ck} ${ik} ${String(h.status).padEnd(14)} ${ip}`);
       }
     });
 
@@ -77,9 +75,14 @@ export function registerViewCommands(computeCmd: Command) {
         console.log(chalk.red(`Compute '${name}' not found`));
         return;
       }
-      const provider = getProvider(compute.provider);
+      // `syncEnvironment` lives on the legacy ComputeProvider registry and
+      // its only real impl (EC2 ssh push/pull) was deleted in Task 4 of the
+      // compute cleanup. Kept as a stub here so the help text still lists
+      // the command; rewiring onto a typed-secret placement / arkd RPC
+      // path is filed as a follow-up.
+      const provider = getProvider(compute.compute_kind);
       if (!provider) {
-        console.log(chalk.red(`Provider '${compute.provider}' not found`));
+        console.log(chalk.red(`Compute kind '${compute.compute_kind}' not registered`));
         return;
       }
       try {

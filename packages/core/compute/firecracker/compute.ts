@@ -122,6 +122,14 @@ export class FirecrackerCompute implements Compute {
     pool: true,
     networkIsolation: true,
     provisionLatency: "seconds",
+    singleton: false,
+    canDelete: true,
+    canReboot: true,
+    supportsWorktree: false,
+    supportsSecretMount: false,
+    needsAuth: false,
+    initialStatus: "stopped",
+    isolationModes: [{ value: "vm", label: "MicroVM" }],
   };
 
   private deps: FirecrackerComputeDeps;

@@ -82,15 +82,12 @@ class FakeSnapshotCompute implements Compute {
 }
 
 /** Create a compute row if it doesn't already exist. */
-async function ensureCompute(ctx: AppContext, name: string, provider: string, computeKind?: string): Promise<void> {
+async function ensureCompute(ctx: AppContext, name: string, _provider: string, computeKind?: string): Promise<void> {
   if (await ctx.computes.get(name)) return;
   await ctx.computeService.create({
     name,
-    provider,
-    // Explicit `compute` kind lets a test create a compute row whose
-    // `compute_kind` doesn't match `providerToPair(provider).compute`
-    // (session-snapshot resolves via the DB column, not the name prefix).
-    ...(computeKind ? { compute: computeKind as any } : {}),
+    compute: (computeKind ?? "firecracker") as any,
+    isolation: "direct",
     config: {},
   });
 }
@@ -105,10 +102,12 @@ async function startSession(opts: Record<string, unknown> = {}): Promise<string>
 
 describe("session/pause", async () => {
   it("on a snapshot-capable compute: calls compute.snapshot() and persists via SnapshotStore", async () => {
-    // Seed a compute row so the session resolves to the firecracker kind.
-    await ensureCompute(app, "firecracker-1", "firecracker", "firecracker");
+    // Register the fake firecracker first so `computeService.create` finds
+    // a Compute for the kind (firecracker isn't auto-registered on macOS
+    // test runners -- requires /dev/kvm).
     const fake = new FakeSnapshotCompute();
     app.registerCompute(fake);
+    await ensureCompute(app, "firecracker-1", "firecracker", "firecracker");
 
     const id = await startSession({ compute_name: "firecracker-1" });
 

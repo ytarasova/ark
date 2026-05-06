@@ -28,14 +28,16 @@ describe("compute template RPC handlers", () => {
     await app.computeTemplates.create({
       name: "test-ec2",
       description: "Test EC2 template",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       config: { size: "l", region: "us-east-1" },
     });
 
     const list = await app.computeTemplates.list();
     expect(list.length).toBe(1);
     expect(list[0].name).toBe("test-ec2");
-    expect(list[0].provider).toBe("ec2");
+    expect(list[0].compute).toBe("ec2");
+    expect(list[0].isolation).toBe("direct");
 
     const got = await app.computeTemplates.get("test-ec2");
     expect(got).not.toBeNull();
@@ -45,7 +47,8 @@ describe("compute template RPC handlers", () => {
   it("delete removes template", async () => {
     await app.computeTemplates.create({
       name: "to-remove",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       config: { image: "alpine" },
     });
     expect(await app.computeTemplates.get("to-remove")).not.toBeNull();
@@ -55,7 +58,7 @@ describe("compute template RPC handlers", () => {
 
   it("config templates are merged with DB templates in list", async () => {
     // Simulate config templates by adding directly to DB
-    await app.computeTemplates.create({ name: "from-db", provider: "ec2", config: {} });
+    await app.computeTemplates.create({ name: "from-db", compute: "ec2", isolation: "direct", config: {} });
 
     const list = await app.computeTemplates.list();
     expect(list.some((t) => t.name === "from-db")).toBe(true);
@@ -64,7 +67,8 @@ describe("compute template RPC handlers", () => {
   it("template config merges correctly with user overrides", async () => {
     await app.computeTemplates.create({
       name: "base-ec2",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       config: { size: "m", region: "us-east-1", arch: "x64" },
     });
 

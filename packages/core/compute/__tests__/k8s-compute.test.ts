@@ -153,6 +153,14 @@ describe("K8sCompute", async () => {
       pool: true,
       networkIsolation: false,
       provisionLatency: "seconds",
+      singleton: false,
+      canDelete: true,
+      canReboot: false,
+      supportsWorktree: false,
+      supportsSecretMount: true,
+      needsAuth: true,
+      initialStatus: "stopped",
+      isolationModes: [{ value: "pod", label: "Pod" }],
     });
   });
 

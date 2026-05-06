@@ -1,11 +1,8 @@
 /**
- * Dispatch: session-lifecycle.ts must resolve a ComputeTarget from either
- * the new `compute_kind` / `isolation_kind` columns or (for legacy rows) the
- * old `provider` column via providerToPair.
- *
- * These tests exercise the resolveComputeTarget helper on AppContext and
- * confirm that the fall-back path keeps working for rows that predate the
- * schema change.
+ * Dispatch: session-lifecycle.ts must resolve a ComputeTarget from the
+ * `compute_kind` / `isolation_kind` columns. The legacy `provider` column
+ * was dropped in migration 015 (Task 5 of the compute cleanup); callers
+ * pass the two-axis pair directly to `computeService.create`.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
@@ -36,24 +33,19 @@ describe("session-lifecycle compute/isolation dispatch", async () => {
     expect(target!.isolation.kind).toBe("direct");
   });
 
-  it("dispatches via provider name when the row was created with legacy provider only", async () => {
-    // Row written only with a legacy `provider` value -- the schema defaults
-    // compute_kind to 'local' and isolation_kind to 'direct' per CLAUDE.md's
-    // "no migration" rule. The repo's rowToCompute fallback (and the
-    // resolveComputeTarget fallback) still honour the provider when the
-    // columns were never explicitly set -- but for defaults-only rows we
-    // get the schema defaults, which is the documented migration contract.
+  it("dispatches with explicit compute + isolation kinds (post-provider-column drop)", async () => {
+    // Two-axis create -- the legacy `provider` parameter is gone.
     const created = await app.computeService.create({
-      name: "legacy-via-provider",
-      provider: "docker",
+      name: "two-axis-docker",
+      compute: "local",
+      isolation: "docker",
     });
-    // create() derives the kind via providerToPair so new rows are correct.
     expect((created as any).compute_kind).toBe("local");
     expect((created as any).isolation_kind).toBe("docker");
 
     const session = await app.sessions.create({
       summary: "lifecycle cr test 2",
-      compute_name: "legacy-via-provider",
+      compute_name: "two-axis-docker",
     });
     const { target } = await app.resolveComputeTarget(await app.sessions.get(session.id)!);
     expect(target).not.toBeNull();
@@ -66,8 +58,8 @@ describe("session-lifecycle compute/isolation dispatch", async () => {
     const ts = new Date().toISOString();
     app.db
       .prepare(
-        `INSERT INTO compute (name, provider, compute_kind, isolation_kind, status, config, tenant_id, created_at, updated_at)
-       VALUES (?, 'unknown', 'unregistered-kind', 'direct', 'stopped', '{}', 'default', ?, ?)`,
+        `INSERT INTO compute (name, compute_kind, isolation_kind, status, config, tenant_id, created_at, updated_at)
+       VALUES (?, 'unregistered-kind', 'direct', 'stopped', '{}', 'default', ?, ?)`,
       )
       .run("unregistered-test", ts, ts);
     const session = await app.sessions.create({

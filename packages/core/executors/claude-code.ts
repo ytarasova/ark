@@ -172,7 +172,10 @@ export const claudeCodeExecutor: Executor = {
     const runtimeMcpServers = collectMcpEntries(app, session, { runtimeName, flowConnectors });
     const { resolveMcpConfigsDir } = await import("../install-paths.js");
 
-    const isRemote = !!(compute && provider && !provider.supportsWorktree);
+    // Capability lives on Compute now; the registered impl for this row's
+    // compute_kind is the source of truth.
+    const computeImpl = compute ? app.getCompute(compute.compute_kind) : null;
+    const isRemote = !!(compute && computeImpl && !computeImpl.capabilities.supportsWorktree);
 
     // For remote dispatch the launcher must `cd` into the workdir on the
     // REMOTE host -- not the conductor's local Mac path. Providers that
@@ -377,7 +380,7 @@ export const claudeCodeExecutor: Executor = {
     // optional on the compute (LocalCompute is a no-op for ensureReachable /
     // prepareWorkspace / flushPlacement); the helper skips any method the
     // impl omits.
-    if (compute && provider && !provider.supportsWorktree) {
+    if (compute && computeImpl && !computeImpl.capabilities.supportsWorktree) {
       const { resolveTargetAndHandle } = await import("../services/dispatch/target-resolver.js");
       const { runTargetLifecycle } = await import("../services/dispatch/target-lifecycle.js");
 

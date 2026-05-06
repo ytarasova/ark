@@ -7,7 +7,7 @@
  */
 
 import type { AppContext } from "../app.js";
-import type { Compute, ComputeProviderName } from "../../types/index.js";
+import type { Compute, ComputeKindName, IsolationKindName } from "../../types/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -132,19 +132,24 @@ export class ComputePoolManager {
       throw new Error(`Pool '${poolName}' at max capacity (${pool.max})`);
     }
 
-    // Create a new compute in the pool
+    // Create a new compute in the pool. The pool stores a legacy provider
+    // string; map it to a (kind, isolation) pair here. Pool schema migration
+    // to two-axis is filed separately; the mapping is a 1:1 carry-over of
+    // the (now-deleted) `pairToProvider` table.
     const idx = poolComputes.length + 1;
     const computeName = `${poolName}-${idx}`;
-    const compute = await this.app.computeService.create({
+    const axes = legacyProviderNameToAxes(pool.provider);
+    await this.app.computeService.create({
       name: computeName,
-      provider: pool.provider as ComputeProviderName,
+      compute: axes.compute_kind,
+      isolation: axes.isolation_kind,
       config: { ...pool.config, pool: poolName },
     });
 
-    // Provision it via the provider
-    const provider = this.app.getProvider(pool.provider);
-    if (provider) {
-      await provider.provision(compute);
+    // Provision via the new ComputeTarget API.
+    const computeImpl = this.app.getCompute(axes.compute_kind);
+    if (computeImpl) {
+      await computeImpl.provision({ config: { ...pool.config, pool: poolName } });
       await this.app.computes.update(computeName, { status: "running" });
     }
 
@@ -230,5 +235,41 @@ export class ComputePoolManager {
     const compute = await this.app.computes.get(computeName);
     if (compute && (compute.config as Record<string, unknown>)?.pool === poolName) return true;
     return false;
+  }
+}
+
+/** Map a legacy provider-name string to the new two-axis (kind, isolation) pair. */
+function legacyProviderNameToAxes(name: string): {
+  compute_kind: ComputeKindName;
+  isolation_kind: IsolationKindName;
+} {
+  switch (name) {
+    case "local":
+      return { compute_kind: "local", isolation_kind: "direct" };
+    case "docker":
+      return { compute_kind: "local", isolation_kind: "docker" };
+    case "devcontainer":
+      return { compute_kind: "local", isolation_kind: "devcontainer" };
+    case "firecracker":
+      return { compute_kind: "firecracker", isolation_kind: "direct" };
+    case "ec2":
+    case "remote-arkd":
+    case "remote-worktree":
+      return { compute_kind: "ec2", isolation_kind: "direct" };
+    case "ec2-docker":
+    case "remote-docker":
+      return { compute_kind: "ec2", isolation_kind: "docker" };
+    case "ec2-devcontainer":
+    case "remote-devcontainer":
+      return { compute_kind: "ec2", isolation_kind: "devcontainer" };
+    case "ec2-firecracker":
+    case "remote-firecracker":
+      return { compute_kind: "ec2", isolation_kind: "firecracker-in-container" };
+    case "k8s":
+      return { compute_kind: "k8s", isolation_kind: "direct" };
+    case "k8s-kata":
+      return { compute_kind: "k8s-kata", isolation_kind: "direct" };
+    default:
+      return { compute_kind: "local", isolation_kind: "direct" };
   }
 }

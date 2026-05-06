@@ -347,6 +347,14 @@ export class EC2Compute implements Compute {
     pool: true,
     networkIsolation: true,
     provisionLatency: "minutes",
+    singleton: false,
+    canDelete: true,
+    canReboot: true,
+    supportsWorktree: false,
+    supportsSecretMount: false,
+    needsAuth: true,
+    initialStatus: "stopped",
+    isolationModes: [{ value: "remote", label: "Remote worktree" }],
   };
 
   private helpers: EC2ComputeHelpers = DEFAULT_HELPERS;

@@ -41,7 +41,8 @@ describe("compute/create (two-axis form)", async () => {
   it("accepts legacy {provider} and backfills compute_kind + isolation_kind", async () => {
     const { compute } = await call("compute/create", {
       name: "legacy-docker",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       config: {},
     });
     expect(compute.name).toBe("legacy-docker");

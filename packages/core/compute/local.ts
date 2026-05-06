@@ -29,6 +29,19 @@ export class LocalCompute implements Compute {
     pool: false,
     networkIsolation: false,
     provisionLatency: "instant",
+    // The host running ark itself: only one row per tenant, can't be deleted,
+    // can't be rebooted, shares the conductor's filesystem (worktree-friendly).
+    singleton: true,
+    canDelete: false,
+    canReboot: false,
+    supportsWorktree: true,
+    supportsSecretMount: false,
+    needsAuth: false,
+    initialStatus: "running",
+    isolationModes: [
+      { value: "worktree", label: "Worktree" },
+      { value: "inplace", label: "In-place" },
+    ],
   };
 
   constructor(private readonly app: AppContext) {}

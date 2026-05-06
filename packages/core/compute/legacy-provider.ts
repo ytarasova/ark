@@ -48,16 +48,15 @@ export interface SyncOpts {
   onLog?: (msg: string) => void;
 }
 
-export interface IsolationMode {
-  value: string;
-  label: string;
-}
+/**
+ * Capability-flag variant kept for back-compat with `compute/index.ts`
+ * re-exports. The canonical type now lives on `ComputeCapabilities` in
+ * `types.ts`; this re-export ships the same shape so importers don't break.
+ */
+export type IsolationMode = import("./types.js").IsolationMode;
 
 export interface ComputeProvider {
   readonly name: string;
-
-  /** Isolation modes this provider supports. Empty = no isolation choice needed. */
-  readonly isolationModes: IsolationMode[];
 
   // ── Compute lifecycle ───────────────────────────────────────────────────
   provision(compute: Compute, opts?: ProvisionOpts): Promise<void>;
@@ -174,26 +173,6 @@ export interface ComputeProvider {
    * legacy paths once every provider has one.
    */
   buildPlacementCtx?(session: Session, compute: Compute): Promise<PlacementCtx>;
-
-  // ── Capability flags ────────────────────────────────────────────────────
-  //
-  // All non-optional: rules are driven off these flags in ComputeService,
-  // so a missing flag would silently fall back to `undefined`/falsy and
-  // skip the rule. Every provider must declare each flag explicitly.
-  readonly singleton: boolean;
-  readonly canReboot: boolean;
-  readonly canDelete: boolean;
-  readonly supportsWorktree: boolean;
-  readonly initialStatus: string;
-  readonly needsAuth: boolean;
-  /**
-   * Provider can mount a cluster-side Secret (or equivalent) at launch time.
-   * True for k8s-family providers (vanilla pod + Kata microVM); false for
-   * everything else (local/docker/devcontainer/firecracker/EC2), which rely
-   * on env injection + host bind-mounts. Drives the dispatch-time claude
-   * auth materialization path in `dispatch-claude-auth.ts`.
-   */
-  readonly supportsSecretMount: boolean;
 
   // ── Session lifecycle (extended) ──────────────────────────────────────
   /** Probe whether the agent's tmux pane is alive on the worker. Pass the

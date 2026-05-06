@@ -145,6 +145,14 @@ export class K8sCompute implements Compute {
     pool: true,
     networkIsolation: false,
     provisionLatency: "seconds",
+    singleton: false,
+    canDelete: true,
+    canReboot: false,
+    supportsWorktree: false,
+    supportsSecretMount: true,
+    needsAuth: true,
+    initialStatus: "stopped",
+    isolationModes: [{ value: "pod", label: "Pod" }],
   };
 
   protected deps: K8sComputeDeps = DEFAULT_DEPS;

@@ -28,7 +28,8 @@ describe("ComputeRepository unified is_template model", () => {
   it("defaults is_template to false when not specified", async () => {
     const c = await repo.insert({
       name: "plain-ec2",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       compute_kind: "ec2",
       isolation_kind: "direct",
       status: "stopped",
@@ -40,7 +41,8 @@ describe("ComputeRepository unified is_template model", () => {
   it("persists is_template: true when specified", async () => {
     const c = await repo.insert({
       name: "tmpl-k8s",
-      provider: "k8s",
+      compute: "k8s",
+      isolation: "direct",
       compute_kind: "k8s",
       isolation_kind: "direct",
       status: "stopped",
@@ -55,7 +57,8 @@ describe("ComputeRepository unified is_template model", () => {
   it("persists cloned_from through insert + read", async () => {
     await repo.insert({
       name: "tmpl",
-      provider: "k8s",
+      compute: "k8s",
+      isolation: "direct",
       compute_kind: "k8s",
       isolation_kind: "direct",
       status: "stopped",
@@ -63,7 +66,8 @@ describe("ComputeRepository unified is_template model", () => {
     });
     const clone = await repo.insert({
       name: "tmpl-session1",
-      provider: "k8s",
+      compute: "k8s",
+      isolation: "direct",
       compute_kind: "k8s",
       isolation_kind: "direct",
       status: "stopped",
@@ -79,14 +83,16 @@ describe("ComputeRepository unified is_template model", () => {
   it("listTemplates returns only template rows", async () => {
     await repo.insert({
       name: "concrete-a",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       compute_kind: "ec2",
       isolation_kind: "direct",
       status: "stopped",
     });
     await repo.insert({
       name: "tmpl-a",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       compute_kind: "local",
       isolation_kind: "docker",
       status: "stopped",
@@ -94,7 +100,8 @@ describe("ComputeRepository unified is_template model", () => {
     });
     await repo.insert({
       name: "tmpl-b",
-      provider: "k8s",
+      compute: "k8s",
+      isolation: "direct",
       compute_kind: "k8s",
       isolation_kind: "direct",
       status: "stopped",
@@ -110,14 +117,16 @@ describe("ComputeRepository unified is_template model", () => {
   it("listConcrete returns only non-template rows", async () => {
     await repo.insert({
       name: "concrete-a",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       compute_kind: "ec2",
       isolation_kind: "direct",
       status: "stopped",
     });
     await repo.insert({
       name: "tmpl-a",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       compute_kind: "local",
       isolation_kind: "docker",
       status: "stopped",
@@ -135,14 +144,16 @@ describe("ComputeRepository unified is_template model", () => {
   it("list() (no filter) returns both templates and concrete rows", async () => {
     await repo.insert({
       name: "concrete-a",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       compute_kind: "ec2",
       isolation_kind: "direct",
       status: "stopped",
     });
     await repo.insert({
       name: "tmpl-a",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       compute_kind: "local",
       isolation_kind: "docker",
       status: "stopped",

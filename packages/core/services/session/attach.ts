@@ -145,8 +145,11 @@ export class SessionAttachService {
     if (session.compute_name) {
       const compute = await this.app.computes.get(session.compute_name);
       if (compute) {
-        const { providerOf } = await import("../../compute/adapters/provider-map.js");
-        const provider = this.app.getProvider(providerOf(compute));
+        // `getAttachCommand` lives on the legacy provider registry until a
+        // dedicated ComputeTarget hook lands (filed as a follow-up issue);
+        // we look it up by compute kind directly so the legacy stub for the
+        // matching name is reachable.
+        const provider = this.app.getProvider(compute.compute_kind);
         try {
           const parts = provider?.getAttachCommand?.(compute, session) ?? [];
           if (parts.length > 0) return parts.join(" ");

@@ -58,10 +58,19 @@ describe("compute/capabilities", () => {
     expect(modes.map((m) => m.value).sort()).toEqual(["inplace", "worktree"]);
   });
 
-  it("returns flags for a docker compute that allow deletion but not reboot", async () => {
+  it("returns flags for a docker compute (capabilities inherit from LocalCompute)", async () => {
+    // Post-Task-5: capabilities live on Compute, not Isolation. A
+    // local+docker row inherits LocalCompute's flags (singleton=true,
+    // canDelete=false, initialStatus=running) -- the legacy distinction
+    // between local-direct and docker-isolation rows is gone. The wire
+    // format still ships a `provider` label derived from the pair so
+    // existing UI code keeps rendering, but capability semantics are
+    // now uniform per kind.
     await app.computeService.create({
       name: "cap-docker-1",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
+      is_template: true, // skip the singleton create-time guard for the test
       config: {},
     });
 
@@ -69,12 +78,11 @@ describe("compute/capabilities", () => {
     const caps = ok(res).capabilities as Record<string, unknown>;
 
     expect(caps.provider).toBe("docker");
-    // Docker runtime declares canDelete=true, canReboot=false.
-    expect(caps.canDelete).toBe(true);
+    // Inherits LocalCompute's flags.
+    expect(caps.canDelete).toBe(false);
     expect(caps.canReboot).toBe(false);
-    // docker provider defaults: singleton unspecified (falsy), initial stopped.
-    expect(caps.singleton).toBe(false);
-    expect(caps.initialStatus).toBe("stopped");
+    expect(caps.singleton).toBe(true);
+    expect(caps.initialStatus).toBe("running");
 
     await app.computes.delete("cap-docker-1");
   });

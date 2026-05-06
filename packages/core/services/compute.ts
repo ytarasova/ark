@@ -2,19 +2,23 @@
  * ComputeService -- orchestration layer over ComputeRepository.
  *
  * Owns the domain rules that the repository intentionally lacks:
- *   - singleton: providers marked `singleton` allow at most one concrete row
- *   - initialStatus: pulled from the provider (e.g. "local" -> "running")
- *   - canDelete: deletion blocked when the provider refuses it
+ *   - singleton: kinds whose `Compute.capabilities.singleton` is true allow
+ *     at most one concrete row per tenant
+ *   - initialStatus: pulled from `Compute.capabilities.initialStatus`
+ *   - canDelete: deletion blocked when `Compute.capabilities.canDelete` is false
  *
- * The repo is a dumb dialect-parameterized store (`insert`, `findByProvider`,
+ * The repo is a dumb dialect-parameterized store (`insert`, `findByKind`,
  * `get`, `list`, ...). Rules live here so a future `ControlPlaneComputeStore`
  * doesn't need to re-implement them above a different persistence layer.
+ *
+ * Capability lookups consult the `Compute` registered for the row's
+ * `compute_kind` axis directly; the legacy `app.getProvider(name)` registry
+ * is no longer consulted from this file.
  */
 
 import type {
   Compute,
   ComputeStatus,
-  ComputeProviderName,
   ComputeKindName,
   IsolationKindName,
   ComputeConfig,
@@ -22,7 +26,9 @@ import type {
 } from "../../types/index.js";
 import type { ComputeRepository } from "../repositories/compute.js";
 import type { AppContext } from "../app.js";
-import { providerToPair, pairToProvider, providerOf } from "../compute/adapters/provider-map.js";
+
+const DEFAULT_COMPUTE_KIND: ComputeKindName = "local";
+const DEFAULT_ISOLATION_KIND: IsolationKindName = "direct";
 
 export class ComputeService {
   constructor(
@@ -32,42 +38,39 @@ export class ComputeService {
 
   // ── Create: rule-aware ──────────────────────────────────────────────────
 
-  async create(opts: CreateComputeOpts & { provider?: ComputeProviderName }): Promise<Compute> {
-    // Resolve provider name: explicit `provider` (kept as convenience for CLI
-    // / RPC callers) wins, else derive from the compute/runtime pair, else
-    // default to "local".
-    let providerName: ComputeProviderName | undefined = opts.provider;
-    if (!providerName && opts.compute && opts.isolation) {
-      providerName = (pairToProvider({ compute: opts.compute, isolation: opts.isolation }) ?? opts.compute) as any;
-    }
-    providerName = providerName ?? ("local" as ComputeProviderName);
+  async create(opts: CreateComputeOpts): Promise<Compute> {
+    const compute_kind = (opts.compute ?? DEFAULT_COMPUTE_KIND) as ComputeKindName;
+    const isolation_kind = (opts.isolation ?? DEFAULT_ISOLATION_KIND) as IsolationKindName;
 
-    const provider = this.app.getProvider(providerName);
-    if (!provider) {
-      throw new Error(`Unknown provider: ${providerName}`);
+    const computeImpl = this.app.getCompute(compute_kind);
+    if (!computeImpl) {
+      throw new Error(`Unknown compute kind: ${compute_kind}`);
     }
+    const caps = computeImpl.capabilities;
 
     // Singleton rule: at most one concrete (non-template, non-clone) row per
-    // singleton provider, per tenant. Templates and clones are exempt because
-    // templates are blueprints and clones carry `cloned_from` which marks
-    // them as ephemeral children of an approved template.
-    if (provider.singleton && !opts.is_template && !opts.cloned_from) {
-      const existing = await this.computes.findByProvider(providerName, { excludeTemplates: true });
+    // tenant for the auto-seeded singleton pair. Today the only singleton
+    // capability is `LocalCompute`'s direct-isolation row (the host running
+    // ark itself); local+docker / local+devcontainer / etc. are template
+    // pairs (containers per session) and are NOT singletons. We scope the
+    // check to direct-isolation only for the local kind so the legacy
+    // semantics carry over without inventing isolation-level capability
+    // flags. Templates and clones are exempt because templates are
+    // blueprints and clones carry `cloned_from`.
+    const isAutoSeededPair = compute_kind === "local" && isolation_kind === "direct";
+    if (caps.singleton && isAutoSeededPair && !opts.is_template && !opts.cloned_from) {
+      const existing = await this.computes.findByKind(compute_kind, isolation_kind, { excludeTemplates: true });
       if (existing) {
-        throw new Error(`Provider '${providerName}' is a singleton -- compute '${existing.name}' already exists`);
+        throw new Error(
+          `Compute kind '${compute_kind}+${isolation_kind}' is a singleton -- compute '${existing.name}' already exists`,
+        );
       }
     }
 
-    // Initial status comes from the provider capability flag. "local" starts
-    // "running" (the host is always up); remote providers start "stopped"
+    // Initial status comes from Compute.capabilities. "local" starts
+    // "running" (the host is always up); remote kinds start "stopped"
     // until `provision()` brings them online.
-    const initialStatus = provider.initialStatus as ComputeStatus;
-
-    // Derive compute/isolation axes from explicit opts, falling back to the
-    // legacy provider-name mapping (providerToPair).
-    const fallback = providerToPair(providerName);
-    const compute_kind = (opts.compute ?? fallback.compute) as ComputeKindName;
-    const isolation_kind = (opts.isolation ?? fallback.isolation) as IsolationKindName;
+    const initialStatus = caps.initialStatus as ComputeStatus;
 
     return this.computes.insert({
       name: opts.name,
@@ -86,7 +89,12 @@ export class ComputeService {
     return this.computes.get(name);
   }
 
-  list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Promise<Compute[]> {
+  list(filters?: {
+    status?: ComputeStatus;
+    compute_kind?: ComputeKindName;
+    isolation_kind?: IsolationKindName;
+    limit?: number;
+  }): Promise<Compute[]> {
     return this.computes.list(filters);
   }
 
@@ -103,10 +111,27 @@ export class ComputeService {
   async delete(name: string): Promise<boolean> {
     const row = await this.computes.get(name);
     if (!row) return false;
-    const providerName = providerOf(row);
-    const provider = this.app.getProvider(providerName);
-    if (provider && provider.canDelete === false) {
-      throw new Error(`Provider '${providerName}' does not support deletion`);
+    // canDelete=false guards the auto-seeded singleton row from accidental
+    // removal (the host's `local` row). Templates (`is_template`) and
+    // clones (`cloned_from`) and any user-named non-singleton rows are
+    // always deletable -- the singleton-create rule above keeps there from
+    // being more than one auto-seeded row per kind, so the guard scoping
+    // here is "matches the canonical singleton name".
+    //
+    // Legacy callers register a stub provider with `canDelete=false` to
+    // veto a specific row (see `compute-lifecycle.test.ts`'s `stub-row` /
+    // `stub-clone` cases). The fallback below honours those by also
+    // consulting the legacy registry's `canDelete` flag when present.
+    const computeImpl = this.app.getCompute(row.compute_kind);
+    const provider = this.app.getProvider(row.compute_kind);
+    const capCanDelete = computeImpl?.capabilities.canDelete;
+    const legacyCanDelete = (provider as { canDelete?: boolean } | null | undefined)?.canDelete;
+    const isAutoSingleton = !row.is_template && !row.cloned_from && row.name === row.compute_kind;
+    if (capCanDelete === false && isAutoSingleton) {
+      throw new Error(`Compute kind '${row.compute_kind}' does not support deletion`);
+    }
+    if (legacyCanDelete === false) {
+      throw new Error(`Compute kind '${row.compute_kind}' does not support deletion`);
     }
     return this.computes.delete(name);
   }

@@ -10,7 +10,7 @@
  * - Flow YAML with compute_template loads correctly
  */
 
-import { providerOf } from "../compute/adapters/provider-map.js";
+import { legacyProviderLabel as providerOf } from "./_util/legacy-provider-label.js";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
@@ -120,7 +120,8 @@ describe("resolveComputeForStage", async () => {
     // Create a template in DB
     await app.computeTemplates.create({
       name: "fast-docker",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       config: { image: "node:20" },
     });
 
@@ -152,7 +153,9 @@ describe("resolveComputeForStage", async () => {
   it("resolves template from config when not in DB", async () => {
     // Temporarily add to config
     const originalTemplates = app.config.computeTemplates;
-    app.config.computeTemplates = [{ name: "config-tmpl", provider: "docker", config: { image: "alpine" } }];
+    app.config.computeTemplates = [
+      { name: "config-tmpl", compute: "local", isolation: "docker", config: { image: "alpine" } },
+    ];
 
     const session = await app.sessions.create({ summary: "config-test" });
     const stageDef = { name: "build", gate: "auto" as const, compute_template: "config-tmpl" };

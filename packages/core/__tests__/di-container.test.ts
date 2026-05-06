@@ -6,7 +6,7 @@
  * injection, and that shutdown disposes cleanly.
  */
 
-import { providerOf } from "../compute/adapters/provider-map.js";
+import { legacyProviderLabel as providerOf } from "./_util/legacy-provider-label.js";
 import { describe, it, expect, afterEach } from "bun:test";
 import { asValue } from "awilix";
 import { AppContext } from "../app.js";
@@ -172,7 +172,7 @@ describe("service dependency injection", async () => {
     setApp(app);
 
     const svc = app.computeService;
-    const c = await svc.create({ name: "di-docker", provider: "docker" });
+    const c = await svc.create({ name: "di-docker", compute: "local", isolation: "docker" });
     expect(c.name).toBe("di-docker");
 
     // Verify it's in the DB via the repository
@@ -394,7 +394,7 @@ describe("cross-service integration through container", async () => {
 
     // Create session and compute through services
     const session = await app.sessionService.start({ summary: "With compute" });
-    const compute = await app.computeService.create({ name: "test-ec2", provider: "ec2" });
+    const compute = await app.computeService.create({ name: "test-ec2", compute: "ec2", isolation: "direct" });
 
     // Both write to the same underlying database
     expect(await app.sessions.get(session.id)).not.toBeNull();

@@ -13,7 +13,7 @@
 import { beforeEach, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { AppContext } from "../app.js";
-import type { Session, SessionStatus, Compute, ComputeProviderName, ComputeStatus } from "../../types/index.js";
+import type { Session, SessionStatus, Compute, ComputeStatus } from "../../types/index.js";
 import { buildHostedAppMode } from "../modes/app-mode.js";
 import type { ArkConfig } from "../config.js";
 
@@ -198,7 +198,8 @@ export function mockSession(overrides: Partial<Session> = {}): Session {
 export function mockCompute(overrides: Partial<Compute> & { name?: string } = {}): Compute {
   return {
     name: "test-compute",
-    provider: "local" as ComputeProviderName,
+    compute_kind: "local",
+    isolation_kind: "direct",
     status: "running" as ComputeStatus,
     config: {},
     created_at: new Date().toISOString(),

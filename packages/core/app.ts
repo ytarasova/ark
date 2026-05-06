@@ -28,7 +28,7 @@ import type { ComputeProvider } from "./compute/legacy-provider.js";
 import type { Compute as NewCompute, Isolation as NewIsolation, ComputeKind, IsolationKind } from "./compute/types.js";
 import type { ComputePool } from "./compute/warm-pool/types.js";
 import type { SnapshotStore } from "./compute/snapshot-store.js";
-import type { Compute, Session, ComputeProviderName } from "../types/index.js";
+import type { Compute, Session } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
 import { setProfilesArkDir } from "./services/profile.js";
@@ -525,10 +525,12 @@ export class AppContext {
     tmplRepo.setTenant(SYSTEM_TENANT_ID);
     for (const tmpl of this.config.computeTemplates) {
       if (!(await tmplRepo.get(tmpl.name))) {
+        const axes = legacyProviderNameToAxesForTemplates(tmpl.provider ?? "local");
         await tmplRepo.create({
           name: tmpl.name,
           description: tmpl.description,
-          provider: tmpl.provider as ComputeProviderName,
+          compute: axes.compute_kind,
+          isolation: axes.isolation_kind,
           config: tmpl.config,
         });
       }
@@ -1038,6 +1040,47 @@ async function installTestSecrets(app: AppContext): Promise<void> {
         // surface a clearer error if any of these turn out to be required.
       }
     }
+  }
+}
+
+/**
+ * Map a config-template's legacy `provider` string to the new two-axis
+ * (compute_kind, isolation_kind) pair. Mirrors the (now-deleted)
+ * `pairToProvider` table; kept inline here because seeding system templates
+ * is the only `app.ts` caller that still consumes the legacy name.
+ */
+function legacyProviderNameToAxesForTemplates(name: string): {
+  compute_kind: import("../types/index.js").ComputeKindName;
+  isolation_kind: import("../types/index.js").IsolationKindName;
+} {
+  switch (name) {
+    case "local":
+      return { compute_kind: "local", isolation_kind: "direct" };
+    case "docker":
+      return { compute_kind: "local", isolation_kind: "docker" };
+    case "devcontainer":
+      return { compute_kind: "local", isolation_kind: "devcontainer" };
+    case "firecracker":
+      return { compute_kind: "firecracker", isolation_kind: "direct" };
+    case "ec2":
+    case "remote-arkd":
+    case "remote-worktree":
+      return { compute_kind: "ec2", isolation_kind: "direct" };
+    case "ec2-docker":
+    case "remote-docker":
+      return { compute_kind: "ec2", isolation_kind: "docker" };
+    case "ec2-devcontainer":
+    case "remote-devcontainer":
+      return { compute_kind: "ec2", isolation_kind: "devcontainer" };
+    case "ec2-firecracker":
+    case "remote-firecracker":
+      return { compute_kind: "ec2", isolation_kind: "firecracker-in-container" };
+    case "k8s":
+      return { compute_kind: "k8s", isolation_kind: "direct" };
+    case "k8s-kata":
+      return { compute_kind: "k8s-kata", isolation_kind: "direct" };
+    default:
+      return { compute_kind: "local", isolation_kind: "direct" };
   }
 }
 

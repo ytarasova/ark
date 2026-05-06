@@ -28,6 +28,14 @@ export class KataCompute extends K8sCompute {
     pool: true,
     networkIsolation: true,
     provisionLatency: "seconds",
+    singleton: false,
+    canDelete: true,
+    canReboot: false,
+    supportsWorktree: false,
+    supportsSecretMount: true,
+    needsAuth: true,
+    initialStatus: "stopped",
+    isolationModes: [{ value: "pod", label: "Pod" }],
   };
 
   protected augmentPodSpec(spec: Record<string, unknown>, cfg: K8sComputeConfig): Record<string, unknown> {

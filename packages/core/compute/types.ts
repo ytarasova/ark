@@ -31,15 +31,74 @@ export type ProvisionLatency = "instant" | "seconds" | "minutes";
 // ── Capability descriptor ──────────────────────────────────────────────────
 
 /**
+ * Isolation mode descriptor surfaced to the UI/CLI for a given Compute.
+ * `value` is the machine-readable token (e.g. "worktree", "container", "vm");
+ * `label` is the human-facing string for picker dropdowns.
+ */
+export interface IsolationMode {
+  readonly value: string;
+  readonly label: string;
+}
+
+/**
  * Read-only capability flags for a Compute. Kept as a plain readonly object
  * (not a class) so it can be a static `const` on the impl and still be
  * introspected by the registry at boot time.
+ *
+ * The "operational" flags (`singleton`, `canDelete`, `canReboot`,
+ * `supportsWorktree`, `supportsSecretMount`, `needsAuth`, `initialStatus`,
+ * `isolationModes`) used to live on the legacy `ComputeProvider` interface;
+ * Task 5 of the compute cleanup ported them onto Compute so callers don't
+ * need to consult the legacy registry to read capability metadata.
  */
 export interface ComputeCapabilities {
   readonly snapshot: boolean;
   readonly pool: boolean;
   readonly networkIsolation: boolean;
   readonly provisionLatency: ProvisionLatency;
+  /**
+   * At most one concrete (non-template, non-clone) row may exist per tenant
+   * for this compute kind. True for `local` (the host running ark itself);
+   * false for everything else.
+   */
+  readonly singleton: boolean;
+  /**
+   * The DB row may be deleted via the `compute/destroy` endpoint and the
+   * lifecycle GC sweep. False for `local` (the auto-created singleton row);
+   * true for everything else.
+   */
+  readonly canDelete: boolean;
+  /** The compute supports `compute/reboot`. False for `local` and k8s family. */
+  readonly canReboot: boolean;
+  /**
+   * The compute shares its filesystem with the conductor (so a git worktree
+   * on the conductor IS the agent's workdir). True for `local`; false for
+   * every remote compute (EC2, k8s, k8s-kata, firecracker).
+   */
+  readonly supportsWorktree: boolean;
+  /**
+   * The compute can mount a cluster-side Secret (or equivalent) at launch
+   * time so claude credentials land at `/root/.claude` without env injection.
+   * True for k8s family (vanilla pod + Kata microVM); false otherwise.
+   */
+  readonly supportsSecretMount: boolean;
+  /**
+   * Provisioning + dispatch require operator-supplied auth (AWS creds, k8s
+   * kubeconfig). True for ec2 + k8s family; false for local + firecracker.
+   */
+  readonly needsAuth: boolean;
+  /**
+   * Default DB status for a fresh compute row of this kind. `running` for
+   * local (the host is always up); `stopped` for everything else (provision
+   * brings them online).
+   */
+  readonly initialStatus: "stopped" | "running";
+  /**
+   * Isolation modes the UI offers when configuring this Compute. Drives the
+   * picker in `ark compute create`. Empty arrays mean "no isolation choice
+   * needed" -- the caller picks a default isolation kind.
+   */
+  readonly isolationModes: readonly IsolationMode[];
 }
 
 // ── Handles ────────────────────────────────────────────────────────────────

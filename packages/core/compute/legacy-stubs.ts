@@ -1,63 +1,29 @@
 /**
- * Capability-only stubs for the legacy `ComputeProvider` registry.
+ * Operational-only stubs for the legacy `ComputeProvider` registry.
  *
  * Task 4 of the compute cleanup deleted the real `ComputeProvider`
- * implementations (LocalWorktreeProvider, RemoteWorktreeProvider, etc.) but
- * the legacy `app.getProvider()` registry still has callers that read
- * capability flags (`provider.singleton`, `provider.canDelete`,
- * `provider.supportsWorktree`, `provider.initialStatus`,
- * `provider.supportsSecretMount`). Until Task 5 sweeps every such caller
- * over to the new `Compute` + `Isolation` interfaces, we register these
- * lightweight stubs so capability lookups keep working.
+ * implementations. Task 5 ported the capability flags onto
+ * `Compute.capabilities` and swept most callers off the legacy registry.
+ * The two executors (`claude-agent.ts`, `claude-code.ts`) and a handful of
+ * server handlers (reboot / checkStatus / attach / getAttachCommand) still
+ * reach through `app.getProvider(...)`; this file registers a stub for
+ * each known legacy name so those calls find _something_ in the registry.
  *
- * The stubs only carry capability flags. Every operational method
- * (`provision`, `launch`, `cleanupSession`, ...) throws -- those code
- * paths run through `ComputeTarget` (the new two-axis dispatch) now, and
- * any caller still poking at the legacy provider for behaviour rather
- * than capabilities is a bug Task 5 must fix.
+ * Every operational method throws -- it points the caller at the new
+ * `ComputeTarget` API. The capability flag readers were swept onto
+ * `target.compute.capabilities` so the stubs no longer carry capability
+ * data.
  */
 
 import type { Compute, Session } from "../../types/index.js";
-import type { ComputeProvider, IsolationMode, LaunchOpts, ProvisionOpts, SyncOpts } from "./legacy-provider.js";
+import type { ComputeProvider, LaunchOpts, ProvisionOpts, SyncOpts } from "./legacy-provider.js";
 
-interface CapabilitySpec {
-  readonly name: string;
-  readonly isolationModes: IsolationMode[];
-  readonly singleton: boolean;
-  readonly canReboot: boolean;
-  readonly canDelete: boolean;
-  readonly supportsWorktree: boolean;
-  readonly initialStatus: string;
-  readonly needsAuth: boolean;
-  readonly supportsSecretMount: boolean;
-}
-
-class LegacyCapabilityStub implements ComputeProvider {
-  readonly name: string;
-  readonly isolationModes: IsolationMode[];
-  readonly singleton: boolean;
-  readonly canReboot: boolean;
-  readonly canDelete: boolean;
-  readonly supportsWorktree: boolean;
-  readonly initialStatus: string;
-  readonly needsAuth: boolean;
-  readonly supportsSecretMount: boolean;
-
-  constructor(spec: CapabilitySpec) {
-    this.name = spec.name;
-    this.isolationModes = spec.isolationModes;
-    this.singleton = spec.singleton;
-    this.canReboot = spec.canReboot;
-    this.canDelete = spec.canDelete;
-    this.supportsWorktree = spec.supportsWorktree;
-    this.initialStatus = spec.initialStatus;
-    this.needsAuth = spec.needsAuth;
-    this.supportsSecretMount = spec.supportsSecretMount;
-  }
+class LegacyOperationalStub implements ComputeProvider {
+  constructor(readonly name: string) {}
 
   private throwOp(op: string): never {
     throw new Error(
-      `LegacyCapabilityStub('${this.name}').${op}() called -- migrate the call site to the new ComputeTarget API.`,
+      `LegacyOperationalStub('${this.name}').${op}() called -- migrate the call site to the new ComputeTarget API.`,
     );
   }
 
@@ -111,133 +77,30 @@ class LegacyCapabilityStub implements ComputeProvider {
   }
 }
 
-const LOCAL_ISOLATION_MODES: IsolationMode[] = [
-  { value: "worktree", label: "Worktree" },
-  { value: "inplace", label: "In-place" },
-];
-
-const CONTAINER_ISOLATION_MODES: IsolationMode[] = [{ value: "container", label: "Container" }];
-
-const REMOTE_ISOLATION_MODES: IsolationMode[] = [{ value: "remote", label: "Remote worktree" }];
-
 /**
- * Capability table for every legacy provider name. Mirrors the flags the
- * deleted classes exposed; the operational methods are implemented as
- * throw-on-call stubs.
+ * Every legacy provider name dispatch and the few remaining executor +
+ * server-handler call sites might encounter. Mirrors the keys in the
+ * (now-deleted) `compute/adapters/provider-map.ts` plus a handful of
+ * historical aliases.
  */
-const LEGACY_SPECS: CapabilitySpec[] = [
-  {
-    name: "local",
-    isolationModes: LOCAL_ISOLATION_MODES,
-    singleton: true,
-    canReboot: false,
-    canDelete: false,
-    supportsWorktree: true,
-    initialStatus: "running",
-    needsAuth: false,
-    supportsSecretMount: false,
-  },
-  {
-    name: "docker",
-    isolationModes: CONTAINER_ISOLATION_MODES,
-    singleton: false,
-    canReboot: false,
-    canDelete: true,
-    supportsWorktree: true,
-    initialStatus: "stopped",
-    needsAuth: false,
-    supportsSecretMount: false,
-  },
-  {
-    name: "devcontainer",
-    isolationModes: CONTAINER_ISOLATION_MODES,
-    singleton: false,
-    canReboot: false,
-    canDelete: true,
-    supportsWorktree: true,
-    initialStatus: "stopped",
-    needsAuth: false,
-    supportsSecretMount: false,
-  },
-  {
-    name: "firecracker",
-    isolationModes: [{ value: "vm", label: "MicroVM" }],
-    singleton: false,
-    canReboot: true,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: false,
-    supportsSecretMount: false,
-  },
-  {
-    name: "ec2",
-    isolationModes: REMOTE_ISOLATION_MODES,
-    singleton: false,
-    canReboot: true,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: true,
-    supportsSecretMount: false,
-  },
-  {
-    name: "ec2-docker",
-    isolationModes: CONTAINER_ISOLATION_MODES,
-    singleton: false,
-    canReboot: true,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: true,
-    supportsSecretMount: false,
-  },
-  {
-    name: "ec2-devcontainer",
-    isolationModes: CONTAINER_ISOLATION_MODES,
-    singleton: false,
-    canReboot: true,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: true,
-    supportsSecretMount: false,
-  },
-  {
-    name: "ec2-firecracker",
-    isolationModes: [{ value: "vm", label: "MicroVM" }],
-    singleton: false,
-    canReboot: true,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: true,
-    supportsSecretMount: false,
-  },
-  {
-    name: "k8s",
-    isolationModes: [{ value: "pod", label: "Pod" }],
-    singleton: false,
-    canReboot: false,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: true,
-    supportsSecretMount: true,
-  },
-  {
-    name: "k8s-kata",
-    isolationModes: [{ value: "pod", label: "Pod" }],
-    singleton: false,
-    canReboot: false,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: true,
-    supportsSecretMount: true,
-  },
-];
+const LEGACY_NAMES = [
+  "local",
+  "docker",
+  "devcontainer",
+  "firecracker",
+  "ec2",
+  "ec2-docker",
+  "ec2-devcontainer",
+  "ec2-firecracker",
+  "remote-arkd",
+  "remote-worktree",
+  "remote-docker",
+  "remote-devcontainer",
+  "remote-firecracker",
+  "k8s",
+  "k8s-kata",
+] as const;
 
 export function buildLegacyCapabilityStubs(): ComputeProvider[] {
-  return LEGACY_SPECS.map((spec) => new LegacyCapabilityStub(spec));
+  return LEGACY_NAMES.map((name) => new LegacyOperationalStub(name));
 }

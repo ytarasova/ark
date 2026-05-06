@@ -39,6 +39,17 @@ describe("LocalCompute", async () => {
       pool: false,
       networkIsolation: false,
       provisionLatency: "instant",
+      singleton: true,
+      canDelete: false,
+      canReboot: false,
+      supportsWorktree: true,
+      supportsSecretMount: false,
+      needsAuth: false,
+      initialStatus: "running",
+      isolationModes: [
+        { value: "worktree", label: "Worktree" },
+        { value: "inplace", label: "In-place" },
+      ],
     });
   });
 

@@ -87,15 +87,23 @@ async function seedSession(computeName?: string): Promise<string> {
 
 async function ensureCompute(name: string, provider: string, computeKind?: string): Promise<void> {
   if (await app.computes.get(name)) return;
+  // Map the legacy provider-name string the test passes to a (compute, isolation)
+  // pair. Tests pass strings like "firecracker", "ec2", "k8s-kata" -- each maps
+  // 1:1 to a compute kind on the new two-axis model.
+  const compute = (computeKind ??
+    (provider === "firecracker"
+      ? "firecracker"
+      : provider === "ec2"
+        ? "ec2"
+        : provider === "k8s"
+          ? "k8s"
+          : provider === "k8s-kata"
+            ? "k8s-kata"
+            : "local")) as any;
   await app.computeService.create({
     name,
-    provider,
-    // When the compute_kind differs from `providerToPair(provider).compute`
-    // (e.g. provider="firecracker" maps to compute="local" in the legacy
-    // table, but we want the snapshot tests to resolve to ComputeKind
-    // "firecracker"), pass the axis explicitly so the stored row carries
-    // the right kind.
-    ...(computeKind ? { compute: computeKind as any } : {}),
+    compute,
+    isolation: "direct",
     config: {},
   });
 }
@@ -116,9 +124,12 @@ describe("resolveSessionCompute", async () => {
   });
 
   it("resolves firecracker compute from compute_kind column", async () => {
-    await ensureCompute("firecracker-test", "firecracker", "firecracker");
+    // Firecracker only auto-registers when /dev/kvm is present (skipped on
+    // macOS test runners). Stand up a fake first so `computeService.create`
+    // finds a Compute for the kind.
     const fake = new FakeSnapshotCompute();
     app.registerCompute(fake);
+    await ensureCompute("firecracker-test", "firecracker", "firecracker");
     const id = await seedSession("firecracker-test");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();

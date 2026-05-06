@@ -82,9 +82,11 @@ interface GitResult {
  * whether the dispatch should be routed through `ArkdClient.run` against the
  * remote workdir.
  *
- * Remote = `provider.supportsWorktree === false` and `provider.getArkdUrl`
- * exists. Everything else (local, missing provider, missing compute) falls
- * back to the local `execFileAsync` path.
+ * Remote = `Compute.capabilities.supportsWorktree === false` and the legacy
+ * provider exposes `getArkdUrl(compute, session)` for the per-session arkd
+ * URL (#423 -- per-session SSM tunnel port). Everything else (local,
+ * missing provider, missing compute) falls back to the local `execFileAsync`
+ * path.
  */
 async function resolveRemoteRouting(
   app: AppContext,
@@ -92,7 +94,11 @@ async function resolveRemoteRouting(
 ): Promise<{ remote: false } | { remote: true; client: ArkdClient; remoteWorkdir: string }> {
   const { provider, compute } = await resolveProvider(app, session);
   if (!provider || !compute) return { remote: false };
-  if (provider.supportsWorktree) return { remote: false };
+  // Capability lives on Compute now; the registered impl for this row's
+  // compute_kind decides whether the conductor's filesystem is the agent's
+  // workdir (worktree-friendly) or whether we must route over arkd.
+  const computeImpl = app.getCompute(compute.compute_kind);
+  if (computeImpl?.capabilities.supportsWorktree) return { remote: false };
   if (!provider.getArkdUrl) return { remote: false };
 
   const remoteWorkdir = resolveRemoteWorkdir(provider, compute, session);

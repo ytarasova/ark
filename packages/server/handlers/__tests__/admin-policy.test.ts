@@ -69,6 +69,7 @@ describe("admin/tenant/policy/* handler gate", () => {
         tenant_id: tenantId,
         allowed_providers: ["k8s", "ec2"],
         default_provider: "k8s",
+        isolation: "direct",
         max_concurrent_sessions: 7,
         max_cost_per_day_usd: 50,
       },

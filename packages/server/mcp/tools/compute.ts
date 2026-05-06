@@ -2,16 +2,14 @@
  * Compute tools. list/show return a deliberately narrow projection so the
  * raw config blob (which may contain provider credentials, kubeconfig
  * fragments, AWS keys baked into EC2 user-data, etc.) never round-trips
- * through MCP. start/stop mirror the wiring in
- * `packages/server/handlers/resource-compute.ts` -- look up the legacy
- * provider name with `providerOf(compute)` and dispatch through the
- * compute provider registry.
+ * through MCP. start/stop dispatch through the new ComputeTarget API
+ * (`Compute.attachExistingHandle` -> `Compute.start/stop`) so the legacy
+ * provider registry is no longer required for these endpoints.
  */
 
 import { z } from "zod";
 import type { ToolDef } from "../registry.js";
 import { sharedRegistry } from "../transport.js";
-import { providerOf } from "../../../core/compute/adapters/provider-map.js";
 
 interface ComputeSummary {
   name: string;
@@ -61,16 +59,22 @@ const computeShow: ToolDef = {
 
 const computeStart: ToolDef = {
   name: "compute_start",
-  description: "Start a stopped compute (provider-specific).",
+  description: "Start a stopped compute (kind-specific).",
   inputSchema: z.object({ name: z.string() }),
   handler: async (input, { app }) => {
     const parsed = input as { name: string };
     const compute = await app.computes.get(parsed.name);
     if (!compute) throw new Error(`Compute not found: ${parsed.name}`);
-    const { getProvider } = await import("../../../core/compute/index.js");
-    const provider = getProvider(providerOf(compute));
-    if (!provider) throw new Error(`Unknown provider: ${providerOf(compute)}`);
-    await provider.start(compute);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) throw new Error(`Unknown compute kind: ${compute.compute_kind}`);
+    const handle = computeImpl.attachExistingHandle?.({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (handle) {
+      await computeImpl.start(handle);
+    }
     await app.computes.update(compute.name, { status: "running" });
     return { status: "running" };
   },
@@ -78,16 +82,22 @@ const computeStart: ToolDef = {
 
 const computeStop: ToolDef = {
   name: "compute_stop",
-  description: "Stop a running compute (provider-specific).",
+  description: "Stop a running compute (kind-specific).",
   inputSchema: z.object({ name: z.string() }),
   handler: async (input, { app }) => {
     const parsed = input as { name: string };
     const compute = await app.computes.get(parsed.name);
     if (!compute) throw new Error(`Compute not found: ${parsed.name}`);
-    const { getProvider } = await import("../../../core/compute/index.js");
-    const provider = getProvider(providerOf(compute));
-    if (!provider) throw new Error(`Unknown provider: ${providerOf(compute)}`);
-    await provider.stop(compute);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) throw new Error(`Unknown compute kind: ${compute.compute_kind}`);
+    const handle = computeImpl.attachExistingHandle?.({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (handle) {
+      await computeImpl.stop(handle);
+    }
     await app.computes.update(compute.name, { status: "stopped" });
     return { status: "stopped" };
   },

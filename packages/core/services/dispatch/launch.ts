@@ -19,7 +19,7 @@ import type { StageDefinition } from "../flow.js";
 import type { StageSecretResolver } from "./secrets-resolve.js";
 import type { Executor, LaunchResult } from "../../executor.js";
 import type { PlacementCtx } from "../../secrets/placement-types.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { DeferredPlacementCtx } from "../../secrets/deferred-placement-ctx.js";
 import { placeAllSecrets } from "../../secrets/placement.js";
 import { logDebug, logWarn } from "../../observability/structured-log.js";
 
@@ -82,48 +82,47 @@ export async function buildLaunchEnv(
   const env: Record<string, string> = { ...secretEnv.env, ...claudeAuth.env };
   let placement: PlacementCtx | undefined;
 
-  // Typed-secret placement (Phase 1: additive, gated on provider opt-in).
+  // Typed-secret placement.
   //
   // The narrowing filter is the union of stage-declared and runtime-declared
   // secret names. Empty means "auto-attach all tenant secrets". This mirrors
   // how the legacy `secrets.resolve()` path scopes things, so a session that
   // declared no secrets stays narrow even when placement runs.
   //
-  // Until a provider opts in via `buildPlacementCtx`, this branch is dead --
-  // placeAllSecrets does not run, no env mutation. Tasks 18-20 wire up the
-  // first real impl (EC2). The wiring lives here so those tasks can land
-  // without touching dispatch again.
+  // We build a DeferredPlacementCtx pre-launch and let `placeAllSecrets`
+  // queue file / provisioner-config ops onto it. Env-typed secrets are
+  // visible immediately via `ctx.getEnv()`; the queued file ops are flushed
+  // post-provision via `target.compute.flushPlacement(handle, opts)` (see
+  // `dispatch/target-lifecycle.ts`). Compute impls without a flushPlacement
+  // (LocalCompute carries an inline impl, k8s flushes via kubectl, EC2 via
+  // SSM) treat the queued ops as a no-op.
   if (computeForAuth) {
     try {
       const app = deps.getApp();
-      const provider = app.getProvider(providerOf(computeForAuth));
-      if (provider?.buildPlacementCtx) {
-        const stageSecrets = stageDef?.secrets ?? [];
-        let runtimeSecrets: string[] = [];
-        try {
-          const rt = deps.runtimes?.get?.(runtime);
-          runtimeSecrets = Array.isArray(rt?.secrets) ? (rt as { secrets?: string[] }).secrets! : [];
-        } catch (err: any) {
-          // Runtime row may be absent in legacy/test paths -- the legacy
-          // resolve() above already tolerates this; placement does too.
-          // Pre-test fallback path; debug-level is appropriate here.
-          logDebug("session", `runtimes.get('${runtime}') failed inside placement narrowing: ${err?.message ?? err}`);
-        }
-        const narrow: Set<string> | undefined =
-          stageSecrets.length === 0 && runtimeSecrets.length === 0
-            ? undefined
-            : new Set([...stageSecrets, ...runtimeSecrets]);
-
-        const ctx = await provider.buildPlacementCtx(session, computeForAuth);
-        await placeAllSecrets(app, session, ctx, { narrow });
-        Object.assign(env, ctx.getEnv());
-        placement = ctx;
+      const stageSecrets = stageDef?.secrets ?? [];
+      let runtimeSecrets: string[] = [];
+      try {
+        const rt = deps.runtimes?.get?.(runtime);
+        runtimeSecrets = Array.isArray(rt?.secrets) ? (rt as { secrets?: string[] }).secrets! : [];
+      } catch (err: any) {
+        // Runtime row may be absent in legacy/test paths -- the legacy
+        // resolve() above already tolerates this; placement does too.
+        // Pre-test fallback path; debug-level is appropriate here.
+        logDebug("session", `runtimes.get('${runtime}') failed inside placement narrowing: ${err?.message ?? err}`);
       }
+      const narrow: Set<string> | undefined =
+        stageSecrets.length === 0 && runtimeSecrets.length === 0
+          ? undefined
+          : new Set([...stageSecrets, ...runtimeSecrets]);
+
+      const ctx = new DeferredPlacementCtx();
+      await placeAllSecrets(app, session, ctx, { narrow });
+      Object.assign(env, ctx.getEnv());
+      placement = ctx;
     } catch (err: any) {
       // Placer errors for fail-fast types (env-var, ssh-private-key, kubeconfig)
       // surface here. Failing closed is right: missing one of these silently
-      // breaks the agent in subtle ways. Phase 3 collapses the legacy path so
-      // there is only one place that can fail; in Phase 1 we keep both.
+      // breaks the agent in subtle ways.
       logWarn("session", `placeAllSecrets failed: ${err?.message ?? err}`);
       return { env: {}, error: `Secret placement failed: ${err?.message ?? String(err)}` };
     }

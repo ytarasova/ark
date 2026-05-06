@@ -26,7 +26,6 @@
 import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
-import { providerOf } from "../compute/adapters/provider-map.js";
 
 /** Shape returned back to dispatch so it can merge env + record what was created. */
 export interface ClaudeAuthMaterialization {
@@ -98,16 +97,15 @@ export async function materializeClaudeAuthForDispatch(
   // -- sessions on docker / local use the host's `~/.claude` already. We
   // still return EMPTY so the caller doesn't mis-assume env was populated.
   //
-  // We read the capability off the registered provider rather than
-  // gating on provider names, so a new k8s-family provider (e.g. EKS) gets
+  // We read the capability off the registered Compute rather than gating
+  // on a legacy provider name, so a new k8s-family Compute (e.g. EKS) gets
   // the Secret-mount path automatically by declaring `supportsSecretMount`.
   if (!compute) return EMPTY;
-  const providerName = providerOf(compute);
-  const provider = app.getProvider(providerName);
-  if (!provider || !provider.supportsSecretMount) {
+  const computeImpl = app.getCompute(compute.compute_kind);
+  if (!computeImpl || !computeImpl.capabilities.supportsSecretMount) {
     logDebug(
       "session",
-      `tenant ${tenantId} bound to subscription_blob but compute '${compute.name}' (${providerName}) does not support Secret mount; skipping Secret creation`,
+      `tenant ${tenantId} bound to subscription_blob but compute '${compute.name}' (${compute.compute_kind}+${compute.isolation_kind}) does not support Secret mount; skipping Secret creation`,
     );
     return EMPTY;
   }
