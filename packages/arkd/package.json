@@ -2,5 +2,9 @@
   "name": "@ark/arkd",
   "version": "0.1.0",
   "type": "module",
-  "main": "index.ts"
+  "exports": {
+    "./common": "./common/index.ts",
+    "./client": "./client/index.ts",
+    "./server": "./server/index.ts"
+  }
 }
