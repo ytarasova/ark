@@ -132,7 +132,7 @@ export function registerDaemonCommands(program: Command) {
       }
 
       // Foreground mode
-      const { startArkd } = await import("../../arkd/index.js");
+      const { startArkd } = await import("../../arkd/server/index.js");
       const { DEFAULT_CONDUCTOR_URL } = await import("../../core/constants.js");
       const conductorUrl = opts.conductorUrl || DEFAULT_CONDUCTOR_URL;
 

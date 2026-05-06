@@ -13,8 +13,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test"
 import { mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir, platform } from "os";
-import { startArkd } from "../../arkd/server.js";
-import { ArkdClient } from "../../arkd/client.js";
+import { startArkd } from "../../arkd/server/index.js";
+import { ArkdClient } from "../../arkd/client/index.js";
 import {
   LocalWorktreeProvider,
   LocalDockerProvider,

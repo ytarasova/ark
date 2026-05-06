@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, existsSync, mkdirSync, rmSync, readdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { sweepOrphanAttachFifos } from "../routes/attach.js";
+import { sweepOrphanAttachFifos } from "../server/routes/attach.js";
 
 let scratch: string;
 

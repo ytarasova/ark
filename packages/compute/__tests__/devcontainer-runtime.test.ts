@@ -19,7 +19,7 @@ import { join } from "path";
 import { DevcontainerIsolation, type DevcontainerIsolationMeta } from "../isolation/devcontainer.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, LaunchOpts, PrepareCtx } from "../core/types.js";
-import type { ArkdClient } from "../../arkd/client.js";
+import type { ArkdClient } from "../../arkd/client/index.js";
 import type { DevcontainerShape } from "../providers/docker/devcontainer-resolve.js";
 import type { AppContext } from "../../core/app.js";
 

@@ -17,9 +17,9 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { startArkd } from "../server.js";
-import { ArkdClient } from "../client.js";
-import { _resetForTests as resetChannels } from "../routes/channels.js";
+import { startArkd } from "../server/index.js";
+import { ArkdClient } from "../client/index.js";
+import { _resetForTests as resetChannels } from "../server/channel-bus.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let ARKD_PORT: number;

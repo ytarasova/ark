@@ -7,7 +7,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { startArkd } from "../../arkd/server.js";
+import { startArkd } from "../../arkd/server/index.js";
 import { ArkdBackedProvider } from "../providers/arkd-backed.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode } from "../types.js";

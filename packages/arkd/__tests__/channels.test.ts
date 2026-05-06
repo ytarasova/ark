@@ -20,9 +20,9 @@
  * await is guaranteed to find a live subscriber. No Bun.sleep race fudges.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { startArkd } from "../server.js";
-import { _resetForTests } from "../routes/channels.js";
-import { ArkdClient } from "../client.js";
+import { startArkd } from "../server/index.js";
+import { _resetForTests } from "../server/channel-bus.js";
+import { ArkdClient } from "../client/index.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let server: { stop(): void };

@@ -28,7 +28,7 @@ import { registerAllHandlers } from "../register.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import { execFileSync } from "child_process";
 import { tmuxBin } from "../../core/infra/tmux.js";
-import { startArkd } from "../../arkd/server.js";
+import { startArkd } from "../../arkd/server/index.js";
 
 let app: AppContext;
 let server: ArkServer;

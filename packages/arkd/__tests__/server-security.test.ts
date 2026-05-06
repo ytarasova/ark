@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { startArkd } from "../server.js";
+import { startArkd } from "../server/index.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let PORT: number;

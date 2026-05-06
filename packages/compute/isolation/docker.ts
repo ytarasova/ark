@@ -20,7 +20,7 @@
  */
 
 import type { AppContext } from "../../core/app.js";
-import { ArkdClient } from "../../arkd/client.js";
+import { ArkdClient } from "../../arkd/client/index.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import type {
   AgentHandle,

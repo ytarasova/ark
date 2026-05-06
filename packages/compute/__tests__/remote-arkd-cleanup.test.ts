@@ -20,7 +20,7 @@ import {
   RemoteFirecrackerProvider,
   RemoteDevcontainerProvider,
 } from "../providers/remote-arkd.js";
-import { ArkdClient } from "../../arkd/client.js";
+import { ArkdClient } from "../../arkd/client/index.js";
 import type { Compute, Session } from "../types.js";
 
 const CONDUCTOR_PATH = "/Users/paytmlabs/Projects/ark";

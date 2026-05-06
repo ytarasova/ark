@@ -29,7 +29,7 @@
  * that don't have a reachable arkd, but the production path goes through here.
  */
 
-import { ArkdClient } from "../../../arkd/index.js";
+import { ArkdClient } from "../../../arkd/client/index.js";
 
 /** Envelope shape the conductor publishes on the `user-input` channel. */
 export interface UserMessageEnvelope {

@@ -28,7 +28,7 @@ import {
   _resetArkdEventsConsumers,
 } from "../conductor/server/arkd-events-consumer.js";
 import { allocatePort } from "../config/port-allocator.js";
-import { SUBSCRIBED_ACK } from "../../arkd/routes/channels.js";
+import { SUBSCRIBED_ACK } from "../../arkd/common/index.js";
 
 let app: AppContext;
 

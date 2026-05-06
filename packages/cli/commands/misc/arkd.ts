@@ -9,7 +9,7 @@ export function registerArkdCommand(program: Command): void {
     .option("--hostname <host>", "Bind address (default: 0.0.0.0)", "0.0.0.0")
     .option("--conductor-url <url>", "Conductor URL for channel relay")
     .action(async (opts) => {
-      const { startArkd } = await import("../../../arkd/index.js");
+      const { startArkd } = await import("../../../arkd/server/index.js");
       const { DEFAULT_CONDUCTOR_URL } = await import("../../../core/constants.js");
       const conductorUrl = opts.conductorUrl || DEFAULT_CONDUCTOR_URL;
       startArkd(parseInt(opts.port), { conductorUrl, hostname: opts.hostname });

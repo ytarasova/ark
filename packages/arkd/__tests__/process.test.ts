@@ -8,8 +8,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test
 import { mkdirSync, readFileSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { startArkd } from "../server.js";
-import { _resetForTests } from "../routes/process.js";
+import { startArkd } from "../server/index.js";
+import { _resetForTests } from "../server/routes/process.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let server: { stop(): void };

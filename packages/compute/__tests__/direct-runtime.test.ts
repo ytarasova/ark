@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { DirectIsolation } from "../isolation/direct.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, LaunchOpts } from "../core/types.js";
-import type { ArkdClient } from "../../arkd/client.js";
+import type { ArkdClient } from "../../arkd/client/index.js";
 import { AppContext } from "../../core/app.js";
 import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 

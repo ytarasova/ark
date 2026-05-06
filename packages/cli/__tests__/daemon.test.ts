@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { startArkd } from "../../arkd/server.js";
+import { startArkd } from "../../arkd/server/index.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 // Allocate ephemeral ports per-test-file so --concurrency 4 workers don't

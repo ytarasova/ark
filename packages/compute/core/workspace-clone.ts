@@ -14,7 +14,7 @@
  * then both run side-by-side.
  */
 
-import { ArkdClient } from "../../arkd/client.js";
+import { ArkdClient } from "../../arkd/client/index.js";
 
 export interface RemoteCloneOpts {
   /** Conductor-reachable arkd URL for the target compute (`getArkdUrl(handle)`). */

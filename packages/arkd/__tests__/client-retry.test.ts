@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { createServer, type Server, type Socket } from "net";
-import { ArkdClient } from "../client.js";
+import { ArkdClient } from "../client/index.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 interface Counter {

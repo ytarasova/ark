@@ -8,7 +8,7 @@ import {
   type TenantContext,
   type MaterializeOptions,
 } from "../core/auth/context.js";
-import { ArkdClient } from "../arkd/client.js";
+import { ArkdClient } from "../arkd/client/index.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
 import { providerOf } from "../compute/adapters/provider-map.js";
 import { handleMcpRequest } from "./mcp/index.js";

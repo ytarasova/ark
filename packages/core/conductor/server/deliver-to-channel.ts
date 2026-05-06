@@ -11,7 +11,7 @@ import type { Session } from "../../../types/index.js";
 import type { AppContext } from "../../app.js";
 import { getProvider } from "../../../compute/index.js";
 import { providerOf } from "../../../compute/adapters/provider-map.js";
-import { ArkdClient } from "../../../arkd/client.js";
+import { ArkdClient } from "../../../arkd/client/index.js";
 import { logDebug } from "../../observability/structured-log.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "../../constants.js";
 

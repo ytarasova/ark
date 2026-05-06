@@ -14,7 +14,7 @@
  *     attachStream, run) rejects within timeout + 500ms.
  */
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { ArkdClient } from "../client.js";
+import { ArkdClient } from "../client/index.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 let server: { stop(): Promise<void> | void };

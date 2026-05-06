@@ -35,7 +35,7 @@ import { handleReport } from "./report-pipeline.js";
 import type { OutboundMessage } from "../common/channel-types.js";
 import { deliverToChannel } from "./deliver-to-channel.js";
 import { logDebug, logInfo, logWarn } from "../../observability/structured-log.js";
-import { ArkdClient } from "../../../arkd/index.js";
+import { ArkdClient } from "../../../arkd/client/index.js";
 
 interface ConsumerEntry {
   computeName: string;

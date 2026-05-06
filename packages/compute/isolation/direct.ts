@@ -7,7 +7,7 @@
  * running, tmux exists) and there's nothing to tear down between agents.
  */
 
-import { ArkdClient } from "../../arkd/client.js";
+import { ArkdClient } from "../../arkd/client/index.js";
 import type { AppContext } from "../../core/app.js";
 import type {
   AgentHandle,

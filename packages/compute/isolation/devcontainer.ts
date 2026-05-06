@@ -32,7 +32,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 
-import { ArkdClient } from "../../arkd/client.js";
+import { ArkdClient } from "../../arkd/client/index.js";
 import type { AppContext } from "../../core/app.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import type {

@@ -20,7 +20,7 @@
 import { rmSync, existsSync } from "fs";
 import { isAbsolute, join, resolve as pathResolve } from "path";
 
-import { ArkdClient } from "../../arkd/client.js";
+import { ArkdClient } from "../../arkd/client/index.js";
 import type { AppContext } from "../../core/app.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import { safeAsync } from "../../core/safe.js";

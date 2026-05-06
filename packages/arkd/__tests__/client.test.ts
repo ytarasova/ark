@@ -6,8 +6,8 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { startArkd } from "../server.js";
-import { ArkdClient, ArkdClientError } from "../client.js";
+import { startArkd } from "../server/index.js";
+import { ArkdClient, ArkdClientError } from "../client/index.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 

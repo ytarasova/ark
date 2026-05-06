@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { startArkd } from "../server.js";
+import { startArkd } from "../server/index.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 
 // ── Auth tests ────────────────────────────────────────────────────────────────
