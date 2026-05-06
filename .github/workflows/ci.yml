@@ -56,26 +56,22 @@ jobs:
         continue-on-error: true
         run: bunx --bun knip --reporter compact || true
 
-      - name: Unit tests (excludes E2E and integration)
-        # `--concurrency 4` matches `make test` locally (~7 min). The
-        # previous `--concurrency 1` ran serially and consistently
-        # exceeded the 15-min job timeout on macos-latest. Per CLAUDE.md
-        # the suite is concurrency-4 safe -- each test file boots/teardown
-        # its own AppContext via `forTestAsync()` with per-call ports +
-        # arkDir, so workers don't collide.
+      - name: Unit tests (excludes compute E2E and integration)
+        # Delegates to `make test`, which excludes any test file with `e2e` in
+        # path plus local-arkd and local-provider tests. Compute end-to-end
+        # tests share global local-arkd state; they run separately in the
+        # `compute-e2e` job below with --concurrency 1.
         #
         # Bun exit-code quirk on macos-latest: bun occasionally exits 1
         # despite "0 fail" when a worker holds an open file descriptor at
-        # process-end (tmux child, postgres connection, etc.). The local
-        # `make test` (same command, same bun version) exits 0 with the
-        # same test set. To avoid spurious CI red, gate the step on the
-        # "X fail" line in bun's summary rather than the process exit
-        # code. A real test failure still appears as "1 fail" / "5 fail"
-        # in the output and fails the step.
+        # process-end (tmux child, postgres connection, etc.). To avoid
+        # spurious CI red, gate the step on the "X fail" line in bun's
+        # summary rather than the process exit code. A real test failure
+        # still appears as "1 fail" / "5 fail" in the output and fails
+        # the step.
         run: |
           set +e
-          bun test --concurrency 4 --timeout 30000 \
-            $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | grep -v local-arkd | grep -v local-provider | grep -v /dist/ | sort) 2>&1 | tee /tmp/bun-test.log
+          make test 2>&1 | tee /tmp/bun-test.log
           BUN_EXIT=$?
           set -e
           if grep -qE '^\s*0 fail$' /tmp/bun-test.log; then
@@ -83,6 +79,47 @@ jobs:
             exit 0
           fi
           echo "::error::Test suite did not report '0 fail' (bun exit code $BUN_EXIT)."
+          exit 1
+
+  # Compute end-to-end tests share global local-arkd state and a single
+  # auto-created "local" compute, so they cannot run safely under
+  # --concurrency 4 alongside other tests. Split into their own job that
+  # runs --concurrency 1 via `make test-compute-e2e`.
+  compute-e2e:
+    name: compute e2e (serial)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install tmux
+        run: sudo apt-get update && sudo apt-get install -y tmux
+
+      - name: Start tmux server
+        run: tmux new-session -d -s ci-init
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build web frontend
+        run: cd packages/web && bunx --bun vite build --logLevel error
+
+      - name: Compute E2E tests (serial)
+        run: |
+          set +e
+          make test-compute-e2e 2>&1 | tee /tmp/compute-e2e.log
+          BUN_EXIT=$?
+          set -e
+          if grep -qE '^\s*0 fail$' /tmp/compute-e2e.log; then
+            echo "::notice::Compute E2E reports 0 fail (bun exited $BUN_EXIT). Treating as success."
+            exit 0
+          fi
+          echo "::error::Compute E2E did not report '0 fail' (bun exit code $BUN_EXIT)."
           exit 1
 
   # Integration tests that need Docker (LocalStack-backed S3 round-trip).
