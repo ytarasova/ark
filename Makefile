@@ -36,7 +36,7 @@ CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|dev-stack|dev-stack-down|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-compute-e2e|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -113,6 +113,22 @@ dev-temporal: ## Start local Temporal cluster (server :7233 + UI :8088) for Phas
 dev-temporal-down: ## Stop and remove the local Temporal cluster + its data volume
 	docker compose -f .infra/docker-compose.temporal.yaml -p ark-temporal down -v
 	@echo "Ark local Temporal cluster stopped."
+
+dev-stack: ## Start local Ark dev stack (Postgres :15433 + Redis :6379) and apply bootstrap SQL
+	@command -v docker >/dev/null 2>&1 || { echo "Docker required. Install Docker Desktop."; exit 1; }
+	@echo "\033[1mStarting Ark dev stack (Postgres + Redis)...\033[0m"
+	docker compose -f .infra/docker-compose.dev.yaml -p ark-dev up -d --wait
+	@echo "\033[1mApplying bootstrap SQL workarounds...\033[0m"
+	docker exec -i ark-postgres psql -U ark -d ark < .infra/dev-stack-bootstrap.sql
+	@echo ""
+	@echo "  Postgres:  postgres://ark:ark@localhost:15433/ark"
+	@echo "  Redis:     redis://localhost:6379"
+	@echo ""
+	@echo "  Next: source .env.control-plane && bun packages/cli/index.ts server start --hosted"
+
+dev-stack-down: ## Stop and remove the local Ark dev stack + its data volumes
+	docker compose -f .infra/docker-compose.dev.yaml -p ark-dev down -v
+	@echo "Ark local dev stack stopped."
 
 spike-temporal-bun: ## Run the Phase 0 Bun / Temporal worker compat spike
 	@./scripts/spike-temporal-bun.sh
