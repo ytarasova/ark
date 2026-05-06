@@ -11,7 +11,7 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down claude-tfy web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down dev-control-plane dev-control-plane-down claude-tfy web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
         docs-cli \
@@ -36,7 +36,7 @@ CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|dev-stack|dev-stack-down|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|dev-stack|dev-stack-down|dev-control-plane|dev-control-plane-down|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-compute-e2e|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -134,6 +134,18 @@ dev-stack: build-web ## Start local Ark dev stack (Postgres :15433 + Redis :6379
 dev-stack-down: ## Stop and remove the local Ark dev stack + its data volumes
 	$(DOCKER_COMPOSE) -f .infra/docker-compose.dev.yaml -p ark-dev down -v
 	@echo "Ark local dev stack stopped."
+
+dev-control-plane: dev-stack ## Boot Ark in control-plane (hosted) mode against local Postgres + Redis
+	@test -f .env.control-plane || { echo ".env.control-plane missing -- copy from repo"; exit 1; }
+	@echo "\033[1mStarting Ark control-plane (hosted)...\033[0m"
+	@set -a && . ./.env.control-plane && set +a && \
+	  echo "  ARK_PROFILE=$$ARK_PROFILE  WEB=:$$ARK_WEB_PORT  DB=$$DATABASE_URL" && \
+	  exec $(BUN) packages/cli/index.ts server start --hosted --port $$ARK_WEB_PORT
+
+dev-control-plane-down: ## Stop the running hosted server (port from .env.control-plane)
+	@set -a && . ./.env.control-plane && set +a && \
+	  pid=$$(lsof -nP -iTCP:$$ARK_WEB_PORT -sTCP:LISTEN -t 2>/dev/null | head -1); \
+	  if [ -n "$$pid" ]; then echo "Killing hosted server PID $$pid on :$$ARK_WEB_PORT"; kill $$pid; else echo "No hosted server listening on :$$ARK_WEB_PORT"; fi
 
 spike-temporal-bun: ## Run the Phase 0 Bun / Temporal worker compat spike
 	@./scripts/spike-temporal-bun.sh
