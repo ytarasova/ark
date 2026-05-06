@@ -1,119 +1,82 @@
-# Plan: Update User Guide (docs/guide.md)
+# PLAN: One-line note in docs/architecture.md
 
-## Summary
+## 1. Summary
 
-The user guide (`docs/guide.md`) is stale -- it reflects roughly the v0.8-v0.12 era and is missing features added through v0.17.0. This plan updates the guide to match the current codebase: new flows, runtimes, recipes, CLI commands, messaging bridges, daemon architecture, desktop app, profiles, schedules, and the `ark doctor`/`ark init` commands. It also corrects outdated counts (flows: 9->14, runtimes: 4->5, recipes: 8->10).
+The task name is truncated (`add-a-one-line-note-to-docs-architecture-md-mentioning-that-` --
+the predicate after "that" is missing). The most plausible referent, given the recent five
+`refactor(arkd): ...` commits on this branch finishing the arkd `client/` / `server/` /
+`common/` separation, is the new arkd package layout: Section 4.1 of `docs/architecture.md`
+still calls arkd a "Single binary (`packages/arkd/server.ts`, ~800 lines)" -- stale after
+commits `c3b89eb9`, `f0311621`, `63889c7a`. This plan adds one sentence to that section to
+record the split. No code, no tests.
 
-## Files to modify/create
+## 2. Files to modify/create
 
-| File | Change |
-|------|--------|
-| `docs/guide.md` | Update all 20 sections plus add 5 new sections (see steps below) |
+- `docs/architecture.md` -- add one sentence to Section 4.1 noting that arkd is organized as
+  `client/`, `server/`, `common/` sub-packages with an ESLint boundary rule, and bump the
+  `Last updated:` line at top.
+- `PLAN.md` -- this planning artifact (committed on this branch by the planner).
 
-No new files needed -- this is a single-file update.
+No new files, no code, no schema, no tests.
 
-## Implementation steps
+## 3. Implementation steps
 
-### 1. Fix counts and add missing entries in existing sections
+These are independent and can each be verified standalone.
 
-**Section 3 -- Flows** (lines 165-226):
-- Change "Builtin flows (9)" to "Builtin flows (14)"
-- Add 5 missing flows to the table:
-  - `autonomous` -- single-agent autonomous execution (no gates)
-  - `autonomous-sdlc` -- plan -> implement -> verify -> review -> PR -> merge pipeline
-  - `brainstorm` -- interactive ideation flow
-  - `conditional` -- DAG with conditional edges based on stage outcome
-  - `docs` -- documentation-focused flow
-- Add `on_outcome` field to the YAML structure docs (conditional routing)
+1. **Edit Section 4.1** of `docs/architecture.md` (lines 459-461):
+   - Replace the "Single binary (`packages/arkd/server.ts`, ~800 lines)" wording with prose
+     that reflects the current layout: server entry under `packages/arkd/server/`, typed
+     `client/` for callers, shared `common/`, and an ESLint `no-restricted-imports` boundary
+     preventing `client/` <-> `server/` cross-imports.
+   - Keep the addition to one sentence; do not balloon the section. The task explicitly says
+     "one-line note".
+2. **Bump the `Last updated:` line** at `docs/architecture.md` line 4 to `2026-05-06`.
+3. **Run `make format`** to apply Prettier to the Markdown file.
+4. **Sanity-grep** for the now-stale phrase elsewhere in `docs/`:
+   `grep -rn "arkd/server.ts" docs/` and `grep -rn "single binary" docs/`. If hits exist
+   outside Section 4.1, **do not fix them in this task** (scope creep -- task is a one-line
+   note). Note them in the commit body as a follow-up.
+5. **Stage and commit**:
+   `git add docs/architecture.md PLAN.md` then
+   `git commit -m "docs(architecture): note arkd client/server/common split"`.
+6. **Verify** with `git log --oneline -1` that the commit landed and `git show --stat HEAD`
+   that only the two expected files changed.
 
-**Section 4 -- Runtimes** (lines 283-334):
-- Change "Runtimes (3 tools + 1 subscription variant)" to "Runtimes (5)"
-- Add goose runtime row to the table:
-  - `goose` | Goose CLI | api | goose
-- Update runtime YAML example or add goose example showing `task_delivery` and `transcript_parser` fields
+## 4. Testing strategy
 
-**Section 6 -- Recipes** (lines 385-417):
-- Change "Builtin recipes (8)" to "Builtin recipes (10)"
-- Add 2 missing recipes to the table:
-  - `self-dogfood` -- use Ark to build Ark
-  - `self-quick` -- quick self-dogfooding recipe
+- No code changed -> no unit tests to write or run.
+- `make format` must succeed (Prettier covers Markdown). Run it before committing.
+- `make lint` is unaffected by Markdown but is cheap; a quick run is reasonable belt-and-
+  braces and matches the pre-commit checklist in CLAUDE.md.
+- Manual: `git diff HEAD~1 -- docs/architecture.md` should show one sentence changed in
+  Section 4.1 plus the `Last updated:` bump -- nothing else. A reviewer should be able to
+  read the diff in under 10 seconds.
 
-**Section 15 -- Dashboards** (lines 799-830):
-- Remove any lingering TUI references (the TUI was removed in v0.16.0)
-- Update web section: mention `--with-daemon` flag on `ark web` that auto-starts conductor + arkd
-- Mention daemon auto-detection (reuses existing daemons if already running)
+## 5. Risk assessment
 
-### 2. Add new sections (insert after section 20, before appendices)
+- **Blast radius:** zero. Documentation only -- no runtime, build, schema, or test surface
+  is touched.
+- **Misinterpretation of the truncated task:** the missing predicate after "mentioning that"
+  could plausibly point elsewhere. Other recent-commit candidates:
+  - the test split between unit and compute-e2e (`9e58a6a8`)
+  - the autonomous-flow port hardcoding fix (`9e58a6a8`)
+  - dropping the flaky attach-sweep test (`96400e59`)
+  None of these match `docs/architecture.md` as a target as cleanly as the arkd refactor
+  does, since architecture.md Section 4.1 is the only place where text is now factually
+  stale because of recent commits. Still, if the implementer or reviewer reads the truncated
+  task differently, the edit may need to be redirected -- see Open Questions.
+- **Breaking changes / migrations:** none.
 
-**Section 21 -- Daemon Architecture**
-- Explain the server daemon (`ark daemon start/stop/status`) on port 19400
-- Web and desktop connect as thin WebSocket clients
-- `ark web --with-daemon` starts conductor (:19100) + arkd (:19300) in-process
-- Desktop app uses `--with-daemon` by default for zero-config experience
+## 6. Open questions
 
-**Section 22 -- Messaging Bridges**
-- Telegram, Slack, Discord notification bridges
-- Config file: `~/.ark/bridge.json`
-- Bridge config structure (botToken/chatId for Telegram, webhookUrl for Slack/Discord)
-- Notifications on session events (stage completion, failures)
-
-**Section 23 -- Profiles**
-- `ark profile list/create/delete`
-- Stored in `~/.ark/profiles.json`
-- Profiles persist UI preferences and settings
-
-**Section 24 -- Schedules**
-- `ark schedule add/list/delete/enable/disable`
-- Cron-based recurring sessions
-- Web UI scheduling page
-
-**Section 25 -- CLI Utilities**
-- `ark doctor` -- check system prerequisites (bun, tmux, git, gh, claude)
-- `ark init` -- initialize Ark for a repo (creates `.ark.yaml`, runs prerequisite checks)
-- `ark acp` -- headless JSON-RPC server on stdin/stdout
-- `ark repo-map` -- generate repository structure map
-- `ark pr list/status` -- manage PR-bound sessions
-- `ark watch` -- watch GitHub issues with a label and auto-create sessions
-
-### 3. Update Table of Contents (lines 7-29)
-
-- Add sections 21-25 to the ToC
-- Renumber if needed
-
-### 4. Update Appendix: Key file locations (lines 1003-1020)
-
-- Add `~/.ark/bridge.json` -- messaging bridge config (Telegram/Slack/Discord)
-- Add `~/.ark/profiles.json` -- profile definitions
-
-### 5. Update Appendix: Common tasks cheat sheet (lines 1023-1053)
-
-- Add daemon start example: `ark daemon start`
-- Add doctor example: `ark doctor`
-- Add schedule example: `ark schedule add --cron "0 9 * * *" --recipe quick-fix --repo . --summary "Daily check"`
-- Add goose runtime example: `ark session start --repo . --summary "..." --runtime goose --dispatch`
-
-### 6. Update closing paragraph (line 1057)
-
-- Add messaging bridges, profiles, schedules, daemon architecture, and CLI utilities to the enumeration
-
-## Testing strategy
-
-- **Manual review**: read through the updated guide end-to-end to verify accuracy against current YAML definitions in `flows/`, `runtimes/`, `agents/`, `recipes/`, `skills/`
-- **Link check**: verify all internal `#anchor` links in the ToC resolve to actual section headers
-- **Count verification**: grep flow/agent/runtime/skill/recipe directories to confirm counts match the updated text
-- **No code changes**: this is a docs-only update, no tests to run
-- **Formatting**: run `make format` to ensure Prettier compliance (120 char line width)
-
-## Risk assessment
-
-- **Low risk**: docs-only change, no code impact
-- **Stale again quickly**: if new features land without guide updates, this will drift. Consider adding a note in CONTRIBUTING.md about updating the guide
-- **Accuracy of new sections**: messaging bridges, profiles, and schedules sections are written from code inspection -- verify examples work by running the CLI commands if possible
-- **Desktop section**: desktop app details come from changelog entries; verify `ark web --with-daemon` flag exists in the current codebase (confirmed in `packages/cli/commands/misc.ts`)
-
-## Open questions
-
-1. **Messaging bridges depth**: should the guide include step-by-step setup for Telegram/Slack/Discord, or just reference the config format? The bridge code exists but it's unclear how well-tested the Discord path is.
-2. **Goose runtime**: the goose runtime YAML exists but should we document it at the same detail level as Claude/Codex/Gemini, or note it as experimental?
-3. **`ark watch` command**: this watches GitHub issues with a label -- is this considered stable/documented, or still experimental?
-4. **`ark eval` command**: there's an `eval.ts` CLI command file -- should this be documented in the guide or is it internal-only?
+- **What does the truncated task title actually say?** The task name ends with `mentioning
+  that-` and is cut off. Two answers resolve the ambiguity:
+  1. Read the originating issue / message that produced this task name (the planner does not
+     have access to it).
+  2. Ask the user for the missing predicate.
+  If neither is available before implementation, the implementer should proceed with the
+  arkd-split interpretation (highest-signal match against recent commits) and call out the
+  ambiguity in the commit body so a reviewer can redirect cheaply.
+- **If the answer is something other than the arkd split** (e.g. the test-suite split,
+  Temporal phasing, or some unrelated subject), this plan does not apply. Abort and re-plan
+  rather than shoe-horning the wrong note into Section 4.1.
