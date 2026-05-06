@@ -43,7 +43,6 @@ describe("compute/template/list", () => {
       { compute: "ec2", isolation: "direct", provider: "ec2" },
       { compute: "ec2", isolation: "docker", provider: "ec2-docker" },
       { compute: "ec2", isolation: "devcontainer", provider: "ec2-devcontainer" },
-      { compute: "ec2", isolation: "firecracker-in-container", provider: "ec2-firecracker" },
       { compute: "firecracker", isolation: "direct", provider: "firecracker" },
       { compute: "k8s", isolation: "direct", provider: "k8s" },
       { compute: "k8s-kata", isolation: "direct", provider: "k8s-kata" },

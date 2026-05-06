@@ -141,9 +141,6 @@ function templateAxesFromConfig(t: { provider?: string; compute?: string; isolat
     case "ec2-devcontainer":
     case "remote-devcontainer":
       return { compute: "ec2", isolation: "devcontainer" };
-    case "ec2-firecracker":
-    case "remote-firecracker":
-      return { compute: "ec2", isolation: "firecracker-in-container" };
     case "k8s":
       return { compute: "k8s", isolation: "direct" };
     case "k8s-kata":

@@ -19,13 +19,13 @@
  *
  * The firecracker data fixup runs first, BEFORE the column drops, so the
  * legacy `provider` field is still queryable for diagnostic logging if
- * anything goes wrong: rows with `compute_kind='local'` +
- * `isolation_kind='firecracker-in-container'` are rewritten to
- * `compute_kind='firecracker'` + `isolation_kind='direct'` (and the same
- * for the `ec2 + firecracker-in-container` family). This matches Task 4's
- * intent to flatten "firecracker as isolation" into "firecracker as
- * compute kind" so `app.getCompute('firecracker')` resolves to the
- * registered FirecrackerCompute impl rather than falling back to LocalCompute.
+ * anything goes wrong: any row whose `isolation_kind` is the previously
+ * coerced `firecracker-in-container` literal (whether the compute_kind
+ * was `local` or `ec2`) is rewritten to `compute_kind='firecracker'` +
+ * `isolation_kind='direct'`. This matches Task 4's intent to flatten
+ * "firecracker as isolation" into "firecracker as compute kind" so
+ * `app.getCompute('firecracker')` resolves to the registered
+ * FirecrackerCompute impl rather than falling back to LocalCompute.
  *
  * Hosted policy columns (`tenant_policies.allowed_providers`,
  * `tenant_policies.default_provider`, `compute_pools.provider`) are NOT

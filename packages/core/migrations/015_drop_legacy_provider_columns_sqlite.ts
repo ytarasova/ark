@@ -24,13 +24,16 @@ import { logDebug } from "../observability/structured-log.js";
 
 export async function applySqliteDropLegacyProviderColumns(db: DatabaseAdapter): Promise<void> {
   // 1. Firecracker data fixup. Idempotent: rows already on (firecracker, direct)
-  //    or (k8s, ...) are untouched.
+  //    or (k8s, ...) are untouched. Coerces both `local + firecracker-in-container`
+  //    AND `ec2 + firecracker-in-container` (the previously coerced legacy
+  //    "firecracker as isolation" shapes) onto the canonical
+  //    `firecracker + direct` pair.
   await db
     .prepare(
       `UPDATE compute
         SET compute_kind = 'firecracker',
             isolation_kind = 'direct'
-        WHERE compute_kind = 'local' AND isolation_kind = 'firecracker-in-container'`,
+        WHERE isolation_kind = 'firecracker-in-container'`,
     )
     .run();
   await db
@@ -38,7 +41,7 @@ export async function applySqliteDropLegacyProviderColumns(db: DatabaseAdapter):
       `UPDATE compute_templates
         SET compute_kind = 'firecracker',
             isolation_kind = 'direct'
-        WHERE compute_kind = 'local' AND isolation_kind = 'firecracker-in-container'`,
+        WHERE isolation_kind = 'firecracker-in-container'`,
     )
     .run();
 

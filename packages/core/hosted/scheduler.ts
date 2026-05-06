@@ -206,9 +206,6 @@ function legacyProviderNameToAxes(name: string): { compute_kind: ComputeKindName
     case "ec2-devcontainer":
     case "remote-devcontainer":
       return { compute_kind: "ec2", isolation_kind: "devcontainer" };
-    case "ec2-firecracker":
-    case "remote-firecracker":
-      return { compute_kind: "ec2", isolation_kind: "firecracker-in-container" };
     case "k8s":
       return { compute_kind: "k8s", isolation_kind: "direct" };
     case "k8s-kata":
@@ -224,13 +221,11 @@ function axesToLegacyProviderName(compute_kind: ComputeKindName, isolation_kind:
     if (isolation_kind === "direct") return "local";
     if (isolation_kind === "docker") return "docker";
     if (isolation_kind === "devcontainer") return "devcontainer";
-    if (isolation_kind === "firecracker-in-container") return "firecracker";
   }
   if (compute_kind === "ec2") {
     if (isolation_kind === "direct") return "ec2";
     if (isolation_kind === "docker") return "ec2-docker";
     if (isolation_kind === "devcontainer") return "ec2-devcontainer";
-    if (isolation_kind === "firecracker-in-container") return "ec2-firecracker";
   }
   if (compute_kind === "firecracker") return "firecracker";
   if (compute_kind === "k8s") return "k8s";

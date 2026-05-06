@@ -1072,9 +1072,6 @@ function legacyProviderNameToAxesForTemplates(name: string): {
     case "ec2-devcontainer":
     case "remote-devcontainer":
       return { compute_kind: "ec2", isolation_kind: "devcontainer" };
-    case "ec2-firecracker":
-    case "remote-firecracker":
-      return { compute_kind: "ec2", isolation_kind: "firecracker-in-container" };
     case "k8s":
       return { compute_kind: "k8s", isolation_kind: "direct" };
     case "k8s-kata":

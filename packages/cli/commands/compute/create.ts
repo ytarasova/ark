@@ -40,9 +40,8 @@ function parseTags(raw: unknown): Record<string, string> {
  *     cluster. See the comment at the top of the k8s case.
  *   - Docker isolation (under `local` or `ec2`) defaults the image to
  *     `ubuntu:22.04` to match historical behaviour.
- *   - Devcontainer / firecracker-in-container isolations are passthrough --
- *     the isolation layer reads its own knobs from the workspace, no extra
- *     CLI flags today.
+ *   - Devcontainer isolation is passthrough -- the isolation layer reads
+ *     its own knobs from the workspace, no extra CLI flags today.
  */
 function configFromFlags(kind: string, isolation: string, opts: Record<string, any>): Record<string, unknown> {
   switch (kind) {
@@ -56,7 +55,7 @@ function configFromFlags(kind: string, isolation: string, opts: Record<string, a
           ...(volumes.length ? { volumes } : {}),
         };
       }
-      // direct / devcontainer / firecracker-in-container -- no CLI knobs.
+      // direct / devcontainer -- no CLI knobs.
       return {};
     }
 
@@ -239,7 +238,7 @@ export function registerCreateCommand(computeCmd: Command) {
     .argument("<name>", "Compute name")
     // Two-axis target.
     .option("--kind <kind>", "Compute kind (local, firecracker, ec2, k8s, k8s-kata)")
-    .option("--isolation <kind>", "Isolation kind (direct, docker, compose, devcontainer, firecracker-in-container)")
+    .option("--isolation <kind>", "Isolation kind (direct, docker, compose, devcontainer)")
     // Common.
     .option("--template", "Create a reusable template (blueprint) instead of a concrete compute target")
     .option("--no-prompt", "Skip interactive prompts (fail if required fields are missing)")

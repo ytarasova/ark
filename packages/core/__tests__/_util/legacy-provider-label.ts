@@ -15,13 +15,11 @@ export function legacyProviderLabel(c: Pick<Compute, "compute_kind" | "isolation
     if (ik === "direct") return "local";
     if (ik === "docker") return "docker";
     if (ik === "devcontainer") return "devcontainer";
-    if (ik === "firecracker-in-container") return "firecracker";
   }
   if (ck === "ec2") {
     if (ik === "direct") return "ec2";
     if (ik === "docker") return "ec2-docker";
     if (ik === "devcontainer") return "ec2-devcontainer";
-    if (ik === "firecracker-in-container") return "ec2-firecracker";
   }
   if (ck === "firecracker") return "firecracker";
   if (ck === "k8s") return "k8s";

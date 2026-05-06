@@ -34,13 +34,11 @@ function legacyProviderLabel(c: Pick<Compute, "compute_kind" | "isolation_kind">
     if (ik === "direct") return "local";
     if (ik === "docker") return "docker";
     if (ik === "devcontainer") return "devcontainer";
-    if (ik === "firecracker-in-container") return "firecracker";
   }
   if (ck === "ec2") {
     if (ik === "direct") return "ec2";
     if (ik === "docker") return "ec2-docker";
     if (ik === "devcontainer") return "ec2-devcontainer";
-    if (ik === "firecracker-in-container") return "ec2-firecracker";
   }
   if (ck === "firecracker") return "firecracker";
   if (ck === "k8s") return "k8s";
@@ -72,9 +70,6 @@ function legacyProviderToAxes(name: string): { compute_kind: ComputeKindName; is
     case "ec2-devcontainer":
     case "remote-devcontainer":
       return { compute_kind: "ec2", isolation_kind: "devcontainer" };
-    case "ec2-firecracker":
-    case "remote-firecracker":
-      return { compute_kind: "ec2", isolation_kind: "firecracker-in-container" };
     case "k8s":
       return { compute_kind: "k8s", isolation_kind: "direct" };
     case "k8s-kata":

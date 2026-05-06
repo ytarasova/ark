@@ -23,7 +23,7 @@
 export type ComputeKind = "local" | "firecracker" | "ec2" | "k8s" | "k8s-kata";
 
 /** How the agent process is sandboxed inside the compute. */
-export type IsolationKind = "direct" | "docker" | "compose" | "devcontainer" | "firecracker-in-container";
+export type IsolationKind = "direct" | "docker" | "compose" | "devcontainer";
 
 /** Provision latency bucket, used for pool sizing decisions. */
 export type ProvisionLatency = "instant" | "seconds" | "minutes";
