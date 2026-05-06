@@ -6,7 +6,7 @@
  * injection, and that shutdown disposes cleanly.
  */
 
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 import { describe, it, expect, afterEach } from "bun:test";
 import { asValue } from "awilix";
 import { AppContext } from "../app.js";

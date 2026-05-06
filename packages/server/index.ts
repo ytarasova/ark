@@ -10,7 +10,7 @@ import {
 } from "../core/auth/context.js";
 import { ArkdClient } from "../arkd/client/index.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
-import { providerOf } from "../compute/adapters/provider-map.js";
+import { providerOf } from "../core/compute/adapters/provider-map.js";
 import { handleMcpRequest } from "./mcp/index.js";
 
 export interface ServerConnection {

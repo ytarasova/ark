@@ -13,7 +13,7 @@ import { execFile } from "child_process";
 
 import type { AppContext } from "../../app.js";
 import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../../compute/types.js";
+import type { ComputeProvider } from "../../compute/types.js";
 import * as claude from "../../claude/claude.js";
 import { loadRepoConfig } from "../../repo-config.js";
 import { logDebug, logError, logWarn } from "../../observability/structured-log.js";

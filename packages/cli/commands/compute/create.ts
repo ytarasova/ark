@@ -1,10 +1,10 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { createInterface } from "readline";
-import { allFlagSpecs, getFlagSpec } from "../../../compute/index.js";
-import type { ProviderFlagOption } from "../../../compute/index.js";
+import { allFlagSpecs, getFlagSpec } from "../../../core/compute/index.js";
+import type { ProviderFlagOption } from "../../../core/compute/index.js";
 import { getArkClient } from "../../app-client.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { providerOf } from "../../../core/compute/adapters/provider-map.js";
 
 /**
  * Minimal raw-readline prompt. Returns the trimmed user input or the
@@ -141,7 +141,7 @@ export function registerCreateCommand(computeCmd: Command) {
     // Resolve either --compute + --isolation (new) or --provider (legacy).
     // We mutate `opts.provider` to a concrete value before handing off to
     // the per-provider flag spec so the spec sees the real provider key.
-    const { providerToPair, pairToProvider } = await import("../../../compute/adapters/provider-map.js");
+    const { providerToPair, pairToProvider } = await import("../../../core/compute/adapters/provider-map.js");
 
     const newCompute: string | undefined = opts.compute;
     const newIsolation: string | undefined = opts.isolation;

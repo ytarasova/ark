@@ -10,8 +10,8 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { getProvider } from "../../compute/index.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { getProvider } from "../../core/compute/index.js";
+import { providerOf } from "../../core/compute/adapters/provider-map.js";
 import { getAllSessionCosts } from "../../core/observability/costs.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type { MetricsSnapshotParams } from "../../types/index.js";

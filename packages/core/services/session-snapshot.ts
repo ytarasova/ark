@@ -19,9 +19,9 @@
  */
 
 import type { AppContext } from "../app.js";
-import type { ComputeKind, ComputeHandle, Snapshot } from "../../compute/core/types.js";
-import type { SnapshotRef } from "../../compute/core/snapshot-store.js";
-import { NotSupportedError } from "../../compute/core/types.js";
+import type { ComputeKind, ComputeHandle, Snapshot } from "../compute/core/types.js";
+import type { SnapshotRef } from "../compute/core/snapshot-store.js";
+import { NotSupportedError } from "../compute/core/types.js";
 
 // ── Public result shapes ───────────────────────────────────────────────────
 
@@ -253,7 +253,7 @@ export async function resumeFromSnapshot(
  * restore.
  */
 async function produceSnapshot(
-  compute: import("../../compute/core/types.js").Compute,
+  compute: import("../compute/core/types.js").Compute,
   handle: ComputeHandle,
 ): Promise<{ snapshot: Snapshot; stream: ReadableStream<Uint8Array> }> {
   const snap = await compute.snapshot(handle);

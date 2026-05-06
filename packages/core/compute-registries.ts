@@ -5,14 +5,14 @@
  * Lives on AppContext because providers are registered imperatively at
  * boot. Keeping the maps + mutators here keeps app.ts focused on lifecycle.
  */
-import type { ComputeProvider } from "../compute/types.js";
+import type { ComputeProvider } from "./compute/types.js";
 import type {
   Compute as NewCompute,
   Isolation as NewIsolation,
   ComputeKind,
   IsolationKind,
-} from "../compute/core/types.js";
-import type { ComputePool } from "../compute/core/pool/types.js";
+} from "./compute/core/types.js";
+import type { ComputePool } from "./compute/core/pool/types.js";
 
 export class ComputeRegistries {
   private providers = new Map<string, ComputeProvider>();

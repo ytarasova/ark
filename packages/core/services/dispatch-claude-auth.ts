@@ -26,7 +26,7 @@
 import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 
 /** Shape returned back to dispatch so it can merge env + record what was created. */
 export interface ClaudeAuthMaterialization {

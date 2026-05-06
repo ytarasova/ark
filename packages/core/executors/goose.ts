@@ -124,7 +124,7 @@ export const gooseExecutor: Executor = {
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
     // Conductor URL (devcontainer vs host)
-    const { parseArcJson } = await import("../../compute/arc-json.js");
+    const { parseArcJson } = await import("../compute/arc-json.js");
     const { DEFAULT_CONDUCTOR_URL, DOCKER_CONDUCTOR_URL } = await import("../constants.js");
     const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
     const conductorUrl = arcJson?.devcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;

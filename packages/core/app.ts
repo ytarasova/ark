@@ -24,15 +24,15 @@ import { createAppContainer, type AppContainer, type AppBootOptions } from "./co
 import { buildContainer } from "./di/index.js";
 import { loadConfig, loadAppConfig, type ArkConfig } from "./config.js";
 import { eventBus } from "./hooks.js";
-import type { ComputeProvider } from "../compute/types.js";
+import type { ComputeProvider } from "./compute/types.js";
 import type {
   Compute as NewCompute,
   Isolation as NewIsolation,
   ComputeKind,
   IsolationKind,
-} from "../compute/core/types.js";
-import type { ComputePool } from "../compute/core/pool/types.js";
-import type { SnapshotStore } from "../compute/core/snapshot-store.js";
+} from "./compute/core/types.js";
+import type { ComputePool } from "./compute/core/pool/types.js";
+import type { SnapshotStore } from "./compute/core/snapshot-store.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
@@ -56,7 +56,7 @@ import type { SessionAttachService } from "./services/session/attach.js";
 import type { DispatchService } from "./services/dispatch/index.js";
 import type { StageAdvanceService } from "./services/stage-advance/index.js";
 import type { FlowStore, SkillStore, AgentStore, RuntimeStore, ModelStore } from "./stores/index.js";
-import type { WorkspaceStore } from "../workspace/store.js";
+import type { WorkspaceStore } from "./workspace/store.js";
 import { ComputeRegistries } from "./compute-registries.js";
 import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
@@ -976,7 +976,7 @@ export class AppContext {
   /** Resolve the ComputeTarget for a session. Delegated to compute-resolver.ts. */
   resolveComputeTarget(
     session: Session,
-  ): Promise<{ target: import("../compute/core/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
+  ): Promise<{ target: import("./compute/core/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
     return resolveComputeTarget(this, session);
   }
 

@@ -10,7 +10,7 @@
  * - Flow YAML with compute_template loads correctly
  */
 
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";

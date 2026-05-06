@@ -30,7 +30,7 @@ function canonical(p: string): string {
 }
 import { AppContext } from "../app.js";
 import { setupSessionWorktree } from "../services/worktree/index.js";
-import { getProvider } from "../../compute/index.js";
+import { getProvider } from "../compute/index.js";
 
 let app: AppContext;
 let originalCwd: string;

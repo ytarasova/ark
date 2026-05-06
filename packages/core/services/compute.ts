@@ -22,7 +22,7 @@ import type {
 } from "../../types/index.js";
 import type { ComputeRepository } from "../repositories/compute.js";
 import type { AppContext } from "../app.js";
-import { providerToPair, pairToProvider, providerOf } from "../../compute/adapters/provider-map.js";
+import { providerToPair, pairToProvider, providerOf } from "../compute/adapters/provider-map.js";
 
 export class ComputeService {
   constructor(

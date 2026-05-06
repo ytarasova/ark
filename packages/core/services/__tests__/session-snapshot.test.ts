@@ -17,8 +17,8 @@ import type {
   ComputeKind,
   ProvisionOpts,
   Snapshot,
-} from "../../../compute/core/types.js";
-import { NotSupportedError } from "../../../compute/core/types.js";
+} from "../../compute/core/types.js";
+import { NotSupportedError } from "../../compute/core/types.js";
 import { setApp } from "../../__tests__/test-helpers.js";
 
 let app: AppContext;

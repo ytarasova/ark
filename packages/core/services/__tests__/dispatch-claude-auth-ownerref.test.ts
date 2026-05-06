@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 import { setSecretOwnerToPod, type K8sSecretsApi } from "../dispatch-claude-auth.js";
-import { K8sProvider } from "../../../compute/providers/k8s.js";
+import { K8sProvider } from "../../compute/providers/k8s.js";
 
 let app: AppContext;
 

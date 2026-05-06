@@ -12,7 +12,7 @@ import { recordingPath } from "../recordings.js";
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude/claude.js";
 import * as tmux from "../infra/tmux.js";
-import { parseArcJson } from "../../compute/arc-json.js";
+import { parseArcJson } from "../compute/arc-json.js";
 import { logWarn } from "../observability/structured-log.js";
 
 /**
@@ -375,7 +375,7 @@ export const claudeCodeExecutor: Executor = {
     if (compute && provider && !provider.supportsWorktree) {
       const { resolveTargetAndHandle } = await import("../services/dispatch/target-resolver.js");
       const { runTargetLifecycle } = await import("../services/dispatch/target-lifecycle.js");
-      const { resolvePortDecls } = await import("../../compute/arc-json.js");
+      const { resolvePortDecls } = await import("../compute/arc-json.js");
 
       const { target, handle } = await resolveTargetAndHandle(app, session);
       if (!target || !handle) {

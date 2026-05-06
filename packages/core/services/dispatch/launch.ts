@@ -19,7 +19,7 @@ import type { StageDefinition } from "../flow.js";
 import type { StageSecretResolver } from "./secrets-resolve.js";
 import type { Executor, LaunchResult } from "../../executor.js";
 import type { PlacementCtx } from "../../secrets/placement-types.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { placeAllSecrets } from "../../secrets/placement.js";
 import { logDebug, logWarn } from "../../observability/structured-log.js";
 

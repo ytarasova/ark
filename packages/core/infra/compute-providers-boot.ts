@@ -15,7 +15,7 @@ export class ComputeProvidersBoot {
 
   async start(): Promise<void> {
     await safeAsync("boot: load compute providers", async () => {
-      const compute = await import("../../compute/index.js");
+      const compute = await import("../compute/index.js");
       compute.setComputeApp(this.app);
       const providers = [
         new compute.LocalWorktreeProvider(this.app),
@@ -33,7 +33,7 @@ export class ComputeProvidersBoot {
 
       // Optional: Kubernetes providers (gated on SDK install)
       try {
-        const { K8sProvider, KataProvider } = await import("../../compute/providers/k8s.js");
+        const { K8sProvider, KataProvider } = await import("../compute/providers/k8s.js");
         const k8s = new K8sProvider(this.app);
         this.app.registerProvider(k8s);
         const kata = new KataProvider(this.app);
@@ -45,8 +45,8 @@ export class ComputeProvidersBoot {
       // Compute / Isolation registrations for Kubernetes
       try {
         await import("@kubernetes/client-node");
-        const { K8sCompute } = await import("../../compute/core/k8s.js");
-        const { KataCompute } = await import("../../compute/core/k8s-kata.js");
+        const { K8sCompute } = await import("../compute/core/k8s.js");
+        const { KataCompute } = await import("../compute/core/k8s-kata.js");
         this.app.registerCompute(new K8sCompute(this.app));
         this.app.registerCompute(new KataCompute(this.app));
       } catch {
@@ -54,12 +54,12 @@ export class ComputeProvidersBoot {
       }
 
       // Compute + Isolation registry (additive, local providers always on)
-      const { LocalCompute } = await import("../../compute/core/local.js");
-      const { EC2Compute } = await import("../../compute/core/ec2.js");
-      const { DirectIsolation } = await import("../../compute/isolation/direct.js");
-      const { DockerIsolation } = await import("../../compute/isolation/docker.js");
-      const { DevcontainerIsolation } = await import("../../compute/isolation/devcontainer.js");
-      const { DockerComposeIsolation } = await import("../../compute/isolation/docker-compose.js");
+      const { LocalCompute } = await import("../compute/core/local.js");
+      const { EC2Compute } = await import("../compute/core/ec2.js");
+      const { DirectIsolation } = await import("../compute/isolation/direct.js");
+      const { DockerIsolation } = await import("../compute/isolation/docker.js");
+      const { DevcontainerIsolation } = await import("../compute/isolation/devcontainer.js");
+      const { DockerComposeIsolation } = await import("../compute/isolation/docker-compose.js");
       this.app.registerCompute(new LocalCompute(this.app));
       this.app.registerCompute(new EC2Compute(this.app));
       this.app.registerIsolation(new DirectIsolation(this.app));
@@ -68,7 +68,7 @@ export class ComputeProvidersBoot {
       this.app.registerIsolation(new DockerComposeIsolation(this.app));
 
       // FirecrackerCompute (gated on /dev/kvm availability)
-      const { registerFirecrackerIfAvailable } = await import("../../compute/core/firecracker/compute.js");
+      const { registerFirecrackerIfAvailable } = await import("../compute/core/firecracker/compute.js");
       registerFirecrackerIfAvailable(this.app);
     });
   }

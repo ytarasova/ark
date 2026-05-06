@@ -4,7 +4,7 @@ import { join, dirname } from "path";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { execFileSync } from "child_process";
-import { getProvider } from "../../../compute/index.js";
+import { getProvider } from "../../../core/compute/index.js";
 import { getArkClient } from "../../app-client.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
 

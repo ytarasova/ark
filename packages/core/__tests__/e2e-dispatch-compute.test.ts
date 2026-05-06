@@ -12,7 +12,7 @@
  * NOT the actual tmux/claude launch (which requires real tmux).
  */
 
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";

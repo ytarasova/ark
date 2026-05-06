@@ -40,8 +40,8 @@
  */
 
 import type { AppContext } from "../../app.js";
-import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../../compute/core/types.js";
-import type { ComputeTarget } from "../../../compute/core/compute-target.js";
+import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../compute/core/types.js";
+import type { ComputeTarget } from "../../compute/core/compute-target.js";
 import type { DeferredPlacementCtx } from "../../secrets/deferred-placement-ctx.js";
 import { provisionStep } from "../provisioning-steps.js";
 

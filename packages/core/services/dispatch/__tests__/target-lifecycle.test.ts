@@ -13,8 +13,8 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AppContext } from "../../../app.js";
 import { runTargetLifecycle } from "../target-lifecycle.js";
 import { DeferredPlacementCtx } from "../../../secrets/deferred-placement-ctx.js";
-import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../../../compute/core/types.js";
-import type { ComputeTarget } from "../../../../compute/core/compute-target.js";
+import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../../compute/core/types.js";
+import type { ComputeTarget } from "../../../compute/core/compute-target.js";
 
 let app: AppContext;
 

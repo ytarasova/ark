@@ -28,7 +28,7 @@ import { execFile } from "child_process";
 
 import type { AppContext } from "../../app.js";
 import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../../compute/types.js";
+import type { ComputeProvider } from "../../compute/types.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
 import { resolveProvider } from "../../compute-resolver.js";
 import { loadRepoConfig } from "../../repo-config.js";

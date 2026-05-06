@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
 import { claudeAgentExecutor } from "../executors/claude-agent.js";
 import type { Compute } from "../../types/index.js";
-import type { ComputeProvider } from "../../compute/types.js";
+import type { ComputeProvider } from "../compute/types.js";
 
 let app: AppContext;
 

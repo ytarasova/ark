@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 
 withTestContext();
 

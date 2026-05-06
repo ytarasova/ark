@@ -5,7 +5,7 @@ import type { DatabaseAdapter } from "../../database.js";
 import { ComputeRepository } from "../compute.js";
 import { initSchema, seedLocalCompute } from "../schema.js";
 import type { ComputeStatus, ComputeConfig } from "../../../types/index.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 
 let db: DatabaseAdapter;
 let repo: ComputeRepository;

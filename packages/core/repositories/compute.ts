@@ -10,7 +10,7 @@ import type {
   IsolationKindName,
   ComputeConfig,
 } from "../../types/index.js";
-import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
+import { providerToPair, pairToProvider } from "../compute/adapters/provider-map.js";
 import { now } from "../util/time.js";
 
 // -- Insert contract ------------------------------------------------------

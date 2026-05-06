@@ -14,7 +14,7 @@ import type { AppContext } from "../app.js";
 import type { Session, ComputeProviderName } from "../../types/index.js";
 import type { WorkerNode } from "./worker-registry.js";
 import type { TenantPolicyManager, TenantComputePolicy } from "../auth/index.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 
 export class SessionScheduler {
   private policyManager: TenantPolicyManager | null = null;

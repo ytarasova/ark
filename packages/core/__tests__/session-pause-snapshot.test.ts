@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
 import { pauseWithSnapshot, resumeFromSnapshot, resolveSessionCompute } from "../services/session-snapshot.js";
-import type { Compute, ComputeHandle, Snapshot } from "../../compute/core/types.js";
-import { NotSupportedError } from "../../compute/core/types.js";
-import { FsSnapshotStore } from "../../compute/core/snapshot-store-fs.js";
+import type { Compute, ComputeHandle, Snapshot } from "../compute/core/types.js";
+import { NotSupportedError } from "../compute/core/types.js";
+import { FsSnapshotStore } from "../compute/core/snapshot-store-fs.js";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";

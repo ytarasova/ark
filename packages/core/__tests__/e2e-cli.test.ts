@@ -5,7 +5,7 @@
  * Tests the same operations the CLI commands perform.
  */
 
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 import { describe, it, expect, afterEach } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";

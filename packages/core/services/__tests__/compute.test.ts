@@ -12,7 +12,7 @@ import { AppContext } from "../../app.js";
 import { ComputeService } from "../compute.js";
 import { ComputeRepository } from "../../repositories/compute.js";
 import type { Compute, ComputeStatus } from "../../../types/index.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 
 let app: AppContext;
 let repo: ComputeRepository;

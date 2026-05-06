@@ -26,7 +26,7 @@ import { setApp, clearApp } from "../../../__tests__/test-helpers.js";
 import { allocatePort } from "../../../config/port-allocator.js";
 import { createWorktreePR, mergeWorktreePR, detectGitHost, parseCreatePrUrl, isGithubPrUrl } from "../pr.js";
 import type { Compute, Session } from "../../../../types/index.js";
-import type { ComputeProvider } from "../../../../compute/types.js";
+import type { ComputeProvider } from "../../../compute/types.js";
 
 // ── Stub arkd server: records every /exec call and returns a programmable response ──
 

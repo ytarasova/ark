@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient } from "../../app-client.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { providerOf } from "../../../core/compute/adapters/provider-map.js";
 
 export function registerLifecycleCommands(computeCmd: Command) {
   computeCmd

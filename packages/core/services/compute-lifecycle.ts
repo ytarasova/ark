@@ -69,8 +69,8 @@ export async function garbageCollectComputeIfTemplate(
   // providers (older local-only installs) are tolerated: the row deletion
   // still proceeds.
   try {
-    const { getProvider } = await import("../../compute/index.js");
-    const { providerOf } = await import("../../compute/adapters/provider-map.js");
+    const { getProvider } = await import("../compute/index.js");
+    const { providerOf } = await import("../compute/adapters/provider-map.js");
     const provider = getProvider(providerOf(compute));
     if (provider) {
       await provider.destroy(compute);

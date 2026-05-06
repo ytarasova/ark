@@ -14,7 +14,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { logDebug } from "../../core/observability/structured-log.js";
-import { providerToPair, providerOf } from "../../compute/adapters/provider-map.js";
+import { providerToPair, providerOf } from "../../core/compute/adapters/provider-map.js";
 import type { ComputeNameParams, ComputeUpdateParams, ComputeProviderName } from "../../types/index.js";
 
 /**
@@ -75,7 +75,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
 
     let effectiveProvider = provider;
     if (!effectiveProvider && computeKind && isolationKind) {
-      const { pairToProvider } = await import("../../compute/adapters/provider-map.js");
+      const { pairToProvider } = await import("../../core/compute/adapters/provider-map.js");
       effectiveProvider = (pairToProvider({ compute: computeKind, isolation: isolationKind }) ??
         "local") as import("../../types/index.js").ComputeProviderName;
     }
@@ -208,7 +208,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
+    const { getProvider } = await import("../../core/compute/index.js");
 
     // Template provision: clone the template into a named concrete row, then
     // provision the clone. Mirrors the session auto-clone path but triggered
@@ -264,7 +264,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
+    const { getProvider } = await import("../../core/compute/index.js");
     const provider = getProvider(providerOf(compute));
     if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     try {
@@ -295,7 +295,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
+    const { getProvider } = await import("../../core/compute/index.js");
     const provider = getProvider(providerOf(compute));
     if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     await provider.start(compute);
@@ -307,7 +307,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
+    const { getProvider } = await import("../../core/compute/index.js");
     const provider = getProvider(providerOf(compute));
     if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     // Capability-driven guard: reject destroy when the provider declares
@@ -334,7 +334,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
+    const { getProvider } = await import("../../core/compute/index.js");
     const provider = getProvider(providerOf(compute));
     if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     // Capability-driven guard -- canReboot may be false even when reboot() is
@@ -360,7 +360,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const instanceId = cfg?.instance_id as string | undefined;
     if (!instanceId) return { reachable: false, message: "No instance_id configured" };
     try {
-      const { ssmExec, ssmCheckInstance } = await import("../../compute/providers/ec2/ssm.js");
+      const { ssmExec, ssmCheckInstance } = await import("../../core/compute/providers/ec2/ssm.js");
       const region = (cfg?.region as string | undefined) ?? "us-east-1";
       const awsProfile = cfg?.aws_profile as string | undefined;
       const online = await ssmCheckInstance({ instanceId, region, awsProfile });
@@ -375,7 +375,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         return { reachable: true, message: stdout.trim() };
       }
       // Check provider status if SSM is offline.
-      const { getProvider } = await import("../../compute/index.js");
+      const { getProvider } = await import("../../core/compute/index.js");
       const provider = getProvider(providerOf(compute));
       if (provider?.checkStatus) {
         const real = await provider.checkStatus(compute).catch((err) => {

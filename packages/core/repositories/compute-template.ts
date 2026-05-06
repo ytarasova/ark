@@ -21,7 +21,7 @@
 
 import type { DatabaseAdapter } from "../database/index.js";
 import type { ComputeProviderName, ComputeConfig, ComputeKindName, IsolationKindName } from "../../types/index.js";
-import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
+import { providerToPair, pairToProvider } from "../compute/adapters/provider-map.js";
 import { ComputeRepository } from "./compute.js";
 
 /** Sentinel tenant for system-wide compute templates seeded at boot. */

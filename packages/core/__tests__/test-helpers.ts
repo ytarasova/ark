@@ -260,7 +260,7 @@ export async function forHostedTestAsync(overrides?: ForHostedTestOptions): Prom
       overridesForContainer.blobStore = new LocalDiskBlobStore(`${ctx.config.dirs.ark}/stub-blobs`);
     }
     if (stubSnapshotStore) {
-      const { FsSnapshotStore } = await import("../../compute/core/snapshot-store-fs.js");
+      const { FsSnapshotStore } = await import("../compute/core/snapshot-store-fs.js");
       overridesForContainer.snapshotStore = new FsSnapshotStore(`${ctx.config.dirs.ark}/stub-snapshots`);
     }
     ctx._setContainerOverridesForTest(overridesForContainer);

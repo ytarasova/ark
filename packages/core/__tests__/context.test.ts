@@ -2,7 +2,7 @@
  * Tests for store context DI -- verifies test isolation works via AppContext.
  */
 
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";

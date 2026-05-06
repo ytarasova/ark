@@ -88,7 +88,7 @@ describe("k8s e2e flow (live cluster)", () => {
   });
 
   it("provisions the k8s template into a live instance pod", async () => {
-    const { getProvider } = await import("../../../compute/index.js");
+    const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider("k8s");
     expect(provider).toBeTruthy();
 
@@ -267,9 +267,9 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
       data[e.name] = buf.toString("base64");
     }
 
-    const { getProvider } = await import("../../../compute/index.js");
+    const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider("k8s");
-    const { K8sProvider } = await import("../../../compute/providers/k8s.js");
+    const { K8sProvider } = await import("../../compute/providers/k8s.js");
     // Borrow the provider's lazy getApi by provisioning first -- that
     // populates `kubeApi`. We stash it on a local for Secret CRUD below.
     const tmpl = (await app.computes.get(templateName))!;
@@ -318,7 +318,7 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
   });
 
   it("provisions the clone + wires the creds Secret into the config", async () => {
-    const { getProvider } = await import("../../../compute/index.js");
+    const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider("k8s");
     expect(provider).toBeTruthy();
 

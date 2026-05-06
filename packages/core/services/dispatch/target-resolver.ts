@@ -40,8 +40,8 @@
 
 import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/index.js";
-import type { ComputeHandle } from "../../../compute/core/types.js";
-import type { ComputeTarget } from "../../../compute/core/compute-target.js";
+import type { ComputeHandle } from "../../compute/core/types.js";
+import type { ComputeTarget } from "../../compute/core/compute-target.js";
 import { logInfo } from "../../observability/structured-log.js";
 import { provisionStep } from "../provisioning-steps.js";
 

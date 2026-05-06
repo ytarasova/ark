@@ -24,8 +24,8 @@
     "packages/server/mcp/tools/**/*.ts",
     "packages/core/connectors/definitions/**/*.ts",
     "packages/core/executors/**/*.ts",
-    "packages/compute/providers/**/*.ts",
-    "packages/compute/core/**/index.ts",
+    "packages/core/compute/providers/**/*.ts",
+    "packages/core/compute/core/**/index.ts",
     "**/*.test.ts",
     "**/*.spec.ts",
     "scripts/**/*.ts"

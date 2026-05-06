@@ -145,7 +145,7 @@ export class SessionAttachService {
     if (session.compute_name) {
       const compute = await this.app.computes.get(session.compute_name);
       if (compute) {
-        const { providerOf } = await import("../../../compute/adapters/provider-map.js");
+        const { providerOf } = await import("../../compute/adapters/provider-map.js");
         const provider = this.app.getProvider(providerOf(compute));
         try {
           const parts = provider?.getAttachCommand?.(compute, session) ?? [];

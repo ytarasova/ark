@@ -11,7 +11,7 @@
 import { z } from "zod";
 import type { ToolDef } from "../registry.js";
 import { sharedRegistry } from "../transport.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { providerOf } from "../../../core/compute/adapters/provider-map.js";
 
 interface ComputeSummary {
   name: string;
@@ -67,7 +67,7 @@ const computeStart: ToolDef = {
     const parsed = input as { name: string };
     const compute = await app.computes.get(parsed.name);
     if (!compute) throw new Error(`Compute not found: ${parsed.name}`);
-    const { getProvider } = await import("../../../compute/index.js");
+    const { getProvider } = await import("../../../core/compute/index.js");
     const provider = getProvider(providerOf(compute));
     if (!provider) throw new Error(`Unknown provider: ${providerOf(compute)}`);
     await provider.start(compute);
@@ -84,7 +84,7 @@ const computeStop: ToolDef = {
     const parsed = input as { name: string };
     const compute = await app.computes.get(parsed.name);
     if (!compute) throw new Error(`Compute not found: ${parsed.name}`);
-    const { getProvider } = await import("../../../compute/index.js");
+    const { getProvider } = await import("../../../core/compute/index.js");
     const provider = getProvider(providerOf(compute));
     if (!provider) throw new Error(`Unknown provider: ${providerOf(compute)}`);
     await provider.stop(compute);

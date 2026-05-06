@@ -163,7 +163,7 @@ test: build-web ## Run unit tests (parallel; excludes compute E2E and integratio
 	  $$(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | grep -v local-arkd | grep -v local-provider | grep -v /dist/ | sort)
 
 test-compute-e2e: build-web ## Run compute end-to-end tests (serial; share global local-arkd state)
-	$(BUN) test packages/compute/__tests__/e2e.test.ts packages/compute/__tests__/e2e-compute.test.ts --concurrency 1
+	$(BUN) test packages/core/compute/__tests__/e2e.test.ts packages/core/compute/__tests__/e2e-compute.test.ts --concurrency 1
 
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
 	$(BUN) test $(F) --concurrency 4
