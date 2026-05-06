@@ -16,16 +16,33 @@ export async function getOutput(
   const session = await app.sessions.get(sessionId);
   if (!session) return "";
 
-  // For running sessions, capture live from tmux. Resolve the provider via the
-  // session's tenant-scoped AppContext so that compute lookup respects the
-  // (name, tenant_id) primary key on the compute table -- otherwise two tenants
-  // with the same compute name would collide.
+  // For running sessions, capture live from tmux via the new ComputeTarget
+  // path. Resolve via the session's tenant-scoped AppContext so that compute
+  // lookup respects the (name, tenant_id) primary key on the compute table --
+  // otherwise two tenants with the same compute name would collide.
   if (session.session_id) {
     const tenantApp = session.tenant_id ? app.forTenant(session.tenant_id) : app;
-    const { provider, compute } = await tenantApp.resolveProvider(session);
-    if (provider && compute) {
-      const live = await provider.captureOutput(compute, session, opts);
-      if (live) return live;
+    try {
+      const { target, compute: computeRow } = await tenantApp.resolveComputeTarget(session);
+      if (target && computeRow) {
+        const computeHandle = target.compute.attachExistingHandle?.({
+          name: computeRow.name,
+          status: computeRow.status,
+          config: computeRow.config ?? {},
+        });
+        if (computeHandle) {
+          const agent = target.isolation.attachAgent(target.compute, computeHandle, session.session_id);
+          try {
+            const live = await agent.captureOutput(opts);
+            if (live) return live;
+          } catch (err: any) {
+            // arkd unreachable / agent gone -- fall through to the recorded file.
+            logDebug("session", `captureOutput failed for ${sessionId}: ${err?.message ?? err}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      logDebug("session", `resolveComputeTarget for output failed for ${sessionId}: ${err?.message ?? err}`);
     }
   }
 

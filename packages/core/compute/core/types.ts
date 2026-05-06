@@ -48,6 +48,11 @@ export interface ComputeCapabilities {
  * Opaque handle produced by `Compute.provision`. Carries the compute name
  * (so repos can be updated by the conductor) plus compute-specific state in
  * `meta` (the same config bag today's `Compute.config` holds).
+ *
+ * Post-launch ops live on the handle so `ComputeTarget` covers the full
+ * compute lifecycle. `getMetrics` is added as an optional method so legacy
+ * handles (synthesized by `attachExistingHandle` on impls that haven't been
+ * upgraded yet) keep working -- callers null-check before invoking.
  */
 export interface ComputeHandle {
   readonly kind: ComputeKind;
@@ -55,6 +60,12 @@ export interface ComputeHandle {
   readonly name: string;
   /** Backend-specific state (container id, EC2 instance id, VM socket, ...). */
   readonly meta: Record<string, unknown>;
+  /**
+   * Pull instantaneous resource metrics for this compute. Delegates to
+   * arkd's `/snapshot` endpoint. Optional: handles synthesized outside of
+   * `Compute.provision` / `attachExistingHandle` (eg. tests) may omit it.
+   */
+  getMetrics?(): Promise<ComputeSnapshot>;
 }
 
 /**
@@ -62,11 +73,36 @@ export interface ComputeHandle {
  * isolations this is just the tmux session name arkd launched, kept
  * structured so future isolations can attach extra state (compose project,
  * devcontainer id) without a breaking change.
+ *
+ * The post-launch operations (`kill`, `captureOutput`, `checkAlive`) live
+ * on the handle: `Isolation.launchAgent` constructs an AgentHandle whose
+ * methods are closures bound to the live `ArkdClient` and the agent's
+ * sessionName. This keeps the call site short (`agent.kill()`) while the
+ * isolation owns the wire format for talking to arkd.
+ *
+ * Rehydration: server handlers that only have a persisted `sessionName`
+ * (e.g. `session.session_id` after a process restart) use
+ * `Isolation.attachAgent(compute, computeHandle, sessionName)` to rebuild
+ * an equivalent handle without re-launching.
  */
 export interface AgentHandle {
   readonly sessionName: string;
   readonly meta?: Record<string, unknown>;
+  /** Terminate the agent process. Idempotent -- arkd no-ops on missing tmux sessions. */
+  kill(): Promise<void>;
+  /** Capture the agent's tmux pane output. Returns the pane contents as a string. */
+  captureOutput(opts?: { lines?: number }): Promise<string>;
+  /** Whether the agent process is still alive. Returns false if arkd is unreachable. */
+  checkAlive(): Promise<boolean>;
 }
+
+/**
+ * Resource snapshot returned by `ComputeHandle.getMetrics`. Re-exported from
+ * `packages/types/common.ts` -- this is the shape arkd's `/snapshot` endpoint
+ * already returns and the dashboard already consumes, so we reuse it instead
+ * of inventing a parallel ComputeMetrics shape.
+ */
+export type ComputeSnapshot = import("../../../types/common.js").ComputeSnapshot;
 
 // ── Options passed through the lifecycle ───────────────────────────────────
 
@@ -330,6 +366,16 @@ export interface Isolation {
 
   /** Launch the agent process via arkd (inside compute). */
   launchAgent(compute: Compute, h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle>;
+
+  /**
+   * Rehydrate an `AgentHandle` from a persisted sessionName without
+   * re-launching the agent. Used by server handlers / status pollers /
+   * terminate paths that only have a session id from the DB.
+   *
+   * The returned handle's methods are bound to the same arkd client the
+   * isolation would build during `launchAgent`. Pure: no I/O at attach time.
+   */
+  attachAgent(compute: Compute, h: ComputeHandle, sessionName: string): AgentHandle;
 
   /** Isolation-level teardown (compose down, devcontainer stop, etc.). */
   shutdown(compute: Compute, h: ComputeHandle): Promise<void>;

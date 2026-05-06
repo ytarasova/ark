@@ -9,6 +9,7 @@
 
 import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
+import { buildAgentHandle } from "../core/handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -45,7 +46,12 @@ export class DirectIsolation implements Isolation {
       script: opts.launcherContent,
       workdir: opts.workdir,
     });
-    return { sessionName: opts.tmuxName };
+    return this.attachAgent(compute, h, opts.tmuxName);
+  }
+
+  attachAgent(compute: Compute, h: ComputeHandle, sessionName: string): AgentHandle {
+    const factory = this.clientFactory ?? ((url: string) => new ArkdClient(url));
+    return buildAgentHandle(sessionName, () => compute.getArkdUrl(h), factory);
   }
 
   async shutdown(_compute: Compute, _h: ComputeHandle): Promise<void> {

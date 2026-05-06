@@ -49,6 +49,35 @@ export class SessionTerminator {
     }
   }
 
+  /**
+   * Kill the agent process via the new `Isolation.attachAgent` path. Resolves
+   * the ComputeTarget from the session, rehydrates the compute handle from
+   * the persisted compute row, attaches an AgentHandle bound to the live
+   * arkd client, and calls `agent.kill()`. Returns true on success, false
+   * when the target is unavailable, the compute can't be rehydrated, or
+   * arkd refuses the kill (caller logs and falls through).
+   */
+  private async killAgentViaTarget(session: Session): Promise<boolean> {
+    if (!session.session_id) return false;
+    return this.withComputeTarget(session, `killAgent ${session.id}`, async (target, computeRow) => {
+      const computeHandle = target.compute.attachExistingHandle?.({
+        name: computeRow.name,
+        status: computeRow.status,
+        config: computeRow.config ?? {},
+      });
+      if (!computeHandle) {
+        // Template-only computes (per-session pod / microVM) reach this
+        // path during stop/delete. Their agent already lives inside the
+        // ephemeral instance that destroy() will reap; nothing to kill via
+        // arkd here. Treat as success so cleanupSession runs.
+        logDebug("session", `killAgent ${session.id}: compute has no attachExistingHandle, skipping kill`);
+        return;
+      }
+      const agent = target.isolation.attachAgent(target.compute, computeHandle, session.session_id!);
+      await agent.kill();
+    });
+  }
+
   async stop(sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
     const d = this.deps;
     const session = await d.sessions.get(sessionId);
@@ -71,28 +100,28 @@ export class SessionTerminator {
       logDebug("session", "fall through to tmux kill");
     }
 
-    // Resolve provider explicitly so we can tell apart "no provider" from
-    // "provider call threw". The local-tmux fallback below is ONLY safe
-    // when there's truly no compute provider for this session -- when a
-    // provider exists but its kill failed (e.g. arkd unreachable on EC2),
-    // running `tmux kill-session` against the conductor's local daemon
-    // does nothing useful and silently masks the real failure (#422 / #425
-    // family). Surface the failure as a log line and continue with the DB
-    // state transition; the agent on the worker may stay alive but at
-    // least the operator sees the session as stopped in the dashboard.
+    // Kill the agent via the new ComputeTarget path: `target.isolation.attachAgent`
+    // rebuilds an AgentHandle from the persisted session_id and calls
+    // `agent.kill()` against the live arkd. The provider-side `cleanupSession`
+    // path stays on the legacy registry until that op also moves to the
+    // new world. Local-tmux fallback below is ONLY safe when no provider
+    // resolves -- when a target exists but its kill failed (e.g. arkd
+    // unreachable on EC2), running `tmux kill-session` against the
+    // conductor's local daemon does nothing useful and silently masks the
+    // real failure (#422 / #425 family).
     const { provider, compute } = await d.resolveProvider(session);
     if (provider && compute) {
-      const ok = await safeAsync(`stop ${sessionId}`, async () => {
-        await provider.killAgent(compute, session);
-        await provider.cleanupSession(compute, session);
-      });
-      if (!ok) {
+      const killOk = await this.killAgentViaTarget(session);
+      if (!killOk) {
         logError(
           "session",
-          `stop ${sessionId}: provider.killAgent failed; agent on worker may still be running. ` +
+          `stop ${sessionId}: target-based killAgent failed; agent on worker may still be running. ` +
             `Status will still flip to 'stopped' so the dashboard reflects operator intent.`,
         );
       }
+      await safeAsync(`stop ${sessionId}: cleanupSession`, async () => {
+        await provider.cleanupSession(compute, session);
+      });
     } else if (session.session_id) {
       // No provider resolved -- legacy local-only sessions or test fixtures.
       // Use local tmux. Safe here because absence of provider implies the
@@ -171,23 +200,23 @@ export class SessionTerminator {
     const session = await d.sessions.get(sessionId);
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-    // Same shape as stop(): only fall back to local tmux when there's
-    // truly no provider for this session. Otherwise treat a provider-side
-    // kill failure as a logged warning, not an excuse to fire local tmux
-    // (which can't reach the worker's pane). #422 / #425 family.
+    // Same shape as stop(): only fall back to local tmux when there's truly
+    // no provider for this session. Kill goes through the new ComputeTarget
+    // path; `cleanupSession` (worktree dir, on-host artefacts) still goes
+    // through the legacy provider until that op moves to the new world.
     const { provider, compute } = await d.resolveProvider(session);
     if (provider && compute) {
-      const ok = await safeAsync(`delete ${sessionId}`, async () => {
-        await provider.killAgent(compute, session);
-        await provider.cleanupSession(compute, session);
-      });
-      if (!ok) {
+      const killOk = await this.killAgentViaTarget(session);
+      if (!killOk) {
         logError(
           "session",
-          `delete ${sessionId}: provider.killAgent failed; agent on worker may still be running. ` +
+          `delete ${sessionId}: target-based killAgent failed; agent on worker may still be running. ` +
             `DB row will still be deleted so the dashboard reflects operator intent.`,
         );
       }
+      await safeAsync(`delete ${sessionId}: cleanupSession`, async () => {
+        await provider.cleanupSession(compute, session);
+      });
     } else if (session.session_id) {
       await killSessionAsync(session.session_id);
     }

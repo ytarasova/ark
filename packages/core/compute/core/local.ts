@@ -8,6 +8,8 @@
  */
 
 import type { AppContext } from "../../app.js";
+import { ArkdClient } from "../../../arkd/client/index.js";
+import { attachComputeMethods, type ArkdClientFactory } from "./handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -31,25 +33,34 @@ export class LocalCompute implements Compute {
 
   constructor(private readonly app: AppContext) {}
 
+  /** Test-only: swap in a stub `ArkdClient` factory for `getMetrics`. */
+  setClientFactoryForTesting(factory: ArkdClientFactory): void {
+    this.clientFactory = factory;
+  }
+
+  private clientFactory: ArkdClientFactory = (url) => new ArkdClient(url);
+
   async provision(opts: ProvisionOpts): Promise<ComputeHandle> {
     // The host is always provisioned. We just mint a handle.
     const name = (opts.tags?.name as string | undefined) ?? "local";
-    return {
+    const handle: ComputeHandle = {
       kind: this.kind,
       name,
       meta: { ...(opts.config ?? {}) },
     };
+    return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
   }
 
   attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
     // The host is always "provisioned" -- there's no underlying instance to
     // create. Synthesize a handle directly from the row so the dispatcher
     // skips the redundant provision() call.
-    return {
+    const handle: ComputeHandle = {
       kind: this.kind,
       name: row.name,
       meta: { ...row.config },
     };
+    return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
   }
 
   async start(_h: ComputeHandle): Promise<void> {

@@ -12,7 +12,7 @@ import type { AppContext } from "../app.js";
 import type { Executor, ExecutorStatus } from "../executor.js";
 import { getExecutor } from "../executor.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
-import { resolveProvider } from "../compute-resolver.js";
+import { resolveProvider, resolveComputeTarget } from "../compute-resolver.js";
 
 /**
  * Read the exit-code sentinel for a session, if the launcher wrote one.
@@ -112,11 +112,26 @@ async function probeSessionStatus(
           // shared compute-level field.
           return await executor.probeStatus({ app, session, handle, compute, provider });
         }
-        const running = await provider.checkSession(compute, handle, session);
-        return running ? { state: "running" } : { state: "not_found" };
+      }
+
+      // No executor-specific probe; route through the new ComputeTarget path
+      // and let `AgentHandle.checkAlive` talk to arkd. Falls back to the
+      // executor's own status probe when the target is unavailable.
+      const { target, compute: computeRow } = await resolveComputeTarget(app, session);
+      if (target && computeRow) {
+        const computeHandle = target.compute.attachExistingHandle?.({
+          name: computeRow.name,
+          status: computeRow.status,
+          config: computeRow.config ?? {},
+        });
+        if (computeHandle) {
+          const agent = target.isolation.attachAgent(target.compute, computeHandle, handle);
+          const running = await agent.checkAlive();
+          return running ? { state: "running" } : { state: "not_found" };
+        }
       }
     } catch (err: any) {
-      logWarn("status", `provider status probe failed for ${sessionId}: ${err?.message ?? err}; keeping running`);
+      logWarn("status", `compute-target status probe failed for ${sessionId}: ${err?.message ?? err}; keeping running`);
       return { state: "running" };
     }
   }

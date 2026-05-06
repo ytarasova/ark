@@ -53,6 +53,8 @@
 
 import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/session.js";
+import { ArkdClient } from "../../../arkd/client/index.js";
+import { attachComputeMethods, type ArkdClientFactory } from "./handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -348,8 +350,14 @@ export class EC2Compute implements Compute {
   };
 
   private helpers: EC2ComputeHelpers = DEFAULT_HELPERS;
+  private clientFactory: ArkdClientFactory = (url) => new ArkdClient(url);
 
   constructor(private readonly app: AppContext) {}
+
+  /** Test-only: swap in a stub `ArkdClient` factory for `getMetrics`. */
+  setClientFactoryForTesting(factory: ArkdClientFactory): void {
+    this.clientFactory = factory;
+  }
 
   /**
    * Test-only: swap in stubs for every EC2 / SSM side-effect. Partial
@@ -448,6 +456,7 @@ export class EC2Compute implements Compute {
       name,
       meta: { ec2: meta },
     };
+    attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
 
     await this.setupTransport(handle, { log });
     return handle;
@@ -486,11 +495,12 @@ export class EC2Compute implements Compute {
       size: (cfg.size as string | undefined) ?? "m",
       arch: (cfg.arch as string | undefined) ?? "x64",
     };
-    return {
+    const handle: ComputeHandle = {
       kind: this.kind,
       name: row.name,
       meta: { ec2: meta },
     };
+    return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
   }
 
   // ── ensureReachable ──────────────────────────────────────────────────────

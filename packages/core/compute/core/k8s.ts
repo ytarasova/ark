@@ -25,7 +25,9 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/session.js";
+import { ArkdClient } from "../../../arkd/client/index.js";
 import { allocatePort } from "../../config/port-allocator.js";
+import { attachComputeMethods, type ArkdClientFactory } from "./handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -148,6 +150,7 @@ export class K8sCompute implements Compute {
   protected deps: K8sComputeDeps = DEFAULT_DEPS;
   /** Memoized CoreV1Api client per kubeconfig path. */
   private apiCache = new Map<string, unknown>();
+  protected clientFactory: ArkdClientFactory = (url) => new ArkdClient(url);
 
   constructor(protected readonly app: AppContext) {}
 
@@ -156,6 +159,11 @@ export class K8sCompute implements Compute {
     this.deps = { ...DEFAULT_DEPS, ...this.deps, ...deps };
     // Invalidate the memoized API client when deps change (new SDK mock).
     this.apiCache.clear();
+  }
+
+  /** Test-only: swap in a stub `ArkdClient` factory for `getMetrics`. */
+  setClientFactoryForTesting(factory: ArkdClientFactory): void {
+    this.clientFactory = factory;
   }
 
   protected async getApi(kubeconfig?: string): Promise<any> {
@@ -258,6 +266,7 @@ export class K8sCompute implements Compute {
       name,
       meta: { k8s: meta },
     };
+    attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
 
     await this.setupPortForward(handle);
     return handle;

@@ -39,6 +39,7 @@ import stripJsonComments from "strip-json-comments";
 import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
 import { allocatePort } from "../../config/port-allocator.js";
+import { buildAgentHandle } from "../core/handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -341,7 +342,7 @@ export class DevcontainerIsolation implements Isolation {
 
   // ── launchAgent ──────────────────────────────────────────────────────────
 
-  async launchAgent(_compute: Compute, h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle> {
+  async launchAgent(compute: Compute, h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle> {
     const meta = this.getMeta(h);
     const client = this.deps.arkdClientFactory(meta.arkdUrl);
     await client.launchAgent({
@@ -349,7 +350,15 @@ export class DevcontainerIsolation implements Isolation {
       script: opts.launcherContent,
       workdir: opts.workdir,
     });
-    return { sessionName: opts.tmuxName };
+    return this.attachAgent(compute, h, opts.tmuxName);
+  }
+
+  attachAgent(_compute: Compute, h: ComputeHandle, sessionName: string): AgentHandle {
+    // Devcontainer pins arkd to the per-handle sidecar URL recorded in
+    // prepare() (image mode: the container's loopback port; compose mode:
+    // the socat forwarder's loopback port). Always read fresh from meta so
+    // the URL reflects the latest prepare cycle.
+    return buildAgentHandle(sessionName, () => this.getMeta(h).arkdUrl, this.deps.arkdClientFactory);
   }
 
   // ── shutdown ─────────────────────────────────────────────────────────────

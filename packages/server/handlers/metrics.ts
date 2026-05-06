@@ -10,8 +10,6 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { getProvider } from "../../core/compute/index.js";
-import { providerOf } from "../../core/compute/adapters/provider-map.js";
 import { getAllSessionCosts } from "../../core/observability/costs.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type { MetricsSnapshotParams } from "../../types/index.js";
@@ -20,12 +18,23 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
   router.handle("metrics/snapshot", async (p) => {
     const { computeName } = extract<MetricsSnapshotParams>(p, []);
     const resolved = computeName ?? "local";
-    const compute = await app.computes.get(resolved);
-    if (!compute) return { snapshot: null };
-    const provider = getProvider(providerOf(compute));
-    if (!provider?.getMetrics) return { snapshot: null };
+    const computeRow = await app.computes.get(resolved);
+    if (!computeRow) return { snapshot: null };
+
+    // Resolve the new ComputeTarget so we can call `handle.getMetrics()`
+    // without going through the legacy provider registry. Task 4 deletes
+    // the registry entirely; this handler must already be on the new path.
+    const computeImpl = app.getCompute(computeRow.compute_kind);
+    if (!computeImpl?.attachExistingHandle) return { snapshot: null };
+    const handle = computeImpl.attachExistingHandle({
+      name: computeRow.name,
+      status: computeRow.status,
+      config: computeRow.config ?? {},
+    });
+    if (!handle?.getMetrics) return { snapshot: null };
+
     try {
-      const snapshot = await provider.getMetrics(compute);
+      const snapshot = await handle.getMetrics();
       return { snapshot };
     } catch {
       // arkd sidecar transiently unreachable (container restarting, daemon

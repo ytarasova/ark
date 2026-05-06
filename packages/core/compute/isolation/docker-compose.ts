@@ -23,6 +23,7 @@ import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
 import { allocatePort } from "../../config/port-allocator.js";
 import { safeAsync } from "../../safe.js";
+import { buildAgentHandle } from "../core/handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -287,7 +288,22 @@ export class DockerComposeIsolation implements Isolation {
       script: opts.launcherContent,
       workdir: opts.workdir,
     });
-    return { sessionName: opts.tmuxName };
+    return this.attachAgent(compute, handle, opts.tmuxName);
+  }
+
+  attachAgent(compute: Compute, handle: ComputeHandle, sessionName: string): AgentHandle {
+    const factory = this.clientFactory ?? ((url: string) => new ArkdClient(url));
+    // Compose isolation prefers the per-session sidecar URL recorded in
+    // prepare(), falling back to the compute default (set in tests where
+    // prepare wasn't run).
+    return buildAgentHandle(
+      sessionName,
+      () => {
+        const meta = handle.meta.dockerCompose as DockerComposeMeta | undefined;
+        return meta?.arkdUrl ?? compute.getArkdUrl(handle);
+      },
+      factory,
+    );
   }
 
   // ── shutdown ───────────────────────────────────────────────────────────

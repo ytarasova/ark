@@ -31,7 +31,9 @@
 
 import type { AppContext } from "../../../app.js";
 import type { Session } from "../../../../types/session.js";
+import { ArkdClient } from "../../../../arkd/client/index.js";
 import { logInfo } from "../../../observability/structured-log.js";
+import { attachComputeMethods, type ArkdClientFactory } from "../handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -126,6 +128,7 @@ export class FirecrackerCompute implements Compute {
   /** vmId -> live VM handle. Needed so start/stop/destroy/snapshot can find
    *  the object we created in provision() without re-spawning firecracker. */
   private vms = new Map<string, FirecrackerVm>();
+  private clientFactory: ArkdClientFactory = (url) => new ArkdClient(url);
 
   constructor(
     private readonly app: AppContext,
@@ -137,6 +140,11 @@ export class FirecrackerCompute implements Compute {
   /** Test-only: swap one or more deps post-construction. */
   setDepsForTesting(partial: Partial<FirecrackerComputeDeps>): void {
     this.deps = { ...this.deps, ...partial };
+  }
+
+  /** Test-only: swap in a stub `ArkdClient` factory for `getMetrics`. */
+  setClientFactoryForTesting(factory: ArkdClientFactory): void {
+    this.clientFactory = factory;
   }
 
   async provision(opts: ProvisionOpts): Promise<ComputeHandle> {
@@ -236,11 +244,12 @@ export class FirecrackerCompute implements Compute {
 
     opts.onLog?.(`firecracker: VM ${vmId} ready at ${arkdUrl}`);
 
-    return {
+    const handle: ComputeHandle = {
       kind: this.kind,
       name,
       meta: { firecracker: meta },
     };
+    return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
   }
 
   /** Resume a paused VM. If we don't have a live handle (e.g. after a

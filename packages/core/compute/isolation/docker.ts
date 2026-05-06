@@ -22,6 +22,7 @@
 import type { AppContext } from "../../app.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
 import { allocatePort } from "../../config/port-allocator.js";
+import { buildAgentHandle } from "../core/handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -185,7 +186,7 @@ export class DockerIsolation implements Isolation {
     (h.meta as Record<string, unknown>).docker = meta;
   }
 
-  async launchAgent(_compute: Compute, h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle> {
+  async launchAgent(compute: Compute, h: ComputeHandle, opts: LaunchOpts): Promise<AgentHandle> {
     const meta = this._readMeta(h);
     const client = this.clientFactory ? this.clientFactory(meta.arkdUrl) : new ArkdClient(meta.arkdUrl);
     await client.launchAgent({
@@ -193,7 +194,14 @@ export class DockerIsolation implements Isolation {
       script: opts.launcherContent,
       workdir: opts.workdir,
     });
-    return { sessionName: opts.tmuxName };
+    return this.attachAgent(compute, h, opts.tmuxName);
+  }
+
+  attachAgent(_compute: Compute, h: ComputeHandle, sessionName: string): AgentHandle {
+    const factory = this.clientFactory ?? ((url: string) => new ArkdClient(url));
+    // Docker isolation pins arkd to the per-handle sidecar URL recorded
+    // during prepare() -- ignore the compute's host-default getArkdUrl.
+    return buildAgentHandle(sessionName, () => this._readMeta(h).arkdUrl, factory);
   }
 
   async shutdown(_compute: Compute, h: ComputeHandle): Promise<void> {
