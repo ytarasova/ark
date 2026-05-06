@@ -148,20 +148,29 @@ export class HookStatusApplier {
     }
 
     // Don't override terminal status -- late hooks can fire after session is
-    // done. Once a session is failed/completed/stopped the only legitimate
-    // transition out is `retryWithContext` (which goes through a different
-    // path); a late SessionEnd / Stop / etc. must not flip the row back to
-    // `ready` or `running` (#435: auto_merge fails -> status=failed, then a
-    // delayed SessionEnd from the still-running EC2 agent maps SessionEnd to
-    // "ready" via `statusMap[SessionEnd] = "ready"` and silently un-fails
-    // the row -- UI shows PENDING + dispatch_failed simultaneously).
-    if (newStatus && session.status === "completed" && newStatus !== "completed") {
-      newStatus = undefined;
-    }
-    if (newStatus && session.status === "failed" && newStatus !== "failed") {
-      newStatus = undefined;
-    }
-    if (newStatus && session.status === "stopped" && newStatus !== "stopped") {
+    // done. Once a session is failed/completed/stopped/archived the only
+    // legitimate transition out is `retryWithContext` / `restore` (which go
+    // through their own paths and emit their own events); a late SessionEnd
+    // / Stop / etc. must not flip the row back to `ready` or `running`
+    // (#435: auto_merge fails -> status=failed, then a delayed SessionEnd
+    // from the still-running EC2 agent maps SessionEnd to "ready" via
+    // `statusMap[SessionEnd] = "ready"` and silently un-fails the row --
+    // UI shows PENDING + dispatch_failed simultaneously).
+    //
+    // `archived` was originally not in this list -- but archive() does NOT
+    // wait for the agent process to exit, so claude-agent processes can
+    // outlive the archive write and emit a delayed SessionEnd that flips
+    // status back to `ready` with no `session_*` event in the log (the
+    // hook handler only emits `hook_status` for the inbound event).
+    // Reproduced 2026-05-06 on the fleet -- two `archived` sessions came
+    // back as `ready` ~7 minutes after archive, no daemon restart, no
+    // intervening event. See memory: project_zombie_session_revival_bug.md.
+    const TERMINAL_STATUSES = ["completed", "failed", "stopped", "archived"] as const;
+    if (
+      newStatus &&
+      (TERMINAL_STATUSES as readonly string[]).includes(session.status) &&
+      newStatus !== session.status
+    ) {
       newStatus = undefined;
     }
 
