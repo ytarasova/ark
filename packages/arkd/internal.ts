@@ -10,12 +10,7 @@
  *   - server/helpers.js (json, readStream, spawnRead, BunLike, BunSpawnProc)
  */
 
-export {
-  VERSION,
-  DEFAULT_PORT,
-  AUTH_EXEMPT_PATHS,
-  SAFE_TMUX_NAME_RE,
-} from "./common/constants.js";
+export { VERSION, DEFAULT_PORT, AUTH_EXEMPT_PATHS, SAFE_TMUX_NAME_RE } from "./common/constants.js";
 export { requireSafeTmuxName } from "./common/validation.js";
 export { EXEC_ALLOWED_COMMANDS } from "./server/exec-allowlist.js";
 export { confineToWorkspace, PathConfinementError } from "./server/confinement.js";

@@ -32,3 +32,54 @@ export interface RouteCtx {
   /** Update conductor URL (used by POST /config). */
   setConductorUrl(url: string | null): void;
 }
+
+import { resolve } from "path";
+import { mkdirSync } from "fs";
+import { confineToWorkspace, PathConfinementError } from "./confinement.js";
+import { logDebug } from "../../core/observability/structured-log.js";
+
+/**
+ * Factory for the RouteCtx object shared with every route-family module.
+ *
+ * Resolves and (best-effort) creates the workspace root directory, builds the
+ * `confine` closure, and wires the mutable conductorUrl accessors.
+ */
+export function createRouteCtx(opts: {
+  workspaceRoot: string | null;
+  getConductorUrl: () => string | null;
+  setConductorUrl: (url: string | null) => void;
+}): RouteCtx {
+  // Workspace confinement root (P1-4). When set, every /file/* and /exec
+  // request is restricted to paths under this directory. When unset,
+  // arkd retains legacy unconfined behavior for local single-user mode.
+  const workspaceRoot: string | null = opts.workspaceRoot ? resolve(opts.workspaceRoot) : null;
+  if (workspaceRoot) {
+    // Ensure the root exists so confined writes succeed out of the box.
+    try {
+      mkdirSync(workspaceRoot, { recursive: true });
+    } catch {
+      logDebug("compute", "best effort -- first real request will surface any permission error");
+    }
+  }
+
+  /**
+   * Enforce workspace confinement (no-op when workspaceRoot is null).
+   * Returns the resolved absolute path, or throws PathConfinementError.
+   */
+  function confine(userPath: unknown): string {
+    if (!workspaceRoot) {
+      if (typeof userPath !== "string") {
+        throw new PathConfinementError("path must be a string");
+      }
+      return userPath;
+    }
+    return confineToWorkspace(workspaceRoot, userPath);
+  }
+
+  return {
+    confine,
+    workspaceRoot,
+    getConductorUrl: opts.getConductorUrl,
+    setConductorUrl: opts.setConductorUrl,
+  };
+}
