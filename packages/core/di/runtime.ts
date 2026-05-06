@@ -134,11 +134,16 @@ export function registerRuntime(container: AppContainer): void {
     // drops in here without rippling through callers.
     snapshotStore: asFunction(
       (c: { config: ArkConfig; mode: import("../modes/app-mode.js").AppMode }) => {
-        if (c.mode.kind === "hosted") {
+        // ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE keeps the laptop dev loop
+        // usable while an S3SnapshotStore is still TODO. NEVER set in
+        // production -- a multi-replica deployment loses snapshot
+        // visibility across pods if this is on.
+        if (c.mode.kind === "hosted" && process.env.ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE !== "1") {
           throw new Error(
             "snapshotStore: hosted mode requires a non-fs snapshot backend " +
               "(FsSnapshotStore is pod-ephemeral and not multi-replica safe). " +
-              "Wire up an S3SnapshotStore implementation before enabling hosted mode.",
+              "Wire up an S3SnapshotStore implementation before enabling hosted mode. " +
+              "For laptop dev, set ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE=1 (NOT for prod).",
           );
         }
         return new FsSnapshotStore(join(c.config.dirs.ark, "snapshots"));
