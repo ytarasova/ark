@@ -35,42 +35,6 @@ function axesToFlagSpecKey(kind: string | undefined, isolation: string | undefin
 }
 
 /**
- * Reverse: legacy provider string -> (kind, isolation) pair. Used when the
- * caller still passes `--provider` for back-compat.
- */
-function legacyProviderToAxes(name: string): { kind: string; isolation: string } {
-  switch (name) {
-    case "local":
-      return { kind: "local", isolation: "direct" };
-    case "docker":
-      return { kind: "local", isolation: "docker" };
-    case "devcontainer":
-      return { kind: "local", isolation: "devcontainer" };
-    case "firecracker":
-      return { kind: "firecracker", isolation: "direct" };
-    case "ec2":
-    case "remote-arkd":
-    case "remote-worktree":
-      return { kind: "ec2", isolation: "direct" };
-    case "ec2-docker":
-    case "remote-docker":
-      return { kind: "ec2", isolation: "docker" };
-    case "ec2-devcontainer":
-    case "remote-devcontainer":
-      return { kind: "ec2", isolation: "devcontainer" };
-    case "ec2-firecracker":
-    case "remote-firecracker":
-      return { kind: "ec2", isolation: "firecracker-in-container" };
-    case "k8s":
-      return { kind: "k8s", isolation: "direct" };
-    case "k8s-kata":
-      return { kind: "k8s-kata", isolation: "direct" };
-    default:
-      return { kind: name, isolation: "direct" };
-  }
-}
-
-/**
  * Minimal raw-readline prompt. Returns the trimmed user input or the
  * `fallback` when the user just hits enter. Respects `--no-prompt` and
  * non-TTY invocations by returning `fallback` without blocking.
@@ -184,14 +148,8 @@ export function registerCreateCommand(computeCmd: Command) {
     .command("create")
     .description("Create a new compute resource (concrete target or reusable template)")
     .argument("<name>", "Compute name")
-    // Two-axis flags (canonical):
     .option("--kind <kind>", "Compute kind (local, firecracker, ec2, k8s, k8s-kata)")
     .option("--isolation <kind>", "Isolation kind (direct, docker, compose, devcontainer, firecracker-in-container)")
-    // Legacy single-axis flag, kept for one release:
-    .option(
-      "--provider <type>",
-      "[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --kind + --isolation.",
-    )
     // Unified-model: template vs concrete target is now just a flag.
     .option("--template", "Create a reusable template (blueprint) instead of a concrete compute target")
     .option("--no-prompt", "Skip interactive prompts (fail if required fields are missing)");
@@ -202,21 +160,8 @@ export function registerCreateCommand(computeCmd: Command) {
   registerProviderFlags(createCmd);
 
   createCmd.option("--from-template <name>", "Use a compute template as defaults").action(async (name, opts) => {
-    // Resolve either --kind + --isolation (new) or --provider (legacy).
     let kind: string | undefined = opts.kind;
     let isolation: string | undefined = opts.isolation;
-
-    if (opts.provider) {
-      const axes = legacyProviderToAxes(opts.provider);
-      console.log(
-        chalk.yellow(
-          `--provider is deprecated; pass --kind + --isolation instead. ` +
-            `Auto-mapping '${opts.provider}' -> --kind ${axes.kind} --isolation ${axes.isolation}.`,
-        ),
-      );
-      kind = kind ?? axes.kind;
-      isolation = isolation ?? axes.isolation;
-    }
 
     // Default when nothing is specified: local + direct (local auto-created).
     if (!kind && !isolation) {
@@ -255,8 +200,8 @@ export function registerCreateCommand(computeCmd: Command) {
         // Template wins on kind/isolation unless user overrode them.
         const tCompute = (tmpl as { compute?: string }).compute;
         const tIsolation = (tmpl as { isolation?: string }).isolation;
-        if (!opts.kind && !opts.provider && tCompute) kind = tCompute;
-        if (!opts.isolation && !opts.provider && tIsolation) isolation = tIsolation;
+        if (!opts.kind && tCompute) kind = tCompute;
+        if (!opts.isolation && tIsolation) isolation = tIsolation;
       }
 
       // The flag-spec registry is still keyed by the legacy provider name;
