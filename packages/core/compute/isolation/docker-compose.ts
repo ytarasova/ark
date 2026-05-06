@@ -23,7 +23,7 @@ import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
 import { allocatePort } from "../../config/port-allocator.js";
 import { safeAsync } from "../../safe.js";
-import { buildAgentHandle } from "../core/handle-helpers.js";
+import { buildAgentHandle } from "../handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -32,7 +32,7 @@ import type {
   Isolation,
   LaunchOpts,
   PrepareCtx,
-} from "../core/types.js";
+} from "../types.js";
 import {
   bootstrapContainer,
   createContainer,
@@ -45,8 +45,8 @@ import {
   stopContainer,
   waitForArkdHealth,
   type BootstrapOpts,
-} from "../providers/docker/helpers.js";
-import { composeDownWithFiles, composeUpWithFiles, resolveComposeNetwork } from "../providers/docker/compose.js";
+} from "./docker-helpers.js";
+import { composeDownWithFiles, composeUpWithFiles, resolveComposeNetwork } from "./compose.js";
 import { parse as parseYaml } from "yaml";
 
 import type { PortDecl } from "./devcontainer.js";

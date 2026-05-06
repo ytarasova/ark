@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { buildUserData } from "../providers/ec2/cloud-init.js";
+import { buildUserData } from "../ec2/cloud-init.js";
 
 describe("buildUserData", () => {
   it("produces a bash script starting with #!/bin/bash", () => {

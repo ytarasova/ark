@@ -11,8 +11,8 @@ import { readFile, mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
-import { FsSnapshotStore } from "../core/snapshot-store-fs.js";
-import { SnapshotNotFoundError } from "../core/snapshot-store.js";
+import { FsSnapshotStore } from "../snapshot-store-fs.js";
+import { SnapshotNotFoundError } from "../snapshot-store.js";
 
 let root: string;
 let store: FsSnapshotStore;

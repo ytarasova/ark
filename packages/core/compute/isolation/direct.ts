@@ -9,7 +9,7 @@
 
 import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
-import { buildAgentHandle } from "../core/handle-helpers.js";
+import { buildAgentHandle } from "../handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -18,7 +18,7 @@ import type {
   Isolation,
   LaunchOpts,
   PrepareCtx,
-} from "../core/types.js";
+} from "../types.js";
 
 export class DirectIsolation implements Isolation {
   readonly kind: IsolationKind = "direct";

@@ -24,12 +24,12 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 
-import { FirecrackerCompute, type FirecrackerMeta } from "../core/firecracker/compute.js";
-import type { FirecrackerVm, FirecrackerVmSpec, SnapshotArtifacts, SnapshotOpts } from "../core/firecracker/vm.js";
-import type { GuestAddr } from "../core/firecracker/network.js";
-import type { AvailabilityResult } from "../core/firecracker/availability.js";
-import type { RootfsPaths } from "../core/firecracker/rootfs.js";
-import type { ComputeHandle, Snapshot } from "../core/types.js";
+import { FirecrackerCompute, type FirecrackerMeta } from "../firecracker/compute.js";
+import type { FirecrackerVm, FirecrackerVmSpec, SnapshotArtifacts, SnapshotOpts } from "../firecracker/vm.js";
+import type { GuestAddr } from "../firecracker/network.js";
+import type { AvailabilityResult } from "../firecracker/availability.js";
+import type { RootfsPaths } from "../firecracker/rootfs.js";
+import type { ComputeHandle, Snapshot } from "../types.js";
 import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 

@@ -22,7 +22,7 @@
 import type { AppContext } from "../../app.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
 import { allocatePort } from "../../config/port-allocator.js";
-import { buildAgentHandle } from "../core/handle-helpers.js";
+import { buildAgentHandle } from "../handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -31,7 +31,7 @@ import type {
   Isolation,
   LaunchOpts,
   PrepareCtx,
-} from "../core/types.js";
+} from "../types.js";
 import type { DockerIsolationConfig } from "./docker-config.js";
 import {
   pullImage,
@@ -44,7 +44,7 @@ import {
   waitForArkdHealth,
   resolveArkSourceRoot,
   DEFAULT_IMAGE,
-} from "../providers/docker/helpers.js";
+} from "./docker-helpers.js";
 import { logDebug } from "../../observability/structured-log.js";
 
 /**

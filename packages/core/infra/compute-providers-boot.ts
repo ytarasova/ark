@@ -1,10 +1,14 @@
 /**
- * ComputeProvidersBoot -- registers legacy `ComputeProvider`s + new
- * `Compute` / `Isolation` kinds on the AppContext during startup.
+ * ComputeProvidersBoot -- registers `Compute` + `Isolation` kinds on the
+ * AppContext during startup.
  *
  * Extracted from `AppContext._registerComputeProviders`. Split into a
  * service so it can run as part of the Lifecycle start phase and isn't
  * tied to private helpers on AppContext.
+ *
+ * Note: Task 4 of the compute cleanup deleted the legacy `ComputeProvider`
+ * implementations; this boot only registers the new two-axis world. The
+ * legacy `app.registerProvider(...)` registry methods survive into Task 5.
  */
 import type { AppContext } from "../app.js";
 import { safeAsync } from "../safe.js";
@@ -17,36 +21,20 @@ export class ComputeProvidersBoot {
     await safeAsync("boot: load compute providers", async () => {
       const compute = await import("../compute/index.js");
       compute.setComputeApp(this.app);
-      const providers = [
-        new compute.LocalWorktreeProvider(this.app),
-        new compute.LocalDockerProvider(this.app),
-        new compute.LocalDevcontainerProvider(this.app),
-        new compute.LocalFirecrackerProvider(this.app),
-        new compute.RemoteWorktreeProvider(this.app),
-        new compute.RemoteDockerProvider(this.app),
-        new compute.RemoteDevcontainerProvider(this.app),
-        new compute.RemoteFirecrackerProvider(this.app),
-      ];
-      for (const p of providers) {
-        this.app.registerProvider(p);
-      }
 
-      // Optional: Kubernetes providers (gated on SDK install)
-      try {
-        const { K8sProvider, KataProvider } = await import("../compute/providers/k8s.js");
-        const k8s = new K8sProvider(this.app);
-        this.app.registerProvider(k8s);
-        const kata = new KataProvider(this.app);
-        this.app.registerProvider(kata);
-      } catch {
-        logDebug("general", "@kubernetes/client-node not installed");
+      // Legacy `ComputeProvider` registry: capability-only stubs. Task 5
+      // sweeps the remaining `app.getProvider()` callers and removes both
+      // the registry and these stubs.
+      const { buildLegacyCapabilityStubs } = await import("../compute/legacy-stubs.js");
+      for (const stub of buildLegacyCapabilityStubs()) {
+        this.app.registerProvider(stub);
       }
 
       // Compute / Isolation registrations for Kubernetes
       try {
         await import("@kubernetes/client-node");
-        const { K8sCompute } = await import("../compute/core/k8s.js");
-        const { KataCompute } = await import("../compute/core/k8s-kata.js");
+        const { K8sCompute } = await import("../compute/k8s.js");
+        const { KataCompute } = await import("../compute/k8s-kata.js");
         this.app.registerCompute(new K8sCompute(this.app));
         this.app.registerCompute(new KataCompute(this.app));
       } catch {
@@ -54,8 +42,8 @@ export class ComputeProvidersBoot {
       }
 
       // Compute + Isolation registry (additive, local providers always on)
-      const { LocalCompute } = await import("../compute/core/local.js");
-      const { EC2Compute } = await import("../compute/core/ec2.js");
+      const { LocalCompute } = await import("../compute/local.js");
+      const { EC2Compute } = await import("../compute/ec2/compute.js");
       const { DirectIsolation } = await import("../compute/isolation/direct.js");
       const { DockerIsolation } = await import("../compute/isolation/docker.js");
       const { DevcontainerIsolation } = await import("../compute/isolation/devcontainer.js");
@@ -68,7 +56,7 @@ export class ComputeProvidersBoot {
       this.app.registerIsolation(new DockerComposeIsolation(this.app));
 
       // FirecrackerCompute (gated on /dev/kvm availability)
-      const { registerFirecrackerIfAvailable } = await import("../compute/core/firecracker/compute.js");
+      const { registerFirecrackerIfAvailable } = await import("../compute/firecracker/compute.js");
       registerFirecrackerIfAvailable(this.app);
     });
   }

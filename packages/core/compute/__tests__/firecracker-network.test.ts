@@ -14,7 +14,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { assignGuestIp, createTap, ensureBridge, removeTap } from "../core/firecracker/network.js";
+import { assignGuestIp, createTap, ensureBridge, removeTap } from "../firecracker/network.js";
 
 const originalPath = process.env.PATH;
 

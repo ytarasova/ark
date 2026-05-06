@@ -116,8 +116,8 @@ export interface ProbeStatusOpts {
   app: import("./app.js").AppContext;
   session: import("../types/session.js").Session;
   handle: string;
-  compute: import("./compute/types.js").Compute;
-  provider: import("./compute/types.js").ComputeProvider;
+  compute: import("../types/index.js").Compute;
+  provider: import("./compute/legacy-provider.js").ComputeProvider;
 }
 
 export interface Executor {

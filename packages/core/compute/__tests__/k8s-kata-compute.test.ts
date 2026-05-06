@@ -14,9 +14,9 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 
-import { KataCompute, DEFAULT_KATA_RUNTIME_CLASS } from "../core/k8s-kata.js";
-import type { K8sComputeDeps } from "../core/k8s.js";
-import { NotSupportedError, type Snapshot } from "../core/types.js";
+import { KataCompute, DEFAULT_KATA_RUNTIME_CLASS } from "../k8s-kata.js";
+import type { K8sComputeDeps } from "../k8s.js";
+import { NotSupportedError, type Snapshot } from "../types.js";
 import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 

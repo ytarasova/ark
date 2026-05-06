@@ -20,7 +20,7 @@ import { logWarn } from "../observability/structured-log.js";
  * Default home directory on EC2 / k8s remote hosts. Used as the
  * remote-safe fallback for `launcherWorkdir` when a remote dispatch has
  * no clone source (bare worktree dispatch). Hard-coded to mirror
- * `packages/compute/providers/ec2/constants.ts:REMOTE_HOME` -- duplicated
+ * `packages/compute/ec2/constants.ts:REMOTE_HOME` -- duplicated
  * here so this executor module avoids a cross-package import on the
  * compute layer.
  */

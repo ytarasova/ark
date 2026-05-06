@@ -1,29 +1,23 @@
 /**
- * Compute layer - provider registry and public API.
+ * Compute layer - public API.
  *
- * The provider registry lives on AppContext. These functions are thin
- * delegates that require AppContext to be booted. No fallback map,
- * no auto-registration -- all lifecycle goes through AppContext.boot().
+ * The provider registry lives on AppContext. The `app()`-bound delegates
+ * below are kept thin so call sites that haven't been migrated to direct
+ * AppContext access still resolve. Task 5 deletes these proxies along
+ * with the legacy `ComputeProvider` interface entirely.
  */
 
-import type { ComputeProvider } from "./types.js";
+import type { ComputeProvider } from "./legacy-provider.js";
 import type { AppContext } from "../app.js";
 
-// Re-export types
+// Legacy provider interface -- on its way out (Task 5).
 export type {
   ComputeProvider,
   IsolationMode,
-  ProvisionOpts,
-  LaunchOpts,
+  ProvisionOpts as LegacyProvisionOpts,
+  LaunchOpts as LegacyLaunchOpts,
   SyncOpts,
-  ComputeSnapshot,
-  ComputeMetrics,
-  ComputeSession,
-  ComputeProcess,
-  DockerContainer,
-  PortDecl,
-  PortStatus,
-} from "./types.js";
+} from "./legacy-provider.js";
 
 export function getIsolationModes(providerName: string): { value: string; label: string }[] {
   const provider = getProvider(providerName);
@@ -60,34 +54,12 @@ export function clearProviders(): void {
   // noop -- AppContext owns the registry
 }
 
-// ArkD-backed providers (new universal architecture)
-import {
-  LocalWorktreeProvider,
-  LocalDockerProvider,
-  LocalDevcontainerProvider,
-  LocalFirecrackerProvider,
-} from "./providers/local-arkd.js";
-export { LocalWorktreeProvider, LocalDockerProvider, LocalDevcontainerProvider, LocalFirecrackerProvider };
-
-import {
-  RemoteWorktreeProvider,
-  RemoteDockerProvider,
-  RemoteDevcontainerProvider,
-  RemoteFirecrackerProvider,
-} from "./providers/remote-arkd.js";
-export { RemoteWorktreeProvider, RemoteDockerProvider, RemoteDevcontainerProvider, RemoteFirecrackerProvider };
-
-// Kubernetes providers (vanilla + Kata/Firecracker)
-import { K8sProvider, KataProvider } from "./providers/k8s.js";
-export { K8sProvider, KataProvider };
-
 // ── Compute + Isolation split ──────────────────────────────────────────────
 //
-// New primary abstractions. Live alongside ComputeProvider; the old interface
-// retires once every dispatch path reads from these. See `docs/architecture.md`.
+// Primary abstractions. See `docs/architecture.md`.
 
 export type {
-  Compute as NewCompute,
+  Compute,
   ComputeCapabilities,
   ComputeHandle,
   ComputeKind,
@@ -96,44 +68,50 @@ export type {
   AgentHandle,
   ProvisionLatency,
   PrepareCtx,
-  ProvisionOpts as NewProvisionOpts,
-  LaunchOpts as NewLaunchOpts,
+  ProvisionOpts,
+  LaunchOpts,
   Snapshot,
-} from "./core/types.js";
-export { NotSupportedError } from "./core/types.js";
+  ComputeSnapshot,
+  AttachExistingComputeRow,
+  EnsureReachableOpts,
+  PrepareWorkspaceOpts,
+  FlushPlacementOpts,
+} from "./types.js";
+export { NotSupportedError } from "./types.js";
 
-export { LocalCompute } from "./core/local.js";
-export { EC2Compute } from "./core/ec2.js";
-export type { EC2HandleMeta, EC2ProvisionConfig, EC2ComputeHelpers } from "./core/ec2.js";
-export { K8sCompute } from "./core/k8s.js";
-export type { K8sComputeConfig, K8sHandleMeta, K8sComputeDeps } from "./core/k8s.js";
-export { KataCompute, DEFAULT_KATA_RUNTIME_CLASS } from "./core/k8s-kata.js";
+export { LocalCompute } from "./local.js";
+export { EC2Compute } from "./ec2/compute.js";
+export type { EC2HandleMeta, EC2ProvisionConfig, EC2ComputeHelpers } from "./ec2/compute.js";
+export { K8sCompute } from "./k8s.js";
+export type { K8sComputeConfig, K8sHandleMeta, K8sComputeDeps } from "./k8s.js";
+export { KataCompute, DEFAULT_KATA_RUNTIME_CLASS } from "./k8s-kata.js";
 export { DirectIsolation } from "./isolation/direct.js";
+export { DockerIsolation } from "./isolation/docker.js";
+export { DevcontainerIsolation } from "./isolation/devcontainer.js";
 export { DockerComposeIsolation } from "./isolation/docker-compose.js";
-export { ComputeTarget } from "./core/compute-target.js";
-export { computeProviderToTarget } from "./adapters/legacy.js";
+export { ComputeTarget } from "./compute-target.js";
 
 // FirecrackerCompute. Re-export from the firecracker barrel so consumers
-// don't have to reach into the core subtree. The sibling barrel
-// (`./core/firecracker/index.ts`) also exports the low-level `createVm` and
+// don't have to reach into the subtree. The sibling barrel
+// (`./firecracker/index.ts`) also exports the low-level `createVm` and
 // network helpers for the pool layer.
-export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./core/firecracker/compute.js";
-export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker/compute.js";
+export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./firecracker/compute.js";
+export type { FirecrackerComputeDeps, FirecrackerMeta } from "./firecracker/compute.js";
 
 export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
 export type { ComputeIsolationPair } from "./adapters/provider-map.js";
 
 // ── Snapshot persistence ───────────────────────────────────────────────────
 
-export type { SnapshotStore, SnapshotRef, SnapshotBlob, SnapshotListFilter } from "./core/snapshot-store.js";
-export { SnapshotNotFoundError } from "./core/snapshot-store.js";
-export { FsSnapshotStore } from "./core/snapshot-store-fs.js";
+export type { SnapshotStore, SnapshotRef, SnapshotBlob, SnapshotListFilter } from "./snapshot-store.js";
+export { SnapshotNotFoundError } from "./snapshot-store.js";
+export { FsSnapshotStore } from "./snapshot-store-fs.js";
 
 // ── Compute pool ───────────────────────────────────────────────────────────
 
-export type { ComputePool, PoolConfig, PoolStats } from "./core/pool/types.js";
-export { defaultPoolConfig } from "./core/pool/types.js";
-export { LocalFirecrackerPool } from "./core/pool/local-firecracker-pool.js";
+export type { ComputePool, PoolConfig, PoolStats } from "./warm-pool/types.js";
+export { defaultPoolConfig } from "./warm-pool/types.js";
+export { LocalFirecrackerPool } from "./warm-pool/local-firecracker-pool.js";
 
 // ── Flag specs (CLI-layer adapter) ─────────────────────────────────────────
 

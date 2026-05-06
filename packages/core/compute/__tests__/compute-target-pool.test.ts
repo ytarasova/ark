@@ -17,8 +17,8 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { AppContext } from "../../app.js";
 import { clearApp, setApp } from "../../__tests__/test-helpers.js";
-import { ComputeTarget, POOL_SOURCE_META_KEY } from "../core/compute-target.js";
-import type { ComputePool, PoolStats } from "../core/pool/types.js";
+import { ComputeTarget, POOL_SOURCE_META_KEY } from "../compute-target.js";
+import type { ComputePool, PoolStats } from "../warm-pool/types.js";
 import type {
   AgentHandle,
   Compute,
@@ -30,7 +30,7 @@ import type {
   ProvisionOpts,
   Runtime,
   Snapshot,
-} from "../core/types.js";
+} from "../types.js";
 
 // ── Stubs ──────────────────────────────────────────────────────────────────
 

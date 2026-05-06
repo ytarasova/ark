@@ -4,8 +4,8 @@
  */
 
 import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../compute/types.js";
-import type { ComputeTarget } from "../../compute/core/compute-target.js";
+import type { ComputeProvider } from "../../compute/legacy-provider.js";
+import type { ComputeTarget } from "../../compute/compute-target.js";
 import type { SessionLifecycleDeps } from "./types.js";
 import * as claude from "../../claude/claude.js";
 import { killSessionAsync } from "../../infra/tmux.js";

@@ -20,7 +20,7 @@ import {
   vmSnapshotPaths,
   vmSocketPath,
   vmWorkDir,
-} from "../core/firecracker/paths.js";
+} from "../firecracker/paths.js";
 
 // Cleanup: remove any directories we created under the real ~/.ark/firecracker
 // during the test. Use unique test-only shas and vm ids so we only touch our

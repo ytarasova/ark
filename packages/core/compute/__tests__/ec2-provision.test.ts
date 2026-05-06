@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { INSTANCE_SIZES, resolveInstanceType, provisionStack, destroyStack } from "../providers/ec2/provision.js";
+import { INSTANCE_SIZES, resolveInstanceType, provisionStack, destroyStack } from "../ec2/provision.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -73,7 +73,7 @@ describe("SSM transport requirements (regression markers)", () => {
   // These tests don't exercise the AWS SDK -- they read the source to
   // confirm that the SSM-only contract is preserved. AWS-side assertions
   // would require mocking the SDK, which is out of scope here.
-  const src = readFileSync(join(__dirname, "..", "providers", "ec2", "provision.ts"), "utf-8");
+  const src = readFileSync(join(__dirname, "..", "ec2", "provision.ts"), "utf-8");
 
   it("does not request a port-22 ingress rule (SSM tunnel replaces direct SSH)", () => {
     expect(src).not.toContain("FromPort: 22");

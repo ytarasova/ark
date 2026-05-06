@@ -27,7 +27,7 @@ import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 import { placeAllSecrets, __test_registerPlacer } from "../placement.js";
 import { _makeSshPrivateKeyPlacer, sshPrivateKeyPlacer } from "../placers/ssh-private-key.js";
-import { _makeEC2PlacementCtx } from "../../compute/providers/ec2/placement-ctx.js";
+import { _makeEC2PlacementCtx } from "../../compute/ec2/placement-ctx.js";
 import { DeferredPlacementCtx } from "../deferred-placement-ctx.js";
 
 describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {

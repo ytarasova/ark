@@ -1,11 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  FAST_METRICS_CMD,
-  DOCKER_METRICS_CMD,
-  parseSnapshot,
-  fetchMetrics,
-  fetchDocker,
-} from "../providers/ec2/metrics.js";
+import { FAST_METRICS_CMD, DOCKER_METRICS_CMD, parseSnapshot, fetchMetrics, fetchDocker } from "../ec2/metrics.js";
 
 const SAMPLE_OUTPUT = `=== CPU ===
 23.5

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { PRICING, EBS_GB_MONTH, hourlyRate, estimateDailyCost, fetchAwsCost } from "../providers/ec2/cost.js";
+import { PRICING, EBS_GB_MONTH, hourlyRate, estimateDailyCost, fetchAwsCost } from "../ec2/cost.js";
 
 describe("EC2 cost tracking", () => {
   it("hourlyRate returns a positive number for m6i.2xlarge", () => {

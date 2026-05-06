@@ -27,7 +27,7 @@ import {
   createVm,
   deriveMac,
   parseHttpResponse,
-} from "../core/firecracker/vm.js";
+} from "../firecracker/vm.js";
 
 let sandbox: string;
 let kernelPath: string;

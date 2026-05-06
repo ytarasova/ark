@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import { getClipboardImage, uploadToSession, watchClipboard } from "../providers/ec2/clipboard.js";
+import { getClipboardImage, uploadToSession, watchClipboard } from "../ec2/clipboard.js";
 
 const SSM = { region: "us-east-1" };
 

@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../../app.js";
 import { garbageCollectComputeIfTemplate } from "../compute-lifecycle.js";
-import type { ComputeProvider } from "../../compute/types.js";
+import type { ComputeProvider } from "../../compute/legacy-provider.js";
 
 // A minimal provider stub used to exercise the `canDelete=false` branch in
 // the GC path. Registered under a unique name per test to avoid clobbering

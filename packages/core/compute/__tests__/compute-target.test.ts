@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "bun:test";
 
-import { ComputeTarget } from "../core/compute-target.js";
+import { ComputeTarget } from "../compute-target.js";
 import type {
   AgentHandle,
   Compute,
@@ -19,7 +19,7 @@ import type {
   ProvisionOpts,
   Runtime,
   Snapshot,
-} from "../core/types.js";
+} from "../types.js";
 
 type Call = { method: string; args: unknown[] };
 

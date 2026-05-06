@@ -39,7 +39,7 @@ import stripJsonComments from "strip-json-comments";
 import { ArkdClient } from "../../../arkd/client/index.js";
 import type { AppContext } from "../../app.js";
 import { allocatePort } from "../../config/port-allocator.js";
-import { buildAgentHandle } from "../core/handle-helpers.js";
+import { buildAgentHandle } from "../handle-helpers.js";
 import type {
   AgentHandle,
   Compute,
@@ -48,7 +48,7 @@ import type {
   Isolation,
   LaunchOpts,
   PrepareCtx,
-} from "../core/types.js";
+} from "../types.js";
 import {
   ARKD_INTERNAL_PORT,
   bootstrapContainer,
@@ -59,12 +59,8 @@ import {
   startContainer,
   stopContainer,
   waitForArkdHealth,
-} from "../providers/docker/helpers.js";
-import {
-  buildDevcontainerImage,
-  resolveDevcontainerShape,
-  type DevcontainerShape,
-} from "../providers/docker/devcontainer-resolve.js";
+} from "./docker-helpers.js";
+import { buildDevcontainerImage, resolveDevcontainerShape, type DevcontainerShape } from "./devcontainer-resolve.js";
 
 const execFileAsync = promisify(execFile);
 

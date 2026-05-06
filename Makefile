@@ -39,7 +39,7 @@ help: ## Show available commands
 	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
-	@grep -E '^(test|test-file|test-compute-e2e|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(test|test-file|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mBuilding & Packaging\033[0m"
 	@grep -E '^(build|build-cli|build-web|build-desktop|package|package-cli|package-desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -161,9 +161,6 @@ desktop: build-web ## Launch the Electron desktop app
 test: build-web ## Run unit tests (parallel; excludes compute E2E and integration suites)
 	$(BUN) test --concurrency 4 \
 	  $$(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | grep -v local-arkd | grep -v local-provider | grep -v /dist/ | sort)
-
-test-compute-e2e: build-web ## Run compute end-to-end tests (serial; share global local-arkd state)
-	$(BUN) test packages/core/compute/__tests__/e2e.test.ts packages/core/compute/__tests__/e2e-compute.test.ts --concurrency 1
 
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
 	$(BUN) test $(F) --concurrency 4

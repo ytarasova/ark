@@ -10,8 +10,8 @@
 import { describe, it, expect } from "bun:test";
 
 import { DockerIsolation } from "../isolation/docker.js";
-import { LocalCompute } from "../core/local.js";
-import type { ComputeHandle, LaunchOpts, PrepareCtx } from "../core/types.js";
+import { LocalCompute } from "../local.js";
+import type { ComputeHandle, LaunchOpts, PrepareCtx } from "../types.js";
 import type { ArkdClient } from "../../../arkd/client/index.js";
 import type { DockerIsolationHelpers, DockerHandleMeta } from "../isolation/docker.js";
 import type { AppContext } from "../../app.js";

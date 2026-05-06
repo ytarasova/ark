@@ -2,13 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import {
-  detectComposeFile,
-  composeUp,
-  composeDown,
-  composePs,
-  resolveComposePorts,
-} from "../providers/docker/compose.js";
+import { detectComposeFile, composeUp, composeDown, composePs, resolveComposePorts } from "../isolation/compose.js";
 
 let tmpDir: string;
 

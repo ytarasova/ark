@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { basename, join } from "path";
 import { tmpdir } from "os";
-import { resolveDevcontainerShape } from "../providers/docker/devcontainer-resolve.js";
+import { resolveDevcontainerShape } from "../isolation/devcontainer-resolve.js";
 
 // ── Shared tmpdir helpers ───────────────────────────────────────────────────
 

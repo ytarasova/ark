@@ -22,8 +22,8 @@ import type { WorkspaceStore } from "../../workspace/store.js";
 import type { Workspace } from "../../workspace/types.js";
 import type { UsageRecorder } from "../../observability/usage.js";
 import type { StatusPollerRegistry } from "../../executors/status-poller.js";
-import type { ComputeProvider } from "../../compute/types.js";
-import type { ComputeTarget } from "../../compute/core/compute-target.js";
+import type { ComputeProvider } from "../../compute/legacy-provider.js";
+import type { ComputeTarget } from "../../compute/compute-target.js";
 
 // ── Callbacks for helpers that still take AppContext ────────────────────────
 // These wrap free functions that themselves take `app: AppContext` and reach

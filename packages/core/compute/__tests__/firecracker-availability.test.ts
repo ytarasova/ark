@@ -11,7 +11,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir, platform } from "os";
 import { join } from "path";
 
-import { isFirecrackerAvailable } from "../core/firecracker/availability.js";
+import { isFirecrackerAvailable } from "../firecracker/availability.js";
 
 const originalPath = process.env.PATH;
 

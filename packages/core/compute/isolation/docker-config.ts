@@ -8,7 +8,7 @@
  * cleanly.
  */
 
-import type { BootstrapOpts } from "../providers/docker/helpers.js";
+import type { BootstrapOpts } from "./docker-helpers.js";
 
 export interface DockerIsolationConfig {
   /** Container image. Default `ubuntu:22.04` (see helpers `DEFAULT_IMAGE`). */

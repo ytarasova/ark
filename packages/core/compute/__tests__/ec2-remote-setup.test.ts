@@ -7,7 +7,7 @@ import {
   cloneRepoOnRemote,
   trustRemoteDirectory,
   autoAcceptChannelPrompt,
-} from "../providers/ec2/remote-setup.js";
+} from "../ec2/remote-setup.js";
 
 describe("EC2 remote setup", async () => {
   // -----------------------------------------------------------------------

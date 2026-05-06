@@ -26,7 +26,7 @@
  * with bad data do not crash dispatch.
  */
 
-import type { ComputeKind, IsolationKind } from "../core/types.js";
+import type { ComputeKind, IsolationKind } from "../types.js";
 
 export interface ComputeIsolationPair {
   compute: ComputeKind;

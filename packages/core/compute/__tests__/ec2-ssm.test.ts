@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { ssmCheckInstance, ssmExec, ssmExecArgs } from "../providers/ec2/ssm.js";
+import { ssmCheckInstance, ssmExec, ssmExecArgs } from "../ec2/ssm.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

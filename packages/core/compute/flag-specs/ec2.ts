@@ -15,7 +15,7 @@
  */
 
 import type { ProviderFlagSpec } from "../flag-spec.js";
-import { INSTANCE_SIZES } from "../providers/ec2/provision.js";
+import { INSTANCE_SIZES } from "../ec2/provision.js";
 
 function parseTags(raw: unknown): Record<string, string> {
   if (!Array.isArray(raw)) return {};

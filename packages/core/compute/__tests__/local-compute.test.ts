@@ -8,8 +8,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
-import { LocalCompute } from "../core/local.js";
-import { NotSupportedError, type ComputeHandle, type Snapshot } from "../core/types.js";
+import { LocalCompute } from "../local.js";
+import { NotSupportedError, type ComputeHandle, type Snapshot } from "../types.js";
 import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 

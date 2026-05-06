@@ -20,8 +20,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test"
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 
-import { K8sCompute, type K8sComputeDeps } from "../core/k8s.js";
-import { NotSupportedError, type ComputeHandle, type Snapshot } from "../core/types.js";
+import { K8sCompute, type K8sComputeDeps } from "../k8s.js";
+import { NotSupportedError, type ComputeHandle, type Snapshot } from "../types.js";
 import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 

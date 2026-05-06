@@ -37,7 +37,7 @@ import type { PricingRegistry } from "./observability/pricing.js";
 import type { UsageRecorder } from "./observability/usage.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
-import type { SnapshotStore } from "./compute/core/snapshot-store.js";
+import type { SnapshotStore } from "./compute/snapshot-store.js";
 import type { BlobStore } from "./storage/blob-store.js";
 import type { AppContext } from "./app.js";
 import type { AppMode } from "./modes/app-mode.js";

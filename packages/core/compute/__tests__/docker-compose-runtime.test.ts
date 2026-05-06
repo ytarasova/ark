@@ -17,8 +17,8 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 import { DockerComposeIsolation, type DockerComposeMeta } from "../isolation/docker-compose.js";
-import { LocalCompute } from "../core/local.js";
-import type { ComputeHandle, PrepareCtx } from "../core/types.js";
+import { LocalCompute } from "../local.js";
+import type { ComputeHandle, PrepareCtx } from "../types.js";
 import type { AppContext } from "../../app.js";
 
 const fakeApp = {

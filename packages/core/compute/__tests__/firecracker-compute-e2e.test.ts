@@ -24,8 +24,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { accessSync, constants as fsConstants } from "fs";
 
-import { FirecrackerCompute } from "../core/firecracker/compute.js";
-import type { FirecrackerMeta } from "../core/firecracker/compute.js";
+import { FirecrackerCompute } from "../firecracker/compute.js";
+import type { FirecrackerMeta } from "../firecracker/compute.js";
 import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 

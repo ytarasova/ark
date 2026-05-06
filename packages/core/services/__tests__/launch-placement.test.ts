@@ -24,7 +24,7 @@ import { DeferredPlacementCtx } from "../../secrets/deferred-placement-ctx.js";
 import { __test_registerPlacer } from "../../secrets/placement.js";
 import { envVarPlacer } from "../../secrets/placers/env-var.js";
 import type { TypedSecretPlacer } from "../../secrets/placement-types.js";
-import type { ComputeProvider } from "../../compute/types.js";
+import type { ComputeProvider } from "../../compute/legacy-provider.js";
 import type { Compute, Session } from "../../../types/index.js";
 
 let app: AppContext;

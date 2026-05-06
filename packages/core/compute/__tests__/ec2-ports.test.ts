@@ -5,7 +5,7 @@ import {
   probeRemotePorts,
   setupForwardTunnel,
   teardownForwardTunnel,
-} from "../providers/ec2/ports.js";
+} from "../ec2/ports.js";
 
 describe("setupTunnels", () => {
   test("is a function", () => {

@@ -8,8 +8,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
-import { EC2Compute, type EC2ComputeHelpers, type EC2HandleMeta, ARKD_REMOTE_PORT } from "../core/ec2.js";
-import { NotSupportedError, type ComputeHandle, type Snapshot } from "../core/types.js";
+import { EC2Compute, type EC2ComputeHelpers, type EC2HandleMeta, ARKD_REMOTE_PORT } from "../ec2/compute.js";
+import { NotSupportedError, type ComputeHandle, type Snapshot } from "../types.js";
 import { AppContext } from "../../app.js";
 import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 

@@ -360,7 +360,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const instanceId = cfg?.instance_id as string | undefined;
     if (!instanceId) return { reachable: false, message: "No instance_id configured" };
     try {
-      const { ssmExec, ssmCheckInstance } = await import("../../core/compute/providers/ec2/ssm.js");
+      const { ssmExec, ssmCheckInstance } = await import("../../core/compute/ec2/ssm.js");
       const region = (cfg?.region as string | undefined) ?? "us-east-1";
       const awsProfile = cfg?.aws_profile as string | undefined;
       const online = await ssmCheckInstance({ instanceId, region, awsProfile });

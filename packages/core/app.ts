@@ -24,15 +24,10 @@ import { createAppContainer, type AppContainer, type AppBootOptions } from "./co
 import { buildContainer } from "./di/index.js";
 import { loadConfig, loadAppConfig, type ArkConfig } from "./config.js";
 import { eventBus } from "./hooks.js";
-import type { ComputeProvider } from "./compute/types.js";
-import type {
-  Compute as NewCompute,
-  Isolation as NewIsolation,
-  ComputeKind,
-  IsolationKind,
-} from "./compute/core/types.js";
-import type { ComputePool } from "./compute/core/pool/types.js";
-import type { SnapshotStore } from "./compute/core/snapshot-store.js";
+import type { ComputeProvider } from "./compute/legacy-provider.js";
+import type { Compute as NewCompute, Isolation as NewIsolation, ComputeKind, IsolationKind } from "./compute/types.js";
+import type { ComputePool } from "./compute/warm-pool/types.js";
+import type { SnapshotStore } from "./compute/snapshot-store.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
@@ -976,7 +971,7 @@ export class AppContext {
   /** Resolve the ComputeTarget for a session. Delegated to compute-resolver.ts. */
   resolveComputeTarget(
     session: Session,
-  ): Promise<{ target: import("./compute/core/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
+  ): Promise<{ target: import("./compute/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
     return resolveComputeTarget(this, session);
   }
 
