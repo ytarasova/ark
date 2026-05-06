@@ -374,6 +374,17 @@ export interface Isolation {
    *
    * The returned handle's methods are bound to the same arkd client the
    * isolation would build during `launchAgent`. Pure: no I/O at attach time.
+   *
+   * **Constraint:** isolations that hold per-session state on
+   * `handle.meta.<isolation>` (docker, devcontainer) require that
+   * `prepare()` ran in this process so the meta slot is populated. For
+   * those isolations, calling `attachAgent` against a `ComputeHandle`
+   * that was rehydrated via `Compute.attachExistingHandle` (i.e. without
+   * a prior `prepare()` in this process) will succeed at attach time but
+   * throw on the first `kill()`/`captureOutput()`/`checkAlive()` call.
+   * Callers that need cross-process rehydrate should use
+   * `LocalCompute + DirectIsolation` or persist the isolation meta
+   * alongside the compute handle.
    */
   attachAgent(compute: Compute, h: ComputeHandle, sessionName: string): AgentHandle;
 

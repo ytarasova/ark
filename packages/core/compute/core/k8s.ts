@@ -272,6 +272,39 @@ export class K8sCompute implements Compute {
     return handle;
   }
 
+  // ── attachExistingHandle ─────────────────────────────────────────────────
+  //
+  // Synthesize a k8s handle from a `compute` row whose pod was provisioned in
+  // a prior process (multi-stage flow, daemon restart, server-handler
+  // post-launch op). Returns null when the row hasn't been provisioned (no
+  // pod_name in config) so the dispatcher falls through to `provision()`.
+  //
+  // Pure: maps row.config -> K8sHandleMeta. No k8s API calls. The caller's
+  // `ensureReachable` runs `setupPortForward` post-attach to (re)establish
+  // the local tunnel that `getArkdUrl(h)` resolves to.
+  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+    const cfg = row.config as Record<string, unknown>;
+    const podName = cfg.pod_name as string | undefined;
+    if (!podName) return null; // never provisioned -- fall through to provision()
+
+    const meta: K8sHandleMeta = this.buildHandleMeta(
+      {
+        podName,
+        namespace: (cfg.namespace as string | undefined) ?? "ark",
+        portForwardPid: typeof cfg.port_forward_pid === "number" ? (cfg.port_forward_pid as number) : null,
+        arkdLocalPort: typeof cfg.arkd_local_port === "number" ? (cfg.arkd_local_port as number) : 0,
+        kubeconfig: cfg.kubeconfig as string | undefined,
+      },
+      cfg as K8sComputeConfig,
+    );
+    const handle: ComputeHandle = {
+      kind: this.kind,
+      name: row.name,
+      meta: { k8s: meta },
+    };
+    return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
+  }
+
   // ── ensureReachable ──────────────────────────────────────────────────────
   //
   // Idempotent port-forward setup. On rehydrate (multi-stage flow, persisted

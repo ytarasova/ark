@@ -68,17 +68,14 @@ export function buildAgentHandle(
       return res.output;
     },
     async checkAlive(): Promise<boolean> {
-      try {
-        const client = factory(getUrl());
-        const res = await client.agentStatus({ sessionName });
-        return res.running;
-      } catch {
-        // arkd unreachable -- treat as not alive. Status pollers further
-        // up the stack distinguish "transient probe failure" from "agent
-        // gone" via their own retry layer; this method's contract is just
-        // a boolean snapshot.
-        return false;
-      }
+      // Propagate transport errors. The status-poller's outer try/catch
+      // distinguishes "transient probe failure" (keeps session running)
+      // from "definitive not_found" (running === false). Swallowing here
+      // would silently flip healthy sessions to completed on a single
+      // arkd outage; see status-poller.ts:90 contract.
+      const client = factory(getUrl());
+      const res = await client.agentStatus({ sessionName });
+      return res.running;
     },
   };
 }

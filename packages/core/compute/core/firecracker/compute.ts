@@ -252,6 +252,42 @@ export class FirecrackerCompute implements Compute {
     return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
   }
 
+  // ── attachExistingHandle ─────────────────────────────────────────────────
+  //
+  // Synthesize a Firecracker handle from a `compute` row whose VM was
+  // provisioned in a prior process. Returns null when the row hasn't been
+  // provisioned (no vm_id in config) so the dispatcher falls through to
+  // `provision()`.
+  //
+  // Pure: maps row.config -> FirecrackerMeta. Does not re-spawn firecracker;
+  // does not consult the in-process `vms` map. Post-launch ops only need
+  // `arkdUrl` (for kill/captureOutput/checkAlive/getMetrics via the helpers)
+  // -- start/stop/destroy/snapshot still need a live `FirecrackerVm` from
+  // `provision`, which is the documented constraint.
+  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+    const cfg = row.config as Record<string, unknown>;
+    const vmId = cfg.vm_id as string | undefined;
+    const arkdUrl = cfg.arkd_url as string | undefined;
+    if (!vmId || !arkdUrl) return null; // never provisioned -- fall through to provision()
+
+    const meta: FirecrackerMeta = {
+      vmId,
+      socketPath: (cfg.socket_path as string | undefined) ?? "",
+      guestIp: (cfg.guest_ip as string | undefined) ?? "",
+      hostIp: (cfg.host_ip as string | undefined) ?? "",
+      tapName: (cfg.tap_name as string | undefined) ?? "",
+      kernelPath: (cfg.kernel_path as string | undefined) ?? "",
+      rootfsPath: (cfg.rootfs_path as string | undefined) ?? "",
+      arkdUrl,
+    };
+    const handle: ComputeHandle = {
+      kind: this.kind,
+      name: row.name,
+      meta: { firecracker: meta },
+    };
+    return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
+  }
+
   /** Resume a paused VM. If we don't have a live handle (e.g. after a
    *  process restart) we treat it as a no-op -- start semantics for a brand
    *  new VM belong in `provision`. */

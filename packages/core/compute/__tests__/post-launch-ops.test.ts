@@ -135,7 +135,11 @@ describe("AgentHandle post-launch ops on local + direct target", () => {
     expect(alive).toBe(false);
   });
 
-  it("checkAlive returns false when arkd is unreachable", async () => {
+  it("checkAlive propagates transport errors so the status-poller can keep the session running", async () => {
+    // Contract: arkd unreachable must NOT silently report dead. The legacy
+    // ComputeProvider.checkSession threw and the status-poller's outer
+    // try/catch kept the session as `running`. The new path preserves that
+    // by propagating; status-poller.ts:106-136 catches and logs.
     const compute = new LocalCompute(app);
     compute.setClientFactoryForTesting(
       () =>
@@ -163,8 +167,7 @@ describe("AgentHandle post-launch ops on local + direct target", () => {
       launcherContent: "",
     });
 
-    const alive = await agent.checkAlive();
-    expect(alive).toBe(false);
+    expect(agent.checkAlive()).rejects.toThrow("arkd unreachable");
   });
 
   it("Isolation.attachAgent rebuilds an AgentHandle without re-launching", async () => {

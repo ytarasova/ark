@@ -66,11 +66,10 @@ export class SessionTerminator {
         config: computeRow.config ?? {},
       });
       if (!computeHandle) {
-        // Template-only computes (per-session pod / microVM) reach this
-        // path during stop/delete. Their agent already lives inside the
-        // ephemeral instance that destroy() will reap; nothing to kill via
-        // arkd here. Treat as success so cleanupSession runs.
-        logDebug("session", `killAgent ${session.id}: compute has no attachExistingHandle, skipping kill`);
+        // Compute row hasn't been provisioned yet (no instance_id / pod_name /
+        // vm_id stored), so there's no arkd to talk to. The cleanupSession
+        // pass that follows handles the row-level teardown.
+        logDebug("session", `killAgent ${session.id}: compute not yet provisioned, skipping kill`);
         return;
       }
       const agent = target.isolation.attachAgent(target.compute, computeHandle, session.session_id!);
