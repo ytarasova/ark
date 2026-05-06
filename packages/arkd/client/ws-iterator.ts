@@ -1,16 +1,26 @@
-/**
- * Bridge a WebSocket subscription to an `AsyncIterable<E>`.
- *
- * Resolves only after the server sends `{ type: "subscribed" }` as its
- * first frame -- the client's `open` event fires when the HTTP Upgrade
- * response arrives, but Bun's server-side `ws.open()` callback may run
- * later. The ack proves the subscriber is registered, so any publish
- * after `await subscribeToChannel(...)` is guaranteed to find a live
- * subscriber rather than buffer.
- */
-
 import { ArkdClientError } from "../common/errors.js";
 
+/**
+ * Bridge a WebSocket to an `AsyncIterable<E>`, resolving only after the
+ * server sends `{ type: "subscribed" }` as its first frame.
+ *
+ * Why wait for the ack rather than the client-side `open` event:
+ * The client's `open` event fires when the HTTP Upgrade response arrives.
+ * Bun's server-side `ws.open()` callback -- where `s.subscribers.add(ws)`
+ * is called -- runs separately and may complete after the client's `open`
+ * handler. If a publish races in between, it finds no subscriber and
+ * buffers instead of delivering directly.
+ *
+ * The ack (`SUBSCRIBED_ACK`) is sent from the very end of the server's
+ * `open()` handler, after the subscriber has been registered and the ring
+ * has been drained. Receiving it is a proof that the server-side state
+ * is consistent: any publish that happens after this point is guaranteed
+ * to find a live subscriber.
+ *
+ * Envelope frames (all frames except the ack control frame) are queued and
+ * yielded to the caller in arrival order. A WS `error` event surfaces as
+ * an `ArkdClientError` thrown out of the iterator.
+ */
 export async function webSocketToAsyncIterable<E extends Record<string, unknown>>(
   ws: WebSocket,
   channel: string,
@@ -39,6 +49,7 @@ export async function webSocketToAsyncIterable<E extends Record<string, unknown>
       const data = typeof ev.data === "string" ? ev.data : "";
       if (!data) return;
       const parsed = JSON.parse(data) as Record<string, unknown>;
+      // The ack is a control frame; strip it before yielding to callers.
       if (parsed.type === "subscribed") {
         resolveAck();
         return;
@@ -80,6 +91,9 @@ export async function webSocketToAsyncIterable<E extends Record<string, unknown>
     signal?.addEventListener("abort", abort, { once: true });
   }
 
+  // Block until the server confirms the subscriber is registered and any
+  // buffered ring entries have been drained. Rejects on error, close, or
+  // abort so callers see a clean failure rather than hanging forever.
   await ackPromise;
 
   return {

@@ -43,6 +43,11 @@ export async function fetchWithRetry(
   path: string,
   method: "GET" | "POST",
 ): Promise<Response> {
+  // Two retries on transient transport errors. Backoff: 250ms, 1s.
+  // Each attempt gets the full timeout budget -- we don't shorten it,
+  // because the original request might have been partway through a long
+  // arkd-side exec; we'd rather wait the timeout than fail-fast on the
+  // first transient close.
   const delays = [250, 1000];
   let lastErr: unknown = null;
   for (let attempt = 0; ; attempt++) {
@@ -56,6 +61,10 @@ export async function fetchWithRetry(
         await new Promise((r) => setTimeout(r, delays[attempt]));
         continue;
       }
+      // Wrap with full request context so callers (and the operator
+      // staring at the failure in the UI) can tell *which* request
+      // failed without spelunking through stack frames. Original
+      // error is preserved as `cause`.
       throw new ArkdClientTransportError(
         `arkd ${method} ${url} failed after ${attempt + 1} attempt(s): ` +
           `${(e as { message?: string })?.message ?? String(e)}`,

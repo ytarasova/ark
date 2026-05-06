@@ -67,6 +67,16 @@ export class ArkdClient {
       this.baseUrl = this.baseUrl.slice(0, -1);
     }
     this.token = opts?.token ?? process.env.ARK_ARKD_TOKEN ?? null;
+    // 30s covers `/snapshot` on a loaded macOS host (top + vm_stat + tmux +
+    // docker stats in parallel) without masking a genuinely gone daemon.
+    // Callers hitting `/health` or `/exec` normally return in <1s so the
+    // extra headroom costs nothing on the happy path.
+    //
+    // EVERY fetch call in this client MUST honor this timeout. The Pass-5
+    // remediation traced a 7+ minute hang to a fetch against an unreachable
+    // arkd URL: an `AbortSignal.timeout` on every single fetch is the only
+    // belt-side guarantee that a dispatch eventually surfaces failure rather
+    // than sitting at status=ready forever.
     this.requestTimeoutMs = opts?.requestTimeoutMs ?? 30_000;
   }
 
@@ -94,13 +104,27 @@ export class ArkdClient {
 
   // -- Process running ---------------------------------------------------------
 
+  /**
+   * Run a command on arkd. The fetch timeout is derived from the server-side
+   * `req.timeout` (default 30_000ms) so we don't abort the HTTP request
+   * before arkd can finish executing. We add a 30s buffer to cover the time
+   * it takes arkd to package up the response after the child exits.
+   *
+   * Without this, callers who set `timeout: 300_000` (e.g. `docker pull`) hit
+   * the default 30s `requestTimeoutMs` ceiling on the client side and saw
+   * fetch aborts mid-exec with no useful error.
+   */
   async run(req: ExecReq): Promise<ExecRes> {
     const serverTimeout = typeof req.timeout === "number" ? req.timeout : 30_000;
     const effectiveTimeout = Math.max(this.requestTimeoutMs, serverTimeout + 30_000);
     return this.post("/exec", req, { timeoutMs: effectiveTimeout });
   }
 
-  // -- Generic process supervisor ----------------------------------------------
+  // -- Generic process supervisor ───────────────────────────────────────────
+  //
+  // Generic spawn/kill/status keyed by a caller-supplied handle. The agent
+  // runtime decides what command to spawn (tmux for claude-code, plain bash
+  // for claude-agent, etc.); arkd just tracks pids. No "agent" semantics.
 
   async spawnProcess(req: ProcessSpawnReq): Promise<ProcessSpawnRes> {
     return this.post("/process/spawn", req);
@@ -114,7 +138,11 @@ export class ArkdClient {
     return this.post("/process/status", req);
   }
 
-  // -- Agent lifecycle (LEGACY tmux wrappers) ----------------------------------
+  // -- Agent lifecycle (LEGACY tmux wrappers) ───────────────────────────────
+  //
+  // Used by the claude-code runtime which still drives tmux directly. The
+  // claude-agent runtime moved to /process/spawn (generic). Phase C will
+  // retire these.
 
   async launchAgent(req: AgentLaunchReq): Promise<AgentLaunchRes> {
     return this.post("/agent/launch", req);
@@ -134,10 +162,40 @@ export class ArkdClient {
 
   // -- Generic channel pub/sub -------------------------------------------------
 
+  /**
+   * Publish an opaque envelope to a named channel. arkd treats the envelope
+   * as opaque JSON -- subscribers see whatever fields the publisher set.
+   * `delivered` reports whether arkd handed the envelope directly to a
+   * parked subscriber (true) or buffered it on the channel ring for the
+   * next subscribe call (false). Buffered envelopes are still durable: the
+   * next subscriber drains them in FIFO order on connect.
+   */
   async publishToChannel(channel: string, envelope: Record<string, unknown>): Promise<ChannelPublishRes> {
     return this.post(`/channel/${encodeURIComponent(channel)}/publish`, { envelope });
   }
 
+  /**
+   * Subscribe to a named channel via WebSocket. Returns a Promise that
+   * resolves to an async iterable of envelopes once the server confirms the
+   * subscriber is registered.
+   *
+   * The Promise resolves after the server sends `{ type: "subscribed" }` as
+   * its first frame. That ack is emitted from inside the server's `open()`
+   * handler -- after `s.subscribers.add(ws)` has run and the ring buffer has
+   * been drained. Callers can therefore publish immediately after
+   * `await subscribeToChannel(...)` and be certain the envelope will be
+   * delivered directly rather than buffered.
+   *
+   * The returned iterable stays open with protocol-level ping/pong keepalive
+   * until the consumer cancels via the AbortSignal or the socket closes.
+   *
+   * Auth: Bearer token goes in `Sec-WebSocket-Protocol` as `Bearer.<token>`
+   * because environments that cannot set custom Upgrade headers (browsers,
+   * some proxies) have no other way to pass credentials on a WS handshake.
+   * The arkd server reads `Authorization` first, then falls back to parsing
+   * `Sec-WebSocket-Protocol` for the `Bearer.` prefix -- same `checkAuth`
+   * function as for HTTP requests.
+   */
   subscribeToChannel<E extends Record<string, unknown> = Record<string, unknown>>(
     channel: string,
     opts?: { signal?: AbortSignal },
@@ -169,8 +227,18 @@ export class ArkdClient {
 
   /**
    * Open the chunked byte stream for an attach handle. Returns the raw
-   * `Response` so callers can pipe the body directly. The connect timeout
-   * caps headers; once headers arrive the body stream lives independently.
+   * `Response` so callers can pipe the body directly. The response stays
+   * open until the handle is closed or the server tears it down.
+   *
+   * Connect timeout: we still cap the time spent waiting for response
+   * headers via `AbortSignal.timeout(requestTimeoutMs)`. Once `fetch()`
+   * resolves the headers are in and the body stream lives independently
+   * (the AbortSignal does NOT abort the in-flight body once headers
+   * arrive). Without this, an unreachable arkd would leave the fetch
+   * pending indefinitely -- the same hang shape the Pass-5 remediation
+   * is fixing on the JSON paths.
+   *
+   * Throws if the server returns a non-2xx.
    */
   async attachStream(streamHandle: string): Promise<Response> {
     const ac = new AbortController();
@@ -178,6 +246,9 @@ export class ArkdClient {
       () => ac.abort(new Error(`arkd attachStream: timeout after ${this.requestTimeoutMs}ms`)),
       this.requestTimeoutMs,
     );
+    // Don't clear `t` in a finally -- once headers arrive and we return the
+    // Response, the body stream lives on independently. Caller is expected
+    // to consume the stream promptly. Worst case we leak a no-op timer.
     void t;
     const resp = await fetch(`${this.baseUrl}/agent/attach/stream?handle=${encodeURIComponent(streamHandle)}`, {
       headers: this.authHeaders(),
