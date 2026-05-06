@@ -109,4 +109,36 @@ export default [
       }],
     },
   },
+  {
+    // Arkd boundary: external consumers must use the package barrels
+    // (common/index.ts, client/index.ts, server/index.ts) -- no deep
+    // imports into split internals or moved routes.
+    files: ["packages/!(arkd)/**/*.ts", "packages/!(arkd)/**/*.tsx"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          {
+            group: ["**/arkd/server/*", "!**/arkd/server/index.js"],
+            message: "Import arkd server symbols from arkd/server/index.js (the barrel).",
+          },
+          {
+            group: ["**/arkd/client/*", "!**/arkd/client/index.js"],
+            message: "Import arkd client symbols from arkd/client/index.js (the barrel).",
+          },
+          {
+            group: ["**/arkd/common/*", "!**/arkd/common/index.js"],
+            message: "Import arkd common symbols from arkd/common/index.js (the barrel).",
+          },
+          {
+            group: ["**/arkd/index.js", "**/arkd/index"],
+            message: "The arkd top-level barrel was removed. Import from arkd/{client,server,common}/index.js.",
+          },
+          {
+            group: ["**/arkd/types.js", "**/arkd/internal.js", "**/arkd/client.js", "**/arkd/server.js", "**/arkd/routes/**"],
+            message: "Old arkd flat paths were removed. Import from arkd/{client,server,common}/index.js.",
+          },
+        ],
+      }],
+    },
+  },
 ];
