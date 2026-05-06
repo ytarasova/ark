@@ -112,8 +112,11 @@ export default [
   {
     // Arkd boundary: external consumers must use the package barrels
     // (common/index.ts, client/index.ts, server/index.ts) -- no deep
-    // imports into split internals or moved routes.
-    files: ["packages/!(arkd)/**/*.ts", "packages/!(arkd)/**/*.tsx"],
+    // imports into split internals or moved routes. Splitting via
+    // `files` + `ignores` rather than a `!(arkd)` extglob avoids
+    // micromatch version differences across CI environments.
+    files: ["packages/**/*.ts", "packages/**/*.tsx"],
+    ignores: ["packages/arkd/**"],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [
