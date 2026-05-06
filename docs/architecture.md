@@ -458,7 +458,7 @@ Only used in hosted mode. Manages API keys in the `api_keys` table.
 
 ### 4.1 What it is
 
-A stateless HTTP server that runs on every compute target on port 19300. Single binary (`packages/arkd/server.ts`, ~800 lines) that exposes agent lifecycle, file ops, exec, metrics, channel relay, and codegraph indexing over HTTP.
+A stateless HTTP server that runs on every compute target on port 19300. Code is split into `packages/arkd/{client,server,common}/` -- consumers import only via the sub-path barrels (`@ark/arkd/client`, `@ark/arkd/server`, `@ark/arkd/common`); an ESLint `no-restricted-imports` rule blocks cross-imports between layers and reaching past barrels. It exposes agent lifecycle, file ops, exec, metrics, channel relay, and codegraph indexing over HTTP.
 
 ### 4.2 Why it exists
 
