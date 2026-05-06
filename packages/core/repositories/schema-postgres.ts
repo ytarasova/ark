@@ -44,6 +44,8 @@ export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
       user_id TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
       workspace_id TEXT,
+      pty_cols INTEGER,
+      pty_rows INTEGER,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
