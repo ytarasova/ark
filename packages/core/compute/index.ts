@@ -107,8 +107,3 @@ export { FsSnapshotStore } from "./snapshot-store-fs.js";
 export type { ComputePool, PoolConfig, PoolStats } from "./warm-pool/types.js";
 export { defaultPoolConfig } from "./warm-pool/types.js";
 export { LocalFirecrackerPool } from "./warm-pool/local-firecracker-pool.js";
-
-// ── Flag specs (CLI-layer adapter) ─────────────────────────────────────────
-
-export type { ProviderFlagSpec, ProviderFlagOption } from "./flag-spec.js";
-export { allFlagSpecs, getFlagSpec, flagSpecRegistry } from "./flag-specs/index.js";
