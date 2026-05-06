@@ -30,7 +30,7 @@ export class HostedDispatcher {
     try {
       const worker = await scheduler.schedule(session, tenantId);
       log(`Dispatched to worker ${worker.id} (${worker.url})`);
-      const { ArkdClient } = await import("../../../arkd/client.js");
+      const { ArkdClient } = await import("../../../arkd/client/index.js");
       const client = new ArkdClient(worker.url);
       const sessionName = `ark-s-${sessionId}`;
       const script = `#!/bin/bash\necho "Dispatched session ${sessionId}"`;

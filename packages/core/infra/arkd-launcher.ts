@@ -27,7 +27,7 @@ export class ArkdLauncher {
   async start(): Promise<void> {
     if (this.opts.skip) return;
     await safeAsync("boot: start arkd", async () => {
-      const { startArkd } = await import("../../arkd/server.js");
+      const { startArkd } = await import("../../arkd/server/index.js");
       const conductorUrl = `http://localhost:${this.config.ports.conductor}`;
       this.handle = startArkd(this.config.ports.arkd ?? 19300, { conductorUrl, quiet: true });
     });

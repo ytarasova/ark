@@ -243,7 +243,7 @@ export const claudeAgentExecutor: Executor = {
               launcherPath: workerLauncherPath,
               launcherBytes: launcherContent.length,
             });
-            const { ArkdClient } = await import("../../arkd/index.js");
+            const { ArkdClient } = await import("../../arkd/client/index.js");
             const arkdClient = new ArkdClient(arkdUrl);
             // mkdir -p the session dir on the worker first; arkd /file/write
             // doesn't auto-create parents, and /tmp/ark-<sid> won't exist

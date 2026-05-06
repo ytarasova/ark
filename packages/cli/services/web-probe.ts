@@ -95,7 +95,7 @@ export async function startAuxiliaryDaemons(app: AppContext): Promise<AuxiliaryD
   const auxiliary: { stop: () => void }[] = [];
 
   const { startConductor } = await import("../../core/conductor/server/conductor.js");
-  const { startArkd } = await import("../../arkd/index.js");
+  const { startArkd } = await import("../../arkd/server/index.js");
   const { DEFAULT_CONDUCTOR_PORT, DEFAULT_ARKD_PORT } = await import("../../core/constants.js");
 
   // Conductor: start unless something already listens on the port
