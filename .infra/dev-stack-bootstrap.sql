@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS knowledge_edges (
   source_id TEXT NOT NULL,
   target_id TEXT NOT NULL,
   relation TEXT NOT NULL,
-  weight REAL DEFAULT 1.0,
+  weight DOUBLE PRECISION DEFAULT 1.0,
   metadata TEXT DEFAULT '{}',
   tenant_id TEXT NOT NULL DEFAULT 'default',
   created_at TEXT NOT NULL DEFAULT (now()::text),
