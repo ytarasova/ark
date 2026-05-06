@@ -22,6 +22,7 @@ import { FileSecretsProvider } from "../secrets/file-provider.js";
 import type { SecretsCapability } from "../secrets/types.js";
 import type { ArkConfig } from "../config.js";
 import { buildTenantScope } from "../tenant-scope.js";
+import type { AppContext } from "../app.js";
 
 /**
  * Hosted compute bootstrap is intentionally a no-op. The operator
@@ -40,10 +41,25 @@ function makeNoopComputeBootstrap(): ComputeBootstrapCapability {
  * scoped contexts (re-asked for the tenant they're already pinned to)
  * short-circuit to avoid nesting child scopes (which would invalidate
  * `===` identity checks on services across re-resolutions).
+ *
+ * Calls from the root context are memoized by tenantId so listeners
+ * registered once on `root.forTenant("default").sessionService` are visible
+ * to every later `root.forTenant("default")` resolution -- otherwise each
+ * call returns a fresh child scope with empty SessionDispatchListeners and
+ * the inline `session_created` dispatcher path silently no-ops.
  */
 function makeHostedTenantScope(): TenantScopeCapability {
+  const cache = new Map<string, AppContext>();
   return {
-    forTenant: (app, tenantId) => (app.tenantId === tenantId ? app : buildTenantScope(app, tenantId)),
+    forTenant: (app, tenantId) => {
+      if (app.tenantId === tenantId) return app;
+      if (app.tenantId !== null) return buildTenantScope(app, tenantId);
+      const existing = cache.get(tenantId);
+      if (existing) return existing;
+      const scope = buildTenantScope(app, tenantId);
+      cache.set(tenantId, scope);
+      return scope;
+    },
   };
 }
 
