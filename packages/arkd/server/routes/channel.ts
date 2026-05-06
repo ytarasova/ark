@@ -27,15 +27,16 @@
  * not need the queue treatment.
  */
 
-import { DEFAULT_CHANNEL_BASE_URL } from "../../core/constants.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "../../../core/constants.js";
 import type {
   ChannelReportRes,
   ChannelRelayReq,
   ChannelRelayRes,
   ChannelDeliverReq,
   ChannelDeliverRes,
-} from "../types.js";
-import { json, type RouteCtx } from "../internal.js";
+} from "../../common/types.js";
+import { json } from "../helpers.js";
+import { type RouteCtx } from "../route-ctx.js";
 import { publishOnChannel } from "./channels.js";
 
 /**

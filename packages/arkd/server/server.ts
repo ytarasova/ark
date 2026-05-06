@@ -20,20 +20,20 @@ import { type ArkdOpts } from "./route-ctx.js";
 import { createRouteCtx } from "./route-ctx.js";
 import { setupAuth, checkAuth } from "./auth.js";
 import { startControlPlane } from "./control-plane.js";
-import { handleFileRoutes } from "../routes/file.js";
-import { handleExecRoutes } from "../routes/exec.js";
-import { handleAgentRoutes } from "../routes/agent.js";
-import { handleMetricsSnapshotRoutes } from "../routes/metrics-snapshot.js";
-import { handleChannelRoutes } from "../routes/channel.js";
+import { handleFileRoutes } from "./routes/file.js";
+import { handleExecRoutes } from "./routes/exec.js";
+import { handleAgentRoutes } from "./routes/agent.js";
+import { handleMetricsSnapshotRoutes } from "./routes/metrics-snapshot.js";
+import { handleChannelRoutes } from "./routes/channel.js";
 import {
   channelWebSocketHandler,
   handleChannelRoutes as handleGenericChannelRoutes,
   matchWsChannelPath,
   type ChannelWsData,
-} from "../routes/channels.js";
-import { handleMiscRoutes } from "../routes/misc.js";
-import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "../routes/attach.js";
-import { handleProcessRoutes } from "../routes/process.js";
+} from "./routes/channels.js";
+import { handleMiscRoutes } from "./routes/misc.js";
+import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "./routes/attach.js";
+import { handleProcessRoutes } from "./routes/process.js";
 
 declare const Bun: BunLike;
 

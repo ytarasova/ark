@@ -19,9 +19,10 @@ import type {
   StatRes,
   MkdirReq,
   MkdirRes,
-} from "../types.js";
-import { logInfo } from "../../core/observability/structured-log.js";
-import { json, type RouteCtx } from "../internal.js";
+} from "../../common/types.js";
+import { logInfo } from "../../../core/observability/structured-log.js";
+import { json } from "../helpers.js";
+import { type RouteCtx } from "../route-ctx.js";
 
 async function listDirectory(dirPath: string, recursive?: boolean): Promise<DirEntry[]> {
   const entries: DirEntry[] = [];

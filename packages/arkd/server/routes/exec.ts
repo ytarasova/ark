@@ -6,8 +6,10 @@
  * root when the caller omits cwd.
  */
 
-import type { ExecReq, ExecRes } from "../types.js";
-import { EXEC_ALLOWED_COMMANDS, json, readStream, type BunLike, type RouteCtx } from "../internal.js";
+import type { ExecReq, ExecRes } from "../../common/types.js";
+import { EXEC_ALLOWED_COMMANDS } from "../exec-allowlist.js";
+import { json, readStream, type BunLike } from "../helpers.js";
+import { type RouteCtx } from "../route-ctx.js";
 
 async function runExec(req: ExecReq): Promise<ExecRes> {
   const Bun = (globalThis as unknown as { Bun: BunLike }).Bun;

@@ -8,8 +8,9 @@
  */
 
 import { join } from "path";
-import type { ConfigReq, ConfigRes } from "../types.js";
-import { json, type BunLike, type RouteCtx } from "../internal.js";
+import type { ConfigReq, ConfigRes } from "../../common/types.js";
+import { json, type BunLike } from "../helpers.js";
+import { type RouteCtx } from "../route-ctx.js";
 
 async function handleCodegraph(req: Request, ctx: RouteCtx): Promise<Response> {
   const Bun = (globalThis as unknown as { Bun: BunLike }).Bun;
