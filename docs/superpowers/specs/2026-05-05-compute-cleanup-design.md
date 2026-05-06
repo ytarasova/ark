@@ -19,8 +19,13 @@
 
 ## Non-goals
 
-- No backwards compatibility for `arc.json`. There are no external users.
-- No deprecation window for the `--provider` CLI flag. Replaced outright by `--kind` + `--isolation`.
+- **No backwards compatibility, anywhere.** No deprecation windows, no shims, no dual-read fallbacks, no aliases preserved "for safety". There are no external users. Every removal is final in this PR.
+  - `arc.json` parser deleted, format gone.
+  - Legacy `provider` column dropped from every table; no fallback read path remains.
+  - Old `ComputeProvider` interface and the entire `providers/` directory deleted; no dual-registry boot.
+  - `--provider` CLI flag removed outright; replaced by `--kind` + `--isolation`. No alias.
+  - Flag-spec registry (interface + Map + per-provider files) deleted; flags live inline in the CLI command.
+  - `firecracker-in-container` isolation kind erased from the codebase as a concept. Not registered, not in any union type, not referenced. The new world is `FirecrackerCompute + DirectIsolation`, and that's the only firecracker shape that exists.
 - No new provider, no new isolation, no new feature. This is pure cleanup.
 - Not redesigning the `Compute` / `Isolation` interfaces beyond adding the post-launch methods that already exist on `ComputeProvider`.
 
@@ -167,11 +172,11 @@ The PR is one commit landing all of the below, but the work is staged internally
 
 4. **Delete `providers/` directory.** Drop the legacy registry from `ComputeProvidersBoot`. Delete `core/compute/providers/`, `core/compute/types.ts` (old `ComputeProvider`), `adapters/legacy.ts`. Build green.
 
-5. **Drop the legacy `provider` column.** Migration `010_drop_legacy_provider_columns.ts`. Schema edit in both `drizzle/schema/sqlite.ts` and `postgres.ts`. Sweep ~15 callers of `providerOf` / `pairToProvider` / `providerToPair`. Delete `adapters/provider-map.ts` and the now-empty `adapters/` dir. Replace `--provider` CLI flag with `--kind` + `--isolation` in `ark compute create`. Build green.
+5. **Fully remove the legacy `provider` column and its translation layer.** Migration `010_drop_legacy_provider_columns.ts` drops the column from every table that carries it (`compute`, `compute_templates`, the `hosted_*` tables) and drops `idx_compute_provider`. Schema edits in both `drizzle/schema/sqlite.ts` and `postgres.ts`. The same migration runs the firecracker data fixup. Sweep every caller of `providerOf` / `pairToProvider` / `providerToPair` (~30 import sites across cli/server/core) and replace with direct use of `compute_kind` + `isolation_kind`. Delete `adapters/provider-map.ts` and the now-empty `adapters/` directory. Remove the `--provider` flag from `ark compute create` and replace with `--kind` + `--isolation`. After this step, grep for `provider:` in INSERT statements, `providerOf`, `providerToPair`, `pairToProvider`, and `compute.provider` returns zero hits in production code. Build green.
 
-6. **Inline flag-specs into CLI, delete `flag-specs/` directory and root `flag-spec.ts`.** Mechanical move. Build green.
+6. **Delete the flag-spec abstraction; inline what survives.** Delete `flag-specs/` directory (six files) and root `flag-spec.ts`. The ~15 surviving CLI options (`--image`, `--aws-region`, `--k8s-namespace`, etc.) are declared directly on the `cmd.option(...)` chain in `packages/cli/commands/compute/create.ts`. The five `configFromFlags` helpers collapse into one `switch (kind)` block in the same file. The five `displaySummary` helpers collapse the same way. No `Map`, no `ProviderFlagSpec` interface, no `allFlagSpecs()` / `getFlagSpec()` lookups. Build green.
 
-7. **Kill phantom `firecracker-in-container` kind.** Coerce data in step-5 migration. Remove the value from any union types. Build green.
+7. **Erase phantom `firecracker-in-container` kind from the code.** Remove the value from `IsolationKind` union, from `provider-map.ts` mappings (which are being deleted anyway in step 5), and from any switch/lookup that names it. The data fixup in step 5's migration handles existing rows. After this step, grep for `firecracker-in-container` returns zero hits anywhere in the repo. Build green.
 
 8. **Final pass.** Scrub `packages/core/compute/index.ts` to export only the new-world surface. Delete root `util.ts` (move helpers into `ec2/`). Scrub doc comments referencing dead modules. Run `make format && make lint && make test`.
 
