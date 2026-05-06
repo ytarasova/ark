@@ -16,7 +16,8 @@ export interface ArkdOpts {
    * Filesystem root that every /file/* and /exec request is confined to.
    * Required in hosted / untrusted contexts; when unset, /file/* and
    * /exec accept absolute paths from any caller and trust the bearer
-   * token for full host FS access.
+   * token for full host FS access -- acceptable only for local-single-user
+   * mode, which is the historical behavior retained for backward compat.
    */
   workspaceRoot?: string;
 }

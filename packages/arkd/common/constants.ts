@@ -13,10 +13,16 @@ export const DEFAULT_PORT = 19300;
 export const AUTH_EXEMPT_PATHS = new Set(["/health"]);
 
 /**
- * tmux session names, channel names, and process handles all share this
- * pattern. Restricted charset closes shell-injection paths in
- * `/tmp/arkd-launcher-<sessionName>.sh` and the `tmux send-keys -l`
- * argument plumbing.
+ * tmux session names, channel names, and process handles must be usable
+ * as both a shell argument and a POSIX filename component. The restricted
+ * charset closes two injection surfaces:
+ *
+ *   1. The `/tmp/arkd-launcher-<sessionName>.sh` path -- without this
+ *      guard, an attacker can write `../../../../etc/cron.d/poison` or
+ *      clobber arbitrary files writable by the arkd user.
+ *   2. The tmux shell-command argument `bash <scriptPath>` -- tmux
+ *      parses the final argv as a shell command, so spaces /
+ *      metacharacters in the session name bleed into shell parsing.
  */
 export const SAFE_TMUX_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
