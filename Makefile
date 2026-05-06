@@ -119,11 +119,11 @@ dev-temporal-down: ## Stop and remove the local Temporal cluster + its data volu
 # ship as `docker-compose`. Some laptop setups have only one of the two.
 DOCKER_COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
 
-dev-stack: ## Start local Ark dev stack (Postgres :15433 + Redis :6379) and apply bootstrap SQL
+dev-stack: build-web ## Start local Ark dev stack (Postgres :15433 + Redis :6379), build web bundle, and apply bootstrap SQL
 	@command -v docker >/dev/null 2>&1 || { echo "Docker required. Install Docker Desktop."; exit 1; }
 	@echo "\033[1mStarting Ark dev stack (Postgres + Redis)...\033[0m"
 	$(DOCKER_COMPOSE) -f .infra/docker-compose.dev.yaml -p ark-dev up -d --wait
-	@echo "\033[1mApplying bootstrap SQL workarounds...\033[0m"
+	@echo "\033[1mApplying bootstrap SQL...\033[0m"
 	docker exec -i ark-postgres psql -U ark -d ark < .infra/dev-stack-bootstrap.sql
 	@echo ""
 	@echo "  Postgres:  postgres://ark:ark@localhost:15433/ark"
