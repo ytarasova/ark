@@ -85,6 +85,7 @@ export class SessionService {
       },
     });
 
+    this.emitSessionCreated(session.id);
     return (await this.sessions.get(session.id))!;
   }
 

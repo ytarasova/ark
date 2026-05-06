@@ -469,6 +469,24 @@ export class AppContext {
     // arkDir so subsequent writes land on disk.
     if (this.mode.kind === "hosted") {
       process.env.ARK_MODE = "hosted";
+      // Laptop hosted dev: when ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE=1 is set,
+      // the operator is running hosted mode against Docker Compose on a real
+      // laptop filesystem (not an ephemeral pod). Materialise the arkDir and
+      // bind the structured log so logInfo/logDebug calls become visible at
+      // ${arkDir}/ark.jsonl. NEVER set this env in real k8s deployments --
+      // the file sink stays null there, matching the original contract.
+      if (process.env.ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE === "1") {
+        for (const dir of [
+          this.config.dirs.ark,
+          this.config.dirs.tracks,
+          this.config.dirs.worktrees,
+          this.config.dirs.logs,
+        ]) {
+          mkdirSync(dir, { recursive: true });
+        }
+        setLogArkDir(this.config.dirs.ark);
+        setProfilesArkDir(this.config.dirs.ark);
+      }
       return;
     }
 

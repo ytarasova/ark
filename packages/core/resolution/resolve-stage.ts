@@ -99,7 +99,13 @@ function pickProviderKey(runtime: RuntimeDefinition, model: ModelDefinition): st
   // Compat-based hint: anything with `bedrock` compat looks up the bedrock
   // slug. This keeps existing agent-sdk.yaml working without adding a new
   // field to every runtime.
-  if (runtime.compat?.includes("bedrock") && model.provider_slugs["tf-bedrock"]) {
+  // Dev escape hatch ARK_DEV_FORCE_DIRECT=1 skips bedrock routing so the
+  // resolver falls through to anthropic-direct. NEVER set this in production.
+  if (
+    runtime.compat?.includes("bedrock") &&
+    model.provider_slugs["tf-bedrock"] &&
+    process.env.ARK_DEV_FORCE_DIRECT !== "1"
+  ) {
     return "tf-bedrock";
   }
 
