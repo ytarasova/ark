@@ -1,11 +1,10 @@
 /**
  * Auto-discovery for the workspace's user-declared ports.
  *
- * The legacy `arc.json` per-repo config used to carry an explicit `ports`
- * block. We deleted it: each workspace now has at most a `docker-compose.yml`
- * and/or `.devcontainer/devcontainer.json`, both of which already declare the
- * ports they want forwarded in their native formats. This module is the thin
- * unifier that reads from the two format-native helpers and dedupes.
+ * Each workspace has at most a `docker-compose.yml` and/or
+ * `.devcontainer/devcontainer.json`, both of which declare the ports they
+ * want forwarded in their native formats. This module is the thin unifier
+ * that reads from the two format-native helpers and dedupes.
  */
 
 import { discoverDevcontainerPorts, type PortDecl } from "./devcontainer.js";

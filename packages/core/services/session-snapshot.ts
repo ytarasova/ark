@@ -3,7 +3,7 @@
  *
  * `pauseWithSnapshot` / `resumeFromSnapshot` are the higher-level counterparts
  * to the state-only `pause` / `resume` in `session-lifecycle.ts`. They talk
- * to the new `Compute` interface (`packages/compute/core/types.ts`) and the
+ * to the `Compute` interface (`packages/core/compute/types.ts`) and the
  * `SnapshotStore` to actually persist VM/container state so that a session
  * can move between hosts or survive an ark restart.
  *

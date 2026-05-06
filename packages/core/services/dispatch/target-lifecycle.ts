@@ -20,18 +20,16 @@
  *      delivered (the SSH key is for git, not for the compute transport).
  *      1 retry, 1_000ms backoff for transient transport blips.
  *   4. `prepare-workspace`  -- mkdir + git clone via arkd HTTP. 2
- *      retries, 1_000ms backoff (matches the legacy `git-clone` step
- *      that lived inside `RemoteWorktreeProvider.launch`).
+ *      retries, 1_000ms backoff.
  *   5. `isolation-prepare`    -- bring up compose / build devcontainer /
  *      boot microVM. Idempotent; 1 retry / 1_000ms backoff.
  *   6. `launch-agent`       -- arkd-side process spawn. NOT retried
  *      (tmux session names don't dedupe; a retry would leak the prior
  *      pane).
  *
- * Step ordering note: the legacy `RemoteWorktreeProvider.launch` ran
- * `flushDeferredPlacement` BEFORE `git clone` because the clone needs
- * the SSH key the placement just delivered. We preserve that order
- * here -- flush-secrets sits at step 3, prepare-workspace at step 4.
+ * Step ordering: `flushDeferredPlacement` MUST run BEFORE `git clone`
+ * because the clone needs the SSH key the placement just delivered.
+ * Flush-secrets sits at step 3, prepare-workspace at step 4.
  *
  * Each step emits a `provisioning_step` event with `compute` +
  * `computeKind` context so the session timeline shows a uniform
@@ -135,10 +133,10 @@ export async function runTargetLifecycle(
   }
 
   // 3. flush-secrets -- runs BEFORE prepare-workspace because the workspace
-  //    clone uses the SSH key the placement just delivered (matches legacy
-  //    RemoteWorktreeProvider.launch ordering: flushDeferredPlacement →
-  //    git-clone → launch-agent). Skip when the queue has no file/
-  //    provisioner ops -- env-only sessions have nothing to flush.
+  //    clone uses the SSH key the placement just delivered (ordering:
+  //    flushDeferredPlacement -> git-clone -> launch-agent). Skip when the
+  //    queue has no file/provisioner ops -- env-only sessions have nothing
+  //    to flush.
   if (opts.placement && opts.placement.hasDeferred() && target.compute.flushPlacement) {
     await provisionStep(
       app,

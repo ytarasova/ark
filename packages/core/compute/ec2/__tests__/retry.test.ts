@@ -1,12 +1,13 @@
 /**
- * Tests for the compute utility functions: retry, poll, sleep.
+ * Tests for the EC2 retry/poll/sleep helpers.
  *
- * These wrap p-retry and p-wait-for with a simpler interface
- * used throughout the compute layer for resilient async operations.
+ * These wrap p-retry and p-wait-for with a simpler interface used by
+ * the EC2 compute path (SSM connect, arkd /health probe, instance state
+ * polling).
  */
 
 import { describe, it, expect } from "bun:test";
-import { retry, poll, sleep } from "../util.js";
+import { retry, poll, sleep } from "../retry.js";
 
 describe("retry (p-retry wrapper)", async () => {
   it("returns result on first success", async () => {

@@ -158,8 +158,8 @@ export interface ComputeCleanZombiesResult {
 
 /**
  * Shape of an isolation-mode descriptor as exposed over the wire. Mirrors
- * `IsolationMode` in `packages/compute/types.ts`; duplicated here to avoid a
- * cross-package import cycle into the compute layer.
+ * `IsolationMode` in `packages/core/compute/legacy-provider.ts`; duplicated
+ * here to avoid a cross-package import cycle into the compute layer.
  */
 export interface ComputeIsolationMode {
   value: string;

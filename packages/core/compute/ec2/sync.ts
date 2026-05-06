@@ -3,8 +3,8 @@
  *
  * Syncs AWS config, gitconfig, gh auth token, and the Claude CLI cache
  * (~/.claude + ~/.claude.json) between the local machine and the remote
- * EC2 host. Also pushes per-project sync files (e.g. arc.json "sync"
- * entries like .env, terraform.tfvars).
+ * EC2 host. Also pushes per-project sync files (.env, terraform.tfvars,
+ * etc) declared on the session config.
  *
  * Transport: pure AWS SSM. Files travel as base64-encoded blobs inside an
  * `AWS-RunShellScript` SendCommand. Pull (host -> local) is implemented by
@@ -12,7 +12,7 @@
  *
  * SSH credentials are NOT synced here. They flow via typed-secret
  * placement (see packages/core/secrets/placers/ssh-private-key.ts and
- * the EC2 placement context in packages/compute/ec2/placement-ctx.ts).
+ * the EC2 placement context in packages/core/compute/ec2/placement-ctx.ts).
  */
 
 import { execFile } from "child_process";
@@ -344,7 +344,8 @@ export async function syncToHost(
 
 /**
  * Push specific project files from a local directory to a remote working directory.
- * These are typically the arc.json "sync" files (.env, terraform.tfvars, etc.)
+ * These are typically the per-project sync files (.env, terraform.tfvars, etc.)
+ * declared on the session config.
  */
 export async function syncProjectFiles(
   instanceId: string,
@@ -353,9 +354,9 @@ export async function syncProjectFiles(
   remoteDir: string,
   ssm: SsmConnectOpts,
 ): Promise<void> {
-  // `remoteDir` is derived from session.workdir / arc.json. Both can be
-  // attacker-controlled in hosted mode -- use argv-based exec so shell
-  // metacharacters are quoted rather than interpreted.
+  // `remoteDir` is derived from session.workdir / per-project sync config.
+  // Both can be attacker-controlled in hosted mode -- use argv-based exec
+  // so shell metacharacters are quoted rather than interpreted.
   await ssmExecArgs({ instanceId, region: ssm.region, awsProfile: ssm.awsProfile, argv: ["mkdir", "-p", remoteDir] });
   for (const file of files) {
     const localPath = join(localDir, file);

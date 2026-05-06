@@ -1,10 +1,9 @@
 /**
- * `compute/template/list` RPC — every template row carries both the legacy
- * `provider` name AND the new `compute` + `isolation` axes. The web bundle
- * used to maintain its own provider-map copy to derive the axes from the
- * provider name; the server now does the derivation once (sourced from the
- * canonical `packages/compute/adapters/provider-map.ts`) so the client can
- * read `tmpl.compute` + `tmpl.isolation` directly.
+ * `compute/template/list` RPC -- every template row carries the new
+ * `compute` + `isolation` axes (and a synthesized legacy `provider` name
+ * for back-compat readers). The web bundle used to maintain its own
+ * provider-map copy to derive the axes; the server now does the derivation
+ * once so the client can read `tmpl.compute` + `tmpl.isolation` directly.
  */
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../../core/app.js";

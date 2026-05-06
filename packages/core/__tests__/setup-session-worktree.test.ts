@@ -30,7 +30,6 @@ function canonical(p: string): string {
 }
 import { AppContext } from "../app.js";
 import { setupSessionWorktree } from "../services/worktree/index.js";
-import { getProvider } from "../compute/index.js";
 
 let app: AppContext;
 let originalCwd: string;
@@ -68,7 +67,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       repo: ".",
     });
 
-    const provider = getProvider("local") ?? undefined;
+    const provider = app.getProvider("local") ?? undefined;
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
     // The worktree must NOT be the live checkout.
@@ -89,7 +88,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       repo: ".",
     });
 
-    const provider = getProvider("local") ?? undefined;
+    const provider = app.getProvider("local") ?? undefined;
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
     const updated = await app.sessions.get(session.id);
@@ -110,7 +109,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       workdir: repoDir,
     });
 
-    const provider = getProvider("local") ?? undefined;
+    const provider = app.getProvider("local") ?? undefined;
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
     expect(effectiveWorkdir).not.toBe(repoDir);
@@ -125,7 +124,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       config: { worktree: false },
     });
 
-    const provider = getProvider("local") ?? undefined;
+    const provider = app.getProvider("local") ?? undefined;
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
     // When worktree is explicitly disabled, we fall back to the resolved repo
@@ -146,7 +145,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       workdir: nonGitDir,
     });
 
-    const provider = getProvider("local") ?? undefined;
+    const provider = app.getProvider("local") ?? undefined;
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
     const wtDir = join(app.config.dirs.worktrees, session.id);

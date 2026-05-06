@@ -8,8 +8,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterAll, spyOn } from "bun:test";
-import * as ssmModule from "../ec2/ssm.js";
-import * as utilModule from "../util.js";
+import * as ssmModule from "../ssm.js";
+import * as utilModule from "../retry.js";
 
 // ── Spy setup ────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ afterAll(() => {
   sleepSpy.mockRestore();
 });
 
-const { autoAcceptChannelPrompt } = await import("../ec2/remote-setup.js");
+const { autoAcceptChannelPrompt } = await import("../remote-setup.js");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

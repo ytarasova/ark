@@ -6,9 +6,11 @@
  * service so it can run as part of the Lifecycle start phase and isn't
  * tied to private helpers on AppContext.
  *
- * Note: Task 4 of the compute cleanup deleted the legacy `ComputeProvider`
- * implementations; this boot only registers the new two-axis world. The
- * legacy `app.registerProvider(...)` registry methods survive into Task 5.
+ * Task 4 of the compute cleanup deleted the legacy `ComputeProvider`
+ * implementations; this boot registers the new two-axis world. A handful
+ * of executor + server-handler call sites still resolve the legacy
+ * `app.getProvider(name)` registry, so capability-only stubs are
+ * registered alongside (deferred sweep tracked in #527, #528).
  */
 import type { AppContext } from "../app.js";
 import { safeAsync } from "../safe.js";
@@ -19,12 +21,9 @@ export class ComputeProvidersBoot {
 
   async start(): Promise<void> {
     await safeAsync("boot: load compute providers", async () => {
-      const compute = await import("../compute/index.js");
-      compute.setComputeApp(this.app);
-
-      // Legacy `ComputeProvider` registry: capability-only stubs. Task 5
-      // sweeps the remaining `app.getProvider()` callers and removes both
-      // the registry and these stubs.
+      // Legacy `ComputeProvider` registry: capability-only stubs. The
+      // remaining `app.getProvider()` callers (two executors + a few
+      // server handlers) resolve through these.
       const { buildLegacyCapabilityStubs } = await import("../compute/legacy-stubs.js");
       for (const stub of buildLegacyCapabilityStubs()) {
         this.app.registerProvider(stub);

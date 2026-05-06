@@ -7,9 +7,8 @@
  *      kind whose worktree lives away from the conductor. We stub the
  *      module-level `fetch` (ArkdClient is fetch-shaped under the hood)
  *      so we can assert the exact `mkdir -p <parent>` + `git clone <src>
- *      <dest>` call sequence the legacy `RemoteWorktreeProvider.launch`
- *      body produces. This is the strongest coverage we can give the
- *      "no divergence from legacy" invariant short of a live arkd.
+ *      <dest>` call sequence. Strongest coverage we can give the
+ *      "two-op shape" invariant short of a live arkd.
  *
  *   2. `EC2Compute.prepareWorkspace` -- thin wrapper around the helper.
  *      Tests use `setCloneHelperForTesting` to inject a recording stub

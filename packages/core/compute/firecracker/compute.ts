@@ -337,12 +337,10 @@ export class FirecrackerCompute implements Compute {
   //
   // Mirror the EC2 path shape inside the microVM:
   //   `${guestHome}/Projects/<sessionId>/<repoBasename>`
-  // The legacy `LocalFirecrackerProvider` did not implement this hook, so we
-  // adopt the EC2 layout for forward compatibility (the VM rootfs ships with
-  // /home/ubuntu by default; override via `handle.meta.firecracker.guestHome`
-  // when a custom rootfs uses a different user). Returns null when neither
-  // `session.config.remoteRepo` nor `session.repo` is set so the caller
-  // falls back to `session.workdir`.
+  // The VM rootfs ships with /home/ubuntu by default; override via
+  // `handle.meta.firecracker.guestHome` when a custom rootfs uses a
+  // different user. Returns null when neither `session.config.remoteRepo`
+  // nor `session.repo` is set so the caller falls back to `session.workdir`.
 
   resolveWorkdir(h: ComputeHandle, session: Session): string | null {
     const cloneSource = (session.config as { remoteRepo?: string } | null | undefined)?.remoteRepo ?? session.repo;

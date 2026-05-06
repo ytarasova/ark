@@ -42,10 +42,9 @@ describe("compute/capabilities", () => {
     const res = await router.dispatch(createRequest(1, "compute/capabilities", { name: "local" }));
     const caps = ok(res).capabilities as Record<string, unknown>;
 
-    // LocalWorktreeProvider (registered as "local") declares singleton=true,
-    // canReboot=false, canDelete=false, initialStatus="running", and two
-    // isolation modes. The handler must read these straight from the
-    // provider registry.
+    // The "local" compute kind declares singleton=true, canReboot=false,
+    // canDelete=false, initialStatus="running", and two isolation modes.
+    // The handler must read these straight from the provider registry.
     expect(caps.provider).toBe("local");
     expect(caps.singleton).toBe(true);
     expect(caps.canReboot).toBe(false);

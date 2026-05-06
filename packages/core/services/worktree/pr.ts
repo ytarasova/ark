@@ -147,8 +147,8 @@ async function resolveRemoteRouting(
 
 /**
  * Best-effort remote workdir for the agent's clone. Prefers the provider's
- * own `resolveWorkdir` (the canonical hook the launcher uses, e.g.
- * `RemoteWorktreeProvider` returns `${REMOTE_HOME}/Projects/<repoBasename>`).
+ * own `resolveWorkdir` (the canonical hook the launcher uses; the EC2
+ * provider returns `${REMOTE_HOME}/Projects/<sessionId>/<repoBasename>`).
  * Falls back to `session.config.remoteWorkdir` (set by some launch flows)
  * and finally to `${REMOTE_HOME}/Projects/<basename(session.repo)>` -- the
  * convention used by EC2 cloud-init.
@@ -161,8 +161,7 @@ function resolveRemoteWorkdir(provider: ComputeProvider, compute: Compute, sessi
   const cfgWd = (session.config as { remoteWorkdir?: string } | null | undefined)?.remoteWorkdir;
   if (cfgWd) return cfgWd;
   // Last resort: derive from the repo name. Matches the
-  // `${REMOTE_HOME}/Projects/<repo>` convention used by RemoteWorktreeProvider
-  // and by cloud-init.
+  // `${REMOTE_HOME}/Projects/<repo>` convention used by EC2 cloud-init.
   const src = (session.config as { remoteRepo?: string } | null | undefined)?.remoteRepo ?? session.repo;
   if (!src) return null;
   const repoName = basename(src).replace(/\.git$/, "");

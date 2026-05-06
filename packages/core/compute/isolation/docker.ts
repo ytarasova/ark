@@ -2,8 +2,7 @@
  * DockerIsolation -- isolation that launches agents inside a per-session
  * arkd-sidecar Docker container.
  *
- * Architecture (mirrors the current `LocalDockerProvider`, but split along
- * the `Compute` x `Isolation` axes):
+ * Architecture (the `Compute` x `Isolation` split):
  *   - The `Compute` owns the host (for `LocalCompute`: the host is always up).
  *   - The `Isolation` owns the per-session container: create, bootstrap, start
  *     arkd inside, health-check, then delegate agent launches to arkd via
@@ -13,10 +12,6 @@
  * that maps to arkd's internal port inside the container. The URL is stored
  * on `handle.meta.docker.arkdUrl` and overrides the compute's default
  * `getArkdUrl` for all `launchAgent` calls.
- *
- * This file only implements the new `Isolation` interface. The legacy
- * `LocalDockerProvider` (same sidecar model, older abstraction) stays live
- * and untouched until dispatch flips over through the ComputeTarget adapter.
  */
 
 import type { AppContext } from "../../app.js";

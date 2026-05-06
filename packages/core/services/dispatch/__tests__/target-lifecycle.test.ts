@@ -300,8 +300,7 @@ describe("runTargetLifecycle", () => {
 
     // Confirm the per-step methods on the target fired in the documented
     // order. Note: flush-secrets sits BEFORE prepare-workspace because
-    // the workspace clone uses the SSH key the placement just delivered
-    // (matches legacy RemoteWorktreeProvider.launch ordering).
+    // the workspace clone uses the SSH key the placement just delivered.
     expect(calls.order).toEqual([
       "start",
       "ensure-reachable",

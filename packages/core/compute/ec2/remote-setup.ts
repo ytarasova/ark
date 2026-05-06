@@ -141,7 +141,7 @@ async function pollChannelPrompt(
         command: `tmux send-keys -t '${tmuxName}' 1`,
         timeoutMs: 5_000,
       });
-      const { sleep } = await import("../util.js");
+      const { sleep } = await import("./retry.js");
       await sleep(300);
       await ssmExec({
         instanceId,
@@ -179,7 +179,7 @@ export async function autoAcceptChannelPrompt(
 ): Promise<void> {
   const max = opts?.maxAttempts ?? 60;
   const delay = opts?.delayMs ?? 2000;
-  const { sleep } = await import("../util.js");
+  const { sleep } = await import("./retry.js");
 
   for (let i = 0; i < max; i++) {
     await sleep(delay);

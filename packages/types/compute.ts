@@ -2,7 +2,7 @@ export type ComputeStatus = "stopped" | "running" | "provisioning" | "destroyed"
 export type ComputeProviderName = "local" | "docker" | "ec2" | "remote-arkd";
 
 /**
- * Where the compute lives. Mirrors `ComputeKind` in packages/compute/core/types.ts
+ * Where the compute lives. Mirrors `ComputeKind` in packages/core/compute/types.ts
  * (duplicated here as a string union to avoid a cross-package import cycle).
  */
 export type ComputeKindName = "local" | "firecracker" | "ec2" | "k8s" | "k8s-kata";

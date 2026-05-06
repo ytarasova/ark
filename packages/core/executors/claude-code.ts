@@ -20,7 +20,7 @@ import { logWarn } from "../observability/structured-log.js";
  * Default home directory on EC2 / k8s remote hosts. Used as the
  * remote-safe fallback for `launcherWorkdir` when a remote dispatch has
  * no clone source (bare worktree dispatch). Hard-coded to mirror
- * `packages/compute/ec2/constants.ts:REMOTE_HOME` -- duplicated
+ * `packages/core/compute/ec2/constants.ts:REMOTE_HOME` -- duplicated
  * here so this executor module avoids a cross-package import on the
  * compute layer.
  */
@@ -75,7 +75,7 @@ export function resolveRemoteWorkdirs(opts: {
 
 /**
  * Audit finding F6 guard. Remote dispatch must receive an explicit
- * `channelConfig` from the provider (e.g. RemoteWorktreeProvider's
+ * `channelConfig` from the provider (the EC2 provider's
  * `buildChannelConfig` returns `${REMOTE_HOME}/.ark/bin/ark channel` --
  * the binary path on the agent's host). When `channelConfig` is null /
  * undefined / empty, `buildChannelConfig` in mcp-config.ts falls back to
@@ -98,8 +98,8 @@ export function assertRemoteChannelConfig(
     return (
       `channel config required for remote dispatch but provider '${providerName ?? "<unknown>"}' ` +
       `returned no channelConfig. The conductor's process.execPath would be embedded in .mcp.json, ` +
-      `which doesn't exist on the remote host. Fix: provider.buildChannelConfig must return a non-null ` +
-      `record (see RemoteWorktreeProvider.buildChannelConfig for the canonical shape).`
+      `which doesn't exist on the remote host. Fix: the provider's buildChannelConfig must return a ` +
+      `non-null record describing the agent-host binary location.`
     );
   }
   return null;

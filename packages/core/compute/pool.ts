@@ -135,7 +135,7 @@ export class ComputePoolManager {
     // Create a new compute in the pool. The pool stores a legacy provider
     // string; map it to a (kind, isolation) pair here. Pool schema migration
     // to two-axis is filed separately; the mapping is a 1:1 carry-over of
-    // the (now-deleted) `pairToProvider` table.
+    // the historical adapter table.
     const idx = poolComputes.length + 1;
     const computeName = `${poolName}-${idx}`;
     const axes = legacyProviderNameToAxes(pool.provider);

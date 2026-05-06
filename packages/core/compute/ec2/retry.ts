@@ -1,8 +1,11 @@
 /**
- * Shared async utilities for the compute layer.
+ * Async retry / poll / sleep helpers used by the EC2 compute path.
  *
- * retry() and poll() delegate to p-retry and p-wait-for respectively,
- * while preserving the same call-site interface.
+ * `retry()` and `poll()` delegate to p-retry and p-wait-for respectively,
+ * preserving a single call-site interface across SSM connect retries,
+ * arkd `/health` poll, and instance-state polling. Lives next to the
+ * EC2 callers (`compute.ts`, `remote-setup.ts`) since no other compute
+ * impl needs them.
  */
 
 import pRetry from "p-retry";

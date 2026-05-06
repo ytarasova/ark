@@ -1,11 +1,9 @@
 /**
  * Typed config surface for `DockerIsolation`.
  *
- * Today's `LocalDockerProvider` reads the same keys off a loose
- * `Record<string, unknown>` bag on `compute.config`. Pulling them into a
- * named type keeps the Isolation call sites explicit and lets sibling
- * isolations (`DockerComposeIsolation`, `DevcontainerIsolation`) diverge
- * cleanly.
+ * Pulling the keys off `compute.config` into a named type keeps the
+ * Isolation call sites explicit and lets sibling isolations
+ * (`DockerComposeIsolation`, `DevcontainerIsolation`) diverge cleanly.
  */
 
 import type { BootstrapOpts } from "./docker-helpers.js";

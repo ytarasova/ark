@@ -1,60 +1,20 @@
 /**
- * Compute layer - public API.
+ * Compute layer -- public API.
  *
- * The provider registry lives on AppContext. The `app()`-bound delegates
- * below are kept thin so call sites that haven't been migrated to direct
- * AppContext access still resolve. Task 5 deletes these proxies along
- * with the legacy `ComputeProvider` interface entirely.
+ * The new-world surface: the `Compute` + `Isolation` two-axis abstraction
+ * (composed via `ComputeTarget`), the concrete impls (Local / EC2 / K8s /
+ * Kata / Firecracker x Direct / Docker / Devcontainer / DockerCompose),
+ * snapshot persistence, the warm pool, port discovery, and a couple of
+ * shared helpers. See `docs/architecture.md`.
+ *
+ * The legacy `ComputeProvider` interface is intentionally NOT re-exported
+ * from here -- the two executors (`claude-agent.ts`, `claude-code.ts`)
+ * and the server handlers that still consult `app.getProvider(name)`
+ * import it directly from `./legacy-provider.js` (deferred sweeps
+ * tracked in #527, #528).
  */
 
-import type { ComputeProvider } from "./legacy-provider.js";
-import type { AppContext } from "../app.js";
-
-// Legacy provider interface -- on its way out. Two executors
-// (`claude-agent.ts`, `claude-code.ts`) and a handful of server handlers
-// still consult `app.getProvider(name)`; the interface stays alive until
-// those are swept (#516, #517).
-export type {
-  ComputeProvider,
-  IsolationMode,
-  ProvisionOpts as LegacyProvisionOpts,
-  LaunchOpts as LegacyLaunchOpts,
-  SyncOpts,
-} from "./legacy-provider.js";
-
-// ── Provider registry (delegates to AppContext) ─────────────────────────────
-
-let _app: AppContext | null = null;
-
-/** Set the AppContext used by the compute registry. Called from AppContext.boot(). */
-export function setComputeApp(app: AppContext): void {
-  _app = app;
-}
-
-function app(): AppContext {
-  if (!_app) throw new Error("Compute registry not initialized -- call setComputeApp() first");
-  return _app;
-}
-
-export function registerProvider(provider: ComputeProvider): void {
-  app().registerProvider(provider);
-}
-
-export function getProvider(name: string): ComputeProvider | null {
-  return app().getProvider(name);
-}
-
-export function listProviders(): string[] {
-  return app().listProviders();
-}
-
-export function clearProviders(): void {
-  // noop -- AppContext owns the registry
-}
-
 // ── Compute + Isolation split ──────────────────────────────────────────────
-//
-// Primary abstractions. See `docs/architecture.md`.
 
 export type {
   Compute,
@@ -77,17 +37,14 @@ export type {
 } from "./types.js";
 export { NotSupportedError } from "./types.js";
 
+// ── Computes ───────────────────────────────────────────────────────────────
+
 export { LocalCompute } from "./local.js";
 export { EC2Compute } from "./ec2/compute.js";
 export type { EC2HandleMeta, EC2ProvisionConfig, EC2ComputeHelpers } from "./ec2/compute.js";
 export { K8sCompute } from "./k8s.js";
 export type { K8sComputeConfig, K8sHandleMeta, K8sComputeDeps } from "./k8s.js";
 export { KataCompute, DEFAULT_KATA_RUNTIME_CLASS } from "./k8s-kata.js";
-export { DirectIsolation } from "./isolation/direct.js";
-export { DockerIsolation } from "./isolation/docker.js";
-export { DevcontainerIsolation } from "./isolation/devcontainer.js";
-export { DockerComposeIsolation } from "./isolation/docker-compose.js";
-export { ComputeTarget } from "./compute-target.js";
 
 // FirecrackerCompute. Re-export from the firecracker barrel so consumers
 // don't have to reach into the subtree. The sibling barrel
@@ -95,6 +52,18 @@ export { ComputeTarget } from "./compute-target.js";
 // network helpers for the pool layer.
 export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./firecracker/compute.js";
 export type { FirecrackerComputeDeps, FirecrackerMeta } from "./firecracker/compute.js";
+
+// ── Isolations ─────────────────────────────────────────────────────────────
+
+export { DirectIsolation } from "./isolation/direct.js";
+export { DockerIsolation } from "./isolation/docker.js";
+export { DevcontainerIsolation } from "./isolation/devcontainer.js";
+export { DockerComposeIsolation } from "./isolation/docker-compose.js";
+export type { DockerIsolationConfig } from "./isolation/docker-config.js";
+
+// ── Composer ───────────────────────────────────────────────────────────────
+
+export { ComputeTarget } from "./compute-target.js";
 
 // ── Snapshot persistence ───────────────────────────────────────────────────
 
@@ -107,3 +76,14 @@ export { FsSnapshotStore } from "./snapshot-store-fs.js";
 export type { ComputePool, PoolConfig, PoolStats } from "./warm-pool/types.js";
 export { defaultPoolConfig } from "./warm-pool/types.js";
 export { LocalFirecrackerPool } from "./warm-pool/local-firecracker-pool.js";
+
+// ── Port discovery ─────────────────────────────────────────────────────────
+
+export { discoverWorkspacePorts, type PortDecl } from "./isolation/ports.js";
+export { discoverDevcontainerPorts } from "./isolation/devcontainer.js";
+export { discoverComposePorts, findComposeFile } from "./isolation/docker-compose.js";
+
+// ── Shared helpers ─────────────────────────────────────────────────────────
+
+export { cloneWorkspaceViaArkd } from "./workspace-clone.js";
+export { attachComputeMethods, buildAgentHandle } from "./handle-helpers.js";

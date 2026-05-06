@@ -4,14 +4,8 @@
  * Every Compute kind whose worktree lives away from the conductor's
  * filesystem (EC2, k8s, firecracker, kata) needs the same two arkd ops to
  * set up a per-session worktree: mkdir the parent, then git clone into the
- * leaf. Factor the body here so a future change (idempotency probe,
- * shallow-clone flags, alternative git transport) lands in one place.
- *
- * The legacy path lives in `RemoteWorktreeProvider.launch`
- * (`packages/compute/providers/remote-arkd.ts`); the call shape mirrored
- * here is identical -- same argv, same timeouts, same parent-directory
- * derivation. Task 7 of the dispatch-flip plan retires that path; until
- * then both run side-by-side.
+ * leaf. Factored here so a future change (idempotency probe, shallow-clone
+ * flags, alternative git transport) lands in one place.
  */
 
 import { ArkdClient } from "../../arkd/client/index.js";
@@ -39,8 +33,7 @@ export interface RemoteCloneOpts {
  * impl re-uses the path across dispatches, add a `git status` probe
  * here.
  *
- * Timeouts mirror the legacy `RemoteWorktreeProvider.launch` body
- * verbatim: 15s for mkdir, 120s for clone. Bumping clone past 120s
+ * Timeouts: 15s for mkdir, 120s for clone. Bumping clone past 120s
  * has historically masked broken-network sessions; lowering it
  * regresses sessions cloning large repos over slow links.
  */

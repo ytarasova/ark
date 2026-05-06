@@ -1,7 +1,7 @@
 /**
  * DirectIsolation -- launches the agent directly via arkd, no further
- * container / devcontainer / compose wrapper. This is the semantic equivalent
- * of today's `LocalWorktreeProvider.launch` path.
+ * container / devcontainer / compose wrapper. The "no isolation" branch
+ * of the (Compute, Isolation) matrix.
  *
  * `prepare` and `shutdown` are no-ops: the host is already set up (arkd is
  * running, tmux exists) and there's nothing to tear down between agents.

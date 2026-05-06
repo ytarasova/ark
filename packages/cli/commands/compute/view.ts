@@ -4,7 +4,6 @@ import { join, dirname } from "path";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { execFileSync } from "child_process";
-import { getProvider } from "../../../core/compute/index.js";
 import { getArkClient } from "../../app-client.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
 
@@ -68,30 +67,24 @@ export function registerViewCommands(computeCmd: Command) {
     .option("--direction <dir>", "Sync direction (push|pull)", "push")
     .action(async (name, opts) => {
       const ark = await getArkClient();
-      let compute: any;
       try {
-        compute = await ark.computeRead(name);
+        await ark.computeRead(name);
       } catch {
         console.log(chalk.red(`Compute '${name}' not found`));
         return;
       }
-      // `syncEnvironment` lives on the legacy ComputeProvider registry and
+      // `syncEnvironment` lived on the legacy ComputeProvider registry and
       // its only real impl (EC2 ssh push/pull) was deleted in Task 4 of the
       // compute cleanup. Kept as a stub here so the help text still lists
       // the command; rewiring onto a typed-secret placement / arkd RPC
       // path is filed as a follow-up.
-      const provider = getProvider(compute.compute_kind);
-      if (!provider) {
-        console.log(chalk.red(`Compute kind '${compute.compute_kind}' not registered`));
-        return;
-      }
-      try {
-        console.log(chalk.dim(`Syncing (${opts.direction}) to '${name}'...`));
-        await provider.syncEnvironment(compute, { direction: opts.direction });
-        console.log(chalk.green(`Sync complete (${opts.direction})`));
-      } catch (e: any) {
-        console.log(chalk.red(`Sync failed: ${e.message}`));
-      }
+      console.log(
+        chalk.yellow(
+          `'compute sync' (direction=${opts.direction}) is not wired in this build -- ` +
+            `the legacy provider impl was removed and the typed-secret placement ` +
+            `replacement has not landed yet.`,
+        ),
+      );
     });
 
   computeCmd

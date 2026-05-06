@@ -2,7 +2,7 @@
  * Migration 012 -- rename `compute.runtime_kind` to `compute.isolation_kind`.
  *
  * The column was originally named `runtime_kind` after the `Runtime` interface
- * in packages/compute/core/types.ts. That collided in code with the agent-
+ * in packages/core/compute/types.ts. That collided in code with the agent-
  * runtime concept (claude-code / codex / gemini / goose) one layer up; the
  * compute-side abstraction was renamed `Isolation` for clarity. This
  * migration aligns the column name with the new TS contract so the storage

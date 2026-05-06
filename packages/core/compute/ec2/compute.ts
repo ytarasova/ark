@@ -241,7 +241,7 @@ async function defaultStartInstance(opts: {
 }): Promise<{ publicIp: string | null; privateIp: string | null }> {
   const { EC2Client, StartInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
   const { awsCredentialsForProfile } = await import("./aws-creds.js");
-  const { poll } = await import("../util.js");
+  const { poll } = await import("./retry.js");
   const client = new EC2Client({
     region: opts.region,
     credentials: awsCredentialsForProfile({ profile: opts.awsProfile }),
@@ -333,7 +333,7 @@ const DEFAULT_HELPERS: EC2ComputeHelpers = {
   }) as EC2ComputeHelpers["allocatePort"],
   fetchHealth: defaultFetchHealth,
   poll: (async (check, opts) => {
-    const { poll } = await import("../util.js");
+    const { poll } = await import("./retry.js");
     return poll(check, opts);
   }) as EC2ComputeHelpers["poll"],
 };
@@ -824,8 +824,7 @@ export class EC2Compute implements Compute {
   // ── resolveWorkdir ───────────────────────────────────────────────────────
   //
   // Translate the conductor-side workdir path to where the cloned worktree
-  // lives on the remote host. Pure transform; no I/O. Mirrors the legacy
-  // `RemoteWorktreeProvider.resolveWorkdir` shape:
+  // lives on the remote host. Pure transform; no I/O. Layout:
   //   `${REMOTE_HOME}/Projects/<sessionId>/<repoBasename>`
   // The path is session-scoped so concurrent / sequential sessions on the
   // same compute don't collide. We prefer `session.config.remoteRepo` (the
@@ -835,8 +834,8 @@ export class EC2Compute implements Compute {
   //
   // `remoteHome` is read off `handle.meta.ec2` for forward-compat with
   // custom AMIs that ship a different default user; today the EC2 provision
-  // path doesn't write the field, so the fallback `/home/ubuntu` matches
-  // the legacy `REMOTE_USER` constant.
+  // path doesn't write the field, so the fallback `/home/ubuntu` (the
+  // `REMOTE_HOME` constant) matches the standard Ubuntu AMI.
 
   resolveWorkdir(h: ComputeHandle, session: Session): string | null {
     const cloneSource = (session.config as { remoteRepo?: string } | null | undefined)?.remoteRepo ?? session.repo;
@@ -861,7 +860,7 @@ export class EC2Compute implements Compute {
   // the dispatcher computes both upstream from session config and the
   // bare-worktree path is meaningful (no clone, agent runs against an
   // empty workdir; misconfig surfaces at the agent stage rather than
-  // here). Mirror the legacy `RemoteWorktreeProvider.launch` body.
+  // here).
   //
   // Ordering invariant: `ensureReachable` must have run on `h` before
   // this call so `getArkdUrl(h)` resolves to the live local-forward

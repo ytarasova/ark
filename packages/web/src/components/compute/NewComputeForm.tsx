@@ -104,10 +104,9 @@ export function NewComputeForm({
   // Keep templateConfig in a ref-style state via watch / setValue -- we
   // stash the chosen template's config object and hand it over on submit.
   // The template dropdown drives (compute, isolation) + config together.
-  // The server attaches `compute` + `isolation` to every template row (derived
-  // from the legacy `provider` via the canonical `providerToPair` table in
-  // packages/compute/adapters/provider-map.ts), so the web bundle no longer
-  // needs its own copy of that mapping.
+  // The server attaches `compute` + `isolation` to every template row, so
+  // the web bundle no longer needs its own copy of the legacy
+  // provider-to-axes mapping.
   useEffect(() => {
     if (!selectedTemplate) return;
     const tmpl = (templates as any[]).find((t) => t.name === selectedTemplate);
