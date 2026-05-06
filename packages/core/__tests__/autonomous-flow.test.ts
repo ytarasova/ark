@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { startConductor } from "../conductor/server/conductor.js";
+import { allocatePort } from "../config/port-allocator.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 
@@ -118,13 +119,13 @@ describe("applyHookStatus SessionEnd auto-gate fallback", async () => {
 
 // ── Integration test via conductor HTTP ─────────────────────────────────────
 
-const TEST_PORT = 19197;
-
 describe("autonomous flow via conductor", async () => {
   let server: { stop(): void };
+  let port: number;
 
-  beforeEach(() => {
-    server = startConductor(getApp(), TEST_PORT, { quiet: true });
+  beforeEach(async () => {
+    port = await allocatePort();
+    server = startConductor(getApp(), port, { quiet: true });
   });
 
   afterEach(() => {
@@ -136,7 +137,7 @@ describe("autonomous flow via conductor", async () => {
   });
 
   async function postHook(sessionId: string, payload: Record<string, unknown>): Promise<Response> {
-    return fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${sessionId}`, {
+    return fetch(`http://localhost:${port}/hooks/status?session=${sessionId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
