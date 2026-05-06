@@ -21,6 +21,10 @@ import type { ModelDefinition, ModelPricing } from "../../types/model.js";
  * model decides.
  */
 function transportKey(compat: readonly string[] | undefined): string {
+  // ARK_DEV_FORCE_DIRECT pairs with the matching gates in resolve-stage.ts
+  // and executors/claude-agent.ts so the laptop hosted-mode loop talks direct
+  // to api.anthropic.com instead of the TrueFoundry/Bedrock proxy.
+  if (process.env.ARK_DEV_FORCE_DIRECT === "1") return "anthropic-direct";
   const c = compat ?? [];
   if (c.includes("bedrock")) return "tf-bedrock";
   return "anthropic-direct";
