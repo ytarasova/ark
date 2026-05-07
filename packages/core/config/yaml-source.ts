@@ -57,7 +57,7 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
   const ports = chunk.ports;
   if (isObj(ports)) {
     // ports.conductor is the merged conductor+server port.
-    // ports.server is a legacy YAML alias -- A3 will remove it from docs.
+    // ports.server is a legacy YAML alias -- A4 will remove it from docs.
     const c = pickInt(ports.conductor) ?? pickInt(ports.server);
     if (c !== undefined) out.ports.conductor = c;
     const a = pickInt(ports.arkd);

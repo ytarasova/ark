@@ -85,7 +85,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
 
   // Ports
   // ARK_CONDUCTOR_PORT sets the merged conductor port (was 19100, now 19400).
-  // ARK_SERVER_PORT is a legacy alias for the same port -- A3 will remove it.
+  // ARK_SERVER_PORT is a legacy alias for the same port -- A4 will remove it.
   const conductor =
     parseIntStrict(env.ARK_CONDUCTOR_PORT, "ARK_CONDUCTOR_PORT") ??
     parseIntStrict(env.ARK_SERVER_PORT, "ARK_SERVER_PORT");
