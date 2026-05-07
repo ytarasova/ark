@@ -500,7 +500,9 @@ export async function createWorktreePR(
       //     mid-flow and the original `--force` push already handled that.
       //   - the branch already carries our session-suffix from an earlier
       //     rename in this same session (avoid runaway suffix stacking).
-      const sessionSuffix = `-s-${sessionId.slice(0, 8)}`;
+      // Session ids carry an `s-` prefix, so the suffix is just `-<sid8>`
+      // -- e.g. session `s-e4xgs0muza` produces `-s-e4xgs0`, not `-s-s-e4xgs0`.
+      const sessionSuffix = `-${sessionId.slice(0, 8)}`;
       const isAlreadyRenamed = branch.endsWith(sessionSuffix);
       const looksLikeNonFastForward = /non-fast-forward|\[rejected\]|failed to push some refs/i.test(reason);
       if (looksLikeNonFastForward && !isSessionOwnedBranch && !isAlreadyRenamed) {

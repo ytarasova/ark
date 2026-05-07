@@ -7,7 +7,8 @@
  * dispatch / manual setup, and the push is rejected non-fast-forward.
  *
  * The fix: detect the rejection, rename the local branch to
- * `<branch>-s-<sid8>`, retry the push once. The session's branch field is
+ * `<branch>-<sid8>` (session ids already carry the `s-` prefix), retry the
+ * push once. The session's branch field is
  * updated and a `branch_renamed_on_conflict` event is emitted so the
  * operator can see why the PR landed under a renamed ref.
  *
@@ -103,7 +104,7 @@ function carveSessionWorktree(work: string, sessionId: string, branch: string, m
 }
 
 describe("createWorktreePR -- branch rename on non-fast-forward", () => {
-  it("renames to <branch>-s-<sid8> and retries push when origin has divergent history", async () => {
+  it("renames to <branch>-<sid8> and retries push when origin has divergent history", async () => {
     const branch = "feat/foo";
     const { work } = setupDivergentOrigin("rename01", branch);
 
@@ -117,7 +118,7 @@ describe("createWorktreePR -- branch rename on non-fast-forward", () => {
     // GitHub host in this unit test):
     //   1. session.branch was updated to the suffixed name
     //   2. branch_renamed_on_conflict event was logged
-    const expectedSuffix = `-s-${session.id.slice(0, 8)}`;
+    const expectedSuffix = `-${session.id.slice(0, 8)}`;
     const after = await app.sessions.get(session.id);
     expect(after?.branch).toBe(`${branch}${expectedSuffix}`);
 
@@ -152,7 +153,7 @@ describe("createWorktreePR -- branch rename on non-fast-forward", () => {
     // Pre-create the session so we know the suffix we need to seed upstream with.
     const provisionalSession = await app.sessions.create({ summary: "rename02-provisional" });
     const sessionId = provisionalSession.id;
-    const suffixedBranch = `feat/foo-s-${sessionId.slice(0, 8)}`;
+    const suffixedBranch = `feat/foo-${sessionId.slice(0, 8)}`;
 
     const { work, origin } = setupDivergentOrigin("rename02", suffixedBranch);
 
