@@ -55,6 +55,10 @@ import { registerClusterHandlers } from "./handlers/clusters.js";
 // --- BEGIN task-B1: worker registry ---
 import { registerWorkerHandlers } from "./handlers/worker.js";
 // --- END task-B1 ---
+// --- BEGIN task-B4-B6: channel/deliver, channel/relay, hook/forward ---
+import { registerChannelHandlers } from "./handlers/channel.js";
+import { registerHookHandlers } from "./handlers/hook.js";
+// --- END task-B4-B6 ---
 
 /**
  * Register every shared handler, then conditionally mount local-only handlers
@@ -120,6 +124,11 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   // --- BEGIN task-B1: worker registry ---
   registerWorkerHandlers(router, app);
   // --- END task-B1 ---
+
+  // --- BEGIN task-B4-B6: channel/deliver, channel/relay, hook/forward ---
+  registerChannelHandlers(router, app);
+  registerHookHandlers(router, app);
+  // --- END task-B4-B6 ---
 }
 
 /**

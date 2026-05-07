@@ -11,9 +11,14 @@
  * The handler also evaluates guardrails on `PreToolUse` events and runs
  * the on-failure retry + terminal-cleanup side-effects for hook-driven
  * status transitions.
+ *
+ * `processHookPayload` contains the transport-agnostic core. It is called
+ * by both the REST handler below and the `hook/forward` JSON-RPC handler in
+ * `packages/server/handlers/hook.ts`.
  */
 
 import type { AppContext } from "../../app.js";
+import type { Session } from "../../../types/index.js";
 import { appForRequest } from "./tenant.js";
 import type { OutboundMessage } from "../common/channel-types.js";
 import { handleReport } from "./report-pipeline.js";
@@ -21,17 +26,27 @@ import { eventBus } from "../../hooks.js";
 import { logDebug, logError, logInfo, logWarn } from "../../observability/structured-log.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../../observability/otlp.js";
 
-export async function handleHookStatus(app: AppContext, req: Request, url: URL): Promise<Response> {
-  const sessionId = url.searchParams.get("session");
-  if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
+/** Result shape returned by `processHookPayload`. */
+export interface HookProcessResult {
+  mapped: string;
+  guardrail?: string;
+}
 
-  const resolved = await appForRequest(app, req);
-  if (resolved.ok === false) return resolved.response;
-  const scoped = resolved.app;
-  const s = await scoped.sessions.get(sessionId);
-  if (!s) return Response.json({ error: "session not found" }, { status: 404 });
-
-  const payload = (await req.json()) as Record<string, unknown>;
+/**
+ * Transport-agnostic hook payload processor.
+ *
+ * Caller is responsible for looking up the session and resolving tenant scope
+ * before calling this function. The session (`s`) must belong to `scoped`.
+ *
+ * Both the REST endpoint (`handleHookStatus`) and the JSON-RPC handler
+ * (`hook/forward`) delegate here after resolving their respective transports.
+ */
+export async function processHookPayload(
+  scoped: AppContext,
+  sessionId: string,
+  s: Session,
+  payload: Record<string, unknown>,
+): Promise<HookProcessResult> {
   const event = String(payload.hook_event_name ?? "");
 
   // Channel-report passthrough: the agent-sdk `ask_user` MCP (and any future
@@ -54,14 +69,14 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
         ...(payload.source ? { source: payload.source } : {}),
       } as unknown as OutboundMessage;
       await handleReport(scoped, sessionId, report);
-      return Response.json({ status: "ok", mapped: reportType });
+      return { mapped: reportType };
     }
   }
 
   // Guard: ignore stale hook events from a previous stage's agent session.
   const hookAgentId = payload.session_id as string | undefined;
   if (hookAgentId && s.claude_session_id && hookAgentId !== s.claude_session_id) {
-    return Response.json({ status: "ok", mapped: "ignored_stale" });
+    return { mapped: "ignored_stale" };
   }
 
   // Each runtime stamps the stage it was provisioned for onto every hook.
@@ -86,7 +101,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
         ...(payload.thinking ? { thinking: true } : {}),
       },
     });
-    return Response.json({ status: "ok", mapped: "agent_message" });
+    return { mapped: "agent_message" };
   }
 
   // Guardrail evaluation for PreToolUse events
@@ -141,7 +156,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
       data: { event, ...payload },
     });
 
-    return Response.json({ status: "ok", guardrail: evalResult.action });
+    return { mapped: "ok", guardrail: evalResult.action };
   }
 
   // Delegate business logic to session.ts
@@ -175,7 +190,7 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
       scoped.dispatchService.dispatch(sessionId).catch((err) => {
         logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
       });
-      return Response.json({ status: "ok", mapped: "retry" });
+      return { mapped: "retry" };
     }
     logWarn("conductor", `on_failure retry (hook) exhausted for ${sessionId}: ${retryResult.message}`);
   }
@@ -225,5 +240,24 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
     }
   }
 
-  return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
+  return { mapped: result.newStatus ?? "no-op" };
+}
+
+export async function handleHookStatus(app: AppContext, req: Request, url: URL): Promise<Response> {
+  const sessionId = url.searchParams.get("session");
+  if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
+
+  const resolved = await appForRequest(app, req);
+  if (resolved.ok === false) return resolved.response;
+  const scoped = resolved.app;
+  const s = await scoped.sessions.get(sessionId);
+  if (!s) return Response.json({ error: "session not found" }, { status: 404 });
+
+  const payload = (await req.json()) as Record<string, unknown>;
+  const hookResult = await processHookPayload(scoped, sessionId, s, payload);
+
+  if (hookResult.guardrail !== undefined) {
+    return Response.json({ status: "ok", guardrail: hookResult.guardrail });
+  }
+  return Response.json({ status: "ok", mapped: hookResult.mapped });
 }
