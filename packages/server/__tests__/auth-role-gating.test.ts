@@ -59,7 +59,7 @@ describe("worker role", () => {
     const err = (res as JsonRpcError).error;
     expect(err).toBeDefined();
     expect(err.code).toBe(ErrorCodes.FORBIDDEN);
-    expect(err.message).toBe("forbidden");
+    expect(err.message).toMatch(/not allowed|requires.*role/i);
   });
 
   it("is blocked from admin/apikey/list with FORBIDDEN", async () => {

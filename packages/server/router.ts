@@ -50,6 +50,17 @@ function methodAllowedForRole(method: string, role: TenantRole): boolean {
   return role !== "worker";
 }
 
+/** Build a role-gating error message that names the method and required role. */
+function forbiddenMessage(method: string): string {
+  if (method.startsWith("worker/")) {
+    return `${method} requires worker or admin role`;
+  }
+  if (method.startsWith("admin/")) {
+    return `${method} requires admin role`;
+  }
+  return `${method} is not allowed for this role`;
+}
+
 export type NotifyFn = (method: string, params?: Record<string, unknown>) => void;
 
 /**
@@ -189,7 +200,7 @@ export class Router {
       // are limited to worker/* only; user-tier roles cannot call worker/* or
       // admin/* methods.
       if (!methodAllowedForRole(req.method, effectiveCtx.role)) {
-        return createErrorResponse(req.id, ErrorCodes.FORBIDDEN, "forbidden");
+        return createErrorResponse(req.id, ErrorCodes.FORBIDDEN, forbiddenMessage(req.method));
       }
 
       const result = await handler(params, notify ?? noop, effectiveCtx, subscription);

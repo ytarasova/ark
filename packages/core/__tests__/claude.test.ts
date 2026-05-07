@@ -21,6 +21,7 @@ import {
   type ClaudeArgsOpts,
   type LauncherOpts,
 } from "../claude/claude.js";
+import { DEFAULT_CONDUCTOR_PORT } from "../constants.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 
@@ -223,7 +224,7 @@ describe("writeChannelConfig", () => {
 
     const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
     const channelConfig = content.mcpServers["ark-channel"];
-    expect(channelConfig.env.ARK_CONDUCTOR_URL).toBe("http://localhost:19100");
+    expect(channelConfig.env.ARK_CONDUCTOR_URL).toBe(`http://localhost:${DEFAULT_CONDUCTOR_PORT}`);
   });
 
   it("passes custom conductor URL to channelMcpConfig", () => {
@@ -233,9 +234,9 @@ describe("writeChannelConfig", () => {
     expect((config.env as Record<string, string>).ARK_CONDUCTOR_URL).toBe("http://host.docker.internal:19100");
   });
 
-  it("channelMcpConfig defaults conductor URL to localhost:19100", () => {
+  it("channelMcpConfig defaults conductor URL to the merged conductor port on localhost", () => {
     const config = channelMcpConfig("s-abc123", "work", 19300);
-    expect((config.env as Record<string, string>).ARK_CONDUCTOR_URL).toBe("http://localhost:19100");
+    expect((config.env as Record<string, string>).ARK_CONDUCTOR_URL).toBe(`http://localhost:${DEFAULT_CONDUCTOR_PORT}`);
   });
 
   it("preserves existing .mcp.json content", () => {
