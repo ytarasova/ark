@@ -12,14 +12,15 @@ import { recordingPath } from "../recordings.js";
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude/claude.js";
 import * as tmux from "../infra/tmux.js";
-import { parseArcJson } from "../../compute/arc-json.js";
+import { discoverWorkspacePorts } from "../compute/isolation/ports.js";
+import { hasDevcontainerConfig } from "../compute/isolation/devcontainer.js";
 import { logWarn } from "../observability/structured-log.js";
 
 /**
  * Default home directory on EC2 / k8s remote hosts. Used as the
  * remote-safe fallback for `launcherWorkdir` when a remote dispatch has
  * no clone source (bare worktree dispatch). Hard-coded to mirror
- * `packages/compute/providers/ec2/constants.ts:REMOTE_HOME` -- duplicated
+ * `packages/core/compute/ec2/constants.ts:REMOTE_HOME` -- duplicated
  * here so this executor module avoids a cross-package import on the
  * compute layer.
  */
@@ -74,7 +75,7 @@ export function resolveRemoteWorkdirs(opts: {
 
 /**
  * Audit finding F6 guard. Remote dispatch must receive an explicit
- * `channelConfig` from the provider (e.g. RemoteWorktreeProvider's
+ * `channelConfig` from the provider (the EC2 provider's
  * `buildChannelConfig` returns `${REMOTE_HOME}/.ark/bin/ark channel` --
  * the binary path on the agent's host). When `channelConfig` is null /
  * undefined / empty, `buildChannelConfig` in mcp-config.ts falls back to
@@ -97,8 +98,8 @@ export function assertRemoteChannelConfig(
     return (
       `channel config required for remote dispatch but provider '${providerName ?? "<unknown>"}' ` +
       `returned no channelConfig. The conductor's process.execPath would be embedded in .mcp.json, ` +
-      `which doesn't exist on the remote host. Fix: provider.buildChannelConfig must return a non-null ` +
-      `record (see RemoteWorktreeProvider.buildChannelConfig for the canonical shape).`
+      `which doesn't exist on the remote host. Fix: the provider's buildChannelConfig must return a ` +
+      `non-null record describing the agent-host binary location.`
     );
   }
   return null;
@@ -118,15 +119,29 @@ export const claudeCodeExecutor: Executor = {
     const tmuxName = `ark-${session.id}`;
     const stage = opts.stage ?? "work";
 
-    // Resolve compute + provider via the polymorphic AppContext helper so
+    // Resolve compute target via the polymorphic AppContext helper so
     // hosted sessions without an explicit `compute_name` resolve to null
     // (caller surfaces "no compute resolved") rather than silently
-    // defaulting to LocalProvider.
-    const { provider, compute } = await app.resolveProvider(session);
+    // defaulting to LocalCompute.
+    const { target, compute } = await app.resolveComputeTarget(session);
+
+    // Synthesize a preview compute handle for path-resolution lookups
+    // before the dispatcher's `runTargetLifecycle` builds the canonical
+    // one. The lifecycle re-runs `attachExistingHandle` itself; we only
+    // need the handle here so `compute.resolveWorkdir(handle, session)`
+    // and `compute.buildLaunchEnv` can read off `handle.meta`.
+    const previewHandle =
+      target && compute
+        ? (target.compute.attachExistingHandle?.({
+            name: compute.name,
+            status: compute.status,
+            config: (compute.config ?? {}) as Record<string, unknown>,
+          }) ?? null)
+        : null;
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
-    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, log);
 
     // Determine conductor URL based on compute type. Default + remote both
     // use `http://localhost:<port>` -- for remote that resolves on the EC2
@@ -135,15 +150,19 @@ export const claudeCodeExecutor: Executor = {
     // app.config so a non-default `--conductor-port` is reflected in the
     // baked-in URL (DEFAULT_CONDUCTOR_URL is hardcoded to 19100 and would
     // mismatch if the user moved the conductor).
-    const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
-    const usesDevcontainer = arcJson?.devcontainer ?? false;
+    //
+    // Devcontainer auto-detection: if the workspace declares a
+    // `.devcontainer/devcontainer.json` (root or `.devcontainer/`), the
+    // conductor URL must rewire to `host.docker.internal` so the agent
+    // running inside the container can reach the host.
+    const usesDevcontainer = !!effectiveWorkdir && hasDevcontainerConfig(effectiveWorkdir);
     const { DOCKER_CONDUCTOR_URL } = await import("../constants.js");
     const localConductorUrl = `http://localhost:${app.config.ports.conductor}`;
     const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : localConductorUrl;
 
     // Channel config + launcher
     const channelPort = app.sessions.channelPort(session.id);
-    const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
+    const channelConfig = target?.compute.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
     // Inject tenant id into the channel process env so outbound relay/report
     // requests carry X-Ark-Tenant-Id for multi-tenant scoping in the conductor.
     if (channelConfig && typeof channelConfig === "object") {
@@ -167,7 +186,9 @@ export const claudeCodeExecutor: Executor = {
     const runtimeMcpServers = collectMcpEntries(app, session, { runtimeName, flowConnectors });
     const { resolveMcpConfigsDir } = await import("../install-paths.js");
 
-    const isRemote = !!(compute && provider && !provider.supportsWorktree);
+    // Capability lives on Compute now; the registered impl for this row's
+    // compute_kind is the source of truth (already resolved via target).
+    const isRemote = !!(compute && target && !target.compute.capabilities.supportsWorktree);
 
     // For remote dispatch the launcher must `cd` into the workdir on the
     // REMOTE host -- not the conductor's local Mac path. Providers that
@@ -188,7 +209,9 @@ export const claudeCodeExecutor: Executor = {
       isRemote,
       effectiveWorkdir,
       resolveWorkdir:
-        compute && provider?.resolveWorkdir ? () => provider.resolveWorkdir!(compute, session) : undefined,
+        previewHandle && target?.compute.resolveWorkdir
+          ? () => target.compute.resolveWorkdir!(previewHandle, session)
+          : undefined,
       onFallback: (reason) => log(`launcherWorkdir: ${reason}`),
     });
 
@@ -206,10 +229,10 @@ export const claudeCodeExecutor: Executor = {
 
     if (isRemote) {
       // Audit finding F6: REMOTE dispatch MUST receive an explicit
-      // `channelConfig` from the provider (see assertRemoteChannelConfig
+      // `channelConfig` from the compute (see assertRemoteChannelConfig
       // for the full rationale). Fail fast instead of producing a broken
       // `.mcp.json` that embeds the conductor's binary path.
-      const channelErr = assertRemoteChannelConfig(channelConfig, provider?.name);
+      const channelErr = assertRemoteChannelConfig(channelConfig, target?.compute.kind);
       if (channelErr) {
         log(`CRITICAL: ${channelErr}`);
         return { ok: false, handle: "", message: channelErr };
@@ -311,7 +334,7 @@ export const claudeCodeExecutor: Executor = {
     const sessionDirEnv = isRemote ? `/tmp/ark-session-${session.id}` : localSessionDir;
     const launchEnv: Record<string, string> = {
       ...(opts.agent.env ?? {}),
-      ...(provider?.buildLaunchEnv(session) ?? {}),
+      ...(target?.compute.buildLaunchEnv?.(session) ?? {}),
       ...buildRouterEnv(app.config, { mode: "claude" }),
       // `opts.env` carries secrets resolved by dispatch; they override
       // every other env source so operator-rotated values take effect
@@ -372,13 +395,12 @@ export const claudeCodeExecutor: Executor = {
     // optional on the compute (LocalCompute is a no-op for ensureReachable /
     // prepareWorkspace / flushPlacement); the helper skips any method the
     // impl omits.
-    if (compute && provider && !provider.supportsWorktree) {
+    if (compute && target && !target.compute.capabilities.supportsWorktree) {
       const { resolveTargetAndHandle } = await import("../services/dispatch/target-resolver.js");
       const { runTargetLifecycle } = await import("../services/dispatch/target-lifecycle.js");
-      const { resolvePortDecls } = await import("../../compute/arc-json.js");
 
-      const { target, handle } = await resolveTargetAndHandle(app, session);
-      if (!target || !handle) {
+      const { target: lifecycleTarget, handle } = await resolveTargetAndHandle(app, session);
+      if (!lifecycleTarget || !handle) {
         return { ok: false, handle: "", message: "no compute target resolved for remote dispatch" };
       }
 
@@ -399,12 +421,12 @@ export const claudeCodeExecutor: Executor = {
       const { runTarget: remoteWorkdir } = resolveRemoteWorkdirs({
         isRemote: true,
         effectiveWorkdir,
-        resolveWorkdir: target.compute.resolveWorkdir
-          ? () => target.compute.resolveWorkdir!(handle, session)
+        resolveWorkdir: lifecycleTarget.compute.resolveWorkdir
+          ? () => lifecycleTarget.compute.resolveWorkdir!(handle, session)
           : undefined,
         onFallback: (reason) => logWarn("session", `remote workdir fallback for session ${session.id}: ${reason}`),
       });
-      const ports = remoteWorkdir ? resolvePortDecls(remoteWorkdir) : [];
+      const ports = remoteWorkdir ? discoverWorkspacePorts(remoteWorkdir) : [];
       if (ports.length > 0) {
         await app.sessions.update(session.id, { config: { ...session.config, ports } });
       }
@@ -428,7 +450,7 @@ export const claudeCodeExecutor: Executor = {
       const agentHandle = await runTargetLifecycle(
         app,
         session.id,
-        target,
+        lifecycleTarget,
         handle,
         {
           tmuxName,

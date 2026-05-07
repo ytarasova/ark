@@ -3,10 +3,9 @@
  *
  * The dispatcher needs both a `ComputeTarget` (Compute × Isolation
  * composition) AND a `ComputeHandle` (per-instance state: EC2 instance
- * id, k8s pod name, container id, ...). The legacy `ComputeProvider`
- * threaded the `Compute` row directly; the new path threads a handle
- * so multi-stage dispatch can resume against the same provisioned
- * compute without re-provisioning every time.
+ * id, k8s pod name, container id, ...). Threading a handle (rather than
+ * just the compute row) lets multi-stage dispatch resume against the
+ * same provisioned compute without re-provisioning every time.
  *
  * Behaviour (precedence order):
  *
@@ -40,8 +39,8 @@
 
 import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/index.js";
-import type { ComputeHandle } from "../../../compute/core/types.js";
-import type { ComputeTarget } from "../../../compute/core/compute-target.js";
+import type { ComputeHandle } from "../../compute/types.js";
+import type { ComputeTarget } from "../../compute/compute-target.js";
 import { logInfo } from "../../observability/structured-log.js";
 import { provisionStep } from "../provisioning-steps.js";
 

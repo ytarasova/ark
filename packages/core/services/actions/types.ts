@@ -5,9 +5,8 @@
  * registry below; adding a new action means creating a new file and
  * registering it here -- no switch to edit.
  *
- * Design mirrors `packages/compute/flag-specs/` (the ProviderFlagSpec
- * registry). Action-layer adapters are NOT part of the core Compute/Runtime
- * interfaces; they operate on an AppContext + Session.
+ * Action-layer adapters are NOT part of the core Compute/Runtime interfaces;
+ * they operate on an AppContext + Session.
  */
 
 import type { AppContext } from "../../app.js";

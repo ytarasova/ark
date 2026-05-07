@@ -143,7 +143,7 @@ describe("flow/read", async () => {
 describe("compute/read", async () => {
   it("returns a compute target after creation", async () => {
     const name = `read-test-${Date.now()}`;
-    await router.dispatch(createRequest(1, "compute/create", { name, provider: "docker" }));
+    await router.dispatch(createRequest(1, "compute/create", { name, compute: "local", isolation: "docker" }));
 
     const res = await router.dispatch(createRequest(2, "compute/read", { name }));
     const result = ok(res);

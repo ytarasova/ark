@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
 import { pauseWithSnapshot, resumeFromSnapshot, resolveSessionCompute } from "../services/session-snapshot.js";
-import type { Compute, ComputeHandle, Snapshot } from "../../compute/core/types.js";
-import { NotSupportedError } from "../../compute/core/types.js";
-import { FsSnapshotStore } from "../../compute/core/snapshot-store-fs.js";
+import type { Compute, ComputeHandle, Snapshot } from "../compute/types.js";
+import { NotSupportedError } from "../compute/types.js";
+import { FsSnapshotStore } from "../compute/snapshot-store-fs.js";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -79,12 +79,15 @@ function makeNoSnapshotCompute(kind = "local" as const): Compute {
  * resolver now reads the DB column directly, so every test that sets a
  * `compute_name` must first persist a compute row with the right kind.
  */
-async function ensureComputeRow(name: string, provider: string, computeKind: string): Promise<void> {
+async function ensureComputeRow(name: string, _provider: string, computeKind: string): Promise<void> {
   if (await app.computes.get(name)) return;
+  // Two-axis create: pick a non-singleton isolation when the kind is local
+  // so the singleton guard doesn't trip on repeated test inserts.
+  const isolation = computeKind === "local" ? "docker" : "direct";
   await app.computeService.create({
     name,
-    provider,
     compute: computeKind as any,
+    isolation: isolation as any,
     config: {},
   });
 }
@@ -115,6 +118,7 @@ describe("pauseWithSnapshot", async () => {
 
   it("pauses a running session with snapshot-capable compute", async () => {
     const session = await app.sessions.create({ summary: "pause-ok" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -133,6 +137,7 @@ describe("pauseWithSnapshot", async () => {
 
   it("sets session status to blocked with breakpoint_reason", async () => {
     const session = await app.sessions.create({ summary: "pause-status" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -151,6 +156,7 @@ describe("pauseWithSnapshot", async () => {
 
   it("uses default reason when none provided", async () => {
     const session = await app.sessions.create({ summary: "pause-default-reason" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -168,6 +174,7 @@ describe("pauseWithSnapshot", async () => {
 
   it("stores last_snapshot_id in session config", async () => {
     const session = await app.sessions.create({ summary: "pause-config" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -200,6 +207,7 @@ describe("pauseWithSnapshot", async () => {
 
   it("persists snapshot bytes to the store", async () => {
     const session = await app.sessions.create({ summary: "pause-persist" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -226,6 +234,7 @@ describe("resumeFromSnapshot", async () => {
 
   it("returns ok: false when no snapshot is available", async () => {
     const session = await app.sessions.create({ summary: "resume-no-snap" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, { status: "blocked", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
@@ -237,6 +246,7 @@ describe("resumeFromSnapshot", async () => {
 
   it("resumes from the latest snapshot when snapshotId is omitted", async () => {
     const session = await app.sessions.create({ summary: "resume-latest" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -256,6 +266,7 @@ describe("resumeFromSnapshot", async () => {
 
   it("sets session status to ready after resume", async () => {
     const session = await app.sessions.create({ summary: "resume-status" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -277,6 +288,7 @@ describe("resumeFromSnapshot", async () => {
 
   it("resumes using explicit snapshotId", async () => {
     const session = await app.sessions.create({ summary: "resume-explicit" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -326,6 +338,7 @@ describe("resumeFromSnapshot", async () => {
 
   it("full pause/resume round-trip preserves session fields", async () => {
     const session = await app.sessions.create({ summary: "round-trip", repo: "/my/repo" });
+    app.registerCompute(makeSnapshotCapableCompute());
     await ensureComputeRow("firecracker-test", "firecracker", "firecracker");
     await app.sessions.update(session.id, {
       session_id: `ark-s-${session.id}`,
@@ -356,9 +369,9 @@ describe("resolveSessionCompute", async () => {
 
   it("reads compute_kind=firecracker from the compute row", async () => {
     const session = await app.sessions.create({ summary: "resolve-fc" });
+    app.registerCompute(makeSnapshotCapableCompute("firecracker"));
     await ensureComputeRow("firecracker-xl", "firecracker", "firecracker");
     await app.sessions.update(session.id, { compute_name: "firecracker-xl" });
-    app.registerCompute(makeSnapshotCapableCompute("firecracker"));
 
     const result = await resolveSessionCompute(app, session.id);
     expect(result).not.toBeNull();

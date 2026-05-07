@@ -49,6 +49,8 @@ const sampleSession = {
 const sampleCompute = {
   name: "local",
   provider: "local",
+  compute_kind: "local",
+  isolation_kind: "direct",
   status: "running",
   config: {},
   created_at: new Date().toISOString(),
@@ -200,8 +202,10 @@ const fixtures: Record<string, MethodFixture> = {
     },
   },
   "compute/create": {
-    validRequest: { name: "devbox", provider: "ec2" },
-    invalidRequest: { name: "devbox", provider: "mystery-cloud" },
+    validRequest: { name: "devbox", compute: "ec2", isolation: "direct" },
+    // Empty `name` is the canonical validation failure now that `provider`
+    // is just a string label (legacy single-axis enum is gone).
+    invalidRequest: { name: "" },
     sampleResponse: { compute: sampleCompute },
   },
   "compute/read": {

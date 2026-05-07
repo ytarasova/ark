@@ -13,7 +13,6 @@ import { execFile } from "child_process";
 
 import type { AppContext } from "../../app.js";
 import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../../compute/types.js";
 import * as claude from "../../claude/claude.js";
 import { loadRepoConfig } from "../../repo-config.js";
 import { logDebug, logError, logWarn } from "../../observability/structured-log.js";
@@ -55,7 +54,6 @@ export async function setupSessionWorktree(
   app: AppContext,
   session: Session,
   compute: Compute | null,
-  provider: ComputeProvider | undefined,
   onLog?: (msg: string) => void,
 ): Promise<string> {
   const log = onLog ?? (() => {});
@@ -79,10 +77,16 @@ export async function setupSessionWorktree(
 
   let effectiveWorkdir = repoSource;
 
-  // Create git worktree unless provider doesn't support it or session config explicitly disables it.
-  // We worktree when repoSource is a real git repo -- even if it resolves to the current cwd
-  // (that is precisely when isolation matters most for the self-dogfood loop).
-  const wantWorktree = provider?.supportsWorktree === true && session.config?.worktree !== false;
+  // Create git worktree unless the registered Compute doesn't support it
+  // or session config explicitly disables it. We worktree when repoSource
+  // is a real git repo -- even if it resolves to the current cwd (that is
+  // precisely when isolation matters most for the self-dogfood loop).
+  //
+  // Capability lives on `Compute.capabilities.supportsWorktree` now; we
+  // read off the registered Compute keyed by the row's `compute_kind`.
+  const computeImpl = compute ? app.getCompute(compute.compute_kind) : app.getCompute("local");
+  const supportsWorktree = computeImpl?.capabilities.supportsWorktree === true;
+  const wantWorktree = supportsWorktree && session.config?.worktree !== false;
   if (wantWorktree && existsSync(join(repoSource, ".git"))) {
     log("Setting up git worktree...");
     const wt = await setupWorktree(app, repoSource, session.id, session.branch ?? undefined);

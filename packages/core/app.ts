@@ -24,16 +24,10 @@ import { createAppContainer, type AppContainer, type AppBootOptions } from "./co
 import { buildContainer } from "./di/index.js";
 import { loadConfig, loadAppConfig, type ArkConfig } from "./config.js";
 import { eventBus } from "./hooks.js";
-import type { ComputeProvider } from "../compute/types.js";
-import type {
-  Compute as NewCompute,
-  Isolation as NewIsolation,
-  ComputeKind,
-  IsolationKind,
-} from "../compute/core/types.js";
-import type { ComputePool } from "../compute/core/pool/types.js";
-import type { SnapshotStore } from "../compute/core/snapshot-store.js";
-import type { Compute, Session, ComputeProviderName } from "../types/index.js";
+import type { Compute as NewCompute, Isolation as NewIsolation, ComputeKind, IsolationKind } from "./compute/types.js";
+import type { ComputePool } from "./compute/warm-pool/types.js";
+import type { SnapshotStore } from "./compute/snapshot-store.js";
+import type { Compute, Session } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
 import { setProfilesArkDir } from "./services/profile.js";
@@ -56,9 +50,9 @@ import type { SessionAttachService } from "./services/session/attach.js";
 import type { DispatchService } from "./services/dispatch/index.js";
 import type { StageAdvanceService } from "./services/stage-advance/index.js";
 import type { FlowStore, SkillStore, AgentStore, RuntimeStore, ModelStore } from "./stores/index.js";
-import type { WorkspaceStore } from "../workspace/store.js";
+import type { WorkspaceStore } from "./workspace/store.js";
 import { ComputeRegistries } from "./compute-registries.js";
-import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
+import { resolveComputeTarget } from "./compute-resolver.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
 import { noopExecutor, NOOP_EXECUTOR_NAMES } from "./executors/noop.js";
@@ -429,13 +423,15 @@ export class AppContext {
         const tenantApp = this.forTenant(tenantId);
         const compute = await tenantApp.computes.get(computeName);
         if (!compute) continue;
-        const { resolveProvider } = await import("./compute-resolver.js");
-        // resolveProvider takes a session; synthesise a minimal one here since
-        // we just need the provider lookup -- it only reads compute_name + tenant_id.
-        const fakeSession = { compute_name: computeName, tenant_id: tenantId } as import("../types/session.js").Session;
-        const { provider } = await resolveProvider(tenantApp, fakeSession);
-        if (!provider) continue;
-        const arkdUrl = (provider as { getArkdUrl?: (c: typeof compute) => string }).getArkdUrl?.(compute);
+        const computeImpl = tenantApp.getCompute(compute.compute_kind);
+        if (!computeImpl) continue;
+        const handle = computeImpl.attachExistingHandle?.({
+          name: compute.name,
+          status: compute.status,
+          config: (compute.config ?? {}) as Record<string, unknown>,
+        });
+        if (!handle) continue;
+        const arkdUrl = computeImpl.getArkdUrl(handle);
         if (!arkdUrl) continue;
         const { startArkdEventsConsumer } = await import("./conductor/server/arkd-events-consumer.js");
         startArkdEventsConsumer(tenantApp, computeName, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
@@ -548,10 +544,12 @@ export class AppContext {
     tmplRepo.setTenant(SYSTEM_TENANT_ID);
     for (const tmpl of this.config.computeTemplates) {
       if (!(await tmplRepo.get(tmpl.name))) {
+        const axes = legacyProviderNameToAxesForTemplates(tmpl.provider ?? "local");
         await tmplRepo.create({
           name: tmpl.name,
           description: tmpl.description,
-          provider: tmpl.provider as ComputeProviderName,
+          compute: axes.compute_kind,
+          isolation: axes.isolation_kind,
           config: tmpl.config,
         });
       }
@@ -942,17 +940,7 @@ export class AppContext {
     return this._container;
   }
 
-  // ── Provider / Compute / Runtime / Pool registries ─────────────────────
-
-  registerProvider(provider: ComputeProvider): void {
-    this._registries.registerProvider(provider);
-  }
-  getProvider(name: string): ComputeProvider | null {
-    return this._registries.getProvider(name);
-  }
-  listProviders(): string[] {
-    return this._registries.listProviders();
-  }
+  // ── Compute / Isolation / Pool registries ──────────────────────────────
 
   registerCompute(c: NewCompute): void {
     this._registries.registerCompute(c);
@@ -986,15 +974,10 @@ export class AppContext {
     return this._registries.listPools();
   }
 
-  /** Resolve the compute provider for a session. Delegated to compute-resolver.ts. */
-  resolveProvider(session: Session): Promise<{ provider: ComputeProvider | null; compute: Compute | null }> {
-    return resolveProvider(this, session);
-  }
-
   /** Resolve the ComputeTarget for a session. Delegated to compute-resolver.ts. */
   resolveComputeTarget(
     session: Session,
-  ): Promise<{ target: import("../compute/core/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
+  ): Promise<{ target: import("./compute/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
     return resolveComputeTarget(this, session);
   }
 
@@ -1061,6 +1044,44 @@ async function installTestSecrets(app: AppContext): Promise<void> {
         // surface a clearer error if any of these turn out to be required.
       }
     }
+  }
+}
+
+/**
+ * Map a config-template's legacy `provider` string to the new two-axis
+ * (compute_kind, isolation_kind) pair. Mirrors the (now-deleted)
+ * `pairToProvider` table; kept inline here because seeding system templates
+ * is the only `app.ts` caller that still consumes the legacy name.
+ */
+function legacyProviderNameToAxesForTemplates(name: string): {
+  compute_kind: import("../types/index.js").ComputeKindName;
+  isolation_kind: import("../types/index.js").IsolationKindName;
+} {
+  switch (name) {
+    case "local":
+      return { compute_kind: "local", isolation_kind: "direct" };
+    case "docker":
+      return { compute_kind: "local", isolation_kind: "docker" };
+    case "devcontainer":
+      return { compute_kind: "local", isolation_kind: "devcontainer" };
+    case "firecracker":
+      return { compute_kind: "firecracker", isolation_kind: "direct" };
+    case "ec2":
+    case "remote-arkd":
+    case "remote-worktree":
+      return { compute_kind: "ec2", isolation_kind: "direct" };
+    case "ec2-docker":
+    case "remote-docker":
+      return { compute_kind: "ec2", isolation_kind: "docker" };
+    case "ec2-devcontainer":
+    case "remote-devcontainer":
+      return { compute_kind: "ec2", isolation_kind: "devcontainer" };
+    case "k8s":
+      return { compute_kind: "k8s", isolation_kind: "direct" };
+    case "k8s-kata":
+      return { compute_kind: "k8s-kata", isolation_kind: "direct" };
+    default:
+      return { compute_kind: "local", isolation_kind: "direct" };
   }
 }
 

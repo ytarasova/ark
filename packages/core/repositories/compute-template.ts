@@ -20,18 +20,23 @@
  */
 
 import type { DatabaseAdapter } from "../database/index.js";
-import type { ComputeProviderName, ComputeConfig, ComputeKindName, IsolationKindName } from "../../types/index.js";
-import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
+import type { ComputeConfig, ComputeKindName, IsolationKindName } from "../../types/index.js";
 import { ComputeRepository } from "./compute.js";
 
 /** Sentinel tenant for system-wide compute templates seeded at boot. */
 export const SYSTEM_TENANT_ID = "__system__";
 
-/** Reusable compute configuration preset. Backed by a `compute` row with `is_template: true`. */
+/**
+ * Reusable compute configuration preset. Backed by a `compute` row with
+ * `is_template: true`. Two-axis fields (`compute`, `isolation`) replaced
+ * the legacy single-axis `provider` field; callers that still want a
+ * legacy provider name can compute it themselves from the pair.
+ */
 export interface ComputeTemplateView {
   name: string;
   description?: string;
-  provider: ComputeProviderName;
+  compute: ComputeKindName;
+  isolation: IsolationKindName;
   config: Partial<ComputeConfig>;
   tenant_id?: string;
 }
@@ -46,8 +51,8 @@ function computeToTemplate(c: {
   return {
     name: c.name,
     description: (c as { description?: string | null }).description ?? undefined,
-    provider: (pairToProvider({ compute: c.compute_kind, isolation: c.isolation_kind }) ??
-      c.compute_kind) as ComputeProviderName,
+    compute: c.compute_kind,
+    isolation: c.isolation_kind,
     config: c.config as Partial<ComputeConfig>,
   };
 }
@@ -101,17 +106,17 @@ export class ComputeTemplateRepository {
         ? safeParse((template as unknown as { config: string }).config)
         : ((template.config ?? {}) as Partial<ComputeConfig>);
 
-    const provider = (template.provider ?? "local") as ComputeProviderName;
-    const pair = providerToPair(provider);
+    const compute_kind = (template.compute ?? "local") as ComputeKindName;
+    const isolation_kind = (template.isolation ?? "direct") as IsolationKindName;
 
     // Templates are blueprints, not concrete instances, so they're exempt
-    // from the singleton rule and the provider-driven initialStatus. Write
+    // from the singleton rule and the compute-driven initialStatus. Write
     // directly via `insert` rather than routing through `ComputeService`,
-    // which would look up a provider this adapter doesn't need.
+    // which would look up a Compute impl this adapter doesn't need.
     await this.inner.insert({
       name: template.name,
-      compute_kind: pair.compute as ComputeKindName,
-      isolation_kind: pair.isolation as IsolationKindName,
+      compute_kind,
+      isolation_kind,
       status: "stopped",
       config: cfg,
       is_template: true,
@@ -120,16 +125,21 @@ export class ComputeTemplateRepository {
 
   async update(
     name: string,
-    fields: Partial<Pick<ComputeTemplateView, "description" | "provider" | "config">>,
+    fields: Partial<Pick<ComputeTemplateView, "description" | "compute" | "isolation" | "config">>,
   ): Promise<void> {
-    const patch: Record<string, unknown> = {};
-    if (fields.provider !== undefined) patch.provider = fields.provider;
+    const patch: Partial<{
+      compute_kind: ComputeKindName;
+      isolation_kind: IsolationKindName;
+      config: Partial<ComputeConfig>;
+    }> = {};
+    if (fields.compute !== undefined) patch.compute_kind = fields.compute;
+    if (fields.isolation !== undefined) patch.isolation_kind = fields.isolation;
     if (fields.config !== undefined) patch.config = fields.config;
     // `description` has no column in the unified compute table -- we drop
     // it on the floor for now. Callers that need it should switch to the
     // unified `compute/*` RPC family (which also lacks a description today).
     if (Object.keys(patch).length === 0) return;
-    await this.inner.update(name, patch);
+    await this.inner.update(name, patch as any);
   }
 
   async delete(name: string): Promise<void> {

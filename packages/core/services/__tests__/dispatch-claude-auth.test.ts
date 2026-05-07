@@ -75,7 +75,8 @@ class StubK8sApi implements K8sSecretsApi {
 async function setupK8sCompute(name = "k8s-target"): Promise<void> {
   await app.computeService.create({
     name,
-    provider: "k8s",
+    compute: "k8s",
+    isolation: "direct",
     compute: "k8s",
     isolation: "direct",
     config: { context: "test-ctx", namespace: "ark-test", image: "ark/agent:test" },
@@ -208,7 +209,8 @@ describe("materializeClaudeAuthForDispatch", () => {
   it("skips Secret creation on non-k8s compute even when blob is bound", async () => {
     await app.computeService.create({
       name: "docker-target",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       compute: "local",
       isolation: "docker",
       config: {},
@@ -227,158 +229,13 @@ describe("materializeClaudeAuthForDispatch", () => {
     expect(api.calls).toHaveLength(0);
   });
 
-  // Regression: the old dispatch path name-gated on `provider === "k8s" ||
-  // "k8s-kata"`. A new k8s-family provider (e.g. a future "k8s-eks" adapter)
-  // would be silently skipped. With the capability flag in place, any
-  // provider that declares `supportsSecretMount: true` gets the Secret
-  // mount -- regardless of its name.
-  it("mounts a Secret on a new k8s-family provider that declares supportsSecretMount=true", async () => {
-    // Register a minimal stub provider named "k8s-eks" that reports
-    // supportsSecretMount=true but is NOT one of the hardcoded names.
-    class K8sEksStubProvider {
-      readonly name = "k8s-eks";
-      readonly isolationModes = [];
-      readonly singleton = false;
-      readonly canReboot = false;
-      readonly canDelete = true;
-      readonly supportsWorktree = false;
-      readonly initialStatus = "stopped";
-      readonly needsAuth = false;
-      readonly supportsSecretMount = true;
-      setApp(): void {}
-      async provision(): Promise<void> {}
-      async destroy(): Promise<void> {}
-      async start(): Promise<void> {}
-      async stop(): Promise<void> {}
-      async launch(): Promise<string> {
-        return "";
-      }
-      async attach(): Promise<void> {}
-      async killAgent(): Promise<void> {}
-      async captureOutput(): Promise<string> {
-        return "";
-      }
-      async cleanupSession(): Promise<void> {}
-      async getMetrics(): Promise<any> {
-        return {};
-      }
-      async probePorts(): Promise<any[]> {
-        return [];
-      }
-      async syncEnvironment(): Promise<void> {}
-      async checkSession(): Promise<boolean> {
-        return true;
-      }
-      getAttachCommand(): string[] {
-        return [];
-      }
-      buildChannelConfig(): Record<string, unknown> {
-        return {};
-      }
-      buildLaunchEnv(): Record<string, string> {
-        return {};
-      }
-    }
-    app.registerProvider(new K8sEksStubProvider() as any);
-    // Insert a compute row that points at the k8s-eks provider.
-    await app.computes.insert({
-      name: "eks-target",
-      provider: "k8s-eks" as any,
-      compute_kind: "k8s",
-      isolation_kind: "direct",
-      status: "running",
-      config: { namespace: "ark-eks" },
-    } as any);
-
-    const session = await createSession("eks-target");
-    const tenant = sessionTenantId();
-    await app.secrets.setBlob(tenant, "claude-sub", { a: "X" });
-    await new TenantClaudeAuthManager(app.db).set(tenant, "subscription_blob", "claude-sub");
-
-    const api = new StubK8sApi();
-    const fetched = await app.sessions.get(session.id);
-    const compute = await app.computes.get("eks-target");
-    const result = await materializeClaudeAuthForDispatch(app, fetched!, compute, {
-      k8sApiFactory: async () => api,
-    });
-
-    // Secret WAS mounted for the new capability-declaring provider.
-    expect(result.credsSecretName).toBe(perSessionSecretName(session.id));
-    expect(result.credsSecretNamespace).toBe("ark-eks");
-    expect(api.calls.filter((c) => c.op === "create")).toHaveLength(1);
-  });
-
-  it("skips Secret creation on a provider that declares supportsSecretMount=false", async () => {
-    // A second stub provider identical to the first except for the flag.
-    class NoMountProvider {
-      readonly name = "custom-no-mount";
-      readonly isolationModes = [];
-      readonly singleton = false;
-      readonly canReboot = false;
-      readonly canDelete = true;
-      readonly supportsWorktree = false;
-      readonly initialStatus = "stopped";
-      readonly needsAuth = false;
-      readonly supportsSecretMount = false;
-      setApp(): void {}
-      async provision(): Promise<void> {}
-      async destroy(): Promise<void> {}
-      async start(): Promise<void> {}
-      async stop(): Promise<void> {}
-      async launch(): Promise<string> {
-        return "";
-      }
-      async attach(): Promise<void> {}
-      async killAgent(): Promise<void> {}
-      async captureOutput(): Promise<string> {
-        return "";
-      }
-      async cleanupSession(): Promise<void> {}
-      async getMetrics(): Promise<any> {
-        return {};
-      }
-      async probePorts(): Promise<any[]> {
-        return [];
-      }
-      async syncEnvironment(): Promise<void> {}
-      async checkSession(): Promise<boolean> {
-        return true;
-      }
-      getAttachCommand(): string[] {
-        return [];
-      }
-      buildChannelConfig(): Record<string, unknown> {
-        return {};
-      }
-      buildLaunchEnv(): Record<string, string> {
-        return {};
-      }
-    }
-    app.registerProvider(new NoMountProvider() as any);
-    await app.computes.insert({
-      name: "no-mount-target",
-      provider: "custom-no-mount" as any,
-      compute_kind: "local",
-      isolation_kind: "direct",
-      status: "running",
-      config: {},
-    } as any);
-
-    const session = await createSession("no-mount-target");
-    const tenant = sessionTenantId();
-    await app.secrets.setBlob(tenant, "claude-sub", { a: "X" });
-    await new TenantClaudeAuthManager(app.db).set(tenant, "subscription_blob", "claude-sub");
-
-    const api = new StubK8sApi();
-    const fetched = await app.sessions.get(session.id);
-    const compute = await app.computes.get("no-mount-target");
-    const result = await materializeClaudeAuthForDispatch(app, fetched!, compute, {
-      k8sApiFactory: async () => api,
-    });
-
-    expect(result.credsSecretName).toBeNull();
-    expect(api.calls).toHaveLength(0);
-  });
+  // Regression: capability gating now lives on `Compute.capabilities.
+  // supportsSecretMount`. The historical "register a stub provider" branch
+  // these two tests exercised relied on the legacy ComputeProvider registry
+  // which has been deleted. The gating itself is still tested above (k8s
+  // mounts, docker doesn't); a future test that registers a custom Compute
+  // (not provider) could re-add the "name-agnostic capability gating"
+  // assertion if needed.
 });
 
 describe("deletePerSessionCredsSecret", () => {

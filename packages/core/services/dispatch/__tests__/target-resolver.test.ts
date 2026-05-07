@@ -42,7 +42,8 @@ describe("resolveTargetAndHandle", () => {
     // state. The persisted handle is returned as-is.
     await app.computes.insert({
       name: "local-rehydrate",
-      provider: "local",
+      compute: "local",
+      isolation: "direct",
       compute_kind: "local",
       isolation_kind: "direct",
       status: "running",
@@ -65,7 +66,8 @@ describe("resolveTargetAndHandle", () => {
   test("provisions a fresh handle and persists it on first dispatch", async () => {
     await app.computes.insert({
       name: "local-fresh",
-      provider: "local",
+      compute: "local",
+      isolation: "direct",
       compute_kind: "local",
       isolation_kind: "direct",
       status: "running",

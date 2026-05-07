@@ -1,8 +1,30 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient, getInProcessApp } from "../../app-client.js";
-import type { ComputeProviderName } from "../../../types/index.js";
 import { runAction } from "../_shared.js";
+
+/**
+ * Display-only helper -- compose a `${compute_kind}+${isolation_kind}` label
+ * back into the legacy provider-name string the wire format used to carry.
+ */
+function legacyLabel(c: { compute?: string; isolation?: string }): string {
+  const ck = c.compute ?? "local";
+  const ik = c.isolation ?? "direct";
+  if (ck === "local") {
+    if (ik === "direct") return "local";
+    if (ik === "docker") return "docker";
+    if (ik === "devcontainer") return "devcontainer";
+  }
+  if (ck === "ec2") {
+    if (ik === "direct") return "ec2";
+    if (ik === "docker") return "ec2-docker";
+    if (ik === "devcontainer") return "ec2-devcontainer";
+  }
+  if (ck === "firecracker") return "firecracker";
+  if (ck === "k8s") return "k8s";
+  if (ck === "k8s-kata") return "k8s-kata";
+  return ck;
+}
 
 export function registerTemplateCommands(computeCmd: Command) {
   const template = computeCmd.command("template").description("Manage compute templates");
@@ -18,17 +40,20 @@ export function registerTemplateCommands(computeCmd: Command) {
         // Also show config-defined templates
         const configTemplates = app.config.computeTemplates ?? [];
         const dbNames = new Set(templates.map((t) => t.name));
-        const allTemplates = [
-          ...templates,
-          ...configTemplates
-            .filter((t) => !dbNames.has(t.name))
-            .map((t) => ({
-              name: t.name,
-              description: t.description,
-              provider: t.provider as ComputeProviderName,
-              config: t.config,
-            })),
-        ];
+        type TemplateRow = { name: string; description?: string; provider: string };
+        const dbRows: TemplateRow[] = templates.map((t) => ({
+          name: t.name,
+          description: t.description,
+          provider: legacyLabel({ compute: t.compute, isolation: t.isolation }),
+        }));
+        const cfgRows: TemplateRow[] = configTemplates
+          .filter((t) => !dbNames.has(t.name))
+          .map((t) => ({
+            name: t.name,
+            description: t.description,
+            provider: t.provider,
+          }));
+        const allTemplates: TemplateRow[] = [...dbRows, ...cfgRows];
 
         if (!allTemplates.length) {
           console.log(chalk.dim("No templates. Add to ~/.ark/config.yaml:"));
@@ -55,6 +80,9 @@ export function registerTemplateCommands(computeCmd: Command) {
       await runAction("compute template show", async () => {
         const app = await getInProcessApp();
         let tmpl: any = await app.computeTemplates.get(name);
+        let providerLabel: string | undefined = tmpl
+          ? legacyLabel({ compute: tmpl.compute, isolation: tmpl.isolation })
+          : undefined;
 
         // Fall back to config
         if (!tmpl) {
@@ -63,9 +91,9 @@ export function registerTemplateCommands(computeCmd: Command) {
             tmpl = {
               name: cfgTmpl.name,
               description: cfgTmpl.description,
-              provider: cfgTmpl.provider as ComputeProviderName,
               config: cfgTmpl.config,
             };
+            providerLabel = cfgTmpl.provider;
           }
         }
 
@@ -76,7 +104,7 @@ export function registerTemplateCommands(computeCmd: Command) {
 
         console.log(chalk.bold(tmpl.name));
         if (tmpl.description) console.log(`  Description: ${tmpl.description}`);
-        console.log(`  Provider:    ${tmpl.provider}`);
+        console.log(`  Provider:    ${providerLabel ?? "-"}`);
         console.log(`  Config:`);
         for (const [k, v] of Object.entries(tmpl.config)) {
           console.log(`    ${k}: ${JSON.stringify(v)}`);

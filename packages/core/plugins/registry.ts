@@ -43,7 +43,7 @@ const EXECUTOR_NAME_ALIASES: Record<string, string> = {
 export interface PluginKindMap {
   executor: Executor;
   // Future extensions land as new entries in this interface, e.g.:
-  // "compute-provider": ComputeProvider;
+  // "compute": Compute;
   // "transcript-parser": TranscriptParser;
   // "runtime": RuntimeDefinition;
 }

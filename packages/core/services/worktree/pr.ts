@@ -27,10 +27,10 @@ import { promisify } from "util";
 import { execFile } from "child_process";
 
 import type { AppContext } from "../../app.js";
-import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../../compute/types.js";
+import type { Session } from "../../../types/index.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
-import { resolveProvider } from "../../compute-resolver.js";
+import { resolveComputeTarget } from "../../compute-resolver.js";
+import type { Compute as ComputeImpl, ComputeHandle } from "../../compute/types.js";
 import { loadRepoConfig } from "../../repo-config.js";
 import { logDebug, logInfo, logWarn } from "../../observability/structured-log.js";
 import { rebaseOntoBase } from "./git-ops.js";
@@ -78,28 +78,34 @@ interface GitResult {
 }
 
 /**
- * Resolve the (provider, compute) pair for a session and tell the caller
- * whether the dispatch should be routed through `ArkdClient.run` against the
- * remote workdir.
+ * Resolve the compute target for a session and tell the caller whether the
+ * dispatch should be routed through `ArkdClient.run` against the remote
+ * workdir.
  *
- * Remote = `provider.supportsWorktree === false` and `provider.getArkdUrl`
- * exists. Everything else (local, missing provider, missing compute) falls
- * back to the local `execFileAsync` path.
+ * Remote = `Compute.capabilities.supportsWorktree === false`. Everything
+ * else (local, missing target, missing compute) falls back to the local
+ * `execFileAsync` path.
  */
 async function resolveRemoteRouting(
   app: AppContext,
   session: Session,
 ): Promise<{ remote: false } | { remote: true; client: ArkdClient; remoteWorkdir: string }> {
-  const { provider, compute } = await resolveProvider(app, session);
-  if (!provider || !compute) return { remote: false };
-  if (provider.supportsWorktree) return { remote: false };
-  if (!provider.getArkdUrl) return { remote: false };
+  const { target, compute } = await resolveComputeTarget(app, session);
+  if (!target || !compute) return { remote: false };
+  if (target.compute.capabilities.supportsWorktree) return { remote: false };
 
-  const remoteWorkdir = resolveRemoteWorkdir(provider, compute, session);
+  const handle = target.compute.attachExistingHandle?.({
+    name: compute.name,
+    status: compute.status,
+    config: (compute.config ?? {}) as Record<string, unknown>,
+  });
+  if (!handle) return { remote: false };
+
+  const remoteWorkdir = resolveRemoteWorkdir(target.compute, handle, session);
   if (!remoteWorkdir) {
     logWarn(
       "session",
-      `runGit: provider '${provider.name}' is remote but resolveWorkdir returned null for session ${session.id}; ` +
+      `runGit: compute '${target.compute.kind}' is remote but resolveWorkdir returned null for session ${session.id}; ` +
         `falling back to local dispatch`,
     );
     return { remote: false };
@@ -108,15 +114,9 @@ async function resolveRemoteRouting(
   // RESILIENCE: ensure the arkd transport is up before we build the client.
   // Action stages don't go through dispatch-core's lifecycle, so they must
   // resolve the same handle (with its compute-specific meta -- instance_id
-  // for EC2, etc.) and call ensureReachable themselves. Building a stub
-  // `{meta:{}}` handle here was the bug: ensureReachable hit `readMeta(h)`
-  // which threw "missing meta.ec2", the catch swallowed the error, and
-  // getArkdUrl then threw "no arkd_local_forward_port" -- causing every
-  // action stage on a remote compute to fail after a conductor restart.
+  // for EC2, etc.) and call ensureReachable themselves.
   try {
-    const { resolveTargetAndHandle } = await import("../dispatch/target-resolver.js");
-    const { target, handle } = await resolveTargetAndHandle(app, session);
-    if (target?.compute.ensureReachable && handle) {
+    if (target.compute.ensureReachable) {
       await target.compute.ensureReachable(handle, { app, sessionId: session.id });
     }
   } catch (err: any) {
@@ -127,12 +127,9 @@ async function resolveRemoteRouting(
     );
   }
 
-  // Fetch the (possibly refreshed) session row so getArkdUrl reads the
-  // freshly-written port. Pass the session into getArkdUrl so the
-  // session-aware lookup runs (the per-session port wins over the
-  // compute-level cache, see #423).
-  const refreshed = (await app.sessions.get(session.id)) ?? session;
-  const arkdUrl = provider.getArkdUrl(compute, refreshed);
+  // ensureReachable mutated `handle.meta` in place to point at the live
+  // tunnel; `getArkdUrl(handle)` now returns the per-session port (#423).
+  const arkdUrl = target.compute.getArkdUrl(handle);
   const cfg = compute.config as { arkd_request_timeout_ms?: number } | null | undefined;
   const requestTimeoutMs = typeof cfg?.arkd_request_timeout_ms === "number" ? cfg.arkd_request_timeout_ms : undefined;
   const client = new ArkdClient(arkdUrl, requestTimeoutMs ? { requestTimeoutMs } : undefined);
@@ -140,23 +137,22 @@ async function resolveRemoteRouting(
 }
 
 /**
- * Best-effort remote workdir for the agent's clone. Prefers the provider's
- * own `resolveWorkdir` (the canonical hook the launcher uses, e.g.
- * `RemoteWorktreeProvider` returns `${REMOTE_HOME}/Projects/<repoBasename>`).
- * Falls back to `session.config.remoteWorkdir` (set by some launch flows)
- * and finally to `${REMOTE_HOME}/Projects/<basename(session.repo)>` -- the
- * convention used by EC2 cloud-init.
+ * Best-effort remote workdir for the agent's clone. Prefers the compute's
+ * own `resolveWorkdir` (the canonical hook the launcher uses; EC2 returns
+ * `${REMOTE_HOME}/Projects/<sessionId>/<repoBasename>`). Falls back to
+ * `session.config.remoteWorkdir` (set by some launch flows) and finally to
+ * `${REMOTE_HOME}/Projects/<basename(session.repo)>` -- the convention
+ * used by EC2 cloud-init.
  */
-function resolveRemoteWorkdir(provider: ComputeProvider, compute: Compute, session: Session): string | null {
-  if (provider.resolveWorkdir) {
-    const wd = provider.resolveWorkdir(compute, session);
+function resolveRemoteWorkdir(compute: ComputeImpl, handle: ComputeHandle, session: Session): string | null {
+  if (compute.resolveWorkdir) {
+    const wd = compute.resolveWorkdir(handle, session);
     if (wd) return wd;
   }
   const cfgWd = (session.config as { remoteWorkdir?: string } | null | undefined)?.remoteWorkdir;
   if (cfgWd) return cfgWd;
   // Last resort: derive from the repo name. Matches the
-  // `${REMOTE_HOME}/Projects/<repo>` convention used by RemoteWorktreeProvider
-  // and by cloud-init.
+  // `${REMOTE_HOME}/Projects/<repo>` convention used by EC2 cloud-init.
   const src = (session.config as { remoteRepo?: string } | null | undefined)?.remoteRepo ?? session.repo;
   if (!src) return null;
   const repoName = basename(src).replace(/\.git$/, "");
@@ -490,7 +486,65 @@ export async function createWorktreePR(
       // Strip the embedded token from the error text before surfacing.
       let reason = e?.stderr || e?.message || String(e);
       if (githubToken) reason = reason.replaceAll(githubToken, "***");
-      return { ok: false, message: `git push failed: ${reason}` };
+
+      // Recoverable: the remote already has commits on this branch from a
+      // prior session/agent that diverge from ours. The whole flow just ran
+      // 6+ stages of real work; failing the PR action over a branch-name
+      // collision throws all that away. Auto-rename the branch to a
+      // session-unique name and retry the push exactly once. Emits a clear
+      // event so the operator can see the rename happened.
+      //
+      // Skipped when:
+      //   - the branch is already session-owned (`ark-s-<sid>`) -- it can
+      //     only collide with itself, which means the agent self-pushed
+      //     mid-flow and the original `--force` push already handled that.
+      //   - the branch already carries our session-suffix from an earlier
+      //     rename in this same session (avoid runaway suffix stacking).
+      // Session ids carry an `s-` prefix, so the suffix is just `-<sid8>`
+      // -- e.g. session `s-e4xgs0muza` produces `-s-e4xgs0`, not `-s-s-e4xgs0`.
+      const sessionSuffix = `-${sessionId.slice(0, 8)}`;
+      const isAlreadyRenamed = branch.endsWith(sessionSuffix);
+      const looksLikeNonFastForward = /non-fast-forward|\[rejected\]|failed to push some refs/i.test(reason);
+      if (looksLikeNonFastForward && !isSessionOwnedBranch && !isAlreadyRenamed) {
+        const originalBranch = branch;
+        const renamedBranch = `${originalBranch}${sessionSuffix}`;
+        try {
+          // Rename the local branch so HEAD now points at the unique name.
+          await runGit(app, session, ["branch", "-m", originalBranch, renamedBranch], {
+            timeout: 15_000,
+            localCwd: routing.remote ? undefined : localPushDir,
+          });
+          const retryArgs = ["push", "-u", "origin", renamedBranch];
+          const r = await runGit(app, session, retryArgs, {
+            timeout: 60_000,
+            localCwd: routing.remote ? undefined : localPushDir,
+          });
+          pushStdout = r.stdout;
+          pushStderr = r.stderr;
+          // Persist the rename so the PR-create step + every downstream
+          // observer (status poller, web UI, retry path) sees the right ref.
+          await app.sessions.update(sessionId, { branch: renamedBranch });
+          (session as { branch: string | null }).branch = renamedBranch;
+          branch = renamedBranch;
+          await app.events.log(sessionId, "branch_renamed_on_conflict", {
+            actor: "system",
+            data: { from: originalBranch, to: renamedBranch, reason: "non-fast-forward push rejected" },
+          });
+          logInfo(
+            "session",
+            `createWorktreePR: renamed ${sessionId} branch ${originalBranch} -> ${renamedBranch} on push conflict`,
+          );
+        } catch (retryErr: any) {
+          let retryReason = retryErr?.stderr || retryErr?.message || String(retryErr);
+          if (githubToken) retryReason = retryReason.replaceAll(githubToken, "***");
+          return {
+            ok: false,
+            message: `git push failed (also failed retry on session-suffixed branch): ${reason} | retry: ${retryReason}`,
+          };
+        }
+      } else {
+        return { ok: false, message: `git push failed: ${reason}` };
+      }
     } finally {
       // Always restore the original origin URL so the token doesn't
       // persist in the worker's git config. Best-effort: a failure

@@ -66,17 +66,22 @@ export async function garbageCollectComputeIfTemplate(
   // (sessions-created or manual Provision-from-template) this is the only
   // thing that actually releases the pod / container / microVM -- without
   // it we'd leak infra in the cluster even though the row is gone. Missing
-  // providers (older local-only installs) are tolerated: the row deletion
-  // still proceeds.
+  // Compute impls (older local-only installs) are tolerated: the row
+  // deletion still proceeds.
   try {
-    const { getProvider } = await import("../../compute/index.js");
-    const { providerOf } = await import("../../compute/adapters/provider-map.js");
-    const provider = getProvider(providerOf(compute));
-    if (provider) {
-      await provider.destroy(compute);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (computeImpl && computeImpl.attachExistingHandle) {
+      const handle = computeImpl.attachExistingHandle({
+        name: compute.name,
+        status: compute.status,
+        config: (compute.config ?? {}) as Record<string, unknown>,
+      });
+      if (handle) {
+        await computeImpl.destroy(handle);
+      }
     }
   } catch (e: any) {
-    logDebug("compute-pool", `provider.destroy during gc for ${computeName} failed: ${e?.message ?? e}`);
+    logDebug("compute-pool", `compute.destroy during gc for ${computeName} failed: ${e?.message ?? e}`);
   }
 
   try {

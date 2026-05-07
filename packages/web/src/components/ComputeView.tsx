@@ -146,10 +146,10 @@ export function ComputeView({
       const config: any = { ...(form.templateConfig ?? {}) };
       if (form.size) config.size = form.size;
       if (form.region) config.region = form.region;
-      // Send compute + isolation axes. Provider is omitted -- the server
-      // derives it via pairToProvider for back-compat reads. is_template
-      // rides on the same RPC -- templates and concrete targets use the
-      // same create surface.
+      // Send compute + isolation axes. The legacy `provider` column is gone
+      // (migration 015), so the server stores only the two-axis pair.
+      // `is_template` rides on the same RPC -- templates and concrete
+      // targets use the same create surface.
       await api.createCompute({
         name: form.name,
         compute: form.compute,

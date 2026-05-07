@@ -66,7 +66,6 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,
-      provider TEXT NOT NULL DEFAULT 'local',
       compute_kind TEXT NOT NULL DEFAULT 'local',
       isolation_kind TEXT NOT NULL DEFAULT 'direct',
       status TEXT NOT NULL DEFAULT 'stopped',
@@ -78,7 +77,6 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
       updated_at TEXT NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
     CREATE INDEX IF NOT EXISTS idx_compute_kind ON compute(compute_kind);
     CREATE INDEX IF NOT EXISTS idx_compute_isolation_kind ON compute(isolation_kind);
     CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
@@ -87,7 +85,8 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
     CREATE TABLE IF NOT EXISTS compute_templates (
       name TEXT NOT NULL,
       description TEXT,
-      provider TEXT NOT NULL,
+      compute_kind TEXT NOT NULL DEFAULT 'local',
+      isolation_kind TEXT NOT NULL DEFAULT 'direct',
       config TEXT DEFAULT '{}',
       tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
@@ -431,8 +430,8 @@ export async function seedLocalCompute(db: DatabaseAdapter): Promise<void> {
   await db
     .prepare(
       `
-    INSERT OR IGNORE INTO compute (name, provider, compute_kind, isolation_kind, status, config, created_at, updated_at)
-    VALUES ('local', 'local', 'local', 'direct', 'running', '{}', ?, ?)
+    INSERT OR IGNORE INTO compute (name, compute_kind, isolation_kind, status, config, created_at, updated_at)
+    VALUES ('local', 'local', 'direct', 'running', '{}', ?, ?)
   `,
     )
     .run(ts, ts);

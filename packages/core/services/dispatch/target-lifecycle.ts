@@ -20,18 +20,16 @@
  *      delivered (the SSH key is for git, not for the compute transport).
  *      1 retry, 1_000ms backoff for transient transport blips.
  *   4. `prepare-workspace`  -- mkdir + git clone via arkd HTTP. 2
- *      retries, 1_000ms backoff (matches the legacy `git-clone` step
- *      that lived inside `RemoteWorktreeProvider.launch`).
+ *      retries, 1_000ms backoff.
  *   5. `isolation-prepare`    -- bring up compose / build devcontainer /
  *      boot microVM. Idempotent; 1 retry / 1_000ms backoff.
  *   6. `launch-agent`       -- arkd-side process spawn. NOT retried
  *      (tmux session names don't dedupe; a retry would leak the prior
  *      pane).
  *
- * Step ordering note: the legacy `RemoteWorktreeProvider.launch` ran
- * `flushDeferredPlacement` BEFORE `git clone` because the clone needs
- * the SSH key the placement just delivered. We preserve that order
- * here -- flush-secrets sits at step 3, prepare-workspace at step 4.
+ * Step ordering: `flushDeferredPlacement` MUST run BEFORE `git clone`
+ * because the clone needs the SSH key the placement just delivered.
+ * Flush-secrets sits at step 3, prepare-workspace at step 4.
  *
  * Each step emits a `provisioning_step` event with `compute` +
  * `computeKind` context so the session timeline shows a uniform
@@ -40,8 +38,8 @@
  */
 
 import type { AppContext } from "../../app.js";
-import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../../compute/core/types.js";
-import type { ComputeTarget } from "../../../compute/core/compute-target.js";
+import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../compute/types.js";
+import type { ComputeTarget } from "../../compute/compute-target.js";
 import type { DeferredPlacementCtx } from "../../secrets/deferred-placement-ctx.js";
 import { provisionStep } from "../provisioning-steps.js";
 
@@ -85,8 +83,8 @@ export interface RunTargetLifecycleOpts {
   /**
    * Optional override for the terminal `launch-agent` step. When provided
    * runTargetLifecycle calls this fn instead of `target.launchAgent` --
-   * lets a runtime use a generic `provider.spawnProcess` (claude-agent
-   * headless model, future runtimes) instead of the legacy tmux launch
+   * lets a runtime use the generic `ComputeHandle.spawnProcess` (claude-
+   * agent headless model, future runtimes) instead of the tmux launch
    * embedded in the isolation impls. Returns the AgentHandle the caller
    * wants to track in the session row.
    */
@@ -135,10 +133,10 @@ export async function runTargetLifecycle(
   }
 
   // 3. flush-secrets -- runs BEFORE prepare-workspace because the workspace
-  //    clone uses the SSH key the placement just delivered (matches legacy
-  //    RemoteWorktreeProvider.launch ordering: flushDeferredPlacement →
-  //    git-clone → launch-agent). Skip when the queue has no file/
-  //    provisioner ops -- env-only sessions have nothing to flush.
+  //    clone uses the SSH key the placement just delivered (ordering:
+  //    flushDeferredPlacement -> git-clone -> launch-agent). Skip when the
+  //    queue has no file/provisioner ops -- env-only sessions have nothing
+  //    to flush.
   if (opts.placement && opts.placement.hasDeferred() && target.compute.flushPlacement) {
     await provisionStep(
       app,
@@ -176,9 +174,9 @@ export async function runTargetLifecycle(
   });
 
   // 6. launch-agent -- terminal step. When `launchOverride` is set the
-  // runtime owns spawning (e.g. claude-agent uses provider.spawnProcess on
-  // arkd's generic /process/spawn instead of the isolation's tmux-based
-  // launchAgent); otherwise we keep the legacy isolation-driven path.
+  // runtime owns spawning (e.g. claude-agent uses ComputeHandle.spawnProcess
+  // on arkd's generic /process/spawn instead of the isolation's tmux-based
+  // launchAgent); otherwise we keep the isolation-driven path.
   return provisionStep(
     app,
     sessionId,

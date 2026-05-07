@@ -1,10 +1,9 @@
 /**
- * `compute/template/list` RPC — every template row carries both the legacy
- * `provider` name AND the new `compute` + `isolation` axes. The web bundle
- * used to maintain its own provider-map copy to derive the axes from the
- * provider name; the server now does the derivation once (sourced from the
- * canonical `packages/compute/adapters/provider-map.ts`) so the client can
- * read `tmpl.compute` + `tmpl.isolation` directly.
+ * `compute/template/list` RPC -- every template row carries the new
+ * `compute` + `isolation` axes (and a synthesized legacy `provider` name
+ * for back-compat readers). The web bundle used to maintain its own
+ * provider-map copy to derive the axes; the server now does the derivation
+ * once so the client can read `tmpl.compute` + `tmpl.isolation` directly.
  */
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../../core/app.js";
@@ -31,27 +30,29 @@ function ok(res: unknown): Record<string, unknown> {
 }
 
 describe("compute/template/list", () => {
-  it("returns the two-axis (compute, isolation) pair derived from the legacy provider", async () => {
-    // Seed one template per legacy provider family so we exercise every
-    // branch of providerToPair.
-    const providers: Array<[string, { compute: string; isolation: string }]> = [
-      ["local", { compute: "local", isolation: "direct" }],
-      ["docker", { compute: "local", isolation: "docker" }],
-      ["devcontainer", { compute: "local", isolation: "devcontainer" }],
-      ["firecracker", { compute: "local", isolation: "firecracker-in-container" }],
-      ["ec2", { compute: "ec2", isolation: "direct" }],
-      ["ec2-docker", { compute: "ec2", isolation: "docker" }],
-      ["ec2-devcontainer", { compute: "ec2", isolation: "devcontainer" }],
-      ["ec2-firecracker", { compute: "ec2", isolation: "firecracker-in-container" }],
-      ["k8s", { compute: "k8s", isolation: "direct" }],
-      ["k8s-kata", { compute: "k8s-kata", isolation: "direct" }],
+  it("returns the two-axis (compute, isolation) pair plus the legacy provider label", async () => {
+    // Seed one template per supported (compute, isolation) pair. The wire
+    // format keeps a legacy `provider` string for back-compat clients,
+    // derived from the pair via `legacyProviderLabel`.
+    type Row = { compute: string; isolation: string; provider: string };
+    const rows: Row[] = [
+      { compute: "local", isolation: "direct", provider: "local" },
+      { compute: "local", isolation: "docker", provider: "docker" },
+      { compute: "local", isolation: "devcontainer", provider: "devcontainer" },
+      { compute: "ec2", isolation: "direct", provider: "ec2" },
+      { compute: "ec2", isolation: "docker", provider: "ec2-docker" },
+      { compute: "ec2", isolation: "devcontainer", provider: "ec2-devcontainer" },
+      { compute: "firecracker", isolation: "direct", provider: "firecracker" },
+      { compute: "k8s", isolation: "direct", provider: "k8s" },
+      { compute: "k8s-kata", isolation: "direct", provider: "k8s-kata" },
     ];
 
-    for (const [prov] of providers) {
+    for (const r of rows) {
       await app.computeTemplates.create({
-        name: `tmpl-${prov}`,
-        description: `Test template for ${prov}`,
-        provider: prov as any,
+        name: `tmpl-${r.provider}`,
+        description: `Test template for ${r.provider}`,
+        compute: r.compute as any,
+        isolation: r.isolation as any,
         config: {},
       });
     }
@@ -65,13 +66,13 @@ describe("compute/template/list", () => {
       expect(typeof t.isolation).toBe("string");
     }
 
-    // Every provider we seeded is present with the expected axes.
-    for (const [prov, pair] of providers) {
-      const row = templates.find((t) => t.name === `tmpl-${prov}`);
+    // Every (compute, isolation) row we seeded is present with the expected axes.
+    for (const r of rows) {
+      const row = templates.find((t) => t.name === `tmpl-${r.provider}`);
       expect(row).toBeDefined();
-      expect(row!.provider).toBe(prov);
-      expect(row!.compute).toBe(pair.compute);
-      expect(row!.isolation).toBe(pair.isolation);
+      expect(row!.provider).toBe(r.provider);
+      expect(row!.compute).toBe(r.compute);
+      expect(row!.isolation).toBe(r.isolation);
     }
   });
 });

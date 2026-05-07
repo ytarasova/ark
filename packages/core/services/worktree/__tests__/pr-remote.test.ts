@@ -26,7 +26,6 @@ import { setApp, clearApp } from "../../../__tests__/test-helpers.js";
 import { allocatePort } from "../../../config/port-allocator.js";
 import { createWorktreePR, mergeWorktreePR, detectGitHost, parseCreatePrUrl, isGithubPrUrl } from "../pr.js";
 import type { Compute, Session } from "../../../../types/index.js";
-import type { ComputeProvider } from "../../../../compute/types.js";
 
 // ── Stub arkd server: records every /exec call and returns a programmable response ──
 
@@ -63,60 +62,6 @@ function startStubArkd(opts: {
     },
   });
   return { server, calls };
-}
-
-// ── Stub remote provider: supportsWorktree = false, getArkdUrl points at the stub ──
-
-function makeRemoteStubProvider(arkdUrl: string, remoteWorkdir: string): ComputeProvider {
-  return {
-    name: "ec2",
-    isolationModes: [],
-    singleton: false,
-    canReboot: true,
-    canDelete: true,
-    supportsWorktree: false,
-    initialStatus: "stopped",
-    needsAuth: true,
-    supportsSecretMount: false,
-    async provision() {},
-    async destroy() {},
-    async start() {},
-    async stop() {},
-    async launch() {
-      return "";
-    },
-    async attach() {},
-    async killAgent() {},
-    async captureOutput() {
-      return "";
-    },
-    async cleanupSession() {},
-    async getMetrics() {
-      return { metrics: {} as any, sessions: [], processes: [], docker: [] };
-    },
-    async probePorts() {
-      return [];
-    },
-    async syncEnvironment() {},
-    async checkSession() {
-      return true;
-    },
-    getAttachCommand() {
-      return [];
-    },
-    buildChannelConfig() {
-      return {};
-    },
-    buildLaunchEnv() {
-      return {};
-    },
-    getArkdUrl() {
-      return arkdUrl;
-    },
-    resolveWorkdir() {
-      return remoteWorkdir;
-    },
-  } as unknown as ComputeProvider;
 }
 
 // ── Test setup ───────────────────────────────────────────────────────────────

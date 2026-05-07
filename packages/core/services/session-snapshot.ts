@@ -3,7 +3,7 @@
  *
  * `pauseWithSnapshot` / `resumeFromSnapshot` are the higher-level counterparts
  * to the state-only `pause` / `resume` in `session-lifecycle.ts`. They talk
- * to the new `Compute` interface (`packages/compute/core/types.ts`) and the
+ * to the `Compute` interface (`packages/core/compute/types.ts`) and the
  * `SnapshotStore` to actually persist VM/container state so that a session
  * can move between hosts or survive an ark restart.
  *
@@ -19,9 +19,9 @@
  */
 
 import type { AppContext } from "../app.js";
-import type { ComputeKind, ComputeHandle, Snapshot } from "../../compute/core/types.js";
-import type { SnapshotRef } from "../../compute/core/snapshot-store.js";
-import { NotSupportedError } from "../../compute/core/types.js";
+import type { ComputeKind, ComputeHandle, Snapshot } from "../compute/types.js";
+import type { SnapshotRef } from "../compute/snapshot-store.js";
+import { NotSupportedError } from "../compute/types.js";
 
 // ── Public result shapes ───────────────────────────────────────────────────
 
@@ -253,7 +253,7 @@ export async function resumeFromSnapshot(
  * restore.
  */
 async function produceSnapshot(
-  compute: import("../../compute/core/types.js").Compute,
+  compute: import("../compute/types.js").Compute,
   handle: ComputeHandle,
 ): Promise<{ snapshot: Snapshot; stream: ReadableStream<Uint8Array> }> {
   const snap = await compute.snapshot(handle);

@@ -22,12 +22,12 @@
  */
 
 import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
 import { recordingPath } from "../recordings.js";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as tmux from "../infra/tmux.js";
 import * as claude from "../claude/claude.js";
+import { hasDevcontainerConfig } from "../compute/isolation/devcontainer.js";
 
 /** Single-quote a string for safe bash interpolation (no expansion). */
 const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -116,18 +116,20 @@ export const gooseExecutor: Executor = {
     const stage = opts.stage ?? "work";
     const tmuxName = `ark-${session.id}`;
 
-    // Worktree + compute provider. Use the polymorphic AppContext helper
+    // Worktree + compute target. Use the polymorphic AppContext helper
     // so hosted sessions without an explicit `compute_name` surface a
-    // clear "no compute resolved" error instead of defaulting to LocalProvider.
-    const { provider, compute } = await app.resolveProvider(session);
+    // clear "no compute resolved" error instead of defaulting to LocalCompute.
+    const { target, compute } = await app.resolveComputeTarget(session);
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
-    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, log);
 
-    // Conductor URL (devcontainer vs host)
-    const { parseArcJson } = await import("../../compute/arc-json.js");
+    // Conductor URL (devcontainer vs host). Auto-detect a devcontainer by
+    // file presence: if `.devcontainer/devcontainer.json` (or top-level
+    // variant) is present, route through `host.docker.internal` so the
+    // agent inside the container can reach the host's conductor.
     const { DEFAULT_CONDUCTOR_URL, DOCKER_CONDUCTOR_URL } = await import("../constants.js");
-    const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
-    const conductorUrl = arcJson?.devcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;
+    const usesDevcontainer = !!effectiveWorkdir && hasDevcontainerConfig(effectiveWorkdir);
+    const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;
 
     // Channel MCP -- reuse the same config builder claude uses. Goose will
     // spawn the `command + args` as a stdio extension and inherit our env.
@@ -173,7 +175,7 @@ export const gooseExecutor: Executor = {
     const mergedEnv: Record<string, string> = {
       ...channelEnv,
       ...(opts.agent.env ?? {}),
-      ...(provider?.buildLaunchEnv?.(session) ?? {}),
+      ...(target?.compute.buildLaunchEnv?.(session) ?? {}),
       ...(opts.env ?? {}),
       ...buildRouterEnv(app.config, { mode: "openai" }),
     };

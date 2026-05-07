@@ -11,10 +11,9 @@
  */
 
 import type { AppContext } from "../app.js";
-import type { Session, ComputeProviderName } from "../../types/index.js";
+import type { Session, ComputeKindName, IsolationKindName } from "../../types/index.js";
 import type { WorkerNode } from "./worker-registry.js";
 import type { TenantPolicyManager, TenantComputePolicy } from "../auth/index.js";
-import { providerOf } from "../../compute/adapters/provider-map.js";
 
 export class SessionScheduler {
   private policyManager: TenantPolicyManager | null = null;
@@ -119,23 +118,30 @@ export class SessionScheduler {
       throw new Error(`Pool "${poolRef.pool_name}" at max capacity (${poolRef.max})`);
     }
 
-    // Use the compute provider to provision
-    const computeProvider = this.app.getProvider(provider);
-    if (!computeProvider) {
-      throw new Error(`No compute provider registered for "${provider}"`);
+    // Use the new ComputeTarget API to provision. We map the legacy
+    // provider-name string the policy stores to a (compute, isolation) pair
+    // and look up the registered Compute impl. Until the policy schema
+    // migrates to two-axis pairs, this mapping keeps the hosted scheduler
+    // wired up to the new registry.
+    const { compute_kind, isolation_kind } = legacyProviderNameToAxes(provider);
+    const computeImpl = this.app.getCompute(compute_kind);
+    if (!computeImpl) {
+      throw new Error(`No compute impl registered for kind "${compute_kind}" (legacy provider "${provider}")`);
     }
 
     // Create compute record
     const computeName = `${tenantId}-${provider}-${Date.now()}`;
     await this.app.computeService.create({
       name: computeName,
-      provider: provider as ComputeProviderName,
+      compute: compute_kind,
+      isolation: isolation_kind,
       config: poolRef.config ?? {},
     });
-    const compute = (await this.app.computes.get(computeName))!;
 
-    // Provision
-    await computeProvider.provision(compute);
+    // Provision via the registered Compute impl. The handle is discarded
+    // here (the hosted scheduler doesn't use it) -- the caller waits for
+    // the agent to register through the worker registry below.
+    await computeImpl.provision({ config: poolRef.config ?? {} });
 
     // Wait for worker to register
     return this._waitForWorkerRegistration(computeName, 60_000);
@@ -152,10 +158,16 @@ export class SessionScheduler {
     throw new Error(`Worker for compute "${computeName}" did not register within ${timeoutMs / 1000}s`);
   }
 
-  /** Resolve the provider name from a compute record. */
+  /**
+   * Resolve the legacy provider name from a compute record. Tenant policies
+   * still store provider-name strings; until that schema migrates to a
+   * two-axis pair we keep this small mapping local rather than reaching
+   * back through a deleted adapters/ module.
+   */
   private async _resolveProviderFromCompute(computeName: string): Promise<string | null> {
     const compute = await this.app.computes.get(computeName);
-    return compute ? providerOf(compute) : null;
+    if (!compute) return null;
+    return axesToLegacyProviderName(compute.compute_kind, compute.isolation_kind);
   }
 
   /**
@@ -165,4 +177,58 @@ export class SessionScheduler {
   private _pickBest(workers: WorkerNode[]): WorkerNode {
     return workers.sort((a, b) => a.active_sessions / a.capacity - b.active_sessions / b.capacity)[0];
   }
+}
+
+/**
+ * Map a tenant_policies-style legacy provider name to the two-axis pair the
+ * new compute registry uses. Mirrors the old `provider-map.ts`; kept inline
+ * here because the hosted scheduler is the last operational caller of
+ * legacy provider names and a separate refactor will collapse the
+ * `tenant_policies` schema onto two-axis pairs.
+ */
+function legacyProviderNameToAxes(name: string): { compute_kind: ComputeKindName; isolation_kind: IsolationKindName } {
+  switch (name) {
+    case "local":
+      return { compute_kind: "local", isolation_kind: "direct" };
+    case "docker":
+      return { compute_kind: "local", isolation_kind: "docker" };
+    case "devcontainer":
+      return { compute_kind: "local", isolation_kind: "devcontainer" };
+    case "firecracker":
+      return { compute_kind: "firecracker", isolation_kind: "direct" };
+    case "ec2":
+    case "remote-arkd":
+    case "remote-worktree":
+      return { compute_kind: "ec2", isolation_kind: "direct" };
+    case "ec2-docker":
+    case "remote-docker":
+      return { compute_kind: "ec2", isolation_kind: "docker" };
+    case "ec2-devcontainer":
+    case "remote-devcontainer":
+      return { compute_kind: "ec2", isolation_kind: "devcontainer" };
+    case "k8s":
+      return { compute_kind: "k8s", isolation_kind: "direct" };
+    case "k8s-kata":
+      return { compute_kind: "k8s-kata", isolation_kind: "direct" };
+    default:
+      return { compute_kind: "local", isolation_kind: "direct" };
+  }
+}
+
+/** Reverse of legacyProviderNameToAxes -- used only for tenant-policy lookups. */
+function axesToLegacyProviderName(compute_kind: ComputeKindName, isolation_kind: IsolationKindName): string {
+  if (compute_kind === "local") {
+    if (isolation_kind === "direct") return "local";
+    if (isolation_kind === "docker") return "docker";
+    if (isolation_kind === "devcontainer") return "devcontainer";
+  }
+  if (compute_kind === "ec2") {
+    if (isolation_kind === "direct") return "ec2";
+    if (isolation_kind === "docker") return "ec2-docker";
+    if (isolation_kind === "devcontainer") return "ec2-devcontainer";
+  }
+  if (compute_kind === "firecracker") return "firecracker";
+  if (compute_kind === "k8s") return "k8s";
+  if (compute_kind === "k8s-kata") return "k8s-kata";
+  return compute_kind;
 }
