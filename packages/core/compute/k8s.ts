@@ -23,6 +23,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
+import { DEFAULT_CONDUCTOR_URL } from "../constants.js";
 import type { AppContext } from "../app.js";
 import type { Session } from "../../types/session.js";
 import { ArkdClient } from "../../arkd/client/index.js";
@@ -540,7 +541,7 @@ export class K8sCompute implements Compute {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
         ARK_ARKD_URL: `http://localhost:${ARKD_POD_PORT}`,
       },
     };
