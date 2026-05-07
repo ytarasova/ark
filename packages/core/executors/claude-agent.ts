@@ -173,6 +173,15 @@ export const claudeAgentExecutor: Executor = {
     const runtimeDef = await app.runtimes?.get?.("claude-agent");
     Object.assign(arkEnv, buildAgentSdkRuntimeEnv(runtimeDef));
 
+    // Propagate the dev-direct escape hatch into the launcher's child env so
+    // launch.ts's hard ANTHROPIC_API_KEY check can fall through to the bundled
+    // claude binary's native auth (~/.claude/credentials.json on linux,
+    // macOS keychain on darwin) when no API key is configured. Pairs with the
+    // matching gates in resolve-stage.ts and Model.transportKey.
+    if (process.env.ARK_DEV_FORCE_DIRECT === "1") {
+      arkEnv.ARK_DEV_FORCE_DIRECT = "1";
+    }
+
     // Secrets (ANTHROPIC_API_KEY etc.) take precedence -- last-write-wins.
     const secretEnv = opts.env ?? {};
 

@@ -94,6 +94,11 @@ export async function startHostedServer(config: ArkConfig): Promise<{
           await (tenantApp.runtimes as any).list?.().catch(() => {});
           void tenantApp.dispatchService
             .dispatch(s.id)
+            .then((res: { ok: boolean; message?: string }) => {
+              if (!res.ok) {
+                logInfo("web", `dispatch poller: ${s.id} failed: ${res.message ?? "(no message)"}`);
+              }
+            })
             .catch((err: Error) => {
               logInfo("web", `dispatch poller: ${s.id} failed: ${err?.message ?? err}`);
             })
