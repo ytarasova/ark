@@ -16,6 +16,7 @@ import type { MessageRepository } from "../repositories/message.js";
 import type { AppContext } from "../app.js";
 import { logDebug } from "../observability/structured-log.js";
 import { SessionDispatchListeners, markDispatchFailedShared } from "./session-dispatch-listeners.js";
+import { ValidationError } from "./orchestrator-errors.js";
 
 // ── SessionService ───────────────────────────────────────────────────────────
 
@@ -59,6 +60,13 @@ export class SessionService {
    * no telemetry, no OTLP spans (those belong at the orchestration layer above).
    */
   async start(opts: CreateSessionOpts): Promise<Session> {
+    // RF-5: reject inline attachment bytes -- callers must upload to BlobStore first.
+    if (opts.attachments?.some((a: any) => a.content && !a.locator)) {
+      throw new ValidationError(
+        "startSession: attachment.content is not allowed; upload to BlobStore and pass locator instead",
+      );
+    }
+
     // compute_name fallback: explicit arg > "local". Mirrors the
     // service-level default in `services/session/create.ts` so every
     // path through `sessionService.start` lands in the DB with a

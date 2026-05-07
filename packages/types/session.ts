@@ -268,7 +268,12 @@ export interface CreateSessionOpts {
   /** Workspace id for workspace-scoped dispatch. Null/undefined = legacy repo-only. */
   workspace_id?: string | null;
   inputs?: SessionInputs;
-  attachments?: Array<{ name: string; content: string; type: string }>;
+  /**
+   * Input file attachments. Callers MUST upload bytes to BlobStore first and
+   * pass a `locator` here -- inline `content` without a `locator` is rejected
+   * at the service boundary (RF-5) so Temporal can serialize activity inputs.
+   */
+  attachments?: Array<{ name: string; content?: string; type: string; locator?: string }>;
 }
 
 export interface SessionListFilters {
