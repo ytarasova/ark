@@ -236,9 +236,14 @@ engine runs. Temporal sits above them, not in place of them.
 
 ### Projector consistency
 
-Every state-changing workflow step calls `project*Activity` with a monotonic `projectionSeq`.
+Every state-changing workflow step passes `projectionSeq = workflow.info().historyLength` into
+`project*Activity`. The Temporal SDK increments `historyLength` on every workflow task
+(activity call, signal, timer) so it is naturally monotonic within a workflow with no
+bookkeeping needed.
+
 The projector compares against `session_projections.last_seq` in a transaction; lower or equal
-seq = no-op. Out-of-order or retried projections are idempotent.
+seq = no-op. This makes every projection write idempotent against retries and against the shadow
+orchestrator writing to the same table.
 
 ```
 BEGIN;
@@ -302,18 +307,18 @@ On workflow cancel, `CancellationScope` runs compensations with retry-until-succ
 
 ### Dev / CI (this branch)
 
-Extend the existing e2e harness:
+Temporal services are **always** part of the e2e docker-compose stack -- not opt-in. Both
+`test-e2e-control-plane` and `test-e2e-temporal` use the same stack.
 
 - `.infra/docker-compose.e2e.yaml` adds `temporal` + `temporal-postgres` + `temporal-ui` on
   shifted ports (`:7234`, `:8089`) -- no clash with `make dev-temporal` (`:7233`, `:8088`).
-- `e2e/helpers/docker-stack.ts` gains `withTemporal: boolean` (default false).
-- `e2e/helpers/server-process.ts` gains `withTemporalWorker: boolean`. When true, spawns
-  `bun packages/core/temporal/worker.ts` as a sibling subprocess in the same temp arkDir.
-- New `.env.e2e-temporal` overlay: `TEMPORAL_HOST=localhost:7234`,
-  `ARK_TEMPORAL_NAMESPACE=ark-e2e`, `features.temporalOrchestration=true`.
+- A `temporal-worker` service is added to the same compose file. It runs the Ark image with
+  the worker entrypoint (`bun packages/core/temporal/worker.ts`). The `make test-e2e-*`
+  targets depend on `make docker-build-worker` so the image is current before tests run.
+- No `withTemporal` flag on `docker-stack.ts` -- Temporal is always up.
+- `.env.e2e` gains `TEMPORAL_HOST=localhost:7234` and `ARK_TEMPORAL_NAMESPACE=ark-e2e`.
 - New Make targets: `test-e2e-temporal-up`, `test-e2e-temporal-down`, `test-e2e-temporal`.
-
-Existing `test-e2e-control-plane` continues to run on the lighter stack throughout.
+- `test-e2e-control-plane` continues to pass unchanged -- it ignores Temporal entirely.
 
 ### Production (design only -- Helm in Phase 4)
 
@@ -365,12 +370,12 @@ runtime. RPC calls carry `X-Ark-Tenant-Id` to route tenants.
 ### T2 -- Crash recovery mid-stage (the headline win)
 
 **Condition.** Hosted, `features.temporalOrchestration=on`. Stub-agent sleeps 30s before
-posting `CompletionReport`. Worker pool size 2; worker spawnable as a child process.
+posting `CompletionReport`. The `temporal-worker` compose service runs with `replicas: 2`.
 
 **Input.**
 1. `session/start` flow=`e2e-docs`. Wait for `session_stages[stage=plan].status='running'`.
-2. `SIGKILL` the Temporal worker process.
-3. Within 5s, spawn a fresh worker on the same task queue.
+2. `docker kill <temporal-worker-container-1>` (SIGKILL one worker replica).
+3. Docker automatically restarts the killed container within 5s (restart policy: `on-failure`).
 
 **Assert.**
 - Session reaches `status=completed` within 60s of the kill.
@@ -461,13 +466,13 @@ Mergeable when all of the following are true:
 The 24-hour shadow run on staging with zero projection diff is the Phase 5 gate (not a merge
 gate for this branch).
 
-## 9. Open questions
+## 9. Resolved decisions
 
-1. **Fan-out join.** Under pure Temporal this is `Promise.all` of child workflow results -- no
-   signal needed. Confirm before PR-5.
-2. **Review gate.** `workflow.condition(() => approved)` with a workflow variable, or an
-   explicit `approveReviewGate` signal? Pick one before PR-5.
-3. **`projectionSeq` source.** `workflow.info().workflowTaskSequence` (free, from SDK) or an
-   explicit counter? Recommend the SDK field.
-4. **Worker lifecycle in e2e tests.** Subprocess spawned in `beforeAll` (fast, matches how we
-   spawn the server) vs a docker-compose service (closer to production). Recommend subprocess.
+All implementation choices are closed.
+
+| # | Question | Decision |
+|---|---|---|
+| Q1 | Fan-out join mechanism | `Promise.all` of child workflow handles -- no signal, structural guarantee |
+| Q2 | Review gate | Explicit `approveReviewGate` / `rejectReviewGate` signals |
+| Q3 | `projectionSeq` source | `workflow.info().historyLength` -- free from SDK, naturally monotonic |
+| Q4 | Worker in e2e | `temporal-worker` compose service (replicas: 2, restart: on-failure) |
