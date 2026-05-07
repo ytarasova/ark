@@ -1,7 +1,7 @@
 # Ark Architecture Reference
 
 > Canonical technical reference for the Ark codebase. Terse, factual, no tutorials.
-> Last updated: 2026-04-10
+> Last updated: 2026-05-07
 
 ## Table of Contents
 
@@ -1147,7 +1147,7 @@ Clients subscribe to `/sse?tenant=<id>` (hosted) or `/sse` (local) and get a str
 
 | Service | Default port | Configurable | Notes |
 |---|---|---|---|
-| Conductor | `19100` | No (hardcoded) | References in `conductor.ts`, `channel.ts`, `constants.ts`, tests |
+| Conductor | `19400` | Yes (`ARK_CONDUCTOR_PORT`) | Merged listener (PR #530); was `:19100` before the conductor/server merge |
 | ArkD | `19300` | Yes (`ARK_ARKD_PORT`) | Universal agent daemon |
 | Channel | `19200 + hash` | Deterministic per session | `19200 + (parseInt(sessionId.replace("s-",""), 16) % 10000)` |
 | LLM Router | `8430` | Yes | OpenAI-compatible proxy |

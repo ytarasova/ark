@@ -1,82 +1,178 @@
-# PLAN: One-line note in docs/architecture.md
+# PLAN: Third e2e attempt -- confirm autonomous-sdlc end-to-end on clean state
 
 ## 1. Summary
 
-The task name is truncated (`add-a-one-line-note-to-docs-architecture-md-mentioning-that-` --
-the predicate after "that" is missing). The most plausible referent, given the recent five
-`refactor(arkd): ...` commits on this branch finishing the arkd `client/` / `server/` /
-`common/` separation, is the new arkd package layout: Section 4.1 of `docs/architecture.md`
-still calls arkd a "Single binary (`packages/arkd/server.ts`, ~800 lines)" -- stale after
-commits `c3b89eb9`, `f0311621`, `63889c7a`. This plan adds one sentence to that section to
-record the split. No code, no tests.
+Third attempt at driving the six-stage `autonomous-sdlc` flow
+(plan -> implement -> verify -> review -> pr -> merge) to completion on a
+clean branch state. Branch `smoke/clean-fix-e2e` sits at the PR #530 merge
+commit (`6cd51e75`) with no commits ahead -- prior attempts on
+`smoke/post-pr530-e2e` (planner only) and `smoke/post-pr530-fix-e2e` (PR #531
+still OPEN, mergeStateStatus UNSTABLE waiting on `test` + `web-e2e`) did not
+reach merge. The "feature" is a deliberately trivial docs-only edit: update
+the Conductor row in Section 15 (Ports Reference) of `docs/architecture.md`
+from the retired `:19100` port to the post-PR530 merged `:19400` port. The
+real point of this task is exercising the flow end-to-end, not the diff.
 
 ## 2. Files to modify/create
 
-- `docs/architecture.md` -- add one sentence to Section 4.1 noting that arkd is organized as
-  `client/`, `server/`, `common/` sub-packages with an ESLint boundary rule, and bump the
-  `Last updated:` line at top.
-- `PLAN.md` -- this planning artifact (committed on this branch by the planner).
+- `docs/architecture.md` -- update one row of the table at line 1150 (the
+  Conductor row in Section 15 "Ports Reference"). Bump `Last updated:` on
+  line 4. No other lines touched.
+- `PLAN.md` -- this artifact, replaces the stale PLAN.md currently on HEAD
+  (which was inherited from PR #518 and describes the older arkd-split task).
+  The planner stage commits this; the implementer leaves it alone.
 
-No new files, no code, no schema, no tests.
+No code, no schema, no migrations, no YAML, no tests, no new files.
 
 ## 3. Implementation steps
 
-These are independent and can each be verified standalone.
+Each step is independently verifiable. Implementer does NOT touch PLAN.md.
 
-1. **Edit Section 4.1** of `docs/architecture.md` (lines 459-461):
-   - Replace the "Single binary (`packages/arkd/server.ts`, ~800 lines)" wording with prose
-     that reflects the current layout: server entry under `packages/arkd/server/`, typed
-     `client/` for callers, shared `common/`, and an ESLint `no-restricted-imports` boundary
-     preventing `client/` <-> `server/` cross-imports.
-   - Keep the addition to one sentence; do not balloon the section. The task explicitly says
-     "one-line note".
-2. **Bump the `Last updated:` line** at `docs/architecture.md` line 4 to `2026-05-06`.
-3. **Run `make format`** to apply Prettier to the Markdown file.
-4. **Sanity-grep** for the now-stale phrase elsewhere in `docs/`:
-   `grep -rn "arkd/server.ts" docs/` and `grep -rn "single binary" docs/`. If hits exist
-   outside Section 4.1, **do not fix them in this task** (scope creep -- task is a one-line
-   note). Note them in the commit body as a follow-up.
-5. **Stage and commit**:
-   `git add docs/architecture.md PLAN.md` then
-   `git commit -m "docs(architecture): note arkd client/server/common split"`.
-6. **Verify** with `git log --oneline -1` that the commit landed and `git show --stat HEAD`
-   that only the two expected files changed.
+1. **Locate the target row.** Open `docs/architecture.md` and go to
+   Section 15 "Ports Reference" (header at line 1146). The Conductor row is
+   line 1150 and currently reads:
+
+   ```
+   | Conductor | `19100` | No (hardcoded) | References in `conductor.ts`, `channel.ts`, `constants.ts`, tests |
+   ```
+
+   This is stale: PR #530 collapsed the standalone `:19100` HTTP server into
+   the merged conductor listener on `:19400` (configurable via
+   `ARK_CONDUCTOR_PORT` per `CLAUDE.md`'s env-var table).
+
+2. **Replace the row** with the post-PR530 truth. Suggested wording (one
+   line, table format preserved):
+
+   ```
+   | Conductor | `19400` | Yes (`ARK_CONDUCTOR_PORT`) | Merged listener (PR #530); was `:19100` before the conductor/server merge |
+   ```
+
+   Do **not** edit any other rows in the same table -- ArkD, Channel, LLM
+   Router, TensorZero, Web UI, Test conductor are all still correct.
+
+3. **Bump `Last updated:`** on line 4 from `2026-04-10` to `2026-05-07`.
+   No other header changes.
+
+4. **Run `make format`.** Prettier covers Markdown -- it should be a no-op
+   on the table edit. If it reflows the surrounding paragraphs, that is
+   acceptable but should be visible in the diff. Investigate any change
+   outside the two intended edits before committing.
+
+5. **Run `make lint`.** ESLint does not lint Markdown but the project's
+   "Before Committing" checklist (`CLAUDE.md`) requires zero warnings.
+   Must exit 0.
+
+6. **Run `make test`.** No test should be affected by a docs-only change.
+   If something fails, the failure is a pre-existing flake (likely the same
+   `test` / `web-e2e` flakes that left PR #531 in mergeStateStatus
+   UNSTABLE). Surface it via the verifier's `report(error)` -- do not paper
+   over it. This smoke is exactly the place to catch repeat flakes.
+
+7. **Stage and commit.** Commit message describes the actual change, not
+   the smoke meta-task (the meta is the session/PR title):
+
+   ```bash
+   git add docs/architecture.md
+   git commit -m "docs(architecture): update Conductor port row to :19400 (post-PR530)"
+   ```
+
+8. **Verify the commit landed.**
+   - `git log --oneline -1` shows the new commit.
+   - `git show --stat HEAD` shows exactly one file (`docs/architecture.md`)
+     touched, two lines changed (the table row + the date).
+   - `git diff main...HEAD -- docs/architecture.md` shows just the two
+     edits plus this PLAN.md (which the planner stage put in HEAD~1).
+
+9. **Call `report(completed)`** from the implementer with: files changed
+   (`docs/architecture.md`), test result (pass), and a one-line note that
+   the diff is intentionally minimal because this is a flow smoke.
 
 ## 4. Testing strategy
 
-- No code changed -> no unit tests to write or run.
-- `make format` must succeed (Prettier covers Markdown). Run it before committing.
-- `make lint` is unaffected by Markdown but is cheap; a quick run is reasonable belt-and-
-  braces and matches the pre-commit checklist in CLAUDE.md.
-- Manual: `git diff HEAD~1 -- docs/architecture.md` should show one sentence changed in
-  Section 4.1 plus the `Last updated:` bump -- nothing else. A reviewer should be able to
-  read the diff in under 10 seconds.
+The autonomous-sdlc verify, review, pr, and merge stages each run their own
+checks; the planner does not duplicate that work here.
+
+- **Unit tests:** none added. No source code changes, so no tests are
+  needed and none should be added (would be scope creep).
+- **`make format`:** must succeed; Prettier-clean.
+- **`make lint`:** zero warnings (per CLAUDE.md "Before Committing").
+- **`make test`:** must pass. If a flake fails, escalate via `report(error)`
+  with the failing test name -- the verify stage exists for this.
+- **Manual verification of the diff:**
+  `git diff main...HEAD -- docs/architecture.md` should show:
+  - one row of the Section 15 table replaced (Conductor row only),
+  - the `Last updated:` line bumped from `2026-04-10` to `2026-05-07`,
+  - nothing else.
+  A reviewer should read the diff in under 10 seconds.
+- **Acceptance criterion for the *flow as a whole*:** a PR is created
+  against `main`, CI passes, auto-merge merges it, the session reports
+  `completed` for all six stages, and `gh pr list --state merged` shows
+  the new PR.
 
 ## 5. Risk assessment
 
-- **Blast radius:** zero. Documentation only -- no runtime, build, schema, or test surface
-  is touched.
-- **Misinterpretation of the truncated task:** the missing predicate after "mentioning that"
-  could plausibly point elsewhere. Other recent-commit candidates:
-  - the test split between unit and compute-e2e (`9e58a6a8`)
-  - the autonomous-flow port hardcoding fix (`9e58a6a8`)
-  - dropping the flaky attach-sweep test (`96400e59`)
-  None of these match `docs/architecture.md` as a target as cleanly as the arkd refactor
-  does, since architecture.md Section 4.1 is the only place where text is now factually
-  stale because of recent commits. Still, if the implementer or reviewer reads the truncated
-  task differently, the edit may need to be redirected -- see Open Questions.
-- **Breaking changes / migrations:** none.
+- **Blast radius:** zero for the docs change itself. One table row in one
+  Markdown file -- no runtime, build, schema, or test surface touched.
+- **Conflict with the open PR #531** (second-attempt branch, still OPEN
+  against `main`, touches Section 5 opener of the same file):
+  - Section 5 opener (lines 532-536) and Section 15 table (line 1150) are
+    >600 lines apart in the same file. Git should three-way-merge cleanly
+    in either order. No anticipated text conflict.
+  - If PR #531 lands first via auto-merge before this attempt's PR is
+    created, the diff still applies -- the Section 15 row is untouched
+    by PR #531.
+  - If this attempt's PR lands first, PR #531's diff still applies for
+    the same reason.
+- **`create_pr` action behaviour on this branch:** `createPullRequest` in
+  `packages/core/services/worktree/pr.ts` is idempotent against existing
+  PRs (returns the existing URL with `result.existed=true`, line 583).
+  Since `smoke/clean-fix-e2e` has no PR yet (`gh pr list --head
+  smoke/clean-fix-e2e` returned `[]`), a fresh PR is created.
+- **`auto_merge` action behaviour:** runs `gh pr merge --auto` on the
+  url returned by `create_pr`. If branch protection requires reviews or
+  the same checks (`test`, `web-e2e`) are still pending/flaky, the merge
+  sits in `--auto` waiting state. That is still a "flow worked" outcome
+  for this smoke; the implementer must NOT force-merge or otherwise
+  paper over it.
+- **Pre-existing flaky CI** (`test`, `web-e2e` are pending on PR #531):
+  if they flake again here, this smoke surfaces it. That is the smoke
+  doing its job, not a smoke failure. Verify stage should `report(error)`
+  with the failing job name and a link.
+- **Branch-name collision on push:** `smoke/clean-fix-e2e` is currently
+  unique (no other branches share the name; remote has not seen it yet
+  per the empty `gh pr list` result). The auto-rename safety net in
+  `pr.ts:508-544` covers the unlikely case where it does collide.
+- **Stale PLAN.md on HEAD:** the existing PLAN.md (committed in PR #518)
+  describes a completely different task (arkd client/server/common split).
+  The planner stage MUST overwrite it with this content; if the
+  implementer reads the old PLAN.md first they will be misled.
+- **Breaking changes:** none.
+- **Migrations:** none.
+- **Concurrency / state:** none -- no shared resource is touched.
+- **Stale-text drift:** the diff fixes only the table row in Section 15.
+  Other `:19100` references remain at lines 75, 180-181, 197, 209, 489,
+  680 of `docs/architecture.md`. They are intentionally out of scope --
+  a full doc cleanup is a separate, larger task and would balloon the
+  diff past the "smoke" threshold. Note them in the commit body as a
+  follow-up, do not fix them.
 
 ## 6. Open questions
 
-- **What does the truncated task title actually say?** The task name ends with `mentioning
-  that-` and is cut off. Two answers resolve the ambiguity:
-  1. Read the originating issue / message that produced this task name (the planner does not
-     have access to it).
-  2. Ask the user for the missing predicate.
-  If neither is available before implementation, the implementer should proceed with the
-  arkd-split interpretation (highest-signal match against recent commits) and call out the
-  ambiguity in the commit body so a reviewer can redirect cheaply.
-- **If the answer is something other than the arkd split** (e.g. the test-suite split,
-  Temporal phasing, or some unrelated subject), this plan does not apply. Abort and re-plan
-  rather than shoe-horning the wrong note into Section 4.1.
+- **Truncated task title** (`third-e2e-attempt-confirm-autonomous-sdlc-
+  end-to-end-on-clea`). The trailing `clea` almost certainly truncates
+  `clean` (matching the branch name `smoke/clean-fix-e2e` and the
+  numbered third-attempt sequence). Best-guess interpretation, used by
+  this plan: drive autonomous-sdlc end-to-end on a clean branch
+  (no prior smoke commits). If the user intended something else (e.g.
+  "on Cleanup PR", "on cleaning up X"), the implementer should pause
+  and ask before changing the diff.
+- **Whether this attempt should wait for PR #531 to merge first.** This
+  plan says no -- the two PRs touch disjoint regions of the same file
+  and either ordering merges cleanly. If the user wants serialised
+  smokes, they should explicitly cancel/close PR #531 before running
+  this attempt.
+- **Whether the verify stage should fail closed on pre-existing CI
+  flakes.** This plan says yes (escalate, do not paper over). If the
+  user wants the smoke to pass *despite* known flakes, the verifier
+  needs an allowlist -- that is a flow-engine change, not an implementer
+  concern, and should be raised separately.
