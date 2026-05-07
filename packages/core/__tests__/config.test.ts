@@ -16,7 +16,7 @@ describe("loadConfig", () => {
     const cfg = loadConfig();
     expect(cfg.dirs.ark).toContain(".ark");
     expect(cfg.dbPath).toContain("ark.db");
-    expect(cfg.ports.conductor).toBe(19100);
+    expect(cfg.ports.conductor).toBe(19400);
     expect(cfg.env).toBe("production");
   });
 

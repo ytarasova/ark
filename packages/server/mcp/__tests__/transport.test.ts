@@ -14,7 +14,7 @@ beforeAll(async () => {
   server = new ArkServer();
   registerAllHandlers(server.router, app);
   server.attachApp(app);
-  port = app.config.ports.server;
+  port = app.config.ports.conductor;
   ws = server.startWebSocket(port);
 });
 

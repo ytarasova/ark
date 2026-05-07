@@ -13,7 +13,7 @@
  *
  * Local mode:
  *   The CLI is a pure client. If no server daemon is reachable on
- *   config.ports.server, one is auto-spawned via `ark server daemon start`
+ *   config.ports.conductor, one is auto-spawned via `ark server daemon start`
  *   the first time a command asks for a client. Subsequent invocations
  *   connect to the now-running daemon. See `./app-client.ts`.
  */

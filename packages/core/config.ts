@@ -27,7 +27,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync } from "fs";
 import YAML from "yaml";
-import { DEFAULT_CONDUCTOR_URL, DEFAULT_ROUTER_URL } from "./constants.js";
+import { DEFAULT_CONDUCTOR_URL, DEFAULT_CONDUCTOR_PORT, DEFAULT_ROUTER_URL } from "./constants.js";
 import type { AuthConfig } from "./auth/index.js";
 import type {
   ArkProfile,
@@ -280,7 +280,7 @@ export function loadConfig(overrides: LoadConfigOptions = {}): ArkConfig {
   const profile = detectProfile(overrides.profile);
   const defaults: ProfileDefaults = {
     profile,
-    ports: { conductor: 19100, arkd: 19300, server: 19400, web: 8420 },
+    ports: { conductor: 19400, arkd: 19300, web: 8420 },
     channels: { basePort: 19200, range: 10000 },
     auth: { requireToken: profile === "control-plane", defaultTenant: null },
     features: { autoRebase: profile === "control-plane" },
@@ -318,7 +318,6 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   const ports: PortsConfig = {
     conductor: merged.ports.conductor ?? defaults.ports.conductor,
     arkd: merged.ports.arkd ?? defaults.ports.arkd,
-    server: merged.ports.server ?? defaults.ports.server,
     web: merged.ports.web ?? defaults.ports.web,
   };
   const channels: ChannelsConfig = {
@@ -382,7 +381,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   const conductorUrl =
     overrides.conductorUrl ??
     process.env.ARK_CONDUCTOR_URL ??
-    (ports.conductor !== 19100 ? `http://localhost:${ports.conductor}` : DEFAULT_CONDUCTOR_URL);
+    (ports.conductor !== DEFAULT_CONDUCTOR_PORT ? `http://localhost:${ports.conductor}` : DEFAULT_CONDUCTOR_URL);
 
   // Legacy `env` field: matches original semantics (ARK_TEST_DIR presence only).
   // The new profile system captures test-mode more broadly via `profile`.

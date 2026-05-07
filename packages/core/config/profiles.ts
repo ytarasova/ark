@@ -65,9 +65,8 @@ export async function localDefaults(): Promise<ProfileDefaults> {
     profile: "local",
     // ports -- fixed; ARK_* env vars still win.
     ports: {
-      conductor: 19100,
+      conductor: 19400,
       arkd: 19300,
-      server: 19400,
       web: 8420,
     },
     channels: { basePort: 19200, range: 10000 },
@@ -83,9 +82,8 @@ export async function controlPlaneDefaults(): Promise<ProfileDefaults> {
   return {
     profile: "control-plane",
     ports: {
-      conductor: 19100,
+      conductor: 19400,
       arkd: 19300,
-      server: 19400,
       web: 8420,
     },
     channels: { basePort: 19200, range: 10000 },
@@ -103,8 +101,7 @@ export async function controlPlaneDefaults(): Promise<ProfileDefaults> {
  * collide. Dirs live under `os.tmpdir()` namespaced by PID.
  */
 export async function testDefaults(): Promise<ProfileDefaults> {
-  const [conductor, arkd, server, web] = await Promise.all([
-    allocatePort(),
+  const [conductor, arkd, web] = await Promise.all([
     allocatePort(),
     allocatePort(),
     allocatePort(),
@@ -115,7 +112,7 @@ export async function testDefaults(): Promise<ProfileDefaults> {
   return {
     profile: "test",
     arkDir,
-    ports: { conductor, arkd, server, web },
+    ports: { conductor, arkd, web },
     channels: { basePort: channelsBase, range: 1000 },
     auth: { requireToken: false, defaultTenant: null },
     features: { autoRebase: false },

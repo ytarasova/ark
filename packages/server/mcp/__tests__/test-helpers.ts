@@ -38,7 +38,7 @@ export async function bootMcpTestServer(opts?: BootMcpTestServerOpts): Promise<M
   registerAllHandlers(server.router, app);
   if (opts?.authSection?.requireToken) server.attachAuth(app);
   server.attachApp(app);
-  const port = app.config.ports.server;
+  const port = app.config.ports.conductor;
   const ws = server.startWebSocket(port);
 
   let nextId = 1;

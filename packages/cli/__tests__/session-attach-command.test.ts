@@ -22,7 +22,7 @@ let port: number;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  port = app.config.ports.server;
+  port = app.config.ports.conductor;
   const s = new ArkServer();
   registerAllHandlers(s.router, app);
   s.attachLifecycle(app);
