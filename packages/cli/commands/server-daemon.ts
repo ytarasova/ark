@@ -271,10 +271,10 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       }
 
       // No PID file or dead process -- try default port anyway
-      const { DEFAULT_SERVER_PORT } = await import("../../core/constants.js");
-      const health = await probeHealth(DEFAULT_SERVER_PORT);
+      const { DEFAULT_CONDUCTOR_PORT } = await import("../../core/constants.js");
+      const health = await probeHealth(DEFAULT_CONDUCTOR_PORT);
       if (health.ok) {
-        console.log(chalk.green(`Server daemon is running on port ${DEFAULT_SERVER_PORT} (no PID file)`));
+        console.log(chalk.green(`Server daemon is running on port ${DEFAULT_CONDUCTOR_PORT} (no PID file)`));
         if (health.data?.pid) console.log(`  PID:    ${health.data.pid}`);
         if (health.data?.uptime) console.log(`  Uptime: ${Math.round(health.data.uptime)}s`);
         return;
