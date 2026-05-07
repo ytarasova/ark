@@ -1,0 +1,59 @@
+# Isolated Postgres + Redis for the control-plane e2e test suite.
+#
+# Distinct from .infra/docker-compose.dev.yaml so a developer running
+# `make dev-stack` locally can also run `make test-e2e-control-plane`
+# without either stack touching the other's data, ports, or volumes.
+#
+# Brings up:
+#   - ark-e2e-postgres : Postgres 16 on :15434 (vs dev :15433)
+#   - ark-e2e-redis    : Redis 7    on :6380  (vs dev :6379)
+#
+# Volumes: ark-e2e-* (vs dev's ark-dev-*). Wiped on every
+# `make test-e2e-control-plane` run via `down -v`.
+#
+# Usage (via Makefile):
+#   make test-e2e-control-plane            # full lifecycle
+#   make test-e2e-control-plane-up         # just bring up (debug)
+#   make test-e2e-control-plane-down       # just tear down (debug)
+
+name: ark-e2e
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ark-e2e-postgres
+    restart: "no"
+    environment:
+      POSTGRES_USER: ark
+      POSTGRES_PASSWORD: ark
+      POSTGRES_DB: ark
+    ports:
+      - "15434:5432"
+    volumes:
+      - ark-e2e-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ark -d ark"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: ark-e2e-redis
+    restart: "no"
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - ark-e2e-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  ark-e2e-postgres-data:
+    name: ark-e2e-postgres-data
+  ark-e2e-redis-data:
+    name: ark-e2e-redis-data
