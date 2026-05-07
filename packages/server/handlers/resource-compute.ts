@@ -359,10 +359,13 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
       await computeImpl.stop(handle);
       await app.computes.update(compute.name, { status: "stopped" });
     } catch (e: any) {
-      // checkStatus stays on the legacy registry until follow-up issue ports it.
-      const provider = app.getProvider(compute.compute_kind);
-      if (provider?.checkStatus) {
-        const real = await provider.checkStatus(compute).catch((err) => {
+      // Stop failed -- probe the live state via the Compute's own checkStatus.
+      // If the cloud provider reports the box is gone (terminated / shutting-
+      // down), mirror that into the DB so the UI doesn't show a stuck
+      // "stopping" row. checkStatus is optional on Compute; computes that
+      // can't probe out-of-band omit it and we re-throw the original error.
+      if (computeImpl.checkStatus) {
+        const real = await computeImpl.checkStatus(handle).catch((err) => {
           logDebug("compute", `compute/stop-instance: checkStatus probe failed (name=${compute.name})`, {
             name: compute.name,
             kind: compute.compute_kind,
@@ -448,17 +451,24 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     if (!computeImpl.capabilities.canReboot) {
       throw new RpcError(`Compute kind '${compute.compute_kind}' does not support reboot`, ErrorCodes.UNSUPPORTED);
     }
-    // `reboot` lives on the legacy registry until a dedicated ComputeTarget
-    // hook lands (filed as a follow-up issue). Look up by compute kind so
-    // the matching legacy stub is reachable.
-    const provider = app.getProvider(compute.compute_kind);
-    if (!provider?.reboot) {
+    if (!computeImpl.reboot) {
       throw new RpcError(
         `Compute kind '${compute.compute_kind}' declares canReboot but has no reboot() implementation`,
         ErrorCodes.INTERNAL_ERROR,
       );
     }
-    await provider.reboot(compute);
+    const handle = computeImpl.attachExistingHandle?.({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (!handle) {
+      throw new RpcError(
+        `Compute '${compute.name}' has not been provisioned -- nothing to reboot`,
+        ErrorCodes.NOT_FOUND,
+      );
+    }
+    await computeImpl.reboot(handle);
     return { ok: true };
   });
 
@@ -484,11 +494,15 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         });
         return { reachable: true, message: stdout.trim() };
       }
-      // Check provider status if SSM is offline. `checkStatus` lives on the
-      // legacy registry until a dedicated ComputeTarget hook lands.
-      const provider = app.getProvider(compute.compute_kind);
-      if (provider?.checkStatus) {
-        const real = await provider.checkStatus(compute).catch((err) => {
+      // Check live state via the Compute's own checkStatus when SSM is offline.
+      const computeImpl = app.getCompute(compute.compute_kind);
+      const handle = computeImpl?.attachExistingHandle?.({
+        name: compute.name,
+        status: compute.status,
+        config: (compute.config ?? {}) as Record<string, unknown>,
+      });
+      if (computeImpl?.checkStatus && handle) {
+        const real = await computeImpl.checkStatus(handle).catch((err) => {
           logDebug("compute", `compute/ping: checkStatus probe failed (name=${compute.name})`, {
             name: compute.name,
             kind: compute.compute_kind,
@@ -499,7 +513,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         if (real && real !== compute.status) {
           await app.computes.update(compute.name, { status: real });
         }
-        return { reachable: false, message: `Unreachable -- provider status: ${real ?? "unknown"}` };
+        return { reachable: false, message: `Unreachable -- compute status: ${real ?? "unknown"}` };
       }
       return { reachable: false, message: "Unreachable -- SSM agent offline" };
     } catch {

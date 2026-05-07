@@ -256,7 +256,7 @@ export async function pipePaneAsync(name: string, outputPath: string): Promise<v
  * Get the local-side attach command for a tmux session.
  *
  * Always returns `tmux attach -t <name>`. Remote-compute attaches go through
- * `provider.getAttachCommand(compute, session)` (e.g. `aws ssm start-session`
+ * `Compute.getAttachCommand(handle, session)` (e.g. `aws ssm start-session`
  * for EC2, `kubectl exec` for k8s) -- the conductor->arkd transport stopped
  * being SSH when the migration to AWS SSM landed, so the old `ssh -t ...`
  * branch this helper used to wrap is gone.

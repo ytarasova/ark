@@ -22,7 +22,6 @@ import type { WorkspaceStore } from "../../workspace/store.js";
 import type { Workspace } from "../../workspace/types.js";
 import type { UsageRecorder } from "../../observability/usage.js";
 import type { StatusPollerRegistry } from "../../executors/status-poller.js";
-import type { ComputeProvider } from "../../compute/legacy-provider.js";
 import type { ComputeTarget } from "../../compute/compute-target.js";
 
 // ── Callbacks for helpers that still take AppContext ────────────────────────
@@ -42,9 +41,6 @@ export interface DeleteCredsSecretCb {
 }
 export interface GcComputeIfTemplateCb {
   (computeName: string | null | undefined): Promise<boolean>;
-}
-export interface ResolveProviderCb {
-  (session: Session): Promise<{ provider: ComputeProvider | null; compute: Compute | null }>;
 }
 export interface ResolveComputeTargetCb {
   (session: Session): Promise<{ target: ComputeTarget | null; compute: Compute | null }>;
@@ -113,7 +109,6 @@ export interface SessionLifecycleDeps {
   removeWorktree: RemoveWorktreeCb;
   deleteCredsSecret: DeleteCredsSecretCb;
   gcComputeIfTemplate: GcComputeIfTemplateCb;
-  resolveProvider: ResolveProviderCb;
   resolveComputeTarget: ResolveComputeTargetCb;
   /** Stage-advance callback. Used by approveReviewGate to force-advance past a gate. */
   advance: AdvanceCb;

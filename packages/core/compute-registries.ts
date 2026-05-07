@@ -1,29 +1,17 @@
 /**
- * In-memory registries for legacy `ComputeProvider`s plus the new
- * `Compute` / `Isolation` kinds and warm `ComputePool`s.
+ * In-memory registries for the new `Compute` / `Isolation` kinds and warm
+ * `ComputePool`s.
  *
- * Lives on AppContext because providers are registered imperatively at
- * boot. Keeping the maps + mutators here keeps app.ts focused on lifecycle.
+ * Lives on AppContext because impls are registered imperatively at boot.
+ * Keeping the maps + mutators here keeps app.ts focused on lifecycle.
  */
-import type { ComputeProvider } from "./compute/legacy-provider.js";
 import type { Compute as NewCompute, Isolation as NewIsolation, ComputeKind, IsolationKind } from "./compute/types.js";
 import type { ComputePool } from "./compute/warm-pool/types.js";
 
 export class ComputeRegistries {
-  private providers = new Map<string, ComputeProvider>();
   private computes = new Map<ComputeKind, NewCompute>();
   private isolations = new Map<IsolationKind, NewIsolation>();
   private pools = new Map<ComputeKind, ComputePool>();
-
-  registerProvider(p: ComputeProvider): void {
-    this.providers.set(p.name, p);
-  }
-  getProvider(name: string): ComputeProvider | null {
-    return this.providers.get(name) ?? null;
-  }
-  listProviders(): string[] {
-    return [...this.providers.keys()];
-  }
 
   registerCompute(c: NewCompute): void {
     this.computes.set(c.kind, c);

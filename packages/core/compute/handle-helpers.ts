@@ -13,14 +13,18 @@
  */
 
 import type { ArkdClient } from "../../arkd/client/index.js";
-import type { AgentHandle, ComputeHandle, ComputeSnapshot } from "./types.js";
+import type { AgentHandle, ComputeHandle, ComputeSnapshot, SpawnProcessOpts } from "./types.js";
 
 /** Factory contract -- production wires `(url) => new ArkdClient(url)`. */
 export type ArkdClientFactory = (url: string) => ArkdClient;
 
 /**
- * Decorate a freshly-minted ComputeHandle with the `getMetrics` method.
- * The closure captures the arkd URL via `getUrl()` so per-call resolution
+ * Decorate a freshly-minted ComputeHandle with the methods every
+ * arkd-backed handle owns: `getMetrics` (delegates to `/snapshot`) and the
+ * generic process-supervisor trio `spawnProcess` / `killProcess` /
+ * `statusProcess` (delegates to `/process/{spawn,kill,status}`).
+ *
+ * The closures capture the arkd URL via `getUrl()` so per-call resolution
  * is honoured (eg. EC2's port-forward port may change between calls).
  *
  * Returns the same handle object (mutated in place) so callers can keep
@@ -32,13 +36,32 @@ export function attachComputeMethods<H extends ComputeHandle>(
   getUrl: () => string,
   factory: ArkdClientFactory,
 ): H {
-  // Cast through `any` so we can install the method on a structural type
+  // Cast through `any` so we can install methods on a structural type
   // without TS demanding a re-typed handle. The return type still satisfies
   // the ComputeHandle interface.
   const h = handle as any;
   h.getMetrics = async function getMetrics(): Promise<ComputeSnapshot> {
     const client = factory(getUrl());
     return (await client.snapshot()) as unknown as ComputeSnapshot;
+  };
+  h.spawnProcess = async function spawnProcess(opts: SpawnProcessOpts): Promise<{ pid: number }> {
+    const client = factory(getUrl());
+    const res = await client.spawnProcess(opts);
+    return { pid: res.pid };
+  };
+  h.killProcess = async function killProcess(
+    procHandle: string,
+    signal?: "SIGTERM" | "SIGKILL",
+  ): Promise<{ wasRunning: boolean }> {
+    const client = factory(getUrl());
+    const res = await client.killProcess({ handle: procHandle, signal });
+    return { wasRunning: res.wasRunning };
+  };
+  h.statusProcess = async function statusProcess(
+    procHandle: string,
+  ): Promise<{ running: boolean; pid?: number; exitCode?: number }> {
+    const client = factory(getUrl());
+    return client.statusProcess({ handle: procHandle });
   };
   return handle;
 }
@@ -76,6 +99,22 @@ export function buildAgentHandle(
       const client = factory(getUrl());
       const res = await client.agentStatus({ sessionName });
       return res.running;
+    },
+    async sendUserMessage(content: string): Promise<{ delivered: boolean }> {
+      // Publish on the global `user-input` channel with `control: "interrupt"`
+      // so the agent's user-message-stream consumer (sees this envelope on
+      // every running agent and filters by sessionName) pushes the content
+      // into its PromptQueue and triggers an SDK abort+resume so the
+      // message takes effect mid-turn instead of waiting for the current
+      // turn's tool calls to finish. See the legacy
+      // `ArkdBackedProvider.sendUserMessage` for the full rationale.
+      const client = factory(getUrl());
+      const res = await client.publishToChannel("user-input", {
+        session: sessionName,
+        content,
+        control: "interrupt",
+      });
+      return { delivered: res.delivered };
     },
   };
 }

@@ -969,6 +969,141 @@ export class EC2Compute implements Compute {
   async restore(_s: Snapshot): Promise<ComputeHandle> {
     throw new NotSupportedError(this.kind, "restore");
   }
+
+  // ── buildChannelConfig ──────────────────────────────────────────────────
+  //
+  // The remote `ark` binary lives at `${REMOTE_HOME}/.ark/bin/ark` (cloud-init
+  // installs it on first boot). The agent on the worker spawns this binary
+  // as the channel server; arkd inside the worker is at loopback:19300.
+
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
+    return {
+      command: `${REMOTE_HOME}/.ark/bin/ark`,
+      args: ["channel"],
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_ARKD_URL: `http://localhost:${ARKD_REMOTE_PORT}`,
+      },
+    };
+  }
+
+  // ── buildLaunchEnv ──────────────────────────────────────────────────────
+  //
+  // Forward Claude auth tokens from the conductor's process env into the
+  // agent's launch env so the worker can reach Anthropic without a separate
+  // secrets resolution path. Mirrors the legacy `RemoteArkdBase.buildLaunchEnv`.
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    const env: Record<string, string> = {};
+    for (const key of ["CLAUDE_CODE_API_KEY", "ANTHROPIC_API_KEY"]) {
+      if (process.env[key]) env[key] = process.env[key]!;
+    }
+    return env;
+  }
+
+  // ── getAttachCommand ────────────────────────────────────────────────────
+  //
+  // SSM start-session targeting the instance, with a tmux-attach inner
+  // command. Returns an empty array when there's nothing to attach to
+  // (no session_id, or the row's instance_id was never populated).
+
+  getAttachCommand(h: ComputeHandle, session: Session): string[] {
+    if (!session.session_id) return [];
+    const meta = readMeta(h);
+    if (!meta.instanceId) return [];
+    const args = [
+      "aws",
+      "ssm",
+      "start-session",
+      "--target",
+      meta.instanceId,
+      "--document-name",
+      "AWS-StartInteractiveCommand",
+      "--parameters",
+      `command=["tmux attach -t ${session.session_id}"]`,
+      "--region",
+      meta.region,
+    ];
+    if (meta.awsProfile) args.push("--profile", meta.awsProfile);
+    return args;
+  }
+
+  // ── checkStatus ─────────────────────────────────────────────────────────
+  //
+  // Probe the EC2 instance's actual lifecycle state via DescribeInstances and
+  // map the AWS state ("terminated", "stopped", "running", "pending", ...)
+  // to an ark status. Returns null when the AWS call failed for a transient
+  // reason (network) so the caller can keep the existing DB status; returns
+  // "destroyed" only when the instance is definitively gone.
+
+  async checkStatus(h: ComputeHandle): Promise<string | null> {
+    const meta = readMeta(h);
+    if (!meta.instanceId) return "destroyed";
+    try {
+      const { publicIp, privateIp } = await this.helpers.describeInstance({
+        instanceId: meta.instanceId,
+        region: meta.region,
+        awsProfile: meta.awsProfile,
+      });
+      // describeInstance returns { publicIp: null, privateIp: null } when AWS
+      // lost the instance; treat that as destroyed. A running instance with
+      // no public IP still has a privateIp (VPC-internal) so the gate is
+      // "neither IP nor describeable".
+      void publicIp;
+      void privateIp;
+      // We don't get the AWS state directly from the helper today (only IPs).
+      // Returning "running" when we got any IP back, "destroyed" otherwise,
+      // matches the practical semantics: "destroyed" means "gone". A future
+      // helper enrichment can return the raw State.Name.
+      return publicIp || privateIp ? "running" : "destroyed";
+    } catch (e: any) {
+      if (e?.name === "InvalidInstanceID.NotFound" || e?.Code === "InvalidInstanceID.NotFound") {
+        return "destroyed";
+      }
+      return null;
+    }
+  }
+
+  // ── reboot ──────────────────────────────────────────────────────────────
+  //
+  // Stop + start the EC2 instance and wait for arkd to come back through the
+  // forward tunnel. Lifted off the legacy EC2Provider's reboot path; uses
+  // RebootInstances under the hood (lighter than stop/start).
+
+  async reboot(h: ComputeHandle, opts?: { onLog?: (msg: string) => void }): Promise<void> {
+    const log = opts?.onLog ?? (() => {});
+    const meta = readMeta(h);
+    if (!meta.instanceId) throw new Error(`EC2Compute.reboot: handle ${h.name} has no instanceId`);
+
+    const { EC2Client, RebootInstancesCommand } = await import("@aws-sdk/client-ec2");
+    const { awsCredentialsForProfile } = await import("./aws-creds.js");
+    const client = new EC2Client({
+      region: meta.region,
+      credentials: awsCredentialsForProfile({ profile: meta.awsProfile }),
+    });
+    await client.send(new RebootInstancesCommand({ InstanceIds: [meta.instanceId] }));
+    log("Reboot initiated -- waiting for arkd to come back...");
+
+    // Tear down the existing forward (the SSM session over a rebooted EC2 host
+    // is wedged) so the next setupTransport call can mint a fresh tunnel.
+    if (meta.portForwardPid !== null && meta.portForwardPid > 0) {
+      await this.helpers.killPortForward(meta.portForwardPid);
+      meta.portForwardPid = null;
+    }
+
+    // Re-run setupTransport with no app/sessionId -- standalone reboot is not
+    // dispatch-driven, so we don't emit provisioning_step events. The next
+    // dispatch will run ensureReachable() which is idempotent.
+    await this.setupTransport(h, { log });
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

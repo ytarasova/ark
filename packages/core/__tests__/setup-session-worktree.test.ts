@@ -67,8 +67,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       repo: ".",
     });
 
-    const provider = app.getProvider("local") ?? undefined;
-    const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, null);
 
     // The worktree must NOT be the live checkout.
     expect(effectiveWorkdir).not.toBe(repoDir);
@@ -88,8 +87,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       repo: ".",
     });
 
-    const provider = app.getProvider("local") ?? undefined;
-    const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, null);
 
     const updated = await app.sessions.get(session.id);
     expect(updated).not.toBeNull();
@@ -109,8 +107,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       workdir: repoDir,
     });
 
-    const provider = app.getProvider("local") ?? undefined;
-    const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, null);
 
     expect(effectiveWorkdir).not.toBe(repoDir);
     const expectedWtDir = join(app.config.dirs.worktrees, session.id);
@@ -124,8 +121,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       config: { worktree: false },
     });
 
-    const provider = app.getProvider("local") ?? undefined;
-    const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, null);
 
     // When worktree is explicitly disabled, we fall back to the resolved repo
     // source (the live checkout). No worktree directory is created.
@@ -145,8 +141,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
       workdir: nonGitDir,
     });
 
-    const provider = app.getProvider("local") ?? undefined;
-    const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, null);
 
     const wtDir = join(app.config.dirs.worktrees, session.id);
     expect(existsSync(wtDir)).toBe(false);

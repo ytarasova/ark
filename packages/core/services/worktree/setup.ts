@@ -13,7 +13,6 @@ import { execFile } from "child_process";
 
 import type { AppContext } from "../../app.js";
 import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../compute/legacy-provider.js";
 import * as claude from "../../claude/claude.js";
 import { loadRepoConfig } from "../../repo-config.js";
 import { logDebug, logError, logWarn } from "../../observability/structured-log.js";
@@ -55,7 +54,6 @@ export async function setupSessionWorktree(
   app: AppContext,
   session: Session,
   compute: Compute | null,
-  provider: ComputeProvider | undefined,
   onLog?: (msg: string) => void,
 ): Promise<string> {
   const log = onLog ?? (() => {});
@@ -84,12 +82,8 @@ export async function setupSessionWorktree(
   // is a real git repo -- even if it resolves to the current cwd (that is
   // precisely when isolation matters most for the self-dogfood loop).
   //
-  // Capability lives on `Compute.capabilities.supportsWorktree` now (Task 5
-  // of the compute cleanup). The legacy `provider.supportsWorktree` flag
-  // was removed; we read off the registered Compute keyed by the row's
-  // `compute_kind`. Caller still passes a legacy provider so the signature
-  // stays back-compat, but we ignore it for capability lookups.
-  void provider; // unused: kept for back-compat; capability flag moved to Compute
+  // Capability lives on `Compute.capabilities.supportsWorktree` now; we
+  // read off the registered Compute keyed by the row's `compute_kind`.
   const computeImpl = compute ? app.getCompute(compute.compute_kind) : app.getCompute("local");
   const supportsWorktree = computeImpl?.capabilities.supportsWorktree === true;
   const wantWorktree = supportsWorktree && session.config?.worktree !== false;

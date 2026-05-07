@@ -12,8 +12,7 @@
  * doesn't need to re-implement them above a different persistence layer.
  *
  * Capability lookups consult the `Compute` registered for the row's
- * `compute_kind` axis directly; the legacy `app.getProvider(name)` registry
- * is no longer consulted from this file.
+ * `compute_kind` axis directly.
  */
 
 import type {
@@ -117,20 +116,10 @@ export class ComputeService {
     // always deletable -- the singleton-create rule above keeps there from
     // being more than one auto-seeded row per kind, so the guard scoping
     // here is "matches the canonical singleton name".
-    //
-    // Legacy callers register a stub provider with `canDelete=false` to
-    // veto a specific row (see `compute-lifecycle.test.ts`'s `stub-row` /
-    // `stub-clone` cases). The fallback below honours those by also
-    // consulting the legacy registry's `canDelete` flag when present.
     const computeImpl = this.app.getCompute(row.compute_kind);
-    const provider = this.app.getProvider(row.compute_kind);
     const capCanDelete = computeImpl?.capabilities.canDelete;
-    const legacyCanDelete = (provider as { canDelete?: boolean } | null | undefined)?.canDelete;
     const isAutoSingleton = !row.is_template && !row.cloned_from && row.name === row.compute_kind;
     if (capCanDelete === false && isAutoSingleton) {
-      throw new Error(`Compute kind '${row.compute_kind}' does not support deletion`);
-    }
-    if (legacyCanDelete === false) {
       throw new Error(`Compute kind '${row.compute_kind}' does not support deletion`);
     }
     return this.computes.delete(name);

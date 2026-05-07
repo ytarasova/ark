@@ -1,8 +1,8 @@
 /**
- * Compute / Isolation resolution helpers.
+ * Compute / Isolation resolution helper.
  *
- * Extracted from app.ts so AppContext stays focused on lifecycle. Both
- * helpers are pure functions over an AppContext + session.
+ * Pure function over an AppContext + session. Lives outside `app.ts` so
+ * AppContext stays focused on lifecycle.
  *
  * Security: compute lookup MUST go through `app.computes.get()` (the
  * tenant-scoped `ComputeRepository`), never a raw `db.prepare(...)`.
@@ -15,42 +15,26 @@
  */
 import type { AppContext } from "./app.js";
 import type { Session, Compute } from "../types/index.js";
-import type { ComputeProvider } from "./compute/legacy-provider.js";
 import type { ComputeKind, IsolationKind } from "./compute/types.js";
-
-export async function resolveProvider(
-  app: AppContext,
-  session: Session,
-): Promise<{ provider: ComputeProvider | null; compute: Compute | null }> {
-  // When a session has no explicit `compute_name` we fall back to the
-  // AppMode's default provider (local mode: "local"; hosted mode: null).
-  // Hosted mode returns `{ provider: null, compute: null }` on purpose --
-  // callers that need a provider must surface a clear error rather than
-  // silently dispatching the session onto the control-plane host.
-  const defaultName = app.mode.defaultProvider;
-  const computeName = session.compute_name || defaultName;
-  if (!computeName) return { provider: null, compute: null };
-  // Re-scope to the session's tenant when the caller passed a different (or
-  // unscoped root) AppContext. Compute PK is (name, tenant_id) -- without this
-  // re-scope, two tenants holding the same compute name get arbitrary row-order
-  // resolution and can leak each other's provider + credentials.
-  const scoped = session.tenant_id && session.tenant_id !== app.tenantId ? app.forTenant(session.tenant_id) : app;
-  const compute = await scoped.computes.get(computeName);
-  if (!compute) return { provider: null, compute: null };
-  // The legacy `ComputeProvider` registry is keyed by the row's `compute_kind`
-  // axis since Task 5 of the compute cleanup. `app.getProvider` returns the
-  // operational stub for that kind; capability flags now live on
-  // `Compute.capabilities` and should be read from the new registry instead
-  // (see `app.getCompute(compute.compute_kind)`).
-  const provider = app.getProvider(compute.compute_kind);
-  return { provider: provider ?? null, compute };
-}
 
 export async function resolveComputeTarget(
   app: AppContext,
   session: Session,
 ): Promise<{ target: import("./compute/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
-  const { compute } = await resolveProvider(app, session);
+  // When a session has no explicit `compute_name` we fall back to the
+  // AppMode's default compute (local mode: "local"; hosted mode: null).
+  // Hosted mode returns `{ target: null, compute: null }` on purpose --
+  // callers that need a target must surface a clear error rather than
+  // silently dispatching the session onto the control-plane host.
+  const defaultName = app.mode.defaultProvider;
+  const computeName = session.compute_name || defaultName;
+  if (!computeName) return { target: null, compute: null };
+  // Re-scope to the session's tenant when the caller passed a different (or
+  // unscoped root) AppContext. Compute PK is (name, tenant_id) -- without this
+  // re-scope, two tenants holding the same compute name get arbitrary row-order
+  // resolution and can leak each other's compute config + credentials.
+  const scoped = session.tenant_id && session.tenant_id !== app.tenantId ? app.forTenant(session.tenant_id) : app;
+  const compute = await scoped.computes.get(computeName);
   if (!compute) return { target: null, compute: null };
 
   const computeKind = compute.compute_kind as ComputeKind;

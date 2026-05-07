@@ -90,12 +90,12 @@ export class SessionTerminator {
     // Kill the agent via the new ComputeTarget path: `target.isolation.attachAgent`
     // rebuilds an AgentHandle from the persisted session_id and calls
     // `agent.kill()` against the live arkd. Local-tmux fallback below is
-    // ONLY safe when no provider resolves -- when a target exists but its
+    // ONLY safe when no compute target resolves -- when a target exists but its
     // kill failed (e.g. arkd unreachable on EC2), running `tmux kill-session`
     // against the conductor's local daemon does nothing useful and silently
     // masks the real failure (#422 / #425 family).
-    const { provider, compute } = await d.resolveProvider(session);
-    if (provider && compute) {
+    const { target, compute } = await d.resolveComputeTarget(session);
+    if (target && compute) {
       const killOk = await this.killAgentViaTarget(session);
       if (!killOk) {
         logError(
@@ -105,9 +105,9 @@ export class SessionTerminator {
         );
       }
     } else if (session.session_id) {
-      // No provider resolved -- legacy local-only sessions or test fixtures.
-      // Use local tmux. Safe here because absence of provider implies the
-      // tmux pane is on the conductor's host.
+      // No compute target resolved -- legacy local-only sessions or test
+      // fixtures. Use local tmux. Safe here because absence of target implies
+      // the tmux pane is on the conductor's host.
       await killSessionAsync(session.session_id);
     }
 
@@ -188,13 +188,12 @@ export class SessionTerminator {
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
     // Same shape as stop(): only fall back to local tmux when there's truly
-    // no provider for this session. Kill goes through the new ComputeTarget
-    // path. The legacy `cleanupSession` path was redundant (the worktree
-    // teardown happens via `removeWorktree` below; isolation-side teardown
-    // is `target.shutdown`) and threw on every legacy stub; dropped here in
-    // Task 5 of the compute cleanup.
-    const { provider, compute } = await d.resolveProvider(session);
-    if (provider && compute) {
+    // no compute target for this session. Kill goes through the new
+    // ComputeTarget path. The legacy `cleanupSession` path was redundant
+    // (the worktree teardown happens via `removeWorktree` below; isolation-
+    // side teardown is `target.shutdown`).
+    const { target, compute } = await d.resolveComputeTarget(session);
+    if (target && compute) {
       const killOk = await this.killAgentViaTarget(session);
       if (!killOk) {
         logError(

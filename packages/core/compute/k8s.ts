@@ -521,6 +521,49 @@ export class K8sCompute implements Compute {
     throw new NotSupportedError(this.kind, "restore");
   }
 
+  // ── buildChannelConfig ──────────────────────────────────────────────────
+  //
+  // K8s pods bake the `ark` binary in their image (`/usr/local/bin/ark`).
+  // The image's arkd listens on the pod-local loopback. Same wire shape as
+  // EC2; only the binary path differs.
+
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
+    return {
+      command: "/usr/local/bin/ark",
+      args: ["channel"],
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_ARKD_URL: `http://localhost:${ARKD_POD_PORT}`,
+      },
+    };
+  }
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    return {};
+  }
+
+  // ── getAttachCommand ────────────────────────────────────────────────────
+  //
+  // `kubectl exec -it` into the arkd pod, attaching to the named tmux
+  // session. Needs the kubeconfig threaded through if the row used one.
+
+  getAttachCommand(h: ComputeHandle, session: Session): string[] {
+    if (!session.session_id) return [];
+    const meta = this.readMeta(h);
+    const args: string[] = ["kubectl"];
+    if (meta.kubeconfig) args.push("--kubeconfig", meta.kubeconfig);
+    args.push("exec", "-it", "-n", meta.namespace, meta.podName, "--", "tmux", "attach", "-t", session.session_id);
+    return args;
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────
 
   protected readMeta(h: ComputeHandle): K8sHandleMeta {

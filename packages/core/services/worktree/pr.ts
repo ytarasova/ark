@@ -27,10 +27,10 @@ import { promisify } from "util";
 import { execFile } from "child_process";
 
 import type { AppContext } from "../../app.js";
-import type { Session, Compute } from "../../../types/index.js";
-import type { ComputeProvider } from "../../compute/legacy-provider.js";
+import type { Session } from "../../../types/index.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
-import { resolveProvider } from "../../compute-resolver.js";
+import { resolveComputeTarget } from "../../compute-resolver.js";
+import type { Compute as ComputeImpl, ComputeHandle } from "../../compute/types.js";
 import { loadRepoConfig } from "../../repo-config.js";
 import { logDebug, logInfo, logWarn } from "../../observability/structured-log.js";
 import { rebaseOntoBase } from "./git-ops.js";
@@ -78,34 +78,34 @@ interface GitResult {
 }
 
 /**
- * Resolve the (provider, compute) pair for a session and tell the caller
- * whether the dispatch should be routed through `ArkdClient.run` against the
- * remote workdir.
+ * Resolve the compute target for a session and tell the caller whether the
+ * dispatch should be routed through `ArkdClient.run` against the remote
+ * workdir.
  *
- * Remote = `Compute.capabilities.supportsWorktree === false` and the legacy
- * provider exposes `getArkdUrl(compute, session)` for the per-session arkd
- * URL (#423 -- per-session SSM tunnel port). Everything else (local,
- * missing provider, missing compute) falls back to the local `execFileAsync`
- * path.
+ * Remote = `Compute.capabilities.supportsWorktree === false`. Everything
+ * else (local, missing target, missing compute) falls back to the local
+ * `execFileAsync` path.
  */
 async function resolveRemoteRouting(
   app: AppContext,
   session: Session,
 ): Promise<{ remote: false } | { remote: true; client: ArkdClient; remoteWorkdir: string }> {
-  const { provider, compute } = await resolveProvider(app, session);
-  if (!provider || !compute) return { remote: false };
-  // Capability lives on Compute now; the registered impl for this row's
-  // compute_kind decides whether the conductor's filesystem is the agent's
-  // workdir (worktree-friendly) or whether we must route over arkd.
-  const computeImpl = app.getCompute(compute.compute_kind);
-  if (computeImpl?.capabilities.supportsWorktree) return { remote: false };
-  if (!provider.getArkdUrl) return { remote: false };
+  const { target, compute } = await resolveComputeTarget(app, session);
+  if (!target || !compute) return { remote: false };
+  if (target.compute.capabilities.supportsWorktree) return { remote: false };
 
-  const remoteWorkdir = resolveRemoteWorkdir(provider, compute, session);
+  const handle = target.compute.attachExistingHandle?.({
+    name: compute.name,
+    status: compute.status,
+    config: (compute.config ?? {}) as Record<string, unknown>,
+  });
+  if (!handle) return { remote: false };
+
+  const remoteWorkdir = resolveRemoteWorkdir(target.compute, handle, session);
   if (!remoteWorkdir) {
     logWarn(
       "session",
-      `runGit: provider '${provider.name}' is remote but resolveWorkdir returned null for session ${session.id}; ` +
+      `runGit: compute '${target.compute.kind}' is remote but resolveWorkdir returned null for session ${session.id}; ` +
         `falling back to local dispatch`,
     );
     return { remote: false };
@@ -114,15 +114,9 @@ async function resolveRemoteRouting(
   // RESILIENCE: ensure the arkd transport is up before we build the client.
   // Action stages don't go through dispatch-core's lifecycle, so they must
   // resolve the same handle (with its compute-specific meta -- instance_id
-  // for EC2, etc.) and call ensureReachable themselves. Building a stub
-  // `{meta:{}}` handle here was the bug: ensureReachable hit `readMeta(h)`
-  // which threw "missing meta.ec2", the catch swallowed the error, and
-  // getArkdUrl then threw "no arkd_local_forward_port" -- causing every
-  // action stage on a remote compute to fail after a conductor restart.
+  // for EC2, etc.) and call ensureReachable themselves.
   try {
-    const { resolveTargetAndHandle } = await import("../dispatch/target-resolver.js");
-    const { target, handle } = await resolveTargetAndHandle(app, session);
-    if (target?.compute.ensureReachable && handle) {
+    if (target.compute.ensureReachable) {
       await target.compute.ensureReachable(handle, { app, sessionId: session.id });
     }
   } catch (err: any) {
@@ -133,12 +127,9 @@ async function resolveRemoteRouting(
     );
   }
 
-  // Fetch the (possibly refreshed) session row so getArkdUrl reads the
-  // freshly-written port. Pass the session into getArkdUrl so the
-  // session-aware lookup runs (the per-session port wins over the
-  // compute-level cache, see #423).
-  const refreshed = (await app.sessions.get(session.id)) ?? session;
-  const arkdUrl = provider.getArkdUrl(compute, refreshed);
+  // ensureReachable mutated `handle.meta` in place to point at the live
+  // tunnel; `getArkdUrl(handle)` now returns the per-session port (#423).
+  const arkdUrl = target.compute.getArkdUrl(handle);
   const cfg = compute.config as { arkd_request_timeout_ms?: number } | null | undefined;
   const requestTimeoutMs = typeof cfg?.arkd_request_timeout_ms === "number" ? cfg.arkd_request_timeout_ms : undefined;
   const client = new ArkdClient(arkdUrl, requestTimeoutMs ? { requestTimeoutMs } : undefined);
@@ -146,16 +137,16 @@ async function resolveRemoteRouting(
 }
 
 /**
- * Best-effort remote workdir for the agent's clone. Prefers the provider's
- * own `resolveWorkdir` (the canonical hook the launcher uses; the EC2
- * provider returns `${REMOTE_HOME}/Projects/<sessionId>/<repoBasename>`).
- * Falls back to `session.config.remoteWorkdir` (set by some launch flows)
- * and finally to `${REMOTE_HOME}/Projects/<basename(session.repo)>` -- the
- * convention used by EC2 cloud-init.
+ * Best-effort remote workdir for the agent's clone. Prefers the compute's
+ * own `resolveWorkdir` (the canonical hook the launcher uses; EC2 returns
+ * `${REMOTE_HOME}/Projects/<sessionId>/<repoBasename>`). Falls back to
+ * `session.config.remoteWorkdir` (set by some launch flows) and finally to
+ * `${REMOTE_HOME}/Projects/<basename(session.repo)>` -- the convention
+ * used by EC2 cloud-init.
  */
-function resolveRemoteWorkdir(provider: ComputeProvider, compute: Compute, session: Session): string | null {
-  if (provider.resolveWorkdir) {
-    const wd = provider.resolveWorkdir(compute, session);
+function resolveRemoteWorkdir(compute: ComputeImpl, handle: ComputeHandle, session: Session): string | null {
+  if (compute.resolveWorkdir) {
+    const wd = compute.resolveWorkdir(handle, session);
     if (wd) return wd;
   }
   const cfgWd = (session.config as { remoteWorkdir?: string } | null | undefined)?.remoteWorkdir;

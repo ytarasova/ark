@@ -145,13 +145,14 @@ export class SessionAttachService {
     if (session.compute_name) {
       const compute = await this.app.computes.get(session.compute_name);
       if (compute) {
-        // `getAttachCommand` lives on the legacy provider registry until a
-        // dedicated ComputeTarget hook lands (filed as a follow-up issue);
-        // we look it up by compute kind directly so the legacy stub for the
-        // matching name is reachable.
-        const provider = this.app.getProvider(compute.compute_kind);
+        const computeImpl = this.app.getCompute(compute.compute_kind);
+        const handle = computeImpl?.attachExistingHandle?.({
+          name: compute.name,
+          status: compute.status,
+          config: (compute.config ?? {}) as Record<string, unknown>,
+        });
         try {
-          const parts = provider?.getAttachCommand?.(compute, session) ?? [];
+          const parts = computeImpl && handle ? computeImpl.getAttachCommand(handle, session) : [];
           if (parts.length > 0) return parts.join(" ");
         } catch {
           // fall through to the local fallback

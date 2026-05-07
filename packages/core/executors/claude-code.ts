@@ -119,15 +119,29 @@ export const claudeCodeExecutor: Executor = {
     const tmuxName = `ark-${session.id}`;
     const stage = opts.stage ?? "work";
 
-    // Resolve compute + provider via the polymorphic AppContext helper so
+    // Resolve compute target via the polymorphic AppContext helper so
     // hosted sessions without an explicit `compute_name` resolve to null
     // (caller surfaces "no compute resolved") rather than silently
-    // defaulting to LocalProvider.
-    const { provider, compute } = await app.resolveProvider(session);
+    // defaulting to LocalCompute.
+    const { target, compute } = await app.resolveComputeTarget(session);
+
+    // Synthesize a preview compute handle for path-resolution lookups
+    // before the dispatcher's `runTargetLifecycle` builds the canonical
+    // one. The lifecycle re-runs `attachExistingHandle` itself; we only
+    // need the handle here so `compute.resolveWorkdir(handle, session)`
+    // and `compute.buildLaunchEnv` can read off `handle.meta`.
+    const previewHandle =
+      target && compute
+        ? (target.compute.attachExistingHandle?.({
+            name: compute.name,
+            status: compute.status,
+            config: (compute.config ?? {}) as Record<string, unknown>,
+          }) ?? null)
+        : null;
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
-    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, log);
 
     // Determine conductor URL based on compute type. Default + remote both
     // use `http://localhost:<port>` -- for remote that resolves on the EC2
@@ -148,7 +162,7 @@ export const claudeCodeExecutor: Executor = {
 
     // Channel config + launcher
     const channelPort = app.sessions.channelPort(session.id);
-    const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
+    const channelConfig = target?.compute.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
     // Inject tenant id into the channel process env so outbound relay/report
     // requests carry X-Ark-Tenant-Id for multi-tenant scoping in the conductor.
     if (channelConfig && typeof channelConfig === "object") {
@@ -173,9 +187,8 @@ export const claudeCodeExecutor: Executor = {
     const { resolveMcpConfigsDir } = await import("../install-paths.js");
 
     // Capability lives on Compute now; the registered impl for this row's
-    // compute_kind is the source of truth.
-    const computeImpl = compute ? app.getCompute(compute.compute_kind) : null;
-    const isRemote = !!(compute && computeImpl && !computeImpl.capabilities.supportsWorktree);
+    // compute_kind is the source of truth (already resolved via target).
+    const isRemote = !!(compute && target && !target.compute.capabilities.supportsWorktree);
 
     // For remote dispatch the launcher must `cd` into the workdir on the
     // REMOTE host -- not the conductor's local Mac path. Providers that
@@ -196,7 +209,9 @@ export const claudeCodeExecutor: Executor = {
       isRemote,
       effectiveWorkdir,
       resolveWorkdir:
-        compute && provider?.resolveWorkdir ? () => provider.resolveWorkdir!(compute, session) : undefined,
+        previewHandle && target?.compute.resolveWorkdir
+          ? () => target.compute.resolveWorkdir!(previewHandle, session)
+          : undefined,
       onFallback: (reason) => log(`launcherWorkdir: ${reason}`),
     });
 
@@ -214,10 +229,10 @@ export const claudeCodeExecutor: Executor = {
 
     if (isRemote) {
       // Audit finding F6: REMOTE dispatch MUST receive an explicit
-      // `channelConfig` from the provider (see assertRemoteChannelConfig
+      // `channelConfig` from the compute (see assertRemoteChannelConfig
       // for the full rationale). Fail fast instead of producing a broken
       // `.mcp.json` that embeds the conductor's binary path.
-      const channelErr = assertRemoteChannelConfig(channelConfig, provider?.name);
+      const channelErr = assertRemoteChannelConfig(channelConfig, target?.compute.kind);
       if (channelErr) {
         log(`CRITICAL: ${channelErr}`);
         return { ok: false, handle: "", message: channelErr };
@@ -319,7 +334,7 @@ export const claudeCodeExecutor: Executor = {
     const sessionDirEnv = isRemote ? `/tmp/ark-session-${session.id}` : localSessionDir;
     const launchEnv: Record<string, string> = {
       ...(opts.agent.env ?? {}),
-      ...(provider?.buildLaunchEnv(session) ?? {}),
+      ...(target?.compute.buildLaunchEnv?.(session) ?? {}),
       ...buildRouterEnv(app.config, { mode: "claude" }),
       // `opts.env` carries secrets resolved by dispatch; they override
       // every other env source so operator-rotated values take effect
@@ -380,12 +395,12 @@ export const claudeCodeExecutor: Executor = {
     // optional on the compute (LocalCompute is a no-op for ensureReachable /
     // prepareWorkspace / flushPlacement); the helper skips any method the
     // impl omits.
-    if (compute && computeImpl && !computeImpl.capabilities.supportsWorktree) {
+    if (compute && target && !target.compute.capabilities.supportsWorktree) {
       const { resolveTargetAndHandle } = await import("../services/dispatch/target-resolver.js");
       const { runTargetLifecycle } = await import("../services/dispatch/target-lifecycle.js");
 
-      const { target, handle } = await resolveTargetAndHandle(app, session);
-      if (!target || !handle) {
+      const { target: lifecycleTarget, handle } = await resolveTargetAndHandle(app, session);
+      if (!lifecycleTarget || !handle) {
         return { ok: false, handle: "", message: "no compute target resolved for remote dispatch" };
       }
 
@@ -406,8 +421,8 @@ export const claudeCodeExecutor: Executor = {
       const { runTarget: remoteWorkdir } = resolveRemoteWorkdirs({
         isRemote: true,
         effectiveWorkdir,
-        resolveWorkdir: target.compute.resolveWorkdir
-          ? () => target.compute.resolveWorkdir!(handle, session)
+        resolveWorkdir: lifecycleTarget.compute.resolveWorkdir
+          ? () => lifecycleTarget.compute.resolveWorkdir!(handle, session)
           : undefined,
         onFallback: (reason) => logWarn("session", `remote workdir fallback for session ${session.id}: ${reason}`),
       });
@@ -435,7 +450,7 @@ export const claudeCodeExecutor: Executor = {
       const agentHandle = await runTargetLifecycle(
         app,
         session.id,
-        target,
+        lifecycleTarget,
         handle,
         {
           tmuxName,

@@ -24,7 +24,6 @@ import { createAppContainer, type AppContainer, type AppBootOptions } from "./co
 import { buildContainer } from "./di/index.js";
 import { loadConfig, loadAppConfig, type ArkConfig } from "./config.js";
 import { eventBus } from "./hooks.js";
-import type { ComputeProvider } from "./compute/legacy-provider.js";
 import type { Compute as NewCompute, Isolation as NewIsolation, ComputeKind, IsolationKind } from "./compute/types.js";
 import type { ComputePool } from "./compute/warm-pool/types.js";
 import type { SnapshotStore } from "./compute/snapshot-store.js";
@@ -53,7 +52,7 @@ import type { StageAdvanceService } from "./services/stage-advance/index.js";
 import type { FlowStore, SkillStore, AgentStore, RuntimeStore, ModelStore } from "./stores/index.js";
 import type { WorkspaceStore } from "./workspace/store.js";
 import { ComputeRegistries } from "./compute-registries.js";
-import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
+import { resolveComputeTarget } from "./compute-resolver.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
 import { noopExecutor, NOOP_EXECUTOR_NAMES } from "./executors/noop.js";
@@ -424,13 +423,15 @@ export class AppContext {
         const tenantApp = this.forTenant(tenantId);
         const compute = await tenantApp.computes.get(computeName);
         if (!compute) continue;
-        const { resolveProvider } = await import("./compute-resolver.js");
-        // resolveProvider takes a session; synthesise a minimal one here since
-        // we just need the provider lookup -- it only reads compute_name + tenant_id.
-        const fakeSession = { compute_name: computeName, tenant_id: tenantId } as import("../types/session.js").Session;
-        const { provider } = await resolveProvider(tenantApp, fakeSession);
-        if (!provider) continue;
-        const arkdUrl = (provider as { getArkdUrl?: (c: typeof compute) => string }).getArkdUrl?.(compute);
+        const computeImpl = tenantApp.getCompute(compute.compute_kind);
+        if (!computeImpl) continue;
+        const handle = computeImpl.attachExistingHandle?.({
+          name: compute.name,
+          status: compute.status,
+          config: (compute.config ?? {}) as Record<string, unknown>,
+        });
+        if (!handle) continue;
+        const arkdUrl = computeImpl.getArkdUrl(handle);
         if (!arkdUrl) continue;
         const { startArkdEventsConsumer } = await import("./conductor/server/arkd-events-consumer.js");
         startArkdEventsConsumer(tenantApp, computeName, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
@@ -921,17 +922,7 @@ export class AppContext {
     return this._container;
   }
 
-  // ── Provider / Compute / Runtime / Pool registries ─────────────────────
-
-  registerProvider(provider: ComputeProvider): void {
-    this._registries.registerProvider(provider);
-  }
-  getProvider(name: string): ComputeProvider | null {
-    return this._registries.getProvider(name);
-  }
-  listProviders(): string[] {
-    return this._registries.listProviders();
-  }
+  // ── Compute / Isolation / Pool registries ──────────────────────────────
 
   registerCompute(c: NewCompute): void {
     this._registries.registerCompute(c);
@@ -963,11 +954,6 @@ export class AppContext {
   }
   listComputePools(): ComputeKind[] {
     return this._registries.listPools();
-  }
-
-  /** Resolve the compute provider for a session. Delegated to compute-resolver.ts. */
-  resolveProvider(session: Session): Promise<{ provider: ComputeProvider | null; compute: Compute | null }> {
-    return resolveProvider(this, session);
   }
 
   /** Resolve the ComputeTarget for a session. Delegated to compute-resolver.ts. */

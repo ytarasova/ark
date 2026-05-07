@@ -3,7 +3,7 @@
  *
  * Exposes a straight delegation over the two interfaces. The dispatch layer
  * constructs a ComputeTarget from the `{compute_kind, isolation_kind}` DB
- * columns instead of looking up a single `ComputeProvider`.
+ * columns.
  *
  * When the underlying Compute declares `capabilities.pool === true` AND an
  * AppContext is wired in AND that app has a `ComputePool` registered for

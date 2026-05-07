@@ -116,12 +116,12 @@ export const gooseExecutor: Executor = {
     const stage = opts.stage ?? "work";
     const tmuxName = `ark-${session.id}`;
 
-    // Worktree + compute provider. Use the polymorphic AppContext helper
+    // Worktree + compute target. Use the polymorphic AppContext helper
     // so hosted sessions without an explicit `compute_name` surface a
-    // clear "no compute resolved" error instead of defaulting to LocalProvider.
-    const { provider, compute } = await app.resolveProvider(session);
+    // clear "no compute resolved" error instead of defaulting to LocalCompute.
+    const { target, compute } = await app.resolveComputeTarget(session);
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
-    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, log);
 
     // Conductor URL (devcontainer vs host). Auto-detect a devcontainer by
     // file presence: if `.devcontainer/devcontainer.json` (or top-level
@@ -175,7 +175,7 @@ export const gooseExecutor: Executor = {
     const mergedEnv: Record<string, string> = {
       ...channelEnv,
       ...(opts.agent.env ?? {}),
-      ...(provider?.buildLaunchEnv?.(session) ?? {}),
+      ...(target?.compute.buildLaunchEnv?.(session) ?? {}),
       ...(opts.env ?? {}),
       ...buildRouterEnv(app.config, { mode: "openai" }),
     };

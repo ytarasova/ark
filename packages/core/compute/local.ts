@@ -21,6 +21,9 @@ import type {
 } from "./types.js";
 import { NotSupportedError } from "./types.js";
 import { LocalPlacementCtx } from "./local-placement-ctx.js";
+import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../constants.js";
+import { channelLaunchSpec } from "../install-paths.js";
+import type { Session } from "../../types/session.js";
 
 export class LocalCompute implements Compute {
   readonly kind: ComputeKind = "local";
@@ -149,5 +152,40 @@ export class LocalCompute implements Compute {
 
   async restore(_s: Snapshot): Promise<ComputeHandle> {
     throw new NotSupportedError(this.kind, "restore");
+  }
+
+  // ── buildChannelConfig ──────────────────────────────────────────────────
+  //
+  // Local channel server runs the conductor's bun (compiled mode self-spawns
+  // via channelLaunchSpec). Mirrors the shape every claude-code agent
+  // expects in `.mcp.json`'s `mcpServers["ark-channel"]`.
+
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
+    const spec = channelLaunchSpec();
+    return {
+      command: spec.command,
+      args: spec.args,
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
+        ARK_ARKD_URL: DEFAULT_ARKD_URL,
+      },
+    };
+  }
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    return {};
+  }
+
+  getAttachCommand(_h: ComputeHandle, session: Session): string[] {
+    if (!session.session_id) return [];
+    return ["tmux", "attach", "-t", session.session_id];
   }
 }

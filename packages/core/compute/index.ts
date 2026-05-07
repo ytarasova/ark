@@ -1,17 +1,11 @@
 /**
  * Compute layer -- public API.
  *
- * The new-world surface: the `Compute` + `Isolation` two-axis abstraction
- * (composed via `ComputeTarget`), the concrete impls (Local / EC2 / K8s /
- * Kata / Firecracker x Direct / Docker / Devcontainer / DockerCompose),
+ * The `Compute` + `Isolation` two-axis abstraction (composed via
+ * `ComputeTarget`), the concrete impls (Local / EC2 / K8s / Kata /
+ * Firecracker x Direct / Docker / Devcontainer / DockerCompose),
  * snapshot persistence, the warm pool, port discovery, and a couple of
  * shared helpers. See `docs/architecture.md`.
- *
- * The legacy `ComputeProvider` interface is intentionally NOT re-exported
- * from here -- the two executors (`claude-agent.ts`, `claude-code.ts`)
- * and the server handlers that still consult `app.getProvider(name)`
- * import it directly from `./legacy-provider.js` (deferred sweeps
- * tracked in #527, #528).
  */
 
 // ── Compute + Isolation split ──────────────────────────────────────────────

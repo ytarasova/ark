@@ -11,10 +11,6 @@
  * separate "agent runtime" concept (claude-code / codex / gemini / goose) one
  * layer up. Renamed for clarity: the layer-2 agent-runtime stays "runtime",
  * this layer-4b sandbox is "isolation".
- *
- * The legacy `ComputeProvider` interface stays live and unchanged -- the
- * adapter in `../adapters/legacy.ts` bridges the old world into the new until
- * every dispatch path reads from the new interfaces.
  */
 
 // ── Kinds ──────────────────────────────────────────────────────────────────
@@ -47,9 +43,8 @@ export interface IsolationMode {
  *
  * The "operational" flags (`singleton`, `canDelete`, `canReboot`,
  * `supportsWorktree`, `supportsSecretMount`, `needsAuth`, `initialStatus`,
- * `isolationModes`) used to live on the legacy `ComputeProvider` interface;
- * Task 5 of the compute cleanup ported them onto Compute so callers don't
- * need to consult the legacy registry to read capability metadata.
+ * `isolationModes`) live here on Compute -- callers read capability
+ * metadata directly off `ComputeCapabilities`.
  */
 export interface ComputeCapabilities {
   readonly snapshot: boolean;
@@ -112,6 +107,11 @@ export interface ComputeCapabilities {
  * compute lifecycle. `getMetrics` is added as an optional method so legacy
  * handles (synthesized by `attachExistingHandle` on impls that haven't been
  * upgraded yet) keep working -- callers null-check before invoking.
+ *
+ * The generic process-supervisor methods (`spawnProcess` / `statusProcess` /
+ * `killProcess`) target arkd's `/process/*` endpoints. Every arkd-backed
+ * Compute populates them via `attachComputeMethods` in `handle-helpers.ts`
+ * so each kind only has to supply the URL.
  */
 export interface ComputeHandle {
   readonly kind: ComputeKind;
@@ -125,6 +125,31 @@ export interface ComputeHandle {
    * `Compute.provision` / `attachExistingHandle` (eg. tests) may omit it.
    */
   getMetrics?(): Promise<ComputeSnapshot>;
+  /**
+   * Spawn a generic process inside the compute via arkd `/process/spawn`.
+   * Used by the claude-agent runtime (no tmux, just bash launching the
+   * agent SDK). Returns the pid arkd assigned. Caller's `handle` is the
+   * bookkeeping key for subsequent kill / status lookups.
+   */
+  spawnProcess?(opts: SpawnProcessOpts): Promise<{ pid: number }>;
+  /** Kill a previously-spawned process by handle. Idempotent. */
+  killProcess?(handle: string, signal?: "SIGTERM" | "SIGKILL"): Promise<{ wasRunning: boolean }>;
+  /** Status of a previously-spawned process by handle. */
+  statusProcess?(handle: string): Promise<{ running: boolean; pid?: number; exitCode?: number }>;
+}
+
+/**
+ * Options for `ComputeHandle.spawnProcess`. Mirrors arkd's `/process/spawn`
+ * request shape exactly.
+ */
+export interface SpawnProcessOpts {
+  /** Caller-assigned process handle. Used as the bookkeeping key for kill / status. */
+  handle: string;
+  cmd: string;
+  args: string[];
+  workdir: string;
+  env?: Record<string, string>;
+  logPath?: string;
 }
 
 /**
@@ -153,6 +178,19 @@ export interface AgentHandle {
   captureOutput(opts?: { lines?: number }): Promise<string>;
   /** Whether the agent process is still alive. Returns false if arkd is unreachable. */
   checkAlive(): Promise<boolean>;
+  /**
+   * Publish a steer / user message INTO a running agent. For arkd-backed
+   * isolations this publishes on arkd's global `user-input` channel with
+   * an envelope of `{ session, content, control: "interrupt" }`; the
+   * agent's user-message-stream consumer subscribes to the same channel,
+   * filters by session id, pushes the content into its PromptQueue, and
+   * triggers an SDK abort+resume so the message takes effect mid-turn.
+   *
+   * Returns `delivered=true` when arkd handed the envelope directly to a
+   * parked subscriber; `false` means it was buffered for a not-yet-attached
+   * consumer (still durable, will be delivered on connect).
+   */
+  sendUserMessage(content: string): Promise<{ delivered: boolean }>;
 }
 
 /**
@@ -408,6 +446,65 @@ export interface Compute {
   /** Snapshot support. Throws `NotSupportedError` if `!capabilities.snapshot`. */
   snapshot(h: ComputeHandle): Promise<Snapshot>;
   restore(s: Snapshot): Promise<ComputeHandle>;
+
+  /**
+   * Build the wire config for the agent's MCP `ark-channel` server. The
+   * shape is compute-kind-specific because the channel binary's location
+   * differs by host: local computes spawn the conductor's bun via
+   * `channelLaunchSpec()`; remote computes (EC2 / k8s family) spawn the
+   * `ark` binary baked into the worker's filesystem image. Returns the
+   * `{ command, args, env }` MCP-config triple `claude-code`'s launcher
+   * embeds in `.mcp.json`.
+   *
+   * Required: every Compute that may host a claude-code agent implements
+   * this. The `claude-code` executor refuses remote dispatch when the
+   * returned record is empty (`assertRemoteChannelConfig`).
+   */
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown>;
+
+  /**
+   * Compute-side env vars merged into the agent's launch env. Only
+   * `EC2Compute` populates this today (forwards `CLAUDE_CODE_API_KEY` /
+   * `ANTHROPIC_API_KEY` so the worker process can reach Anthropic
+   * without re-resolving secrets). All other Computes return an empty
+   * record. Optional so impls without contributions can omit.
+   */
+  buildLaunchEnv?(session: import("../../types/session.js").Session): Record<string, string>;
+
+  /**
+   * Operator-runnable command to attach a terminal to the agent's pane on
+   * this compute. Local: `["tmux", "attach", "-t", "<pane>"]`. EC2:
+   * `["aws", "ssm", "start-session", ...]` wrapping `tmux attach`.
+   * K8s: `["kubectl", "exec", "-it", ...]`.
+   *
+   * Returns an empty array when there is nothing to attach to (no
+   * `session.session_id`, or the compute kind has no shell access).
+   */
+  getAttachCommand(h: ComputeHandle, session: import("../../types/session.js").Session): string[];
+
+  /**
+   * Probe the compute's high-level lifecycle state and return a status
+   * string the dashboard uses to reconcile against the DB row. Mostly
+   * used by EC2 (queries `DescribeInstances`); other kinds without a
+   * meaningful out-of-band state probe omit this method.
+   *
+   * Returns `null` when the probe couldn't determine status (network
+   * error, transient SDK failure). Throws on programmer errors (missing
+   * config field) so the caller can surface a real failure.
+   */
+  checkStatus?(h: ComputeHandle): Promise<string | null>;
+
+  /**
+   * Reboot the compute. EC2 hits `RebootInstances` then waits for SSH /
+   * SSM to return. Local / k8s kinds with `capabilities.canReboot=false`
+   * omit this method; `compute/reboot` surfaces a clean error.
+   */
+  reboot?(h: ComputeHandle, opts?: { onLog?: (msg: string) => void }): Promise<void>;
 }
 
 /**

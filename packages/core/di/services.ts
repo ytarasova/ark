@@ -144,7 +144,6 @@ export function registerServices(
           removeWorktree: (session) => removeSessionWorktree(c.app, session),
           deleteCredsSecret: (session, compute) => deletePerSessionCredsSecret(c.app, session, compute),
           gcComputeIfTemplate: (computeName) => garbageCollectComputeIfTemplate(c.app, computeName ?? null),
-          resolveProvider: (session) => c.app.resolveProvider(session),
           resolveComputeTarget: (session) => c.app.resolveComputeTarget(session),
           advance: (id, force) => c.app.stageAdvance.advance(id, force),
           provisionWorkspaceWorkdir: (session, ws, opts) => provisionWorkspaceWorkdir(c.app, session, ws, opts),

@@ -45,8 +45,7 @@ import type {
   ProvisionOpts,
   Snapshot,
 } from "../types.js";
-// ^ core/types.ts -- the new Compute/Isolation abstractions. Do NOT import from
-// `packages/compute/types.ts`, which is the legacy ComputeProvider surface.
+// ^ compute/types.ts -- the Compute/Isolation abstractions.
 import { NotSupportedError } from "../types.js";
 import { cloneWorkspaceViaArkd } from "../workspace-clone.js";
 import { provisionStep } from "../../services/provisioning-steps.js";
@@ -575,6 +574,46 @@ export class FirecrackerCompute implements Compute {
       name: vmId.replace(/^ark-fc-/, ""),
       meta: { firecracker: meta },
     };
+  }
+
+  // ── buildChannelConfig ──────────────────────────────────────────────────
+  //
+  // The microVM's rootfs ships `ark` at `/usr/local/bin/ark`. arkd inside
+  // the guest listens on `GUEST_ARKD_PORT` and the agent reaches it via
+  // localhost (loopback inside the VM).
+
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
+    return {
+      command: "/usr/local/bin/ark",
+      args: ["channel"],
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_ARKD_URL: `http://localhost:${GUEST_ARKD_PORT}`,
+      },
+    };
+  }
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    return {};
+  }
+
+  // ── getAttachCommand ────────────────────────────────────────────────────
+  //
+  // The microVM has no operator-friendly attach surface today. The only path
+  // would be SSH into the guest IP (assuming the rootfs has openssh-server
+  // and a known key); we leave that to a follow-up. Returns empty so the
+  // CLI surfaces a clean "attach not supported" message.
+
+  getAttachCommand(_h: ComputeHandle, _session: Session): string[] {
+    return [];
   }
 }
 

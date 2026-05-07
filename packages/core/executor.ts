@@ -107,17 +107,16 @@ export interface SendUserMessageResult {
 /**
  * Context passed to `Executor.probeStatus`. Each runtime owns its own
  * "is the agent still alive on the worker" check -- tmux-based runtimes
- * ask `provider.checkSession` (-> arkd `/agent/status`); process-based
- * runtimes (claude-agent) ask `provider.statusProcessByHandle` (-> arkd
+ * ask `AgentHandle.checkAlive` (-> arkd `/agent/status`); process-based
+ * runtimes (claude-agent) ask `ComputeHandle.statusProcess` (-> arkd
  * `/process/status`). The status-poller is runtime-agnostic; it routes
- * through this hook.
+ * through this hook. Each impl resolves its own ComputeTarget from the
+ * AppContext (no longer threaded in here).
  */
 export interface ProbeStatusOpts {
   app: import("./app.js").AppContext;
   session: import("../types/session.js").Session;
   handle: string;
-  compute: import("../types/index.js").Compute;
-  provider: import("./compute/legacy-provider.js").ComputeProvider;
 }
 
 export interface Executor {
@@ -133,8 +132,8 @@ export interface Executor {
   /**
    * Runtime-aware "is the agent still alive on the worker" probe. Called
    * by the status-poller every ~3s. Optional: when omitted the poller
-   * falls back to `provider.checkSession` (the tmux probe), which is the
-   * right answer for legacy tmux-based runtimes.
+   * falls back to `AgentHandle.checkAlive` (the tmux probe), which is the
+   * right answer for tmux-based runtimes.
    */
   probeStatus?(opts: ProbeStatusOpts): Promise<ExecutorStatus>;
   /**

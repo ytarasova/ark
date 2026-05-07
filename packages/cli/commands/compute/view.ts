@@ -74,10 +74,9 @@ export function registerViewCommands(computeCmd: Command) {
         return;
       }
       // `syncEnvironment` lived on the legacy ComputeProvider registry and
-      // its only real impl (EC2 ssh push/pull) was deleted in Task 4 of the
-      // compute cleanup. Kept as a stub here so the help text still lists
-      // the command; rewiring onto a typed-secret placement / arkd RPC
-      // path is filed as a follow-up.
+      // its only real impl (EC2 ssh push/pull) is gone. Kept as a stub
+      // here so the help text still lists the command; rewiring onto a
+      // typed-secret placement / arkd RPC path is filed as a follow-up.
       console.log(
         chalk.yellow(
           `'compute sync' (direction=${opts.direction}) is not wired in this build -- ` +
