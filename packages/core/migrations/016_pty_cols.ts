@@ -1,7 +1,7 @@
 import type { MigrationApplyContext } from "./types.js";
-import { applyPostgresPtyCols } from "./015_pty_cols_postgres.js";
+import { applyPostgresPtyCols } from "./016_pty_cols_postgres.js";
 
-export const VERSION = 15;
+export const VERSION = 16;
 export const NAME = "pty_cols";
 
 export async function up(ctx: MigrationApplyContext): Promise<void> {

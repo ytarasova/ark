@@ -30,8 +30,9 @@ import * as m012 from "./012_isolation_kind_rename.js";
 import * as m013 from "./013_eval_session_type.js";
 // Migration 014: standalone workspaces + workspace_repos tables (post code-intel).
 import * as m014 from "./014_workspaces.js";
-// Migration 015: add pty_cols / pty_rows to sessions (postgres schema parity).
-import * as m015 from "./015_pty_cols.js";
+// Migration 016: add pty_cols / pty_rows to sessions (postgres schema parity).
+// Numbered 016 to leave slot 015 for main's `015_drop_legacy_provider_columns`.
+import * as m016 from "./016_pty_cols.js";
 
 export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m001.VERSION, name: m001.NAME, up: m001.up },
@@ -52,5 +53,5 @@ export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m012.VERSION, name: m012.NAME, up: m012.up },
   { version: m013.VERSION, name: m013.NAME, up: m013.up },
   { version: m014.VERSION, name: m014.NAME, up: m014.up },
-  { version: m015.VERSION, name: m015.NAME, up: m015.up },
+  { version: m016.VERSION, name: m016.NAME, up: m016.up },
 ];
