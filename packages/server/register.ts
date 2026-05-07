@@ -52,6 +52,9 @@ import { registerTenantAuthHandlers } from "./handlers/tenant-auth.js";
 // --- BEGIN agent-G: clusters + tenant compute config ---
 import { registerClusterHandlers } from "./handlers/clusters.js";
 // --- END agent-G ---
+// --- BEGIN task-B1: worker registry ---
+import { registerWorkerHandlers } from "./handlers/worker.js";
+// --- END task-B1 ---
 
 /**
  * Register every shared handler, then conditionally mount local-only handlers
@@ -113,6 +116,10 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   // --- BEGIN agent-G: clusters + tenant compute config ---
   registerClusterHandlers(router, app);
   // --- END agent-G ---
+
+  // --- BEGIN task-B1: worker registry ---
+  registerWorkerHandlers(router, app);
+  // --- END task-B1 ---
 }
 
 /**
