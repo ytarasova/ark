@@ -15,7 +15,7 @@
  *     `handle` must have been obtained from a prior `terminal/subscribe` call
  *     on the same JSON-RPC connection.
  *
- * NOTE: The raw `/terminal/:sessionId` WebSocket bridge in `packages/server/
+ * NOTE: The raw `/terminal/:sessionId` WebSocket bridge in `packages/conductor/
  * index.ts` is unchanged and continues to serve the browser. These RPC
  * methods are an additive surface for programmatic callers (CLI, test
  * harnesses, MCP tool use) that already hold a JSON-RPC connection.
@@ -55,7 +55,7 @@ function makeHandle(): string {
 
 /**
  * Resolve the arkd URL + optional auth token for a session. Mirrors the
- * `resolveArkdForSession` helper in `packages/server/index.ts` but is
+ * `resolveArkdForSession` helper in `packages/conductor/index.ts` but is
  * self-contained here so the handlers file has no import coupling to the
  * WS server.
  */

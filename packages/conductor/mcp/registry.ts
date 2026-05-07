@@ -5,7 +5,7 @@
  * The transport handler iterates the registry on `tools/list` and dispatches on
  * `tools/call`. Adding a new tool means: (1) define it in `tools/<group>.ts`,
  * (2) register it on `sharedRegistry`, (3) import the file from
- * `packages/server/mcp/index.ts` so its side-effect register runs.
+ * `packages/conductor/mcp/index.ts` so its side-effect register runs.
  */
 
 import type { z } from "zod";

@@ -13,8 +13,8 @@
  * status transitions.
  *
  * `processHookPayload` contains the transport-agnostic core. It is called
- * by both the REST handler (in `packages/server/mounts/hooks.ts`) and the
- * `hook/forward` JSON-RPC handler in `packages/server/handlers/hook.ts`.
+ * by both the REST handler (in `packages/conductor/mounts/hooks.ts`) and the
+ * `hook/forward` JSON-RPC handler in `packages/conductor/handlers/hook.ts`.
  */
 
 import type { AppContext } from "../../app.js";

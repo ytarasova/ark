@@ -1,6 +1,6 @@
 /**
  * Session tools. Thin pass-throughs to the AppContext services and
- * repositories that the JSON-RPC handlers in `packages/server/handlers/`
+ * repositories that the JSON-RPC handlers in `packages/conductor/handlers/`
  * already use. No business logic here; auth/tenant scoping is handled
  * upstream by the /mcp route.
  */
@@ -91,7 +91,7 @@ const sessionStart: ToolDef = {
       }
     }
 
-    // Mirror packages/server/handlers/session.ts session/start: delegate to
+    // Mirror packages/conductor/handlers/session.ts session/start: delegate to
     // sessionLifecycle.start with the onCreated callback so the default
     // dispatcher listener kicks the background launcher synchronously.
     const session = await app.sessionLifecycle.start(
@@ -135,7 +135,7 @@ const sessionKill: ToolDef = {
   inputSchema: sessionKillInput,
   handler: async (input, { app }) => {
     const parsed = input as z.infer<typeof sessionKillInput>;
-    // Mirror packages/server/handlers/session.ts session/kill: there is no
+    // Mirror packages/conductor/handlers/session.ts session/kill: there is no
     // single sessionService.kill primitive; the handler inlines executor
     // terminate + status update + cleanupSession. We replay the same calls
     // so the MCP surface and JSON-RPC surface end up in identical states.

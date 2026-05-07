@@ -175,7 +175,7 @@ describe("attach endpoints", () => {
   });
 
   // Note: /agent/attach/stream wire-level behaviour (chunked byte delivery,
-  // fifo lifecycle) is covered by packages/server/__tests__/terminal-ws.test.ts,
+  // fifo lifecycle) is covered by packages/conductor/__tests__/terminal-ws.test.ts,
   // which exercises the end-to-end server-daemon -> arkd -> fifo -> WS path
   // with a real tmux pane. We intentionally don't duplicate that here because
   // a raw fifo can't be probed without a writer without deadlocking on Bun's

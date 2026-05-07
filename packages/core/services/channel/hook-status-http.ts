@@ -3,7 +3,7 @@
  *
  * This thin adapter reads the session param from the URL search params and
  * the payload from the request body, then delegates to `processHookPayload`.
- * Used by both the merged server port (via `packages/server/mounts/hooks.ts`)
+ * Used by both the merged server port (via `packages/conductor/mounts/hooks.ts`)
  * and test helpers that start a minimal HTTP server.
  */
 

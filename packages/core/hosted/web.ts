@@ -13,7 +13,7 @@
  *
  * Live terminal attach for the Web UI runs on the server daemon's
  * `/terminal/:sessionId` WS route (port 19400), proxied through arkd's
- * `/agent/attach/*` endpoints. See packages/server/index.ts.
+ * `/agent/attach/*` endpoints. See packages/conductor/index.ts.
  */
 
 import { readFileSync, existsSync } from "fs";
@@ -261,7 +261,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
 
       // Live terminal attach moved to the server daemon's /terminal/:sessionId
       // WS route (port 19400). The hosted web server no longer bridges a raw
-      // PTY; see packages/server/index.ts for the arkd-backed implementation.
+      // PTY; see packages/conductor/index.ts for the arkd-backed implementation.
 
       // SSE endpoint
       if (url.pathname === "/api/events/stream") {
@@ -353,7 +353,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // Unified trigger webhooks: POST /api/webhooks/:source (or /webhooks/:source).
       // Handles every registered source (github, bitbucket, slack, linear, jira,
       // generic-hmac, ...). Signature verification + 2xx-fast dispatch lives in
-      // packages/server/handlers/webhooks.ts.
+      // packages/conductor/handlers/webhooks.ts.
       if (req.method === "POST" && matchWebhookPath(url.pathname)) {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
