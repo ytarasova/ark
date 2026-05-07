@@ -52,6 +52,8 @@ export const sessions = sqliteTable(
     tenantId: text("tenant_id").notNull().default("default"),
     workspaceId: text("workspace_id"),
     orchestrator: text("orchestrator").notNull().default("custom"),
+    workflowId: text("workflow_id"),
+    workflowRunId: text("workflow_run_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -553,4 +555,21 @@ export const arkSchemaMigrations = sqliteTable("ark_schema_migrations", {
   version: integer("version").primaryKey(),
   name: text("name").notNull(),
   appliedAt: text("applied_at").notNull(),
+});
+
+// ── session_projections ───────────────────────────────────────────────────
+//
+// Sidecar tables for the Temporal shadow projector diff harness (migration 015).
+// Tracks the last applied event sequence per session (and optionally per stage).
+
+export const sessionProjections = sqliteTable("session_projections", {
+  sessionId: text("session_id").notNull(),
+  stageIdx: integer("stage_idx"),
+  lastSeq: integer("last_seq").notNull(),
+});
+
+export const sessionProjectionsShadow = sqliteTable("session_projections_shadow", {
+  sessionId: text("session_id").notNull(),
+  stageIdx: integer("stage_idx"),
+  lastSeq: integer("last_seq").notNull(),
 });
