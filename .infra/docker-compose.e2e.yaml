@@ -5,16 +5,23 @@
 # without either stack touching the other's data, ports, or volumes.
 #
 # Brings up:
-#   - ark-e2e-postgres : Postgres 16 on :15434 (vs dev :15433)
-#   - ark-e2e-redis    : Redis 7    on :6380  (vs dev :6379)
+#   - ark-e2e-postgres         : Postgres 16 on :15434 (vs dev :15433)
+#   - ark-e2e-redis            : Redis 7    on :6380  (vs dev :6379)
+#   - ark-e2e-temporal-postgres: Postgres 16 on :15435 (Temporal persistence)
+#   - ark-e2e-temporal         : Temporal server on :7234 (vs dev :7233)
+#   - ark-e2e-temporal-ui      : Temporal UI on :8089 (vs dev :8088)
+#   - ark-e2e-temporal-worker  : Ark worker (replicas: 2) for T1-T5
 #
 # Volumes: ark-e2e-* (vs dev's ark-dev-*). Wiped on every
-# `make test-e2e-control-plane` run via `down -v`.
+# `make test-e2e-temporal-down` run via `down -v`.
 #
 # Usage (via Makefile):
-#   make test-e2e-control-plane            # full lifecycle
-#   make test-e2e-control-plane-up         # just bring up (debug)
-#   make test-e2e-control-plane-down       # just tear down (debug)
+#   make test-e2e-temporal             # full lifecycle (T1-T5)
+#   make test-e2e-temporal-up          # just bring up (debug)
+#   make test-e2e-temporal-down        # just tear down (debug)
+#   make test-e2e-control-plane        # bespoke-only (no Temporal services needed)
+#   make test-e2e-control-plane-up     # just bring up (debug)
+#   make test-e2e-control-plane-down   # just tear down (debug)
 
 name: ark-e2e
 
@@ -52,8 +59,84 @@ services:
       timeout: 3s
       retries: 30
 
+  temporal-postgres:
+    image: postgres:16
+    container_name: ark-e2e-temporal-postgres
+    restart: "no"
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    ports:
+      - "15435:5432"
+    volumes:
+      - ark-e2e-temporal-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  temporal:
+    image: temporalio/auto-setup:1.26
+    container_name: ark-e2e-temporal
+    restart: "no"
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgres
+    ports:
+      - "7234:7233"
+    healthcheck:
+      test: ["CMD", "temporal", "workflow", "list", "--namespace", "default", "--address", "localhost:7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    container_name: ark-e2e-temporal-ui
+    restart: "no"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8089:8080"
+
+  temporal-worker:
+    build:
+      context: ..
+      dockerfile: .infra/Dockerfile.temporal-worker
+    image: ark-temporal-worker:e2e
+    container_name: ark-e2e-temporal-worker
+    restart: on-failure
+    depends_on:
+      temporal:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+    environment:
+      DATABASE_URL: postgres://ark:ark@postgres:5432/ark?sslmode=disable
+      ARK_TEMPORAL_SERVER_URL: temporal:7233
+      ARK_TEMPORAL_NAMESPACE: default
+      ARK_TEMPORAL_WORKER: "true"
+      ARK_TEMPORAL_ORCHESTRATION: "true"
+      ARK_PROFILE: control-plane
+      ARK_LOG_LEVEL: warn
+
 volumes:
   ark-e2e-postgres-data:
     name: ark-e2e-postgres-data
   ark-e2e-redis-data:
     name: ark-e2e-redis-data
+  ark-e2e-temporal-postgres-data:
+    name: ark-e2e-temporal-postgres-data

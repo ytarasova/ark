@@ -189,6 +189,21 @@ test-e2e-control-plane-up: ## Bring up the e2e Docker stack only (debug aid)
 test-e2e-control-plane-down: ## Tear down the e2e Docker stack and volumes
 	$(DOCKER_COMPOSE) -f .infra/docker-compose.e2e.yaml -p ark-e2e down -v
 
+test-e2e-temporal: ## Run Temporal e2e tests (T1-T5) against full docker stack
+	@command -v docker >/dev/null 2>&1 || { echo "Docker required for temporal e2e."; exit 1; }
+	@command -v tmux >/dev/null 2>&1 || { echo "tmux required for temporal e2e (brew install tmux)."; exit 1; }
+	@echo "\033[1mRunning Temporal e2e (T1-T5)...\033[0m"
+	$(BUN) test e2e/temporal-control-plane.test.ts
+
+test-e2e-temporal-up: ## Bring up full e2e stack including Temporal services
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.e2e.yaml -p ark-e2e up -d --wait
+
+test-e2e-temporal-down: ## Tear down the full e2e stack and volumes
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.e2e.yaml -p ark-e2e down -v
+
+docker-build-temporal-worker: ## Build the Temporal worker Docker image for e2e
+	docker build -t ark-temporal-worker:e2e -f .infra/Dockerfile.temporal-worker .
+
 test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web dashboard)
 	@# `bunx --bun playwright test` runs Playwright under Bun, which is
 	@# required: fixtures/web-server.ts uses Bun APIs (`import { spawn }
