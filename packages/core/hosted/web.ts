@@ -23,7 +23,7 @@ import type { AppContext } from "../app.js";
 import { eventBus } from "../hooks.js";
 import { Router } from "../../server/router.js";
 import { registerAllHandlers } from "../../server/register.js";
-import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
+import { DEFAULT_CHANNEL_BASE_URL, DEFAULT_CONDUCTOR_URL } from "../constants.js";
 import {
   handleIssueWebhook,
   type IssueWebhookConfig,
@@ -442,7 +442,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   // Check daemon health on web server start
   (async () => {
     try {
-      const resp = await fetch("http://localhost:19100/health", { signal: AbortSignal.timeout(1000) });
+      const resp = await fetch(`${DEFAULT_CONDUCTOR_URL}/health`, { signal: AbortSignal.timeout(1000) });
       if (resp.ok) console.warn("Conductor: online");
       else console.warn("WARNING: Conductor not responding. Run: ark server daemon start");
     } catch {
