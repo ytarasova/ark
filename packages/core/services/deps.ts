@@ -23,6 +23,13 @@ export interface OrchestrationDeps {
   secrets: SecretsCapability;
   tenantId: string;
   arkDir: string;
+  /**
+   * Optional dispatch callback wired at worker bootstrap time.
+   * Allows dispatchStageActivity to invoke the bespoke DispatchService without
+   * holding a full AppContext reference. Phase 3 will replace this with a
+   * self-contained DispatchDeps constructed from OrchestrationDeps.
+   */
+  dispatch?: (sessionId: string) => Promise<{ ok: boolean; message?: string; pid?: number; handle?: string }>;
 }
 
 /** Derive narrow deps from a full AppContext for local/transition use. */
@@ -38,5 +45,6 @@ export function depsFromApp(app: import("../app.js").AppContext): OrchestrationD
     secrets: app.mode.secrets,
     tenantId: app.tenantId!,
     arkDir: app.arkDir,
+    dispatch: (sessionId: string) => app.dispatchService.dispatch(sessionId),
   };
 }
