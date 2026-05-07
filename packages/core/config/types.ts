@@ -167,6 +167,45 @@ export interface FeaturesConfig {
    * @envvar ARK_AUTO_REBASE
    */
   autoRebase: boolean;
+  /**
+   * Route new hosted sessions through Temporal.
+   * @envvar ARK_TEMPORAL_ORCHESTRATION
+   * @default false
+   */
+  temporalOrchestration: boolean;
+  /**
+   * Run shadow Temporal projector alongside bespoke engine.
+   * @envvar ARK_TEMPORAL_SHADOW
+   * @default false
+   */
+  temporalOrchestrationShadow: boolean;
+}
+
+/** Temporal workflow engine configuration. */
+export interface TemporalConfig {
+  /**
+   * Temporal server address.
+   * @envvar ARK_TEMPORAL_SERVER_URL
+   * @default "localhost:7233"
+   */
+  serverUrl: string;
+  /**
+   * Temporal namespace.
+   * @envvar ARK_TEMPORAL_NAMESPACE
+   * @default "default"
+   */
+  namespace: string;
+  /**
+   * Task queues this worker pulls from.
+   * @default []
+   */
+  taskQueueAssignments: string[];
+  /**
+   * Whether to start a Temporal worker in this process.
+   * @envvar ARK_TEMPORAL_WORKER
+   * @default false
+   */
+  workerEnabled: boolean;
 }
 
 /**
@@ -183,4 +222,5 @@ export interface ProfileDefaults {
   features: FeaturesConfig;
   observability: { logLevel: ObservabilityConfig["logLevel"] };
   storage: StorageConfig;
+  temporal?: Partial<TemporalConfig>;
 }

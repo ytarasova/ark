@@ -18,6 +18,7 @@ import type {
   AuthSectionConfig,
   FeaturesConfig,
   StorageConfig,
+  TemporalConfig,
 } from "./types.js";
 
 export interface EnvSecretsOverrides {
@@ -35,6 +36,7 @@ export interface EnvOverrides {
   features: Partial<FeaturesConfig>;
   storage: Partial<StorageConfig>;
   secrets: EnvSecretsOverrides;
+  temporal: Partial<TemporalConfig>;
   databaseUrl?: string;
   redisUrl?: string;
 }
@@ -77,6 +79,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
     features: {},
     storage: {},
     secrets: {},
+    temporal: {},
   };
 
   // Dirs
@@ -138,6 +141,18 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
   // Database
   if (env.DATABASE_URL) out.databaseUrl = env.DATABASE_URL;
   if (env.REDIS_URL) out.redisUrl = env.REDIS_URL;
+
+  // Temporal
+  if (env.ARK_TEMPORAL_SERVER_URL) out.temporal.serverUrl = env.ARK_TEMPORAL_SERVER_URL;
+  if (env.ARK_TEMPORAL_NAMESPACE) out.temporal.namespace = env.ARK_TEMPORAL_NAMESPACE;
+  const temporalWorker = parseBool(env.ARK_TEMPORAL_WORKER);
+  if (temporalWorker !== undefined) out.temporal.workerEnabled = temporalWorker;
+
+  // Temporal feature flags
+  const temporalOrchestration = parseBool(env.ARK_TEMPORAL_ORCHESTRATION);
+  if (temporalOrchestration !== undefined) out.features.temporalOrchestration = temporalOrchestration;
+  const temporalShadow = parseBool(env.ARK_TEMPORAL_SHADOW);
+  if (temporalShadow !== undefined) out.features.temporalOrchestrationShadow = temporalShadow;
 
   return out;
 }

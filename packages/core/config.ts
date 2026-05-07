@@ -39,6 +39,7 @@ import type {
   FeaturesConfig,
   DatabaseConfig,
   StorageConfig,
+  TemporalConfig,
   ProfileDefaults,
 } from "./config/types.js";
 import { detectProfile, loadProfileDefaults } from "./config/profiles.js";
@@ -56,6 +57,7 @@ export type {
   FeaturesConfig,
   DatabaseConfig,
   StorageConfig,
+  TemporalConfig,
 } from "./config/types.js";
 export type { ClusterConfig, ClusterAuth } from "./config/clusters.js";
 
@@ -142,6 +144,8 @@ export interface ArkConfig {
   storage: StorageConfig;
   /** Compute-wide configuration. Includes the system-layer cluster list. */
   compute: ComputeConfig;
+  /** Temporal workflow engine configuration. */
+  temporal: TemporalConfig;
 
   // ── Extra scalars not part of a nested section ─────────────────────────
 
@@ -283,7 +287,11 @@ export function loadConfig(overrides: LoadConfigOptions = {}): ArkConfig {
     ports: { conductor: 19100, arkd: 19300, server: 19400, web: 8420 },
     channels: { basePort: 19200, range: 10000 },
     auth: { requireToken: profile === "control-plane", defaultTenant: null },
-    features: { autoRebase: profile === "control-plane" },
+    features: {
+      autoRebase: profile === "control-plane",
+      temporalOrchestration: false,
+      temporalOrchestrationShadow: false,
+    },
     observability: { logLevel: profile === "test" ? "error" : "info" },
     storage: { blobBackend: profile === "control-plane" ? "s3" : "local" },
   };
@@ -335,6 +343,25 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   };
   const features: FeaturesConfig = {
     autoRebase: merged.features.autoRebase ?? defaults.features.autoRebase,
+    temporalOrchestration: merged.features.temporalOrchestration ?? defaults.features.temporalOrchestration ?? false,
+    temporalOrchestrationShadow:
+      merged.features.temporalOrchestrationShadow ?? defaults.features.temporalOrchestrationShadow ?? false,
+  };
+
+  const temporalDefaults: TemporalConfig = {
+    serverUrl: "localhost:7233",
+    namespace: "default",
+    taskQueueAssignments: [],
+    workerEnabled: false,
+  };
+  const temporal: TemporalConfig = {
+    serverUrl: merged.temporal?.serverUrl ?? defaults.temporal?.serverUrl ?? temporalDefaults.serverUrl,
+    namespace: merged.temporal?.namespace ?? defaults.temporal?.namespace ?? temporalDefaults.namespace,
+    taskQueueAssignments:
+      merged.temporal?.taskQueueAssignments ??
+      defaults.temporal?.taskQueueAssignments ??
+      temporalDefaults.taskQueueAssignments,
+    workerEnabled: merged.temporal?.workerEnabled ?? defaults.temporal?.workerEnabled ?? temporalDefaults.workerEnabled,
   };
   // DATABASE_URL takes precedence; fall back to assembling from DB_* parts
   // (host/port/user/password/name). The latter is ergonomic for k8s where
@@ -407,6 +434,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     database,
     storage,
     compute: { clusters },
+    temporal,
 
     // Extra scalars
     dbPath: join(arkDir, "ark.db"),
@@ -487,7 +515,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
 }
 
 function emptyEnvOverrides(): EnvOverrides {
-  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {}, secrets: {} };
+  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {}, secrets: {}, temporal: {} };
 }
 
 /** Translate LoadConfigOptions into EnvOverrides so it merges with env/yaml layers. */
