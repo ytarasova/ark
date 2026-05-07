@@ -57,11 +57,6 @@ export function isRemoteMode(): boolean {
  */
 function defaultServerPort(): number {
   if (_port) return _port;
-  const env = process.env.ARK_SERVER_PORT;
-  if (env) {
-    const n = Number(env);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
   return 19400;
 }
 
