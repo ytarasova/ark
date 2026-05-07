@@ -58,8 +58,8 @@ describe("SessionService.saveInput -> blob store", async () => {
   });
 
   it("input/read handler returns the bytes the caller just uploaded", async () => {
-    const { registerSessionHandlers } = await import("../../../server/handlers/session.js");
-    const { Router } = await import("../../../server/router.js");
+    const { registerSessionHandlers } = await import("../../../conductor/handlers/session.js");
+    const { Router } = await import("../../../conductor/router.js");
     const { createRequest } = await import("../../../protocol/types.js");
 
     const router = new Router();

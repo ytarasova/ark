@@ -537,8 +537,8 @@ describe("Regression: complete() must advance flow (not leave status=ready)", as
     await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
     // Use Router + registerSessionHandlers (same pattern as handler tests)
-    const { Router } = await import("../../server/router.js");
-    const { registerSessionHandlers } = await import("../../server/handlers/session.js");
+    const { Router } = await import("../../conductor/router.js");
+    const { registerSessionHandlers } = await import("../../conductor/handlers/session.js");
     const { createRequest } = await import("../../protocol/types.js");
 
     const router = new Router();
@@ -558,8 +558,8 @@ describe("Regression: complete() must advance flow (not leave status=ready)", as
     const session = await app.sessionLifecycle.start({ summary: "rpc complete quick", flow: "quick" });
     await app.sessions.update(session.id, { session_id: `ark-s-${session.id}`, status: "running" });
 
-    const { Router } = await import("../../server/router.js");
-    const { registerSessionHandlers } = await import("../../server/handlers/session.js");
+    const { Router } = await import("../../conductor/router.js");
+    const { registerSessionHandlers } = await import("../../conductor/handlers/session.js");
     const { createRequest } = await import("../../protocol/types.js");
 
     const router = new Router();

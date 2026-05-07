@@ -21,15 +21,15 @@ import { execFileSync } from "child_process";
 import { join, resolve } from "path";
 import type { AppContext } from "../app.js";
 import { eventBus } from "../hooks.js";
-import { Router } from "../../server/router.js";
-import { registerAllHandlers } from "../../server/register.js";
+import { Router } from "../../conductor/router.js";
+import { registerAllHandlers } from "../../conductor/register.js";
 import { DEFAULT_CHANNEL_BASE_URL, DEFAULT_CONDUCTOR_URL } from "../constants.js";
 import {
   handleIssueWebhook,
   type IssueWebhookConfig,
   type IssueWebhookPayload,
 } from "../integrations/github-webhook.js";
-import { handleWebhookRequest, matchWebhookPath } from "../../server/handlers/webhooks.js";
+import { handleWebhookRequest, matchWebhookPath } from "../../conductor/handlers/webhooks.js";
 import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import { fromWire, localAdminContext, type TenantContext as HandlerTenantContext } from "../auth/context.js";

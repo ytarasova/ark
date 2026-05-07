@@ -141,8 +141,8 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       // Foreground mode: boot everything in-process
       const { AppContext } = await import("../../core/app.js");
       const { loadConfig } = await import("../../core/config.js");
-      const { ArkServer } = await import("../../server/index.js");
-      const { registerAllHandlers } = await import("../../server/register.js");
+      const { ArkServer } = await import("../../conductor/index.js");
+      const { registerAllHandlers } = await import("../../conductor/register.js");
 
       const config = loadConfig();
 

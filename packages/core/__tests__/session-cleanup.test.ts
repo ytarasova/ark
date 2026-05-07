@@ -15,8 +15,8 @@ import { AppContext } from "../app.js";
 import { setApp, clearApp } from "./test-helpers.js";
 import { cleanupSession } from "../services/session/cleanup.js";
 import { claudeAgentExecutor } from "../executors/claude-agent.js";
-import { Router } from "../../server/router.js";
-import { registerSessionHandlers } from "../../server/handlers/session.js";
+import { Router } from "../../conductor/router.js";
+import { registerSessionHandlers } from "../../conductor/handlers/session.js";
 import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
 
 let app: AppContext;

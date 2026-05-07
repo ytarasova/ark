@@ -34,7 +34,7 @@ packages/
   compute/   -> 11 providers (local, docker, devcontainer, firecracker, ec2-*, e2b, k8s, k8s-kata)
   arkd/      -> Universal agent daemon (:19300) on every compute target
   router/    -> LLM Router (OpenAI-compatible proxy, 3 policies, circuit breakers)
-  server/    -> JSON-RPC handlers (delegate to services via AppContext)
+  conductor/ -> Merged service: JSON-RPC, OpenAI proxy, webhooks, MCP, terminal WS, health (:19400)
   protocol/  -> ArkClient (typed JSON-RPC client)
   web/       -> Vite web dashboard (SSE, Recharts)
   desktop/   -> Electron shell wrapping the web dashboard
@@ -55,7 +55,7 @@ No workspaces -- packages coordinated via relative imports.
 - `AppContext` (`app.ts`) -- repos: `app.sessions`, `app.computes`; services: `app.sessionService`; stores: `app.flows`, `app.skills`, `app.agents`, `app.recipes`
 - `SessionService` (`services/session.ts`) -- lifecycle facade, delegates to `session-orchestration.ts`
 - `session-orchestration.ts` -- all orchestration. Every function takes `app: AppContext` as first arg
-- MCP server (`packages/server/mcp/`) -- HTTP MCP at `:19400/mcp`. 27 tools (read + Tier 1/2 write). See `docs/mcp.md`.
+- MCP server (`packages/conductor/mcp/`) -- HTTP MCP at `:19400/mcp`. 27 tools (read + Tier 1/2 write). See `docs/mcp.md`.
 
 **Orchestration (current + future).** Ark uses a custom session/flow state machine today, all under `packages/core/services/` (`flow.ts`, `session.ts`, `session/`, `dispatch/`, `stage-advance/`). A Temporal-backed replacement is in design (`docs/temporal.md`); phases tracked in #374. Local Temporal cluster for Phase 1+ dev is `make dev-temporal` (see `docs/temporal-local-dev.md`). The legacy engine stays semantically frozen until Phase 2 lands.
 

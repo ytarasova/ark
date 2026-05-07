@@ -19,8 +19,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../core/app.js";
-import { ArkServer } from "../../server/index.js";
-import { registerAllHandlers } from "../../server/register.js";
+import { ArkServer } from "../../conductor/index.js";
+import { registerAllHandlers } from "../../conductor/register.js";
 import { getArkClient, setRemoteServer, setServerPort, closeArkClient, shutdownInProcessApp } from "../app-client.js";
 
 describe("app-client: remote-mode (--server url)", () => {

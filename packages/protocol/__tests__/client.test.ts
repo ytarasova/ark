@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../core/app.js";
 import { ArkClient } from "../client.js";
-import { ArkServer } from "../../server/index.js";
-import { registerAllHandlers } from "../../server/register.js";
+import { ArkServer } from "../../conductor/index.js";
+import { registerAllHandlers } from "../../conductor/register.js";
 import type { Transport } from "../transport.js";
 import type { JsonRpcMessage } from "../types.js";
 

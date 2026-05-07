@@ -170,8 +170,8 @@ automatically.
 - Trigger pipeline: `packages/core/triggers/`
 - Connectors: `packages/core/connectors/`
 - Unified catalog: `packages/core/integrations/registry.ts`
-- Webhook route: `packages/server/handlers/webhooks.ts`
-- JSON-RPC CRUD: `packages/server/handlers/triggers.ts`
+- Webhook route: `packages/conductor/handlers/webhooks.ts`
+- JSON-RPC CRUD: `packages/conductor/handlers/triggers.ts`
 - CLI: `packages/cli/commands/trigger.ts`
 - Shipped MCP configs: `mcp-configs/`
 - Shipped trigger examples: `triggers/`
