@@ -20,10 +20,10 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AppContext } from "../app.js";
-import { startConductor } from "../conductor/server/conductor.js";
+import { startConductor } from "./_util/start-test-server.js";
 import { allocatePort } from "../config/port-allocator.js";
-import { Router } from "../../server/router.js";
-import { registerSessionHandlers } from "../../server/handlers/session.js";
+import { Router } from "../../conductor/router.js";
+import { registerSessionHandlers } from "../../conductor/handlers/session.js";
 import { clearApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;

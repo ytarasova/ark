@@ -8,8 +8,8 @@ import { fmtCost, fmtDuration, relTime } from "../../util.js";
 /**
  * Full session tree panel rendered on the Flow tab for root + parent
  * sessions. Uses `session/tree` for the initial snapshot and subscribes to
- * `/api/sessions/:rootId/tree/stream` for live updates (200ms debounced
- * server-side).
+ * live updates via the JSON-RPC `session/tree-stream` WebSocket subscription
+ * (200ms debounced server-side).
  *
  * Deliberately kept as a dedicated renderer rather than overloading
  * `FlowDag`, which encodes stage-level pipeline semantics (done/running/
@@ -33,8 +33,8 @@ export function FlowTreePanel({ session, rootId: rootIdProp }: FlowTreePanelProp
     staleTime: 5_000,
   });
 
-  // Subscribe to SSE so react-query cache stays fresh while this panel is
-  // mounted. Server debounces to 200ms.
+  // Subscribe to JSON-RPC tree updates so the react-query cache stays fresh
+  // while this panel is mounted. Server debounces snapshots to 200ms.
   useSessionTreeStream(rootId);
 
   const flat = useMemo(() => (root ? flatten(root, 0, true) : []), [root]);

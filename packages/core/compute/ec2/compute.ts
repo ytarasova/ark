@@ -51,6 +51,7 @@
  * never provision an EC2 compute.
  */
 
+import { DEFAULT_CONDUCTOR_URL } from "../../constants.js";
 import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/session.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
@@ -71,7 +72,7 @@ import { REMOTE_HOME } from "./constants.js";
 import { cloneWorkspaceViaArkd } from "../workspace-clone.js";
 import { logDebug, logInfo } from "../../observability/structured-log.js";
 import { provisionStep } from "../../services/provisioning-steps.js";
-import { startArkdEventsConsumer } from "../../conductor/server/arkd-events-consumer.js";
+import { startArkdEventsConsumer } from "../../services/channel/arkd-events-consumer.js";
 import { EC2PlacementCtx } from "./placement-ctx.js";
 import type { PlacementCtx } from "../../secrets/placement-types.js";
 
@@ -989,7 +990,7 @@ export class EC2Compute implements Compute {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
         ARK_ARKD_URL: `http://localhost:${ARKD_REMOTE_PORT}`,
       },
     };

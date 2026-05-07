@@ -5,7 +5,7 @@ import { getArkClient } from "../../app-client.js";
 async function forkCloneHandler(id: string, opts: { task?: string; group?: string }) {
   const ark = await getArkClient();
   try {
-    // Server auto-dispatches clones (see handler in packages/server/handlers/session.ts).
+    // Server auto-dispatches clones (see handler in packages/conductor/handlers/session.ts).
     const forked = await ark.sessionClone(id, opts.task);
     if (opts.group) await ark.sessionUpdate(forked.id, { group_name: opts.group });
     console.log(chalk.green(`Forked -> ${forked.id}`));

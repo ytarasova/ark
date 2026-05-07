@@ -37,8 +37,8 @@ import { logDebug } from "./observability/structured-log.js";
  *      conductor code paths that touch them
  *   3. tensorZero (optional gateway, needed by router)
  *   4. router     -- depends on tensorZero URL
- *   5. conductor  -- HTTP server; agents + web both talk to it
- *   6. arkd       -- agent daemon; forwards to conductor
+ *   5. serverPollers -- schedule, PR review, PR merge, issue pollers
+ *   6. arkd       -- agent daemon; forwards to merged server port
  *   7. metrics poller
  *   8. maintenance pollers (purge, tmux status, notify daemon)
  *   9. boot file cleanup (one-shot)
@@ -49,7 +49,7 @@ const START_ORDER: (keyof Cradle)[] = [
   "computeProvidersBoot",
   "tensorZeroLauncher",
   "routerLauncher",
-  "conductorLauncher",
+  "serverPollers",
   "arkdLauncher",
   "metricsPoller",
   "maintenancePollers",

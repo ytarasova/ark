@@ -35,7 +35,7 @@ ark [options] <command>
 | [`ark search-all`](#ark-search-all) | Search across all Claude conversations |
 | [`ark memory`](#ark-memory) | Manage cross-session memory (backed by knowledge graph) |
 | [`ark profile`](#ark-profile) | Manage profiles |
-| [`ark conductor`](#ark-conductor) | Conductor operations |
+| [`ark conductor`](#ark-conductor) | Conductor operations and arkd lifecycle |
 | [`ark router`](#ark-router) | LLM routing proxy |
 | [`ark runtime`](#ark-runtime) | Manage runtime definitions |
 | [`ark auth`](#ark-auth) | Manage authentication and API keys |
@@ -53,7 +53,6 @@ ark [options] <command>
 | [`ark server`](#ark-server) | JSON-RPC server |
 | [`ark exec`](#ark-exec) | Run a session non-interactively (for CI/CD) |
 | [`ark try`](#ark-try) | Run a one-shot sandboxed session (auto-cleans up) |
-| [`ark daemon`](#ark-daemon) | Manage the arkd agent daemon |
 | [`ark pr`](#ark-pr) | Manage PR-bound sessions |
 | [`ark watch`](#ark-watch) | Watch GitHub issues with a label and auto-create sessions |
 | [`ark claude`](#ark-claude) | Interact with Claude Code sessions |
@@ -1511,15 +1510,49 @@ Delete a profile
 
 ## `ark conductor`
 
-Conductor operations
+Conductor operations and arkd lifecycle management
 
 **Synopsis:** `ark conductor`
 
+### `ark conductor start`
+
+Start the arkd agent daemon
+
+**Synopsis:** `ark conductor start [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` | `"19300"` | Port |
+| `--hostname <host>` | `"0.0.0.0"` | Bind address |
+| `--conductor-url <url>` |  | Conductor URL for channel relay |
+| `--workspace-root <path>` |  | Confine /file/* and /exec to this directory (recommended in hosted / multi-tenant deployments) |
+| `-d, --detach` |  | Run in background (detached mode) |
+
+### `ark conductor stop`
+
+Stop a running arkd daemon
+
+**Synopsis:** `ark conductor stop [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` |  | Port of daemon to stop (uses PID file by default) |
+
 ### `ark conductor status`
 
-Show whether a conductor is running on the daemon
+Check arkd daemon status and conductor liveness
 
-**Synopsis:** `ark conductor status`
+**Synopsis:** `ark conductor status [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` | `"19300"` | Port to check |
 
 ### `ark conductor learnings`
 
@@ -2748,52 +2781,6 @@ Run a one-shot sandboxed session (auto-cleans up)
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--image <image>` | `"ubuntu:22.04"` | Docker image |
-
-## `ark daemon`
-
-Manage the arkd agent daemon
-
-**Synopsis:** `ark daemon`
-
-### `ark daemon start`
-
-Start the arkd agent daemon
-
-**Synopsis:** `ark daemon start [options]`
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-p, --port <port>` | `"19300"` | Port |
-| `--hostname <host>` | `"0.0.0.0"` | Bind address |
-| `--conductor-url <url>` |  | Conductor URL for channel relay |
-| `--workspace-root <path>` |  | Confine /file/* and /exec to this directory (recommended in hosted / multi-tenant deployments) |
-| `-d, --detach` |  | Run in background (detached mode) |
-
-### `ark daemon stop`
-
-Stop a running daemon
-
-**Synopsis:** `ark daemon stop [options]`
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-p, --port <port>` |  | Port of daemon to stop (uses PID file by default) |
-
-### `ark daemon status`
-
-Check daemon status
-
-**Synopsis:** `ark daemon status [options]`
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-p, --port <port>` | `"19300"` | Port to check |
 
 ## `ark pr`
 

@@ -43,7 +43,7 @@ async function goToDashboard() {
 }
 
 test("dashboard/summary RPC returns the shape DashboardView consumes", async () => {
-  // Contract check against packages/server/handlers/dashboard.ts:
+  // Contract check against packages/conductor/handlers/dashboard.ts:
   // returns { counts, costs, recentEvents, topCostSessions, system, activeCompute }.
   // A regression in the handler's shape silently breaks the dashboard
   // until someone opens it.

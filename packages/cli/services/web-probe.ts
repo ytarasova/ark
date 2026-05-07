@@ -86,30 +86,18 @@ export interface AuxiliaryDaemons {
 }
 
 /**
- * Boot conductor + arkd in-process so `ark web --with-daemon` can serve a
- * fully working instance (desktop app / standalone use). When the ports are
- * already claimed by external daemons the start calls are skipped; the
- * web dashboard probes localhost:19100 / 19300 and finds them online.
+ * Boot arkd in-process so `ark web --with-daemon` can serve a fully working
+ * instance (desktop app / standalone use). When the port is already claimed
+ * by an external daemon the start call is skipped.
+ *
+ * The old conductor (port 19100) is merged into the server daemon (port
+ * 19400) -- there is no separate conductor process to start here.
  */
-export async function startAuxiliaryDaemons(app: AppContext): Promise<AuxiliaryDaemons> {
+export async function startAuxiliaryDaemons(_app: AppContext): Promise<AuxiliaryDaemons> {
   const auxiliary: { stop: () => void }[] = [];
 
-  const { startConductor } = await import("../../core/conductor/server/conductor.js");
   const { startArkd } = await import("../../arkd/server/index.js");
   const { DEFAULT_CONDUCTOR_PORT, DEFAULT_ARKD_PORT } = await import("../../core/constants.js");
-
-  // Conductor: start unless something already listens on the port
-  try {
-    if (await probeDaemonHealth(DEFAULT_CONDUCTOR_PORT, "conductor", "cli/web: conductor")) {
-      console.log(chalk.dim(`Conductor already running on :${DEFAULT_CONDUCTOR_PORT} -- reusing`));
-    } else {
-      const conductor = startConductor(app, DEFAULT_CONDUCTOR_PORT, { quiet: true });
-      auxiliary.push(conductor);
-      console.log(chalk.dim(`Started conductor on :${DEFAULT_CONDUCTOR_PORT}`));
-    }
-  } catch (e: any) {
-    console.log(chalk.yellow(`Could not start conductor: ${e?.message ?? e}`));
-  }
 
   // ArkD: start unless something already listens on the port
   try {

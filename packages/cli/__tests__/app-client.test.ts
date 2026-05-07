@@ -19,8 +19,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../core/app.js";
-import { ArkServer } from "../../server/index.js";
-import { registerAllHandlers } from "../../server/register.js";
+import { ArkServer } from "../../conductor/index.js";
+import { registerAllHandlers } from "../../conductor/register.js";
 import { getArkClient, setRemoteServer, setServerPort, closeArkClient, shutdownInProcessApp } from "../app-client.js";
 
 describe("app-client: remote-mode (--server url)", () => {
@@ -35,7 +35,7 @@ describe("app-client: remote-mode (--server url)", () => {
     // Stand up a WebSocket transport backed by the test AppContext; mirrors
     // what `ark server daemon start` does in prod. Use the test profile's
     // preallocated server port so we don't clash with anything else.
-    port = app.config.ports.server;
+    port = app.config.ports.conductor;
     const s = new ArkServer();
     registerAllHandlers(s.router, app);
     s.attachLifecycle(app);
@@ -78,7 +78,7 @@ describe("app-client: auto-discovery against a running local daemon", () => {
     app = await AppContext.forTestAsync();
     await app.boot();
 
-    port = app.config.ports.server;
+    port = app.config.ports.conductor;
     const s = new ArkServer();
     registerAllHandlers(s.router, app);
     s.attachLifecycle(app);
@@ -86,7 +86,7 @@ describe("app-client: auto-discovery against a running local daemon", () => {
     server = s.startWebSocket(port);
 
     // No --server flag; the client helper should see the listening daemon
-    // on config.ports.server and connect. We communicate the port via the
+    // on config.ports.conductor and connect. We communicate the port via the
     // helper's setServerPort() hatch so the test doesn't depend on the
     // default 19400 being free.
     setRemoteServer(undefined, undefined);

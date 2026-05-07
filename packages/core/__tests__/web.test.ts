@@ -266,5 +266,5 @@ describe("web server", async () => {
 
   // Live terminal attach is served by the server daemon's
   // /terminal/:sessionId WS route (port 19400); see
-  // packages/server/__tests__/terminal-ws.test.ts.
+  // packages/conductor/__tests__/terminal-ws.test.ts.
 });

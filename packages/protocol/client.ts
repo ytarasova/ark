@@ -45,6 +45,7 @@ import { SecretsClient } from "./clients/secrets.js";
 import { TicketsClient } from "./clients/tickets.js";
 import { ObservabilityClient } from "./clients/observability.js";
 import { SystemClient } from "./clients/system.js";
+import { InfraClient } from "./clients/infra.js";
 
 // Re-exports so callers that previously imported these types directly from
 // `protocol/client.js` keep compiling unchanged.
@@ -82,7 +83,8 @@ export interface ArkClient
     SecretsClient,
     TicketsClient,
     ObservabilityClient,
-    SystemClient {}
+    SystemClient,
+    InfraClient {}
 
 export class ArkClient {
   private transport: Transport;
@@ -229,6 +231,8 @@ export class ArkClient {
 // Wire every mixin's methods onto ArkClient.prototype. Each mixin reads
 // `this.rpc` -- that's the bound `rpcCall` set in the constructor above,
 // so the transport + pending-promise bookkeeping flows through `this`.
+// InfraClient additionally reads `this.on` / `this.off` which are defined
+// as public methods on ArkClient, so they resolve at runtime correctly.
 applyMixins(ArkClient, [
   SessionClient,
   SessionInteractClient,
@@ -241,4 +245,5 @@ applyMixins(ArkClient, [
   TicketsClient,
   ObservabilityClient,
   SystemClient,
+  InfraClient,
 ]);

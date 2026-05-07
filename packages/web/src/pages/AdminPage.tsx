@@ -21,7 +21,7 @@ interface AdminPageProps {
  * Plain tables + confirm dialogs on destructive actions; uses the shared
  * toast helper wired through from App.tsx. Gated behind the admin role in
  * the sidebar -- the handler layer also refuses if the caller isn't admin
- * (see packages/server/handlers/admin.ts).
+ * (see packages/conductor/handlers/admin.ts).
  */
 export function AdminPage({ view, onNavigate, readOnly, daemonStatus, onToast }: AdminPageProps) {
   const [tab, setTab] = useState<string>("tenants");

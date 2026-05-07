@@ -141,8 +141,8 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       // Foreground mode: boot everything in-process
       const { AppContext } = await import("../../core/app.js");
       const { loadConfig } = await import("../../core/config.js");
-      const { ArkServer } = await import("../../server/index.js");
-      const { registerAllHandlers } = await import("../../server/register.js");
+      const { ArkServer } = await import("../../conductor/index.js");
+      const { registerAllHandlers } = await import("../../conductor/register.js");
 
       const config = loadConfig();
 
@@ -271,10 +271,10 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       }
 
       // No PID file or dead process -- try default port anyway
-      const { DEFAULT_SERVER_PORT } = await import("../../core/constants.js");
-      const health = await probeHealth(DEFAULT_SERVER_PORT);
+      const { DEFAULT_CONDUCTOR_PORT } = await import("../../core/constants.js");
+      const health = await probeHealth(DEFAULT_CONDUCTOR_PORT);
       if (health.ok) {
-        console.log(chalk.green(`Server daemon is running on port ${DEFAULT_SERVER_PORT} (no PID file)`));
+        console.log(chalk.green(`Server daemon is running on port ${DEFAULT_CONDUCTOR_PORT} (no PID file)`));
         if (health.data?.pid) console.log(`  PID:    ${health.data.pid}`);
         if (health.data?.uptime) console.log(`  Uptime: ${Math.round(health.data.uptime)}s`);
         return;

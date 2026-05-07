@@ -28,7 +28,6 @@ const ENV_KEYS_WE_TOUCH = [
   "ARK_PROFILE",
   "ARK_CONDUCTOR_PORT",
   "ARK_ARKD_PORT",
-  "ARK_SERVER_PORT",
   "ARK_WEB_PORT",
   "ARK_CHANNEL_BASE_PORT",
   "ARK_CHANNEL_RANGE",
@@ -164,7 +163,7 @@ describe("loadConfig precedence", () => {
     delete process.env.NODE_ENV;
     process.env.ARK_DIR = scratchDir(); // stable dir with no config.yaml
     const cfg = loadConfig({ profile: "local" });
-    expect(cfg.ports.conductor).toBe(19100);
+    expect(cfg.ports.conductor).toBe(19400);
     expect(cfg.profile).toBe("local");
   });
 
@@ -230,7 +229,7 @@ describe("loadConfig precedence", () => {
   it("missing YAML file is non-fatal", () => {
     process.env.ARK_DIR = scratchDir(); // empty dir, no config.yaml
     const cfg = loadConfig({ profile: "local" });
-    expect(cfg.ports.conductor).toBe(19100);
+    expect(cfg.ports.conductor).toBe(19400);
   });
 
   it("malformed YAML falls back to defaults without crashing", () => {
@@ -238,7 +237,7 @@ describe("loadConfig precedence", () => {
     writeFileSync(join(dir, "config.yaml"), "ports:\n  conductor: [not, valid\n");
     process.env.ARK_DIR = dir;
     const cfg = loadConfig({ profile: "local" });
-    expect(cfg.ports.conductor).toBe(19100);
+    expect(cfg.ports.conductor).toBe(19400);
   });
 });
 
@@ -272,7 +271,6 @@ describe("loadAppConfig (async)", async () => {
     // Every port pair should differ between sibling builds in test mode
     expect(a.ports.conductor).not.toBe(b.ports.conductor);
     expect(a.ports.arkd).not.toBe(b.ports.arkd);
-    expect(a.ports.server).not.toBe(b.ports.server);
     expect(a.ports.web).not.toBe(b.ports.web);
   });
 

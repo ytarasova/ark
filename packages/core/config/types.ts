@@ -46,9 +46,9 @@ export interface DirsConfig {
 /** Network ports. */
 export interface PortsConfig {
   /**
-   * Conductor HTTP port.
+   * Merged conductor + server daemon HTTP port.
    * @envvar ARK_CONDUCTOR_PORT
-   * @default 19100 (test profile: random)
+   * @default 19400 (test profile: random)
    */
   conductor: number;
   /**
@@ -57,12 +57,6 @@ export interface PortsConfig {
    * @default 19300 (test profile: random)
    */
   arkd: number;
-  /**
-   * Server daemon WS port.
-   * @envvar ARK_SERVER_PORT
-   * @default 19400 (test profile: random)
-   */
-  server: number;
   /**
    * Web dashboard port.
    * @envvar ARK_WEB_PORT

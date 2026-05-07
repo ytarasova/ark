@@ -13,7 +13,7 @@
  *
  * Local mode:
  *   The CLI is a pure client. If no server daemon is reachable on
- *   config.ports.server, one is auto-spawned via `ark server daemon start`
+ *   config.ports.conductor, one is auto-spawned via `ark server daemon start`
  *   the first time a command asks for a client. Subsequent invocations
  *   connect to the now-running daemon. See `./app-client.ts`.
  */
@@ -45,7 +45,6 @@ import { registerDashboardCommands } from "./commands/dashboard.js";
 import { registerCostsCommands } from "./commands/costs.js";
 import { registerServerCommands } from "./commands/server.js";
 import { registerExecTryCommands } from "./commands/exec-try.js";
-import { registerDaemonCommands } from "./commands/daemon.js";
 import { registerMiscCommands } from "./commands/misc.js";
 import { registerDbCommands } from "./commands/db.js";
 import { registerSecretsCommands } from "./commands/secrets.js";
@@ -115,7 +114,6 @@ registerUserCommands(program);
 registerDashboardCommands(program);
 registerCostsCommands(program);
 registerServerCommands(program);
-registerDaemonCommands(program);
 registerExecTryCommands(program);
 registerMiscCommands(program);
 registerDbCommands(program);

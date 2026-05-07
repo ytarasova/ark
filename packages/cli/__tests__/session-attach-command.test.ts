@@ -11,8 +11,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../core/app.js";
-import { ArkServer } from "../../server/index.js";
-import { registerAllHandlers } from "../../server/register.js";
+import { ArkServer } from "../../conductor/index.js";
+import { registerAllHandlers } from "../../conductor/register.js";
 import { getArkClient, setRemoteServer, setServerPort, closeArkClient, shutdownInProcessApp } from "../app-client.js";
 
 let app: AppContext;
@@ -22,7 +22,7 @@ let port: number;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  port = app.config.ports.server;
+  port = app.config.ports.conductor;
   const s = new ArkServer();
   registerAllHandlers(s.router, app);
   s.attachLifecycle(app);

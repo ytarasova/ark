@@ -17,8 +17,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { asValue } from "awilix";
 import { AppContext } from "../app.js";
-import { startConductor } from "../conductor/server/conductor.js";
-import type { OutboundMessage } from "../conductor/common/channel-types.js";
+import { startConductor } from "./_util/start-test-server.js";
+import type { OutboundMessage } from "../services/channel/channel-types.js";
 
 let app: AppContext;
 

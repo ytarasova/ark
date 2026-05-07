@@ -40,7 +40,7 @@ export function setRemoteServer(url: string | undefined, token: string | undefin
   _remoteToken = token;
 }
 
-/** Override the server port (defaults to config.ports.server / 19400). */
+/** Override the server port (defaults to config.ports.conductor / 19400). */
 export function setServerPort(port: number | undefined): void {
   _port = port;
 }
@@ -51,17 +51,12 @@ export function isRemoteMode(): boolean {
 }
 
 /**
- * Default port for the local server daemon. Mirrors config.ports.server.
+ * Default port for the local server daemon. Mirrors config.ports.conductor.
  * Kept as a standalone helper so we do not have to boot a full AppConfig
  * just to discover the port.
  */
 function defaultServerPort(): number {
   if (_port) return _port;
-  const env = process.env.ARK_SERVER_PORT;
-  if (env) {
-    const n = Number(env);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
   return 19400;
 }
 

@@ -1067,9 +1067,9 @@ Ark uses a daemon-client architecture. The server daemon runs on port 19400 and 
 ### Managing the daemon
 
 ```bash
-ark daemon start        # start the server daemon (port 19400)
-ark daemon stop         # stop a running daemon
-ark daemon status       # check if the daemon is running
+ark conductor start        # start the arkd agent daemon (port 19300)
+ark conductor stop         # stop a running daemon
+ark conductor status       # check if the daemon is running
 ```
 
 ### Auto-start with web and desktop
@@ -1228,8 +1228,8 @@ ark session start --repo . --summary "Long refactor" \
   --agent implementer --runtime claude-max --dispatch
 
 # Start/stop the daemon
-ark daemon start
-ark daemon status
+ark conductor start
+ark conductor status
 
 # Schedule a recurring session
 ark schedule add --cron "0 9 * * *" --recipe quick-fix \

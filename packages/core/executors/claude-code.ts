@@ -486,7 +486,7 @@ export const claudeCodeExecutor: Executor = {
     // it immediately. When the web terminal attaches, the first client
     // resize calls `tmux resize-window`, which SIGWINCHes claude so its TUI
     // reflows. pty_cols / pty_rows stay NULL until that first resize.
-    // See packages/server/index.ts for the /terminal/:sessionId proxy.
+    // See packages/conductor/index.ts for the /terminal/:sessionId proxy.
     await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, {
       arkDir: app.config.dirs.ark,
     });

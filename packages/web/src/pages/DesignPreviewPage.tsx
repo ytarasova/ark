@@ -248,27 +248,27 @@ export function DesignPreviewPage() {
                   <p>
                     Analyzing the codebase. Found 3 files that need auth middleware applied. The current routes in{" "}
                     <code className="bg-[var(--bg-code)] px-1 py-0.5 rounded text-[12px] font-[family-name:var(--font-mono)]">
-                      packages/server/routes/
+                      packages/conductor/routes/
                     </code>{" "}
                     are missing authentication checks.
                   </p>
                 </AgentMessage>
 
                 <ToolCallRow
-                  label="Read: packages/server/routes/api.ts"
+                  label="Read: packages/conductor/routes/api.ts"
                   duration="0.3s"
                   status="done"
                   detail={<pre>{"const router = express.Router();\n// ... file contents"}</pre>}
                 />
-                <ToolCallRow label="Read: packages/server/routes/admin.ts" duration="0.2s" status="done" />
-                <ToolCallRow label="Edit: packages/server/middleware/auth.ts" duration="1.2s" status="done" />
+                <ToolCallRow label="Read: packages/conductor/routes/admin.ts" duration="0.2s" status="done" />
+                <ToolCallRow label="Edit: packages/conductor/middleware/auth.ts" duration="1.2s" status="done" />
 
                 <AgentMessage agentName="Implementer" avatarColor="#3b82f6" model="claude-4-sonnet" timestamp="2:14 PM">
                   <p>Applied auth middleware to all 3 route files. Each route now requires a valid JWT token.</p>
                 </AgentMessage>
 
                 <ToolCallFailed
-                  label="Run: bun test packages/server/__tests__/auth.test.ts"
+                  label="Run: bun test packages/conductor/__tests__/auth.test.ts"
                   duration="4.2s"
                   error="FAIL: Expected status 401, received 200. The middleware is not rejecting expired tokens."
                 />
@@ -289,9 +289,9 @@ export function DesignPreviewPage() {
                   </p>
                 </AgentMessage>
 
-                <ToolCallRow label="Edit: packages/server/middleware/auth.ts" duration="0.8s" status="done" />
+                <ToolCallRow label="Edit: packages/conductor/middleware/auth.ts" duration="0.8s" status="done" />
                 <ToolCallRow
-                  label="Run: bun test packages/server/__tests__/auth.test.ts"
+                  label="Run: bun test packages/conductor/__tests__/auth.test.ts"
                   duration="3.1s"
                   status="done"
                 />
@@ -354,7 +354,7 @@ export function DesignPreviewPage() {
               <DiffViewer
                 files={[
                   {
-                    filename: "packages/server/middleware/auth.ts",
+                    filename: "packages/conductor/middleware/auth.ts",
                     additions: 28,
                     deletions: 3,
                     lines: [
@@ -394,7 +394,7 @@ export function DesignPreviewPage() {
                     ],
                   },
                   {
-                    filename: "packages/server/routes/api.ts",
+                    filename: "packages/conductor/routes/api.ts",
                     additions: 2,
                     deletions: 1,
                     lines: [
@@ -423,7 +423,7 @@ export function DesignPreviewPage() {
 
             {activeTab === "terminal" && (
               <div className="font-[family-name:var(--font-mono)] text-[12px] text-[var(--fg-muted)] leading-[1.6]">
-                <div>$ bun test packages/server/__tests__/auth.test.ts</div>
+                <div>$ bun test packages/conductor/__tests__/auth.test.ts</div>
                 <div className="text-[var(--running)]">PASS 12/12 tests passed (3.1s)</div>
               </div>
             )}

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { startConductor } from "../conductor/server/conductor.js";
+import { startConductor } from "./_util/start-test-server.js";
 
 let app: AppContext;
 

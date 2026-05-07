@@ -11,7 +11,7 @@ make test-file F=path # run a single test file
 make lint             # ESLint (zero warnings allowed)
 make format           # Prettier auto-fix
 make dev              # hot-reload: API (:8420) + Vite HMR (:5173) + auto-starts daemon
-make dev-daemon       # hot-reload: server daemon (conductor + arkd + WS)
+make dev-daemon       # hot-reload: conductor (merged listener + arkd + WS)
 ./ark <command>       # run CLI directly via bun
 ```
 
@@ -34,7 +34,7 @@ packages/
   compute/   -> 11 providers (local, docker, devcontainer, firecracker, ec2-*, e2b, k8s, k8s-kata)
   arkd/      -> Universal agent daemon (:19300) on every compute target
   router/    -> LLM Router (OpenAI-compatible proxy, 3 policies, circuit breakers)
-  server/    -> JSON-RPC handlers (delegate to services via AppContext)
+  conductor/ -> Merged service: JSON-RPC, OpenAI proxy, webhooks, MCP, terminal WS, health (:19400)
   protocol/  -> ArkClient (typed JSON-RPC client)
   web/       -> Vite web dashboard (SSE, Recharts)
   desktop/   -> Electron shell wrapping the web dashboard
@@ -55,7 +55,7 @@ No workspaces -- packages coordinated via relative imports.
 - `AppContext` (`app.ts`) -- repos: `app.sessions`, `app.computes`; services: `app.sessionService`; stores: `app.flows`, `app.skills`, `app.agents`, `app.recipes`
 - `SessionService` (`services/session.ts`) -- lifecycle facade, delegates to `session-orchestration.ts`
 - `session-orchestration.ts` -- all orchestration. Every function takes `app: AppContext` as first arg
-- MCP server (`packages/server/mcp/`) -- HTTP MCP at `:19400/mcp`. 27 tools (read + Tier 1/2 write). See `docs/mcp.md`.
+- MCP server (`packages/conductor/mcp/`) -- HTTP MCP at `:19400/mcp`. 27 tools (read + Tier 1/2 write). See `docs/mcp.md`.
 
 **Orchestration (current + future).** Ark uses a custom session/flow state machine today, all under `packages/core/services/` (`flow.ts`, `session.ts`, `session/`, `dispatch/`, `stage-advance/`). A Temporal-backed replacement is in design (`docs/temporal.md`); phases tracked in #374. Local Temporal cluster for Phase 1+ dev is `make dev-temporal` (see `docs/temporal-local-dev.md`). The legacy engine stays semantically frozen until Phase 2 lands.
 
@@ -85,7 +85,7 @@ The runner wraps each migration's `up()` + apply-log write in a single transacti
 
 **Compute dispatch is two-axis.** The compute table stores both the legacy `provider` column (one of `local`, `docker`, `ec2`, ...) and the new `compute_kind` + `isolation_kind` columns (`local`/`ec2`/`k8s`/... x `direct`/`docker`/`devcontainer`/...). Dispatch resolves through `ComputeTarget(Compute, Isolation)` keyed off the new columns; legacy rows without them fall back to `packages/compute/adapters/provider-map.ts:providerToPair()` (e.g. `docker` -> `local + docker`). Always write both the legacy provider and the new axes when creating rows -- `ComputeRepository.create` does this for you. Layer-2 "agent runtime" (claude-code / codex / gemini / goose, YAML files under `runtimes/`) is a separate concept from layer-4b "isolation" -- see `docs/architecture.md` for the full layering.
 
-**Port map:** 19100 (conductor), 19300 (arkd), 19400 (server daemon WS), 8420 (web). Channel ports: `config.channels.basePort + (hash(sessionId) % config.channels.range)` (default basePort 19200, range 10000; test profile randomizes basePort). Use `config.channels.*` -- don't hardcode.
+**Port map:** 19400 (conductor -- merged listener), 19300 (arkd), 8420 (web). Channel ports: `config.channels.basePort + (hash(sessionId) % config.channels.range)` (default basePort 19200, range 10000; test profile randomizes basePort). Use `config.channels.*` -- don't hardcode.
 
 **Never use em dashes** (U+2014). Use hyphens (-) or double dashes (--) everywhere.
 
@@ -139,9 +139,8 @@ Env-var -> Config field map:
 | ------------------------------------ | ----------------------------------- | ----------------------------- |
 | `ARK_PROFILE`                        | `config.profile`                    | heuristic                     |
 | `ARK_DIR` (or legacy `ARK_TEST_DIR`) | `config.dirs.ark`                   | `~/.ark`                      |
-| `ARK_CONDUCTOR_PORT`                 | `config.ports.conductor`            | 19100                         |
+| `ARK_CONDUCTOR_PORT`                 | `config.ports.conductor`            | 19400                         |
 | `ARK_ARKD_PORT`                      | `config.ports.arkd`                 | 19300                         |
-| `ARK_SERVER_PORT`                    | `config.ports.server`               | 19400                         |
 | `ARK_WEB_PORT`                       | `config.ports.web`                  | 8420                          |
 | `ARK_CHANNEL_BASE_PORT`              | `config.channels.basePort`          | 19200                         |
 | `ARK_CHANNEL_RANGE`                  | `config.channels.range`             | 10000                         |
@@ -160,7 +159,7 @@ YAML format (`~/.ark/config.yaml`):
 ```yaml
 # top-level defaults apply to every profile
 ports:
-  conductor: 19100
+  conductor: 19400
   arkd: 19300
 channels:
   basePort: 19200

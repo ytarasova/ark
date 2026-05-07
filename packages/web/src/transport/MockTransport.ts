@@ -1,6 +1,10 @@
 import type { WebTransport } from "./types.js";
 
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
+type SessionTreeStreamFactory = (
+  sessionId: string,
+  onUpdate: (root: unknown) => void,
+) => Promise<{ tree: unknown; unsubscribe: () => void }>;
 
 /**
  * In-memory WebTransport for unit tests.
@@ -13,10 +17,16 @@ type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
  * `createEventSource()` returns a minimal stub object that records open/close
  * without touching the network. For more sophisticated SSE tests, call
  * `.onCreateEventSource()` to install a custom factory.
+ *
+ * `sessionTreeStream()` returns a default stub (empty tree, no-op unsubscribe)
+ * unless `.onSessionTreeStream()` installs a custom factory. Tests that need
+ * to drive live updates should install a factory that captures `onUpdate` and
+ * calls it on a controlled trigger.
  */
 export class MockTransport implements WebTransport {
   private handlers = new Map<string, Handler>();
   private esFactory: ((path: string) => EventSource) | null = null;
+  private treeStreamFactory: SessionTreeStreamFactory | null = null;
 
   /** Last token passed to setToken() -- exposed for login-flow assertions. */
   public token: string | null = null;
@@ -33,6 +43,19 @@ export class MockTransport implements WebTransport {
   /** Install a custom EventSource factory for SSE tests. */
   onCreateEventSource(factory: (path: string) => EventSource): this {
     this.esFactory = factory;
+    return this;
+  }
+
+  /**
+   * Install a custom `sessionTreeStream` factory for subscription tests.
+   *
+   * The factory receives the same `(sessionId, onUpdate)` arguments as the
+   * real method and must return `{ tree, unsubscribe }`. Use this to capture
+   * `onUpdate` and call it on a controlled trigger so tests can exercise the
+   * live-update path without a real WebSocket.
+   */
+  onSessionTreeStream(factory: SessionTreeStreamFactory): this {
+    this.treeStreamFactory = factory;
     return this;
   }
 
@@ -73,5 +96,16 @@ export class MockTransport implements WebTransport {
       onerror: null,
     };
     return stub as unknown as EventSource;
+  }
+
+  sessionTreeStream(
+    sessionId: string,
+    onUpdate: (root: unknown) => void,
+  ): Promise<{ tree: unknown; unsubscribe: () => void }> {
+    if (this.treeStreamFactory) {
+      return this.treeStreamFactory(sessionId, onUpdate);
+    }
+    // Default stub: resolves with a null tree and a no-op unsubscribe.
+    return Promise.resolve({ tree: null, unsubscribe: () => {} });
   }
 }

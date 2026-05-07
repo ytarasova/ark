@@ -13,7 +13,7 @@
  *
  * Live terminal attach for the Web UI runs on the server daemon's
  * `/terminal/:sessionId` WS route (port 19400), proxied through arkd's
- * `/agent/attach/*` endpoints. See packages/server/index.ts.
+ * `/agent/attach/*` endpoints. See packages/conductor/index.ts.
  */
 
 import { readFileSync, existsSync } from "fs";
@@ -21,15 +21,15 @@ import { execFileSync } from "child_process";
 import { join, resolve } from "path";
 import type { AppContext } from "../app.js";
 import { eventBus } from "../hooks.js";
-import { Router } from "../../server/router.js";
-import { registerAllHandlers } from "../../server/register.js";
-import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
+import { Router } from "../../conductor/router.js";
+import { registerAllHandlers } from "../../conductor/register.js";
+import { DEFAULT_CHANNEL_BASE_URL, DEFAULT_CONDUCTOR_URL } from "../constants.js";
 import {
   handleIssueWebhook,
   type IssueWebhookConfig,
   type IssueWebhookPayload,
 } from "../integrations/github-webhook.js";
-import { handleWebhookRequest, matchWebhookPath } from "../../server/handlers/webhooks.js";
+import { handleWebhookRequest, matchWebhookPath } from "../../conductor/handlers/webhooks.js";
 import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import { fromWire, localAdminContext, type TenantContext as HandlerTenantContext } from "../auth/context.js";
@@ -261,7 +261,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
 
       // Live terminal attach moved to the server daemon's /terminal/:sessionId
       // WS route (port 19400). The hosted web server no longer bridges a raw
-      // PTY; see packages/server/index.ts for the arkd-backed implementation.
+      // PTY; see packages/conductor/index.ts for the arkd-backed implementation.
 
       // SSE endpoint
       if (url.pathname === "/api/events/stream") {
@@ -353,7 +353,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // Unified trigger webhooks: POST /api/webhooks/:source (or /webhooks/:source).
       // Handles every registered source (github, bitbucket, slack, linear, jira,
       // generic-hmac, ...). Signature verification + 2xx-fast dispatch lives in
-      // packages/server/handlers/webhooks.ts.
+      // packages/conductor/handlers/webhooks.ts.
       if (req.method === "POST" && matchWebhookPath(url.pathname)) {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
@@ -442,7 +442,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   // Check daemon health on web server start
   (async () => {
     try {
-      const resp = await fetch("http://localhost:19100/health", { signal: AbortSignal.timeout(1000) });
+      const resp = await fetch(`${DEFAULT_CONDUCTOR_URL}/health`, { signal: AbortSignal.timeout(1000) });
       if (resp.ok) console.warn("Conductor: online");
       else console.warn("WARNING: Conductor not responding. Run: ark server daemon start");
     } catch {

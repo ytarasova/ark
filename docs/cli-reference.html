@@ -223,10 +223,6 @@
 <td>Run a one-shot sandboxed session (auto-cleans up)</td>
 </tr>
 <tr>
-<td><a href="#ark-daemon"><code>ark daemon</code></a></td>
-<td>Manage the arkd agent daemon</td>
-</tr>
-<tr>
 <td><a href="#ark-pr"><code>ark pr</code></a></td>
 <td>Manage PR-bound sessions</td>
 </tr>
@@ -2901,11 +2897,82 @@
 </tr>
 </tbody></table>
 <h2><code>ark conductor</code></h2>
-<p>Conductor operations</p>
+<p>Conductor operations and arkd lifecycle management</p>
 <p><strong>Synopsis:</strong> <code>ark conductor</code></p>
+<h3><code>ark conductor start</code></h3>
+<p>Start the arkd agent daemon</p>
+<p><strong>Synopsis:</strong> <code>ark conductor start [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;19300&quot;</code></td>
+<td>Port</td>
+</tr>
+<tr>
+<td><code>--hostname &lt;host&gt;</code></td>
+<td><code>&quot;0.0.0.0&quot;</code></td>
+<td>Bind address</td>
+</tr>
+<tr>
+<td><code>--conductor-url &lt;url&gt;</code></td>
+<td></td>
+<td>Conductor URL for channel relay</td>
+</tr>
+<tr>
+<td><code>--workspace-root &lt;path&gt;</code></td>
+<td></td>
+<td>Confine /file/* and /exec to this directory (recommended in hosted / multi-tenant deployments)</td>
+</tr>
+<tr>
+<td><code>-d, --detach</code></td>
+<td></td>
+<td>Run in background (detached mode)</td>
+</tr>
+</tbody></table>
+<h3><code>ark conductor stop</code></h3>
+<p>Stop a running arkd daemon</p>
+<p><strong>Synopsis:</strong> <code>ark conductor stop [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td></td>
+<td>Port of daemon to stop (uses PID file by default)</td>
+</tr>
+</tbody></table>
 <h3><code>ark conductor status</code></h3>
-<p>Show whether a conductor is running on the daemon</p>
-<p><strong>Synopsis:</strong> <code>ark conductor status</code></p>
+<p>Check arkd daemon status and conductor liveness</p>
+<p><strong>Synopsis:</strong> <code>ark conductor status [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;19300&quot;</code></td>
+<td>Port to check</td>
+</tr>
+</tbody></table>
 <h3><code>ark conductor learnings</code></h3>
 <p>Show conductor learnings</p>
 <p><strong>Synopsis:</strong> <code>ark conductor learnings</code></p>
@@ -4949,83 +5016,6 @@
 <td><code>--image &lt;image&gt;</code></td>
 <td><code>&quot;ubuntu:22.04&quot;</code></td>
 <td>Docker image</td>
-</tr>
-</tbody></table>
-<h2><code>ark daemon</code></h2>
-<p>Manage the arkd agent daemon</p>
-<p><strong>Synopsis:</strong> <code>ark daemon</code></p>
-<h3><code>ark daemon start</code></h3>
-<p>Start the arkd agent daemon</p>
-<p><strong>Synopsis:</strong> <code>ark daemon start [options]</code></p>
-<p><strong>Options:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>-p, --port &lt;port&gt;</code></td>
-<td><code>&quot;19300&quot;</code></td>
-<td>Port</td>
-</tr>
-<tr>
-<td><code>--hostname &lt;host&gt;</code></td>
-<td><code>&quot;0.0.0.0&quot;</code></td>
-<td>Bind address</td>
-</tr>
-<tr>
-<td><code>--conductor-url &lt;url&gt;</code></td>
-<td></td>
-<td>Conductor URL for channel relay</td>
-</tr>
-<tr>
-<td><code>--workspace-root &lt;path&gt;</code></td>
-<td></td>
-<td>Confine /file/* and /exec to this directory (recommended in hosted / multi-tenant deployments)</td>
-</tr>
-<tr>
-<td><code>-d, --detach</code></td>
-<td></td>
-<td>Run in background (detached mode)</td>
-</tr>
-</tbody></table>
-<h3><code>ark daemon stop</code></h3>
-<p>Stop a running daemon</p>
-<p><strong>Synopsis:</strong> <code>ark daemon stop [options]</code></p>
-<p><strong>Options:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>-p, --port &lt;port&gt;</code></td>
-<td></td>
-<td>Port of daemon to stop (uses PID file by default)</td>
-</tr>
-</tbody></table>
-<h3><code>ark daemon status</code></h3>
-<p>Check daemon status</p>
-<p><strong>Synopsis:</strong> <code>ark daemon status [options]</code></p>
-<p><strong>Options:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>-p, --port &lt;port&gt;</code></td>
-<td><code>&quot;19300&quot;</code></td>
-<td>Port to check</td>
 </tr>
 </tbody></table>
 <h2><code>ark pr</code></h2>

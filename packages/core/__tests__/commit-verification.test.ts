@@ -18,7 +18,7 @@ import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import type { OutboundMessage } from "../conductor/common/channel-types.js";
+import type { OutboundMessage } from "../services/channel/channel-types.js";
 
 let app: AppContext;
 

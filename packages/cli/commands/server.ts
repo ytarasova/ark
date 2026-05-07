@@ -50,8 +50,8 @@ export function registerServerCommands(program: Command) {
 
       // Local stdio / WebSocket transport
       const { AppContext, loadConfig } = await import("../../core/index.js");
-      const { ArkServer } = await import("../../server/index.js");
-      const { registerAllHandlers } = await import("../../server/register.js");
+      const { ArkServer } = await import("../../conductor/index.js");
+      const { registerAllHandlers } = await import("../../conductor/register.js");
 
       const serverApp = new AppContext(loadConfig());
       await serverApp.boot();

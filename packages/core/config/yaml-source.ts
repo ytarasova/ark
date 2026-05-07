@@ -56,12 +56,11 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
 
   const ports = chunk.ports;
   if (isObj(ports)) {
+    // ports.conductor is the merged conductor+server port.
     const c = pickInt(ports.conductor);
     if (c !== undefined) out.ports.conductor = c;
     const a = pickInt(ports.arkd);
     if (a !== undefined) out.ports.arkd = a;
-    const s = pickInt(ports.server);
-    if (s !== undefined) out.ports.server = s;
     const w = pickInt(ports.web);
     if (w !== undefined) out.ports.web = w;
   }

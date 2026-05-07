@@ -56,7 +56,7 @@ export class ApiKeyManager {
   async create(
     tenantId: string,
     name: string,
-    role: "admin" | "member" | "viewer" = "member",
+    role: "admin" | "member" | "viewer" | "worker" = "member",
     expiresAt?: string,
   ): Promise<{ key: string; id: string }> {
     const id = `ak-${randomBytes(4).toString("hex")}`;

@@ -4,12 +4,13 @@
 
 import { describe, it, expect } from "bun:test";
 import { channelMcpConfig } from "../claude/claude.js";
+import { DEFAULT_CONDUCTOR_PORT } from "../constants.js";
 
 describe("channelMcpConfig", () => {
-  it("defaults conductor URL to localhost:19100", () => {
+  it("defaults conductor URL to the merged conductor port on localhost", () => {
     const config = channelMcpConfig("s-abc", "work", 19200);
     const env = config.env as Record<string, string>;
-    expect(env.ARK_CONDUCTOR_URL).toBe("http://localhost:19100");
+    expect(env.ARK_CONDUCTOR_URL).toBe(`http://localhost:${DEFAULT_CONDUCTOR_PORT}`);
     expect(env.ARK_SESSION_ID).toBe("s-abc");
     expect(env.ARK_CHANNEL_PORT).toBe("19200");
   });

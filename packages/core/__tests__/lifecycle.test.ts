@@ -11,7 +11,7 @@
 
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { ConductorLauncher } from "../infra/conductor-launcher.js";
+import { ServerPollers } from "../infra/server-pollers.js";
 import { ArkdLauncher } from "../infra/arkd-launcher.js";
 import { RouterLauncher } from "../infra/router-launcher.js";
 import { TensorZeroLauncher } from "../infra/tensorzero-launcher.js";
@@ -44,7 +44,7 @@ describe("Lifecycle orchestrator", async () => {
     expect(cradle.computeProvidersBoot).toBeInstanceOf(ComputeProvidersBoot);
     expect(cradle.tensorZeroLauncher).toBeInstanceOf(TensorZeroLauncher);
     expect(cradle.routerLauncher).toBeInstanceOf(RouterLauncher);
-    expect(cradle.conductorLauncher).toBeInstanceOf(ConductorLauncher);
+    expect(cradle.serverPollers).toBeInstanceOf(ServerPollers);
     expect(cradle.arkdLauncher).toBeInstanceOf(ArkdLauncher);
     expect(cradle.metricsPoller).toBeInstanceOf(MetricsPoller);
     expect(cradle.maintenancePollers).toBeInstanceOf(MaintenancePollers);
@@ -53,13 +53,12 @@ describe("Lifecycle orchestrator", async () => {
     expect(cradle.sessionDrain).toBeInstanceOf(SessionDrain);
   });
 
-  it("skipConductor disables conductor + arkd launchers", async () => {
+  it("skipConductor disables serverPollers + arkd launchers", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
 
-    // forTest() sets skipConductor: true
-    expect(app.container.cradle.conductorLauncher.running).toBe(false);
-    expect(app.container.cradle.arkdLauncher.running).toBe(false);
+    // forTest() sets skipConductor: true -- serverPollers and arkd are skipped
+    // conductor getter always returns null (merged into server daemon)
     expect(app.conductor).toBeNull();
     expect(app.arkd).toBeNull();
   });
@@ -74,14 +73,14 @@ describe("Lifecycle orchestrator", async () => {
 });
 
 describe("Launcher disposers fire via container.dispose()", async () => {
-  it("ConductorLauncher.stop() is idempotent", async () => {
+  it("ServerPollers.stop() is idempotent", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
 
-    const launcher = app.container.cradle.conductorLauncher;
-    expect(() => launcher.stop()).not.toThrow();
+    const pollers = app.container.cradle.serverPollers;
+    expect(() => pollers.stop()).not.toThrow();
     // second stop is a no-op
-    expect(() => launcher.stop()).not.toThrow();
+    expect(() => pollers.stop()).not.toThrow();
   });
 
   it("MetricsPoller stop clears its interval", async () => {
@@ -140,7 +139,7 @@ describe("container.dispose() runs each launcher's disposer", async () => {
       wiring: 0,
       tz: 0,
       router: 0,
-      conductor: 0,
+      pollers: 0,
       arkd: 0,
       metrics: 0,
       maintenance: 0,
@@ -163,10 +162,10 @@ describe("container.dispose() runs each launcher's disposer", async () => {
       stops.router++;
       origRouter();
     };
-    const origConductor = cradle.conductorLauncher.stop.bind(cradle.conductorLauncher);
-    cradle.conductorLauncher.stop = () => {
-      stops.conductor++;
-      origConductor();
+    const origPollers = cradle.serverPollers.stop.bind(cradle.serverPollers);
+    cradle.serverPollers.stop = () => {
+      stops.pollers++;
+      origPollers();
     };
     const origArkd = cradle.arkdLauncher.stop.bind(cradle.arkdLauncher);
     cradle.arkdLauncher.stop = () => {
@@ -200,7 +199,7 @@ describe("container.dispose() runs each launcher's disposer", async () => {
     expect(stops.wiring).toBe(1);
     expect(stops.tz).toBe(1);
     expect(stops.router).toBe(1);
-    expect(stops.conductor).toBe(1);
+    expect(stops.pollers).toBe(1);
     expect(stops.arkd).toBe(1);
     expect(stops.metrics).toBe(1);
     expect(stops.maintenance).toBe(1);

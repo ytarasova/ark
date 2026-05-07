@@ -86,9 +86,6 @@ export {
   type GhIssue,
 } from "./integrations/issue-poller.js";
 
-// Conductor
-export { startConductor } from "./conductor/server/conductor.js";
-
 // Claude sessions
 // Repo-scoped config
 export { loadRepoConfig, type RepoConfig } from "./repo-config.js";

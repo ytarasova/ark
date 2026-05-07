@@ -84,12 +84,11 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
   else if (env.ARK_TEST_DIR) out.arkDir = env.ARK_TEST_DIR;
 
   // Ports
+  // ARK_CONDUCTOR_PORT sets the merged conductor port (was 19100, now 19400).
   const conductor = parseIntStrict(env.ARK_CONDUCTOR_PORT, "ARK_CONDUCTOR_PORT");
   if (conductor !== undefined) out.ports.conductor = conductor;
   const arkd = parseIntStrict(env.ARK_ARKD_PORT, "ARK_ARKD_PORT");
   if (arkd !== undefined) out.ports.arkd = arkd;
-  const server = parseIntStrict(env.ARK_SERVER_PORT, "ARK_SERVER_PORT");
-  if (server !== undefined) out.ports.server = server;
   const web = parseIntStrict(env.ARK_WEB_PORT, "ARK_WEB_PORT");
   if (web !== undefined) out.ports.web = web;
 
