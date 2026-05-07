@@ -60,7 +60,7 @@ describe("Migration 003 -- tenants backfill", () => {
 
     await db
       .prepare(
-        "INSERT INTO compute (name, provider, compute_kind, isolation_kind, status, tenant_id, created_at, updated_at) VALUES (?, 'local', 'local', 'direct', 'running', ?, ?, ?)",
+        "INSERT INTO compute (name, compute_kind, isolation_kind, status, tenant_id, created_at, updated_at) VALUES (?, 'local', 'direct', 'running', ?, ?, ?)",
       )
       .run("c-1", "initech", ts, ts);
 

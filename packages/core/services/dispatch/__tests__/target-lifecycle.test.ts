@@ -13,8 +13,8 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AppContext } from "../../../app.js";
 import { runTargetLifecycle } from "../target-lifecycle.js";
 import { DeferredPlacementCtx } from "../../../secrets/deferred-placement-ctx.js";
-import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../../../compute/core/types.js";
-import type { ComputeTarget } from "../../../../compute/core/compute-target.js";
+import type { AgentHandle, ComputeHandle, LaunchOpts, PrepareCtx } from "../../../compute/types.js";
+import type { ComputeTarget } from "../../../compute/compute-target.js";
 
 let app: AppContext;
 
@@ -300,8 +300,7 @@ describe("runTargetLifecycle", () => {
 
     // Confirm the per-step methods on the target fired in the documented
     // order. Note: flush-secrets sits BEFORE prepare-workspace because
-    // the workspace clone uses the SSH key the placement just delivered
-    // (matches legacy RemoteWorktreeProvider.launch ordering).
+    // the workspace clone uses the SSH key the placement just delivered.
     expect(calls.order).toEqual([
       "start",
       "ensure-reachable",

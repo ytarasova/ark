@@ -14,8 +14,70 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { logDebug } from "../../core/observability/structured-log.js";
-import { providerToPair, providerOf } from "../../compute/adapters/provider-map.js";
-import type { ComputeNameParams, ComputeUpdateParams, ComputeProviderName } from "../../types/index.js";
+import type {
+  Compute,
+  ComputeKindName,
+  IsolationKindName,
+  ComputeNameParams,
+  ComputeUpdateParams,
+} from "../../types/index.js";
+
+/**
+ * Display-only helper -- compose a `${compute_kind}+${isolation_kind}` label
+ * back into the legacy provider-name string the wire format used to carry.
+ * Mirrors the (now-deleted) `pairToProvider` helper from compute/adapters/.
+ */
+function legacyProviderLabel(c: Pick<Compute, "compute_kind" | "isolation_kind">): string {
+  const ck = c.compute_kind;
+  const ik = c.isolation_kind;
+  if (ck === "local") {
+    if (ik === "direct") return "local";
+    if (ik === "docker") return "docker";
+    if (ik === "devcontainer") return "devcontainer";
+  }
+  if (ck === "ec2") {
+    if (ik === "direct") return "ec2";
+    if (ik === "docker") return "ec2-docker";
+    if (ik === "devcontainer") return "ec2-devcontainer";
+  }
+  if (ck === "firecracker") return "firecracker";
+  if (ck === "k8s") return "k8s";
+  if (ck === "k8s-kata") return "k8s-kata";
+  return ck;
+}
+
+/**
+ * Reverse of legacyProviderLabel -- used only for back-compat handling of
+ * RPC callers that still pass `{provider}` instead of `{compute, isolation}`.
+ */
+function legacyProviderToAxes(name: string): { compute_kind: ComputeKindName; isolation_kind: IsolationKindName } {
+  switch (name) {
+    case "local":
+      return { compute_kind: "local", isolation_kind: "direct" };
+    case "docker":
+      return { compute_kind: "local", isolation_kind: "docker" };
+    case "devcontainer":
+      return { compute_kind: "local", isolation_kind: "devcontainer" };
+    case "firecracker":
+      return { compute_kind: "firecracker", isolation_kind: "direct" };
+    case "ec2":
+    case "remote-arkd":
+    case "remote-worktree":
+      return { compute_kind: "ec2", isolation_kind: "direct" };
+    case "ec2-docker":
+    case "remote-docker":
+      return { compute_kind: "ec2", isolation_kind: "docker" };
+    case "ec2-devcontainer":
+    case "remote-devcontainer":
+      return { compute_kind: "ec2", isolation_kind: "devcontainer" };
+    case "k8s":
+      return { compute_kind: "k8s", isolation_kind: "direct" };
+    case "k8s-kata":
+      return { compute_kind: "k8s-kata", isolation_kind: "direct" };
+    default:
+      return { compute_kind: "local", isolation_kind: "direct" };
+  }
+}
 
 /**
  * Kill tmux sessions for zombie ark sessions (no DB record or terminal status).
@@ -46,15 +108,16 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     if (include === "template") targets = await app.computes.listTemplates();
     else if (include === "concrete") targets = await app.computes.listConcrete();
     else targets = await app.computes.list();
-    // Wire-format back-compat: include derived `provider` on each row.
-    return { targets: targets.map((t) => ({ ...t, provider: providerOf(t) })) };
+    // Wire-format back-compat: include the legacy `provider` label on each
+    // row so existing clients keep rendering. Will be dropped once the web
+    // UI moves to `${compute_kind}+${isolation_kind}` directly.
+    return { targets: targets.map((t) => ({ ...t, provider: legacyProviderLabel(t) })) };
   });
 
   router.handle("compute/create", async (p) => {
-    // Accept either legacy `{provider}` or new `{compute, isolation}`. When
-    // only `provider` is given, the repo derives the pair via providerToPair.
-    // When only the new axes are given, we reverse-map to the best-matching
-    // legacy provider name so back-compat reads keep working.
+    // Accept either legacy `{provider}` or new `{compute, isolation}`. The
+    // legacy form maps to a (compute_kind, isolation_kind) pair via
+    // `legacyProviderToAxes`; the new form is passed through verbatim.
     const {
       name,
       provider,
@@ -65,27 +128,32 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
       cloned_from,
     } = extract<{
       name: string;
-      provider?: import("../../types/index.js").ComputeProviderName;
-      compute?: import("../../types/index.js").ComputeKindName;
-      isolation?: import("../../types/index.js").IsolationKindName;
+      provider?: string;
+      compute?: ComputeKindName;
+      isolation?: IsolationKindName;
       config?: Partial<import("../../types/index.js").ComputeConfig>;
       is_template?: boolean;
       cloned_from?: string;
     }>(p, ["name"]);
 
-    let effectiveProvider = provider;
-    if (!effectiveProvider && computeKind && isolationKind) {
-      const { pairToProvider } = await import("../../compute/adapters/provider-map.js");
-      effectiveProvider = (pairToProvider({ compute: computeKind, isolation: isolationKind }) ??
-        "local") as import("../../types/index.js").ComputeProviderName;
+    let effectiveCompute = computeKind;
+    let effectiveIsolation = isolationKind;
+    if (!effectiveCompute && !effectiveIsolation && provider) {
+      const axes = legacyProviderToAxes(provider);
+      effectiveCompute = axes.compute_kind;
+      effectiveIsolation = axes.isolation_kind;
     }
 
     // K8s targets must specify context, namespace, image up-front -- fail at
     // create time rather than letting a misconfigured target provision pods
     // into the wrong cluster/namespace later. Match on the new compute kind
     // (preferred) and the legacy provider string (back-compat callers).
-    const providerStr = String(effectiveProvider ?? "");
-    const isK8s = computeKind === "k8s" || providerStr === "k8s" || providerStr === "k8s-kata";
+    const providerStr = String(provider ?? "");
+    const isK8s =
+      effectiveCompute === "k8s" ||
+      effectiveCompute === "k8s-kata" ||
+      providerStr === "k8s" ||
+      providerStr === "k8s-kata";
     if (isK8s) {
       const cfg = (config ?? {}) as Record<string, unknown>;
       const missing = ["context", "namespace", "image"].filter((k) => !cfg[k]);
@@ -110,16 +178,15 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
 
     const created = await app.computeService.create({
       name,
-      provider: effectiveProvider,
-      compute: computeKind,
-      isolation: isolationKind,
+      compute: effectiveCompute,
+      isolation: effectiveIsolation,
       config,
       is_template,
       cloned_from,
     });
-    // RPC wire format still carries `provider` for back-compat clients; derive
-    // it from the (compute_kind, isolation_kind) axes.
-    return { compute: { ...created, provider: providerOf(created) } };
+    // RPC wire format still carries `provider` for back-compat clients;
+    // derive the legacy label from the (compute_kind, isolation_kind) axes.
+    return { compute: { ...created, provider: legacyProviderLabel(created) } };
   });
 
   // Discover available k8s contexts + namespaces from the local kubeconfig
@@ -175,31 +242,34 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError("Compute not found", ErrorCodes.SESSION_NOT_FOUND);
-    return { compute: { ...compute, provider: providerOf(compute) } };
+    return { compute: { ...compute, provider: legacyProviderLabel(compute) } };
   });
 
   /**
-   * Authoritative capability flags for a compute target, sourced straight
-   * from the provider instance. UI consumers query this so the Reboot /
-   * Destroy / Auth-prompt buttons are driven by provider metadata instead
-   * of hardcoded `provider === "local"` checks.
+   * Authoritative capability flags for a compute target, sourced from the
+   * registered Compute impl's `capabilities` block. UI consumers query this
+   * so the Reboot / Destroy / Auth-prompt buttons are driven by Compute
+   * metadata instead of hardcoded `provider === "local"` checks.
    */
   router.handle("compute/capabilities", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const provider = app.getProvider(providerOf(compute));
-    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) {
+      throw new RpcError(`Unknown compute kind: ${compute.compute_kind}`, ErrorCodes.NOT_FOUND);
+    }
+    const caps = computeImpl.capabilities;
     return {
       capabilities: {
-        provider: provider.name,
-        singleton: provider.singleton ?? false,
-        canReboot: provider.canReboot,
-        canDelete: provider.canDelete,
-        needsAuth: provider.needsAuth,
-        supportsWorktree: provider.supportsWorktree,
-        initialStatus: provider.initialStatus,
-        isolationModes: provider.isolationModes,
+        provider: legacyProviderLabel(compute),
+        singleton: caps.singleton,
+        canReboot: caps.canReboot,
+        canDelete: caps.canDelete,
+        needsAuth: caps.needsAuth,
+        supportsWorktree: caps.supportsWorktree,
+        initialStatus: caps.initialStatus,
+        isolationModes: caps.isolationModes,
       },
     };
   });
@@ -208,7 +278,6 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
 
     // Template provision: clone the template into a named concrete row, then
     // provision the clone. Mirrors the session auto-clone path but triggered
@@ -225,15 +294,19 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         cloned_from: compute.name,
       });
       const clone = (await app.computes.get(cloneName))!;
-      const provider = getProvider(providerOf(clone));
-      if (!provider) throw new RpcError(`Unknown provider: ${providerOf(clone)}`, ErrorCodes.NOT_FOUND);
+      const cloneImpl = app.getCompute(clone.compute_kind);
+      if (!cloneImpl) {
+        throw new RpcError(`Unknown compute kind: ${clone.compute_kind}`, ErrorCodes.NOT_FOUND);
+      }
       await app.computes.update(clone.name, { status: "provisioning" });
       try {
-        // Provision validates the environment; Start brings up the real
-        // instance. Template provision without Start would leave a clone
-        // row with no backing infra, defeating the point of manual provision.
-        await provider.provision(clone);
-        await provider.start(clone);
+        // Provision validates the environment + brings up the real instance.
+        // The Compute interface fuses the legacy provision+start into a
+        // single `provision()` call (returns a live handle) so we don't
+        // need a separate start step here.
+        const handle = await cloneImpl.provision({ config: (clone.config ?? {}) as Record<string, unknown> });
+        await cloneImpl.start(handle).catch(() => undefined); // optional, idempotent
+        await app.computes.update(clone.name, { status: "running" });
         const started = (await app.computes.get(clone.name))!;
         return { ok: true, name: cloneName, cloned_from: compute.name, status: started.status };
       } catch (e: any) {
@@ -247,11 +320,14 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
       }
     }
 
-    const provider = getProvider(providerOf(compute));
-    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) {
+      throw new RpcError(`Unknown compute kind: ${compute.compute_kind}`, ErrorCodes.NOT_FOUND);
+    }
     await app.computes.update(compute.name, { status: "provisioning" });
     try {
-      await provider.provision(compute);
+      const handle = await computeImpl.provision({ config: (compute.config ?? {}) as Record<string, unknown> });
+      await computeImpl.start(handle).catch(() => undefined);
       await app.computes.update(compute.name, { status: "running" });
       return { ok: true, name: compute.name };
     } catch (e: any) {
@@ -264,18 +340,35 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(providerOf(compute));
-    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) {
+      throw new RpcError(`Unknown compute kind: ${compute.compute_kind}`, ErrorCodes.NOT_FOUND);
+    }
+    const handle = computeImpl.attachExistingHandle?.({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (!handle) {
+      // Compute hasn't been provisioned yet -- nothing to stop. Treat the
+      // status flip as the only thing the user asked for.
+      await app.computes.update(compute.name, { status: "stopped" });
+      return { ok: true };
+    }
     try {
-      await provider.stop(compute);
+      await computeImpl.stop(handle);
       await app.computes.update(compute.name, { status: "stopped" });
     } catch (e: any) {
-      if (provider.checkStatus) {
-        const real = await provider.checkStatus(compute).catch((err) => {
+      // Stop failed -- probe the live state via the Compute's own checkStatus.
+      // If the cloud provider reports the box is gone (terminated / shutting-
+      // down), mirror that into the DB so the UI doesn't show a stuck
+      // "stopping" row. checkStatus is optional on Compute; computes that
+      // can't probe out-of-band omit it and we re-throw the original error.
+      if (computeImpl.checkStatus) {
+        const real = await computeImpl.checkStatus(handle).catch((err) => {
           logDebug("compute", `compute/stop-instance: checkStatus probe failed (name=${compute.name})`, {
             name: compute.name,
-            provider: providerOf(compute),
+            kind: compute.compute_kind,
             error: err instanceof Error ? err.message : String(err),
           });
           return null;
@@ -295,10 +388,18 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(providerOf(compute));
-    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
-    await provider.start(compute);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) {
+      throw new RpcError(`Unknown compute kind: ${compute.compute_kind}`, ErrorCodes.NOT_FOUND);
+    }
+    const handle = computeImpl.attachExistingHandle?.({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (handle) {
+      await computeImpl.start(handle);
+    }
     await app.computes.update(compute.name, { status: "running" });
     return { ok: true };
   });
@@ -307,17 +408,24 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(providerOf(compute));
-    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
-    // Capability-driven guard: reject destroy when the provider declares
-    // canDelete=false instead of relying on the provider's destroy() to
-    // throw. Keeps the error surface clean (server refused vs runtime
-    // failure) and matches what the UI queries via compute/capabilities.
-    if (!provider.canDelete) {
-      throw new RpcError(`Provider '${provider.name}' does not support destroy`, ErrorCodes.UNSUPPORTED);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) {
+      throw new RpcError(`Unknown compute kind: ${compute.compute_kind}`, ErrorCodes.NOT_FOUND);
     }
-    await provider.destroy(compute);
+    // Capability-driven guard: reject destroy when the Compute declares
+    // canDelete=false. Keeps the error surface clean (server refused vs
+    // runtime failure) and matches what the UI queries via compute/capabilities.
+    if (!computeImpl.capabilities.canDelete) {
+      throw new RpcError(`Compute kind '${compute.compute_kind}' does not support destroy`, ErrorCodes.UNSUPPORTED);
+    }
+    const handle = computeImpl.attachExistingHandle?.({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (handle) {
+      await computeImpl.destroy(handle);
+    }
     await app.computes.delete(compute.name);
     return { ok: true };
   });
@@ -334,21 +442,33 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(providerOf(compute));
-    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
-    // Capability-driven guard -- canReboot may be false even when reboot() is
-    // defined (a provider might define reboot() that just throws NotSupported).
-    if (!provider.canReboot) {
-      throw new RpcError(`Provider '${provider.name}' does not support reboot`, ErrorCodes.UNSUPPORTED);
+    const computeImpl = app.getCompute(compute.compute_kind);
+    if (!computeImpl) {
+      throw new RpcError(`Unknown compute kind: ${compute.compute_kind}`, ErrorCodes.NOT_FOUND);
     }
-    if (!provider.reboot) {
+    // Capability-driven guard -- canReboot may be false even when reboot() is
+    // defined (a Compute impl might define reboot() that throws NotSupported).
+    if (!computeImpl.capabilities.canReboot) {
+      throw new RpcError(`Compute kind '${compute.compute_kind}' does not support reboot`, ErrorCodes.UNSUPPORTED);
+    }
+    if (!computeImpl.reboot) {
       throw new RpcError(
-        `Provider '${provider.name}' declares canReboot but has no reboot() implementation`,
+        `Compute kind '${compute.compute_kind}' declares canReboot but has no reboot() implementation`,
         ErrorCodes.INTERNAL_ERROR,
       );
     }
-    await provider.reboot(compute);
+    const handle = computeImpl.attachExistingHandle?.({
+      name: compute.name,
+      status: compute.status,
+      config: (compute.config ?? {}) as Record<string, unknown>,
+    });
+    if (!handle) {
+      throw new RpcError(
+        `Compute '${compute.name}' has not been provisioned -- nothing to reboot`,
+        ErrorCodes.NOT_FOUND,
+      );
+    }
+    await computeImpl.reboot(handle);
     return { ok: true };
   });
 
@@ -360,7 +480,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const instanceId = cfg?.instance_id as string | undefined;
     if (!instanceId) return { reachable: false, message: "No instance_id configured" };
     try {
-      const { ssmExec, ssmCheckInstance } = await import("../../compute/providers/ec2/ssm.js");
+      const { ssmExec, ssmCheckInstance } = await import("../../core/compute/ec2/ssm.js");
       const region = (cfg?.region as string | undefined) ?? "us-east-1";
       const awsProfile = cfg?.aws_profile as string | undefined;
       const online = await ssmCheckInstance({ instanceId, region, awsProfile });
@@ -374,14 +494,18 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         });
         return { reachable: true, message: stdout.trim() };
       }
-      // Check provider status if SSM is offline.
-      const { getProvider } = await import("../../compute/index.js");
-      const provider = getProvider(providerOf(compute));
-      if (provider?.checkStatus) {
-        const real = await provider.checkStatus(compute).catch((err) => {
+      // Check live state via the Compute's own checkStatus when SSM is offline.
+      const computeImpl = app.getCompute(compute.compute_kind);
+      const handle = computeImpl?.attachExistingHandle?.({
+        name: compute.name,
+        status: compute.status,
+        config: (compute.config ?? {}) as Record<string, unknown>,
+      });
+      if (computeImpl?.checkStatus && handle) {
+        const real = await computeImpl.checkStatus(handle).catch((err) => {
           logDebug("compute", `compute/ping: checkStatus probe failed (name=${compute.name})`, {
             name: compute.name,
-            provider: providerOf(compute),
+            kind: compute.compute_kind,
             error: err instanceof Error ? err.message : String(err),
           });
           return null;
@@ -389,7 +513,7 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
         if (real && real !== compute.status) {
           await app.computes.update(compute.name, { status: real });
         }
-        return { reachable: false, message: `Unreachable -- provider status: ${real ?? "unknown"}` };
+        return { reachable: false, message: `Unreachable -- compute status: ${real ?? "unknown"}` };
       }
       return { reachable: false, message: "Unreachable -- SSM agent offline" };
     } catch {
@@ -407,35 +531,51 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
     const dbTemplates = await app.computeTemplates.list();
     const configTemplates = app.config.computeTemplates ?? [];
     const dbNames = new Set(dbTemplates.map((t) => t.name));
-    // Every template carries both the legacy provider name AND the new
-    // two-axis (compute, isolation) pair so web clients don't have to maintain
-    // a duplicate provider-map table. Source of truth:
-    // packages/compute/adapters/provider-map.ts.
-    const withAxes = (t: { name: string; description?: string | null; provider: string; config: unknown }) => {
-      const pair = providerToPair(t.provider);
-      return {
-        name: t.name,
-        description: t.description ?? undefined,
-        provider: t.provider,
-        compute: pair.compute,
-        isolation: pair.isolation,
-        config: t.config,
-      };
-    };
-    const merged = [...dbTemplates.map(withAxes), ...configTemplates.filter((t) => !dbNames.has(t.name)).map(withAxes)];
-    return { templates: merged };
+    // DB rows carry the two-axis (compute, isolation) pair directly.
+    // Config-defined rows still carry a legacy `provider` field; we map it
+    // through `legacyProviderToAxes` here. Wire format includes the legacy
+    // `provider` label so existing clients keep rendering.
+    const dbWire = dbTemplates.map((t) => ({
+      name: t.name,
+      description: t.description,
+      provider: legacyProviderLabel({ compute_kind: t.compute, isolation_kind: t.isolation }),
+      compute: t.compute,
+      isolation: t.isolation,
+      config: t.config,
+    }));
+    const cfgWire = configTemplates
+      .filter((t) => !dbNames.has(t.name))
+      .map((t) => {
+        const axes = legacyProviderToAxes(t.provider ?? "local");
+        return {
+          name: t.name,
+          description: t.description ?? undefined,
+          provider: t.provider,
+          compute: axes.compute_kind,
+          isolation: axes.isolation_kind,
+          config: t.config,
+        };
+      });
+    return { templates: [...dbWire, ...cfgWire] };
   });
 
   router.handle("compute/template/get", async (p) => {
     const { name } = extract<{ name: string }>(p, ["name"]);
     let tmpl: any = await app.computeTemplates.get(name);
-    if (!tmpl) {
+    if (tmpl) {
+      // Template view carries the two-axis pair; re-emit the legacy label
+      // for back-compat clients that still key off it.
+      tmpl = { ...tmpl, provider: legacyProviderLabel({ compute_kind: tmpl.compute, isolation_kind: tmpl.isolation }) };
+    } else {
       const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === name);
       if (cfgTmpl) {
+        const axes = legacyProviderToAxes(cfgTmpl.provider ?? "local");
         tmpl = {
           name: cfgTmpl.name,
           description: cfgTmpl.description,
-          provider: cfgTmpl.provider as ComputeProviderName,
+          provider: cfgTmpl.provider,
+          compute: axes.compute_kind,
+          isolation: axes.isolation_kind,
           config: cfgTmpl.config,
         };
       }
@@ -444,21 +584,36 @@ export function registerComputeHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("compute/template/create", async (p) => {
-    const { name, provider, config, description } = extract<{
+    const {
+      name,
+      provider,
+      compute: computeKind,
+      isolation: isolationKind,
+      config,
+      description,
+    } = extract<{
       name: string;
-      provider: string;
+      provider?: string;
+      compute?: ComputeKindName;
+      isolation?: IsolationKindName;
       config?: Record<string, unknown>;
       description?: string;
-    }>(p, ["name", "provider"]);
+    }>(p, ["name"]);
+    let effectiveCompute = computeKind;
+    let effectiveIsolation = isolationKind;
+    if ((!effectiveCompute || !effectiveIsolation) && provider) {
+      const axes = legacyProviderToAxes(provider);
+      effectiveCompute = effectiveCompute ?? axes.compute_kind;
+      effectiveIsolation = effectiveIsolation ?? axes.isolation_kind;
+    }
     await app.computeTemplates.create({
       name,
-      description: description ?? null,
-      provider: provider as ComputeProviderName,
-      config: JSON.stringify(config ?? {}),
+      description: description ?? undefined,
+      compute: (effectiveCompute ?? "local") as ComputeKindName,
+      isolation: (effectiveIsolation ?? "direct") as IsolationKindName,
+      config: (config ?? {}) as Record<string, unknown>,
       tenant_id: "default",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as any);
+    });
     return { ok: true };
   });
 

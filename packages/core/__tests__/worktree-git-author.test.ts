@@ -23,7 +23,6 @@ import { join } from "path";
 
 import { AppContext } from "../app.js";
 import { setupSessionWorktree } from "../services/worktree/index.js";
-import { getProvider } from "../../compute/index.js";
 
 let app: AppContext;
 let originalCwd: string;
@@ -60,8 +59,7 @@ function readWorktreeIdentity(wt: string): { name: string; email: string } {
 describe("setupSessionWorktree -- git author identity", () => {
   it("pins user.name / user.email on the worktree's local git config", async () => {
     const session = await app.sessions.create({ summary: "git-author test", repo: "." });
-    const provider = getProvider("local") ?? undefined;
-    const wt = await setupSessionWorktree(app, session, null, provider);
+    const wt = await setupSessionWorktree(app, session, null);
 
     const { name, email } = readWorktreeIdentity(wt);
     expect(name).toBe(app.config.git?.authorName ?? "Ark Agent");
@@ -70,8 +68,7 @@ describe("setupSessionWorktree -- git author identity", () => {
 
   it("does NOT inherit the host's global git identity on agent commits", async () => {
     const session = await app.sessions.create({ summary: "git-author isolation", repo: "." });
-    const provider = getProvider("local") ?? undefined;
-    const wt = await setupSessionWorktree(app, session, null, provider);
+    const wt = await setupSessionWorktree(app, session, null);
 
     const { email } = readWorktreeIdentity(wt);
     expect(email).not.toBe("host-config@example.com");
@@ -86,8 +83,7 @@ describe("setupSessionWorktree -- git author identity", () => {
     };
 
     const session = await app.sessions.create({ summary: "git-author override", repo: "." });
-    const provider = getProvider("local") ?? undefined;
-    const wt = await setupSessionWorktree(app, session, null, provider);
+    const wt = await setupSessionWorktree(app, session, null);
 
     expect(readWorktreeIdentity(wt)).toEqual({ name: "Custom Bot", email: "bot@example.org" });
   });

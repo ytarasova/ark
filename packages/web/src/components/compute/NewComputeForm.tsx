@@ -13,7 +13,7 @@ import { effectiveLifecycle, type ComputeKindName, type IsolationKindName } from
 // Surface both compute + isolation axes. Static defaults render while the
 // server reply is in flight; the queries below overwrite with the live list.
 const DEFAULT_COMPUTE_KINDS = ["local", "firecracker", "ec2", "k8s", "k8s-kata"] as const;
-const DEFAULT_ISOLATION_KINDS = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"] as const;
+const DEFAULT_ISOLATION_KINDS = ["direct", "docker", "compose", "devcontainer"] as const;
 
 // Zod schema -- single source of truth for form validation. The submit
 // payload type is `NewComputeFormValues`, derived from the schema so caller
@@ -104,10 +104,9 @@ export function NewComputeForm({
   // Keep templateConfig in a ref-style state via watch / setValue -- we
   // stash the chosen template's config object and hand it over on submit.
   // The template dropdown drives (compute, isolation) + config together.
-  // The server attaches `compute` + `isolation` to every template row (derived
-  // from the legacy `provider` via the canonical `providerToPair` table in
-  // packages/compute/adapters/provider-map.ts), so the web bundle no longer
-  // needs its own copy of that mapping.
+  // The server attaches `compute` + `isolation` to every template row, so
+  // the web bundle no longer needs its own copy of the legacy
+  // provider-to-axes mapping.
   useEffect(() => {
     if (!selectedTemplate) return;
     const tmpl = (templates as any[]).find((t) => t.name === selectedTemplate);

@@ -24,7 +24,6 @@ describe("compute lifecycle classification", () => {
     expect(ISOLATION_KIND_LIFECYCLE.docker).toBe("template");
     expect(ISOLATION_KIND_LIFECYCLE.compose).toBe("template");
     expect(ISOLATION_KIND_LIFECYCLE.devcontainer).toBe("template");
-    expect(ISOLATION_KIND_LIFECYCLE["firecracker-in-container"]).toBe("template");
   });
 
   it("effectiveLifecycle: persistent only when both axes are persistent", () => {
@@ -53,7 +52,7 @@ describe("compute lifecycle classification", () => {
   });
 
   it("every IsolationKindName has a lifecycle entry", () => {
-    const kinds: IsolationKindName[] = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"];
+    const kinds: IsolationKindName[] = ["direct", "docker", "compose", "devcontainer"];
     for (const k of kinds) {
       expect(ISOLATION_KIND_LIFECYCLE[k]).toBeDefined();
     }

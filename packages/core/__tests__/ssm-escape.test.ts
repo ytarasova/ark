@@ -21,8 +21,8 @@
 import { describe, test, expect } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { shellEscape } from "../../compute/providers/ec2/shell-escape.js";
-import { ssmExecArgs } from "../../compute/providers/ec2/ssm.js";
+import { shellEscape } from "../compute/ec2/shell-escape.js";
+import { ssmExecArgs } from "../compute/ec2/ssm.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 
@@ -76,7 +76,7 @@ describe("ssmExecArgs -- argv-based remote exec validates inputs", async () => {
 
 describe("call-site regression guards -- user-derived vars never land unescaped", () => {
   test("sync.ts syncProjectFiles uses ssmExecArgs, not template-string mkdir", () => {
-    const src = readFileSync(join(ROOT, "packages/compute/providers/ec2/sync.ts"), "utf-8");
+    const src = readFileSync(join(ROOT, "packages/core/compute/ec2/sync.ts"), "utf-8");
     // Old vulnerable patterns MUST be gone.
     expect(src).not.toMatch(/sshExec\([^)]*,\s*`mkdir -p \$\{remoteDir\}`/);
     expect(src).not.toMatch(/sshExec\([^)]*,\s*`mkdir -p \$\{remoteDir\}\/\$\{subdir\}`/);
@@ -85,7 +85,7 @@ describe("call-site regression guards -- user-derived vars never land unescaped"
   });
 
   test("sync.ts refreshRemoteToken shell-escapes the token", () => {
-    const src = readFileSync(join(ROOT, "packages/compute/providers/ec2/sync.ts"), "utf-8");
+    const src = readFileSync(join(ROOT, "packages/core/compute/ec2/sync.ts"), "utf-8");
     // Old pattern (raw '${token}') must be gone.
     expect(src).not.toMatch(/CLAUDE_CODE_SESSION_ACCESS_TOKEN\s+'\$\{token\}'/);
     // Escaped pattern must be used.
@@ -93,13 +93,13 @@ describe("call-site regression guards -- user-derived vars never land unescaped"
   });
 
   test("docker-compose isolation uses argv-form exec (no shell -c interpolation)", () => {
-    const src = readFileSync(join(ROOT, "packages/compute/isolation/docker-compose.ts"), "utf-8");
+    const src = readFileSync(join(ROOT, "packages/core/compute/isolation/docker-compose.ts"), "utf-8");
     expect(src).not.toMatch(/sh\s+-c\s+`[^`]*\$\{/);
     expect(src).toMatch(/composeUpWithFiles/);
   });
 
   test("docker compose argv helpers exec docker with separated args (no shell)", () => {
-    const src = readFileSync(join(ROOT, "packages/compute/providers/docker/compose.ts"), "utf-8");
+    const src = readFileSync(join(ROOT, "packages/core/compute/isolation/compose.ts"), "utf-8");
     expect(src).not.toMatch(/sh\s+-c\s+`[^`]*\$\{/);
     expect(src).not.toMatch(/cd \$\{[a-zA-Z_]+\} && docker compose/);
     expect(src).toMatch(/execFileAsync\("docker",/);

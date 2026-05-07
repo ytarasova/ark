@@ -1,4 +1,4 @@
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { legacyProviderLabel as providerOf } from "./_util/legacy-provider-label.js";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { AppContext } from "../app.js";
 
@@ -25,20 +25,27 @@ describe("ComputeTemplateRepository", () => {
     await app.computeTemplates.create({
       name: "gpu-large",
       description: "Large GPU instance for ML",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       config: { size: "xl", region: "us-east-1", arch: "x64" },
     });
 
     const tmpl = await app.computeTemplates.get("gpu-large");
     expect(tmpl).not.toBeNull();
     expect(tmpl!.name).toBe("gpu-large");
-    expect(tmpl!.provider).toBe("ec2");
+    expect(tmpl!.compute).toBe("ec2");
+    expect(tmpl!.isolation).toBe("direct");
     expect(tmpl!.config).toEqual({ size: "xl", region: "us-east-1", arch: "x64" });
   });
 
   it("lists templates", async () => {
-    await app.computeTemplates.create({ name: "sandbox", provider: "docker", config: { image: "ubuntu:22.04" } });
-    await app.computeTemplates.create({ name: "quick", provider: "local", config: {} });
+    await app.computeTemplates.create({
+      name: "sandbox",
+      compute: "local",
+      isolation: "docker",
+      config: { image: "ubuntu:22.04" },
+    });
+    await app.computeTemplates.create({ name: "quick", compute: "local", isolation: "direct", config: {} });
 
     const templates = await app.computeTemplates.list();
     expect(templates.length).toBe(2);
@@ -46,7 +53,12 @@ describe("ComputeTemplateRepository", () => {
   });
 
   it("updates a template", async () => {
-    await app.computeTemplates.create({ name: "test-tmpl", provider: "ec2", config: { size: "s" } });
+    await app.computeTemplates.create({
+      name: "test-tmpl",
+      compute: "ec2",
+      isolation: "direct",
+      config: { size: "s" },
+    });
     await app.computeTemplates.update("test-tmpl", { config: { size: "l", region: "eu-west-1" } });
 
     const tmpl = await app.computeTemplates.get("test-tmpl");
@@ -54,7 +66,7 @@ describe("ComputeTemplateRepository", () => {
   });
 
   it("deletes a template", async () => {
-    await app.computeTemplates.create({ name: "to-delete", provider: "docker", config: {} });
+    await app.computeTemplates.create({ name: "to-delete", compute: "local", isolation: "docker", config: {} });
     expect(await app.computeTemplates.get("to-delete")).not.toBeNull();
 
     await app.computeTemplates.delete("to-delete");
@@ -72,20 +84,28 @@ describe("ComputeTemplateRepository", () => {
     // a `(name, tenant_id)` composite PK -- tracked separately. Until then,
     // this test just asserts that tenant-scoped reads don't leak across
     // tenants even when the raw `compute` row exists under the default tenant.
-    await app.computeTemplates.create({ name: "default-only-template", provider: "ec2", config: { size: "s" } });
+    await app.computeTemplates.create({
+      name: "default-only-template",
+      compute: "ec2",
+      isolation: "direct",
+      config: { size: "s" },
+    });
     const tenantApp = app.forTenant("tenant-a");
     await tenantApp.computeTemplates.create({
       name: "tenant-a-only-template",
-      provider: "docker",
+      compute: "local",
+      isolation: "docker",
       config: { image: "alpine" },
     });
 
     const defaultTmpl = await app.computeTemplates.get("default-only-template");
-    expect(defaultTmpl!.provider).toBe("ec2");
+    expect(defaultTmpl!.compute).toBe("ec2");
+    expect(defaultTmpl!.isolation).toBe("direct");
     expect(await tenantApp.computeTemplates.get("default-only-template")).toBeNull();
 
     const tenantTmpl = await tenantApp.computeTemplates.get("tenant-a-only-template");
-    expect(tenantTmpl!.provider).toBe("docker");
+    expect(tenantTmpl!.compute).toBe("local");
+    expect(tenantTmpl!.isolation).toBe("docker");
     expect(await app.computeTemplates.get("tenant-a-only-template")).toBeNull();
   });
 });

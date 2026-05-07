@@ -12,7 +12,7 @@
  * NOT the actual tmux/claude launch (which requires real tmux).
  */
 
-import { providerOf } from "../../compute/adapters/provider-map.js";
+import { legacyProviderLabel as providerOf } from "./_util/legacy-provider-label.js";
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
@@ -70,7 +70,7 @@ describe("dispatch compute: worktree creation", async () => {
 
   it("does NOT create worktree for EC2 compute", async () => {
     // Register an EC2 compute in the store
-    await app.computeService.create({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
+    await app.computeService.create({ name: "my-ec2", compute: "ec2", isolation: "direct", config: { ip: "1.2.3.4" } });
     const session = await getApp().sessions.create({ summary: "ec2-test", compute_name: "my-ec2" });
 
     const compute = await app.computes.get(session.compute_name!);
@@ -225,7 +225,7 @@ describe("dispatch compute: session creation defaults", async () => {
   });
 
   it("session stores compute_name when specified", async () => {
-    await app.computeService.create({ name: "test-compute", provider: "ec2" });
+    await app.computeService.create({ name: "test-compute", compute: "ec2", isolation: "direct" });
     const session = await getApp().sessions.create({ summary: "compute-name-test", compute_name: "test-compute" });
     expect(session.compute_name).toBe("test-compute");
   });

@@ -22,13 +22,12 @@ import { logDebug } from "../observability/structured-log.js";
  * conductor's host.
  *
  * REMOTE DISPATCH MUST NOT use this. For remote dispatch the channel MCP
- * config has to come from `provider.buildChannelConfig` (e.g.
- * `RemoteWorktreeProvider.buildChannelConfig` -- returns
- * `${REMOTE_HOME}/.ark/bin/ark channel`, the binary path that exists on
- * the agent's host). `claude-code.ts:executor.launch` enforces this with
- * an explicit assertion (audit finding F6); without that guard, a falsy
- * `channelConfig` would silently fall back here and embed the conductor's
- * binary path in the agent's `.mcp.json`.
+ * config has to come from the legacy provider's `buildChannelConfig` (e.g.
+ * the EC2 provider returns `${REMOTE_HOME}/.ark/bin/ark channel`, the
+ * binary path that exists on the agent's host). `claude-code.ts:executor.launch`
+ * enforces this with an explicit assertion (audit finding F6); without that
+ * guard, a falsy `channelConfig` would silently fall back here and embed
+ * the conductor's binary path in the agent's `.mcp.json`.
  */
 export function channelMcpConfig(
   sessionId: string,

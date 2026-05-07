@@ -94,7 +94,6 @@ export const compute = sqliteTable(
   "compute",
   {
     name: text("name").primaryKey(),
-    provider: text("provider").notNull().default("local"),
     computeKind: text("compute_kind").notNull().default("local"),
     isolationKind: text("isolation_kind").notNull().default("direct"),
     status: text("status").notNull().default("stopped"),
@@ -106,7 +105,6 @@ export const compute = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => ({
-    idxProvider: index("idx_compute_provider").on(t.provider),
     idxKind: index("idx_compute_kind").on(t.computeKind),
     idxIsolationKind: index("idx_compute_isolation_kind").on(t.isolationKind),
     idxStatus: index("idx_compute_status").on(t.status),
@@ -115,13 +113,19 @@ export const compute = sqliteTable(
 );
 
 // ── compute_templates ─────────────────────────────────────────────────────
+//
+// Templates and concrete compute targets share the `compute` table now (Task 3
+// of the cleanup); this row keeps a separate `compute_templates` table only
+// for legacy callers that haven't been swept yet. Two-axis fields mirror the
+// `compute` table; the legacy `provider` column was dropped in migration 015.
 
 export const computeTemplates = sqliteTable(
   "compute_templates",
   {
     name: text("name").notNull(),
     description: text("description"),
-    provider: text("provider").notNull(),
+    computeKind: text("compute_kind").notNull().default("local"),
+    isolationKind: text("isolation_kind").notNull().default("direct"),
     config: text("config").default("{}"),
     tenantId: text("tenant_id").notNull().default("default"),
     createdAt: text("created_at").notNull(),

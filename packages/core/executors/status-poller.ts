@@ -12,7 +12,7 @@ import type { AppContext } from "../app.js";
 import type { Executor, ExecutorStatus } from "../executor.js";
 import { getExecutor } from "../executor.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
-import { resolveProvider } from "../compute-resolver.js";
+import { resolveComputeTarget } from "../compute-resolver.js";
 
 /**
  * Read the exit-code sentinel for a session, if the launcher wrote one.
@@ -104,19 +104,28 @@ async function probeSessionStatus(
   const session = await app.sessions.get(sessionId);
   if (session?.compute_name) {
     try {
-      const { provider, compute } = await resolveProvider(app, session);
-      if (provider && compute) {
+      // Resolve the compute target once. The runtime-specific probeStatus
+      // path (e.g. claude-agent's /process/status) gets first crack via its
+      // own resolver; if absent we fall back to AgentHandle.checkAlive
+      // which talks /agent/status to arkd.
+      const { target, compute: computeRow } = await resolveComputeTarget(app, session);
+      if (target && computeRow) {
         if (executor.probeStatus) {
-          // Pass the session through so the provider reads
-          // session.config.arkd_local_forward_port (#423) instead of the
-          // shared compute-level field.
-          return await executor.probeStatus({ app, session, handle, compute, provider });
+          return await executor.probeStatus({ app, session, handle });
         }
-        const running = await provider.checkSession(compute, handle, session);
-        return running ? { state: "running" } : { state: "not_found" };
+        const computeHandle = target.compute.attachExistingHandle?.({
+          name: computeRow.name,
+          status: computeRow.status,
+          config: computeRow.config ?? {},
+        });
+        if (computeHandle) {
+          const agent = target.isolation.attachAgent(target.compute, computeHandle, handle);
+          const running = await agent.checkAlive();
+          return running ? { state: "running" } : { state: "not_found" };
+        }
       }
     } catch (err: any) {
-      logWarn("status", `provider status probe failed for ${sessionId}: ${err?.message ?? err}; keeping running`);
+      logWarn("status", `compute-target status probe failed for ${sessionId}: ${err?.message ?? err}; keeping running`);
       return { state: "running" };
     }
   }

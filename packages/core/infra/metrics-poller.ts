@@ -24,7 +24,7 @@ export class MetricsPoller {
         const computes = (await this.app.computes?.list({ status: "running" })) ?? [];
         for (const c of computes) {
           await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
-            const compute = (await import("../../compute/index.js")) as Record<string, unknown>;
+            const compute = (await import("../compute/index.js")) as Record<string, unknown>;
             if (typeof compute.pollMetrics === "function") {
               await (compute.pollMetrics as (name: string) => Promise<void>)(c.name);
             }

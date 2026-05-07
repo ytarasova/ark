@@ -114,59 +114,16 @@ describe("session/attach-command", () => {
     expect(res.error?.code).toBe(ErrorCodes.SESSION_NOT_FOUND);
   });
 
-  it("interactive plan for remote compute -- ark-native command, transport from provider", async () => {
-    class FakeRemoteProvider {
-      readonly name = "ec2";
-      readonly singleton = false;
-      readonly canReboot = true;
-      readonly canDelete = true;
-      readonly supportsWorktree = false;
-      readonly initialStatus = "running";
-      readonly needsAuth = false;
-      readonly supportsSecretMount = false;
-      readonly isolationModes: { value: string; label: string }[] = [];
-      setApp(): void {}
-      async provision(): Promise<void> {}
-      async destroy(): Promise<void> {}
-      async start(): Promise<void> {}
-      async stop(): Promise<void> {}
-      async attach(): Promise<void> {}
-      async cleanupSession(): Promise<void> {}
-      async syncEnvironment(): Promise<void> {}
-      async launch(): Promise<string> {
-        return "";
-      }
-      async killAgent(): Promise<void> {}
-      async captureOutput(): Promise<string> {
-        return "";
-      }
-      async getMetrics(): Promise<any> {
-        return {};
-      }
-      async probePorts(): Promise<any[]> {
-        return [];
-      }
-      async checkSession(): Promise<boolean> {
-        return true;
-      }
-      getAttachCommand(_c: any, s: any) {
-        return ["aws", "ssm", "start-session", "--target", "i-fake", "--", `tmux attach -t ${s.session_id}`];
-      }
-      buildChannelConfig(): Record<string, unknown> {
-        return {};
-      }
-      buildLaunchEnv(): Record<string, string> {
-        return {};
-      }
-    }
-    app.registerProvider(new FakeRemoteProvider() as any);
+  it("interactive plan for remote compute -- ark-native command, transport from EC2Compute", async () => {
+    // Use the real EC2Compute -- its `getAttachCommand` impl returns the
+    // SSM start-session shape. We just need a row with an instance_id so
+    // the SSM target resolves.
     await app.computes.insert({
       name: "fake-remote-1",
-      provider: "fake-remote" as any,
       compute_kind: "ec2",
       isolation_kind: "direct",
       status: "running",
-      config: { ip: "1.2.3.4" },
+      config: { ip: "1.2.3.4", instance_id: "i-fake", region: "us-east-1" },
     } as any);
     const id = await createSession({
       session_id: "ark-remote-1",
@@ -182,6 +139,7 @@ describe("session/attach-command", () => {
     expect(p.command).not.toContain("tmux");
     // Transport command IS the raw provider output for the CLI to exec.
     expect(p.transportCommand).toContain("aws ssm start-session");
+    expect(p.transportCommand).toContain("i-fake");
     expect(p.transportCommand).toContain("ark-remote-1");
   });
 });

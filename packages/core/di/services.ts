@@ -20,7 +20,7 @@ import type { TodoRepository } from "../repositories/todo.js";
 import type { FlowStateRepository } from "../repositories/flow-state.js";
 import type { FlowStore } from "../stores/flow-store.js";
 import type { RuntimeStore } from "../stores/runtime-store.js";
-import type { WorkspaceStore } from "../../workspace/store.js";
+import type { WorkspaceStore } from "../workspace/store.js";
 import type { ModelStore } from "../stores/model-store.js";
 import { ModelService } from "../models/ModelService.js";
 import type { UsageRecorder } from "../observability/usage.js";
@@ -39,7 +39,7 @@ import { deletePerSessionCredsSecret, materializeClaudeAuthForDispatch } from ".
 import { garbageCollectComputeIfTemplate } from "../services/compute-lifecycle.js";
 import { capturePlanMdIfPresent } from "../services/plan-artifact.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
-import { provisionWorkspaceWorkdir } from "../../workspace/provisioner.js";
+import { provisionWorkspaceWorkdir } from "../workspace/provisioner.js";
 import * as flow from "../services/flow.js";
 import { buildTaskWithHandoff, extractSubtasks } from "../services/task-builder.js";
 import * as agentRegistry from "../agent/agent.js";
@@ -144,7 +144,6 @@ export function registerServices(
           removeWorktree: (session) => removeSessionWorktree(c.app, session),
           deleteCredsSecret: (session, compute) => deletePerSessionCredsSecret(c.app, session, compute),
           gcComputeIfTemplate: (computeName) => garbageCollectComputeIfTemplate(c.app, computeName ?? null),
-          resolveProvider: (session) => c.app.resolveProvider(session),
           resolveComputeTarget: (session) => c.app.resolveComputeTarget(session),
           advance: (id, force) => c.app.stageAdvance.advance(id, force),
           provisionWorkspaceWorkdir: (session, ws, opts) => provisionWorkspaceWorkdir(c.app, session, ws, opts),

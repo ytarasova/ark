@@ -9,8 +9,6 @@
 
 import type { Session } from "../../../types/index.js";
 import type { AppContext } from "../../app.js";
-import { getProvider } from "../../../compute/index.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
 import { logDebug } from "../../observability/structured-log.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "../../constants.js";
@@ -28,19 +26,32 @@ export async function deliverToChannel(
   channelPort: number,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  // Try arkd delivery first (works for both local and remote)
+  // Try arkd delivery first (works for both local and remote). Resolve the
+  // arkd URL via the new ComputeTarget API: `target.compute.getArkdUrl(handle)`.
+  // No legacy registry hop, no per-session port (this delivery path only
+  // needs the compute-level arkd URL; the per-session SSM tunnel lookup
+  // lives in `worktree/pr.ts` for the action-stage RPC path).
   const computeName = targetSession.compute_name || "local";
   const tenantApp = targetSession.tenant_id ? app.forTenant(targetSession.tenant_id) : app;
   const compute = await tenantApp.computes.get(computeName);
-  const provider = compute ? getProvider(providerOf(compute)) : null;
-  if (provider?.getArkdUrl) {
-    try {
-      const arkdUrl = provider.getArkdUrl(compute!);
-      const client = new ArkdClient(arkdUrl);
-      const result = await client.channelDeliver({ channelPort, payload });
-      if (result.delivered) return;
-    } catch {
-      logDebug("conductor", "arkd not available -- fall through to direct HTTP");
+  if (compute) {
+    const computeImpl = tenantApp.getCompute(compute.compute_kind);
+    if (computeImpl && computeImpl.attachExistingHandle) {
+      const handle = computeImpl.attachExistingHandle({
+        name: compute.name,
+        status: compute.status,
+        config: (compute.config ?? {}) as Record<string, unknown>,
+      });
+      if (handle) {
+        try {
+          const arkdUrl = computeImpl.getArkdUrl(handle);
+          const client = new ArkdClient(arkdUrl);
+          const result = await client.channelDeliver({ channelPort, payload });
+          if (result.delivered) return;
+        } catch {
+          logDebug("conductor", "arkd not available -- fall through to direct HTTP");
+        }
+      }
     }
   }
 

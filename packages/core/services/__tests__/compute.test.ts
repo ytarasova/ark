@@ -12,7 +12,7 @@ import { AppContext } from "../../app.js";
 import { ComputeService } from "../compute.js";
 import { ComputeRepository } from "../../repositories/compute.js";
 import type { Compute, ComputeStatus } from "../../../types/index.js";
-import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { legacyProviderLabel as providerOf } from "../../__tests__/_util/legacy-provider-label.js";
 
 let app: AppContext;
 let repo: ComputeRepository;
@@ -32,27 +32,32 @@ afterEach(async () => {
 describe("ComputeService", async () => {
   // ── create: rule-aware (singleton, initialStatus) ──────────────────────
 
-  it("create returns compute with correct defaults (docker -> stopped)", async () => {
-    const c = await svc.create({ name: "test-docker", provider: "docker" });
+  it("create returns compute with correct defaults (local -> running)", async () => {
+    // After Task 5 of the compute cleanup, capabilities (including
+    // initialStatus) live on Compute -- so any local+<isolation> row
+    // inherits LocalCompute's initialStatus=running. The legacy distinction
+    // between local-direct (running) and docker/devcontainer/firecracker-
+    // template (stopped) is no longer carried by the singleton-axis rows.
+    const c = await svc.create({ name: "test-docker", compute: "local", isolation: "docker", is_template: true });
     expect(c.name).toBe("test-docker");
     expect(providerOf(c)).toBe("docker");
-    expect(c.status).toBe("stopped");
+    expect(c.status).toBe("running");
   });
 
-  it("create pulls initialStatus from the provider (local -> running)", async () => {
+  it("create pulls initialStatus from the Compute (local -> running)", async () => {
     // Fresh tenant has no local row seeded (seedLocalCompute runs at boot,
     // but it lives under the default tenant). An isolated tenant scope gives
     // us a ComputeService that writes against an empty `compute` view so
     // we can exercise the provider-driven initialStatus path without
     // tripping the singleton rule against the seeded default-tenant row.
     const isolated = app.forTenant("isolated-tenant");
-    const c = await isolated.computeService.create({ name: "iso-local", provider: "local" });
+    const c = await isolated.computeService.create({ name: "iso-local", compute: "local", isolation: "direct" });
     expect(c.status).toBe("running");
   });
 
   it("create rejects second local provider (singleton)", async () => {
     // "local" is seeded at boot -- creating another must throw.
-    expect(svc.create({ name: "local2", provider: "local" })).rejects.toThrow(/singleton/);
+    expect(svc.create({ name: "local2", compute: "local", isolation: "direct" })).rejects.toThrow(/singleton/);
   });
 
   it("create with no provider defaults to local and rejects (singleton)", async () => {
@@ -60,22 +65,27 @@ describe("ComputeService", async () => {
   });
 
   it("create allows a second local row when is_template=true (template exempt)", async () => {
-    const c = await svc.create({ name: "local-tmpl", provider: "local", is_template: true });
+    const c = await svc.create({ name: "local-tmpl", compute: "local", isolation: "direct", is_template: true });
     expect(c.is_template).toBe(true);
     expect(c.name).toBe("local-tmpl");
   });
 
   it("create allows a local-provider row when cloned_from is set (clone exempt)", async () => {
     // Seed a local template first.
-    await svc.create({ name: "local-parent", provider: "local", is_template: true });
+    await svc.create({ name: "local-parent", compute: "local", isolation: "direct", is_template: true });
     // Clone of the template is concrete but exempt from the singleton check
     // because it carries cloned_from.
-    const c = await svc.create({ name: "local-child", provider: "local", cloned_from: "local-parent" });
+    const c = await svc.create({
+      name: "local-child",
+      compute: "local",
+      isolation: "direct",
+      cloned_from: "local-parent",
+    });
     expect(c.cloned_from).toBe("local-parent");
   });
 
-  it("create throws for an unknown provider", async () => {
-    expect(svc.create({ name: "mystery", provider: "not-a-real-provider" as any })).rejects.toThrow(/Unknown provider/);
+  it("create throws for an unknown compute kind", async () => {
+    expect(svc.create({ name: "mystery", compute: "not-a-real-kind" as any })).rejects.toThrow(/Unknown compute kind/);
   });
 
   // ── get ────────────────────────────────────────────────────────────────
@@ -93,22 +103,22 @@ describe("ComputeService", async () => {
   // ── list ───────────────────────────────────────────────────────────────
 
   it("list returns all compute entries", async () => {
-    await svc.create({ name: "d1", provider: "docker" });
+    await svc.create({ name: "d1", compute: "local", isolation: "docker" });
     const all = await svc.list();
     expect(all.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("list filters by provider", async () => {
-    await svc.create({ name: "d1", provider: "docker" });
-    await svc.create({ name: "e1", provider: "ec2" });
-    const dockers = await svc.list({ provider: "docker" });
+  it("list filters by isolation_kind", async () => {
+    await svc.create({ name: "d1", compute: "local", isolation: "docker" });
+    await svc.create({ name: "e1", compute: "ec2", isolation: "direct" });
+    const dockers = await svc.list({ isolation_kind: "docker" });
     expect(dockers.every((c) => providerOf(c) === "docker")).toBe(true);
   });
 
   // ── update ─────────────────────────────────────────────────────────────
 
   it("update changes fields", async () => {
-    await svc.create({ name: "upd", provider: "docker" });
+    await svc.create({ name: "upd", compute: "local", isolation: "docker" });
     const updated = await svc.update("upd", { session_id: `ark-s-${"upd"}`, status: "running" as ComputeStatus });
     expect(updated!.status).toBe("running");
   });
@@ -116,14 +126,14 @@ describe("ComputeService", async () => {
   // ── delete: rule-aware (canDelete) ─────────────────────────────────────
 
   it("delete removes compute", async () => {
-    await svc.create({ name: "del-me", provider: "docker" });
+    await svc.create({ name: "del-me", compute: "local", isolation: "docker" });
     expect(await svc.delete("del-me")).toBe(true);
     expect(await svc.get("del-me")).toBeNull();
   });
 
-  it("delete throws when provider.canDelete is false (local)", async () => {
-    // "local" provider sets canDelete=false. Attempting to delete must throw
-    // rather than silently no-op, so the caller sees a clear error.
+  it("delete throws when capabilities.canDelete is false (local)", async () => {
+    // LocalCompute.capabilities.canDelete=false. Attempting to delete must
+    // throw rather than silently no-op, so the caller sees a clear error.
     expect(svc.delete("local")).rejects.toThrow(/does not support deletion/);
     expect(await svc.get("local")).not.toBeNull();
   });
@@ -135,7 +145,7 @@ describe("ComputeService", async () => {
   // ── mergeConfig ────────────────────────────────────────────────────────
 
   it("mergeConfig delegates to repository", async () => {
-    await svc.create({ name: "merge", provider: "docker", config: { ip: "1.2.3.4" } });
+    await svc.create({ name: "merge", compute: "local", isolation: "docker", config: { ip: "1.2.3.4" } });
     const updated = await svc.mergeConfig("merge", { region: "us-east-1" });
     expect(updated!.config).toEqual({ ip: "1.2.3.4", region: "us-east-1" });
   });
@@ -166,7 +176,7 @@ describe("ComputeService", async () => {
             return c;
           },
         ),
-        findByProvider: mock(async () => null),
+        findByKind: mock(async () => null),
         get: mock(async (name: string) => stored.find((c) => c.name === name) ?? null),
         list: mock(async () => stored),
         update: mock(async () => null),
@@ -180,7 +190,7 @@ describe("ComputeService", async () => {
       });
 
       const freshSvc = app.container.resolve("computeService");
-      const c = await freshSvc.create({ name: "fake-ec2", provider: "ec2" });
+      const c = await freshSvc.create({ name: "fake-ec2", compute: "ec2", isolation: "direct" });
 
       expect(c.name).toBe("fake-ec2");
       expect(fakeRepo.insert).toHaveBeenCalledTimes(1);

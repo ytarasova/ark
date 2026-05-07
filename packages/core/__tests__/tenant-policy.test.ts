@@ -28,7 +28,9 @@ describe("TenantPolicyManager", async () => {
         default_provider: "k8s",
         max_concurrent_sessions: 20,
         max_cost_per_day_usd: 50.0,
-        compute_pools: [{ pool_name: "pool-1", provider: "k8s", min: 1, max: 5, config: { namespace: "prod" } }],
+        compute_pools: [
+          { pool_name: "pool-1", compute: "k8s", isolation: "direct", min: 1, max: 5, config: { namespace: "prod" } },
+        ],
       });
 
       const policy = await pm.getPolicy("tenant-a");

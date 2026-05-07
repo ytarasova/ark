@@ -55,7 +55,8 @@ describe("resolveComputeForStage + template cloning", () => {
   it("returns concrete compute name as-is (no cloning)", async () => {
     await app.computeService.create({
       name: "shared-ec2",
-      provider: "ec2",
+      compute: "ec2",
+      isolation: "direct",
       config: {},
     });
     const sessionId = "abcdef1234567890";

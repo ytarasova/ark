@@ -127,64 +127,16 @@ describe("/terminal/:sessionId WS route", () => {
     wsClient.close();
   }, 15_000);
 
-  it("routes via provider.getArkdUrl for sessions with a compute_name", async () => {
-    // Register a stub compute backed by a custom arkd URL (the same local
-    // arkd on a different URL string, just to prove we hit the provider).
-    class StubProvider {
-      readonly name = "stub-terminal-remote";
-      readonly singleton = false;
-      readonly canReboot = true;
-      readonly canDelete = true;
-      readonly supportsWorktree = false;
-      readonly initialStatus = "running";
-      readonly needsAuth = false;
-      readonly supportsSecretMount = false;
-      readonly isolationModes: any[] = [];
-      setApp(): void {}
-      async provision(): Promise<void> {}
-      async destroy(): Promise<void> {}
-      async start(): Promise<void> {}
-      async stop(): Promise<void> {}
-      async attach(): Promise<void> {}
-      async cleanupSession(): Promise<void> {}
-      async syncEnvironment(): Promise<void> {}
-      async launch(): Promise<string> {
-        return "";
-      }
-      async killAgent(): Promise<void> {}
-      async captureOutput(): Promise<string> {
-        return "";
-      }
-      async getMetrics(): Promise<any> {
-        return {};
-      }
-      async probePorts(): Promise<any[]> {
-        return [];
-      }
-      async checkSession(): Promise<boolean> {
-        return true;
-      }
-      getAttachCommand(): string[] {
-        return [];
-      }
-      buildChannelConfig(): Record<string, unknown> {
-        return {};
-      }
-      buildLaunchEnv(): Record<string, string> {
-        return {};
-      }
-      getArkdUrl(): string {
-        // Route back to the same arkd boot fixture. This proves the WS
-        // handler honoured the provider (if it hadn't, the test would still
-        // pass against the fallback, but we'd miss the regression signal).
-        return `http://localhost:${arkdPort}`;
-      }
-    }
-    app.registerProvider(new StubProvider() as any);
+  it("routes via Compute.getArkdUrl for sessions with a compute_name", async () => {
+    // Use the real LocalCompute (whose getArkdUrl returns
+    // http://localhost:<app.config.ports.arkd>). Override the test app's
+    // arkd port to point at the boot-fixture arkd so the bridge dials a
+    // real listener -- proves the WS handler honoured the Compute path.
+    (app.config as any).ports.arkd = arkdPort;
+
     await app.computes.insert({
       name: "stub-remote-1",
-      provider: "stub-terminal-remote" as any,
-      compute_kind: "ec2",
+      compute_kind: "local",
       isolation_kind: "direct",
       status: "running",
       config: {},

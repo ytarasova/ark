@@ -81,7 +81,6 @@ export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,
-      provider TEXT NOT NULL DEFAULT 'local',
       compute_kind TEXT NOT NULL DEFAULT 'local',
       isolation_kind TEXT NOT NULL DEFAULT 'direct',
       status TEXT NOT NULL DEFAULT 'stopped',
@@ -94,7 +93,6 @@ export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
     )
   `);
 
-  await db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_kind ON compute(compute_kind)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_isolation_kind ON compute(isolation_kind)`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status)`);
@@ -104,7 +102,8 @@ export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
     CREATE TABLE IF NOT EXISTS compute_templates (
       name TEXT NOT NULL,
       description TEXT,
-      provider TEXT NOT NULL,
+      compute_kind TEXT NOT NULL DEFAULT 'local',
+      isolation_kind TEXT NOT NULL DEFAULT 'direct',
       config TEXT DEFAULT '{}',
       tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
@@ -470,8 +469,8 @@ export async function seedLocalComputePostgres(db: DatabaseAdapter): Promise<voi
   await db
     .prepare(
       `
-    INSERT INTO compute (name, provider, compute_kind, isolation_kind, status, config, created_at, updated_at)
-    VALUES ($1, 'local', 'local', 'direct', 'running', '{}', $2, $3)
+    INSERT INTO compute (name, compute_kind, isolation_kind, status, config, created_at, updated_at)
+    VALUES ($1, 'local', 'direct', 'running', '{}', $2, $3)
     ON CONFLICT (name) DO NOTHING
   `,
     )
