@@ -1,7 +1,7 @@
 export interface TenantContext {
   tenantId: string;
   userId: string | null;
-  role: "admin" | "member" | "viewer";
+  role: "admin" | "member" | "viewer" | "worker";
 }
 
 export interface ApiKey {
@@ -9,7 +9,7 @@ export interface ApiKey {
   tenantId: string;
   keyHash: string;
   name: string;
-  role: "admin" | "member" | "viewer";
+  role: "admin" | "member" | "viewer" | "worker";
   createdAt: string;
   lastUsedAt: string | null;
   expiresAt: string | null;

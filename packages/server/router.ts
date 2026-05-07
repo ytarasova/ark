@@ -10,6 +10,46 @@ import {
 import { validateRequest } from "./validate.js";
 import { localAdminContext, type TenantContext } from "../core/auth/context.js";
 
+// ── Role-based method gating ─────────────────────────────────────────────────
+//
+// Method names follow the convention `<prefix>/<verb>`, e.g. `session/start`,
+// `worker/heartbeat`, `admin/apikey/create`. The prefix determines which roles
+// are permitted to call the method:
+//
+//   worker/* -> only callers with role "worker" (or "admin" which is superset)
+//   admin/*  -> only callers with role "admin"
+//   anything else -> callers with role "user", "member", "viewer", or "admin"
+//
+// The special-case `initialize` method (no prefix) is allowed for all roles.
+// Anonymous / viewer callers are blocked from worker/* and admin/* only --
+// they can still hit the user-tier methods (individual handlers can further
+// restrict access if needed).
+
+type TenantRole = TenantContext["role"];
+
+/**
+ * Return true when `role` is permitted to call `method`.
+ *
+ * Rules:
+ *   - `initialize` (no slash) -> always allowed (handshake method)
+ *   - `worker/*` -> allowed for "worker" and "admin"
+ *   - `admin/*`  -> allowed for "admin" only
+ *   - everything else -> allowed for any role except "worker"
+ */
+function methodAllowedForRole(method: string, role: TenantRole): boolean {
+  // Handshake method has no prefix -- open to all.
+  if (method === "initialize") return true;
+
+  if (method.startsWith("worker/")) {
+    return role === "worker" || role === "admin";
+  }
+  if (method.startsWith("admin/")) {
+    return role === "admin";
+  }
+  // User-tier: all roles except dedicated worker tokens.
+  return role !== "worker";
+}
+
 export type NotifyFn = (method: string, params?: Record<string, unknown>) => void;
 
 /**
@@ -143,6 +183,15 @@ export class Router {
       // default to a local-admin view in that case. Hosted transports
       // always pass an explicit ctx.
       const effectiveCtx: TenantContext = ctx ?? localAdminContext(null);
+
+      // Role-based method gating: check the caller's role against the method
+      // prefix before invoking the handler. Admin has full access; worker tokens
+      // are limited to worker/* only; user-tier roles cannot call worker/* or
+      // admin/* methods.
+      if (!methodAllowedForRole(req.method, effectiveCtx.role)) {
+        return createErrorResponse(req.id, ErrorCodes.FORBIDDEN, "forbidden");
+      }
+
       const result = await handler(params, notify ?? noop, effectiveCtx, subscription);
       return createResponse(req.id, result);
     } catch (err) {
