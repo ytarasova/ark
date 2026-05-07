@@ -1,21 +1,16 @@
 /**
- * Conductor RPC handlers.
+ * Conductor/bridge RPC handlers.
  *
- * Surfaces conductor-side operations that were previously reached only by
- * booting an in-process AppContext from the CLI:
+ * The old conductor HTTP server is merged into the server daemon (port 19400).
+ * These JSON-RPC methods remain for CLI / protocol back-compat:
  *
- *   - conductor/status     read-only "is the conductor running" probe
+ *   - conductor/status     reports the merged server as the conductor
  *   - conductor/bridge     start the local messaging bridge (slack/email)
  *   - conductor/notify     send a one-shot message via the bridge
  *
  * Bridge ops are host-local-by-nature (they read the local bridge config
  * on disk and drive outbound HTTP), so they always use the un-scoped
  * `app.config.dirs.ark`.
- *
- * Local-by-nature carve-outs (kept out of this handler file):
- *   - `conductor start` -- starting the conductor is part of daemon boot, not
- *     an RPC surface. Callers who want to know whether one is alive use
- *     `conductor/status`.
  */
 
 import type { Router } from "../router.js";
@@ -25,10 +20,11 @@ import { createBridge } from "../../core/integrations/bridge.js";
 
 export function registerConductorHandlers(router: Router, app: AppContext): void {
   // ── Status ────────────────────────────────────────────────────────────────
+  // The conductor is merged into the server daemon on the server port.
+  // The daemon is always "running" when this handler executes (it's in-process).
   router.handle("conductor/status", async (_p, _notify, _ctx) => {
-    const running = app.conductor !== null;
-    const port = app.config.ports?.conductor ?? 19100;
-    return { running, port, pid: running ? process.pid : undefined };
+    const port = app.config.ports?.conductor ?? 19400;
+    return { running: true, port, pid: process.pid };
   });
 
   // ── Bridge ────────────────────────────────────────────────────────────────

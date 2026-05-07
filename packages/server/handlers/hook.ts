@@ -4,7 +4,7 @@
  * This handler replaces the equivalent REST endpoint in the legacy conductor:
  *   POST /hooks/status  ->  hook/forward
  *
- * The REST endpoint continues to serve in parallel until Phase E removes it.
+ * The REST endpoint `/hooks/status` is now served on the merged port via the mounts layer.
  *
  * Business logic lives in `processHookPayload` (extracted from
  * `hook-status-handler.ts`) so both transports share one implementation.
@@ -14,7 +14,7 @@ import { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
-import { processHookPayload } from "../../core/conductor/server/hook-status-handler.js";
+import { processHookPayload } from "../../core/services/channel/hook-status.js";
 import { resolveTenantApp } from "./scope-helpers.js";
 
 export function registerHookHandlers(router: Router, app: AppContext): void {

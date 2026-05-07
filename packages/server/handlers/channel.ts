@@ -5,16 +5,16 @@
  *   POST /api/channel/:sessionId  ->  channel/deliver
  *   POST /api/relay               ->  channel/relay
  *
- * The REST endpoints continue to serve in parallel until Phase E removes them.
+ * The REST channel endpoints (/api/channel, /api/relay) have been removed.
  */
 
 import { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
-import { handleReport } from "../../core/conductor/server/report-pipeline.js";
-import { deliverToChannel } from "../../core/conductor/server/deliver-to-channel.js";
-import type { OutboundMessage } from "../../core/conductor/common/channel-types.js";
+import { handleReport } from "../../core/services/channel/report-pipeline.js";
+import { deliverToChannel } from "../../core/services/channel/deliver.js";
+import type { OutboundMessage } from "../../core/services/channel/channel-types.js";
 import { resolveTenantApp } from "./scope-helpers.js";
 
 export function registerChannelHandlers(router: Router, app: AppContext): void {
