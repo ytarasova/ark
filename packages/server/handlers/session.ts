@@ -5,6 +5,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { resolveTenantApp } from "./scope-helpers.js";
+import { eventBus } from "../../core/hooks.js";
 import type {
   SessionIdParams,
   SessionStartParams,
@@ -699,5 +700,94 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     });
 
     return { ok: true };
+  });
+
+  // ── session/tree-stream -- subscription-style tree update push ────────────
+  //
+  // Subscribes the caller's connection to live debounced tree snapshots for a
+  // root session. Returns an initial snapshot immediately, then pushes
+  // `session/tree-update` notifications via JSON-RPC notify whenever any
+  // descendant changes status or a new descendant is created.
+  //
+  // Uses the per-connection `Subscription` (Option A) to register cleanup so
+  // event-bus listeners and debounce timers are torn down when the WS closes.
+  //
+  // Mirrors the SSE handler in
+  // `packages/core/conductor/server/rest-api-handler.ts:handleTreeStream`.
+
+  router.handle("session/tree-stream", async (params, notify, ctx, subscription) => {
+    const { sessionId } = extract<{ sessionId: string }>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
+
+    const existing = await scoped.sessions.get(sessionId);
+    if (!existing) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+
+    const DEBOUNCE_MS = 200;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+
+    // descendantIds is rebuilt on every snapshot so the set stays current
+    // as the tree grows. Shared by the bus listener and pushSnapshot.
+    let descendantIds = new Set<string>();
+
+    const buildDescendantIds = (node: { id: string; children?: unknown[] }): void => {
+      descendantIds.add(node.id);
+      for (const child of node.children ?? []) {
+        buildDescendantIds(child as { id: string; children?: unknown[] });
+      }
+    };
+
+    const pushSnapshot = async (): Promise<void> => {
+      if (closed) return;
+      try {
+        const root = await scoped.sessions.loadTree(sessionId);
+        // Rebuild descendant set so the bus listener stays accurate.
+        descendantIds = new Set<string>();
+        buildDescendantIds(root as { id: string; children?: unknown[] });
+        notify("session/tree-update", { sessionId, root });
+      } catch (e: any) {
+        notify("session/tree-error", { sessionId, error: String(e?.message ?? e) });
+      }
+    };
+
+    const scheduleSnapshot = (): void => {
+      if (closed || timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        void pushSnapshot();
+      }, DEBOUNCE_MS);
+    };
+
+    // Initial snapshot (also populates descendantIds).
+    const initialRoot = await scoped.sessions.loadTree(sessionId);
+    buildDescendantIds(initialRoot as { id: string; children?: unknown[] });
+
+    // Subscribe to the global event bus. Filter to relevant event types and
+    // tree members, mirroring the logic in the SSE handleTreeStream handler.
+    const unsub = eventBus.onAll((evt) => {
+      if (closed) return;
+      if (evt.type !== "hook_status" && evt.type !== "session_updated" && evt.type !== "session_created") return;
+      // session_created always triggers a snapshot -- the new session may be
+      // a descendant whose parent is already in the tree.
+      if (evt.type === "session_created") {
+        scheduleSnapshot();
+        return;
+      }
+      if (descendantIds.has(evt.sessionId)) {
+        scheduleSnapshot();
+      }
+    });
+
+    // Register cleanup for when the connection closes.
+    subscription?.onClose(() => {
+      closed = true;
+      unsub();
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    });
+
+    return { tree: initialRoot };
   });
 }

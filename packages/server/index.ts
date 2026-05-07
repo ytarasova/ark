@@ -1,4 +1,4 @@
-import { Router, type Handler } from "./router.js";
+import { Router, Subscription, type Handler } from "./router.js";
 import { createNotification, isRequest, isNotification, parseMessage, type JsonRpcMessage } from "../protocol/types.js";
 import { createStdioTransport, type Transport } from "../protocol/transport.js";
 import { logDebug } from "../core/observability/structured-log.js";
@@ -215,6 +215,7 @@ export class ArkServer {
         handlers: ((msg: JsonRpcMessage) => void)[];
         authorizationHeader: string | null;
         queryToken: string | null;
+        subscription: Subscription;
       }
     >();
     const terminalMetadata = new WeakMap<
@@ -404,6 +405,9 @@ export class ArkServer {
           const handlers: ((msg: JsonRpcMessage) => void)[] = [];
           const authorizationHeader = upgradeData.authorizationHeader ?? null;
           const queryToken = upgradeData.queryToken ?? null;
+          // Per-connection subscription registry for subscription-style handlers
+          // (e.g. session/tree-stream). Flushed when the WS connection closes.
+          const subscription = new Subscription();
 
           const conn: ServerConnection = {
             id: connId,
@@ -423,7 +427,7 @@ export class ArkServer {
           };
 
           self.connections.set(connId, conn);
-          wsMetadata.set(ws, { connId, handlers, authorizationHeader, queryToken });
+          wsMetadata.set(ws, { connId, handlers, authorizationHeader, queryToken, subscription });
 
           // Wire message routing (same as addConnection)
           conn.transport.onMessage(async (msg) => {
@@ -432,7 +436,7 @@ export class ArkServer {
                 conn.subscriptions = msg.params.subscribe as string[];
               }
               const ctx = await self.resolveContext(conn);
-              const response = await self.router.dispatch(msg, self.notify.bind(self), ctx);
+              const response = await self.router.dispatch(msg, self.notify.bind(self), ctx, subscription);
               conn.transport.send(response);
               if (msg.method === "initialize" && "result" in response) {
                 self.router.markInitialized();
@@ -481,7 +485,12 @@ export class ArkServer {
             return;
           }
           const meta = wsMetadata.get(ws);
-          if (meta) self.connections.delete(meta.connId);
+          if (meta) {
+            // Flush subscription cleanups before removing the connection so
+            // any open event-bus listeners, timers, etc. are torn down.
+            meta.subscription.flush();
+            self.connections.delete(meta.connId);
+          }
         },
       },
     });

@@ -11,21 +11,60 @@ import { validateRequest } from "./validate.js";
 import { localAdminContext, type TenantContext } from "../core/auth/context.js";
 
 export type NotifyFn = (method: string, params?: Record<string, unknown>) => void;
+
+/**
+ * Per-connection subscription registry passed as the optional fourth argument
+ * to subscription-style handlers (B7+). Handlers that hold resources open
+ * (event bus listeners, timers, etc.) call `subscription.onClose(fn)` to
+ * register cleanup. The transport owner (ArkServer WS close handler) calls
+ * `subscription.flush()` when the connection drops.
+ *
+ * Non-subscription handlers may omit the fourth parameter entirely -- JS
+ * ignores unused trailing function parameters.
+ */
+export class Subscription {
+  private cleanupFns: Array<() => void> = [];
+
+  /** Register a cleanup function to be called when the connection closes. */
+  onClose(fn: () => void): void {
+    this.cleanupFns.push(fn);
+  }
+
+  /** Call every registered cleanup function and clear the registry. */
+  flush(): void {
+    for (const fn of this.cleanupFns) {
+      try {
+        fn();
+      } catch {
+        /* ignore cleanup errors */
+      }
+    }
+    this.cleanupFns = [];
+  }
+}
+
 /**
  * Handler signature -- every handler receives:
  *   - `params`: validated JSON-RPC params (via Zod when registered)
  *   - `notify`: per-request notify for push events
  *   - `ctx`: caller's TenantContext (tenant id, user id, isAdmin)
+ *   - `subscription`: optional per-connection cleanup registry for
+ *     subscription-style handlers that hold resources open after returning
  *
  * `ctx` is always present; in local / single-user mode the router
  * materializes a local-admin context. Hosted mode materializes from the
  * Authorization header / query token via `ApiKeyManager`.
  *
- * Thin handlers that don't use ctx may still declare it for documentation
- * (`async (params, _notify, _ctx) => ...`). Omitting it is safe at runtime
- * too, since JS ignores unused trailing function parameters.
+ * Thin handlers that don't use ctx or subscription may still declare them for
+ * documentation. Omitting trailing params is safe at runtime too, since JS
+ * ignores unused trailing function parameters.
  */
-export type Handler = (params: Record<string, unknown>, notify: NotifyFn, ctx: TenantContext) => Promise<unknown>;
+export type Handler = (
+  params: Record<string, unknown>,
+  notify: NotifyFn,
+  ctx: TenantContext,
+  subscription?: Subscription,
+) => Promise<unknown>;
 
 export class Router {
   private handlers = new Map<string, Handler>();
@@ -79,7 +118,12 @@ export class Router {
     this.initialized = true;
   }
 
-  async dispatch(req: JsonRpcRequest, notify?: NotifyFn, ctx?: TenantContext): Promise<JsonRpcResponse | JsonRpcError> {
+  async dispatch(
+    req: JsonRpcRequest,
+    notify?: NotifyFn,
+    ctx?: TenantContext,
+    subscription?: Subscription,
+  ): Promise<JsonRpcResponse | JsonRpcError> {
     if (this.requireInit && !this.initialized && req.method !== "initialize") {
       return createErrorResponse(req.id, ErrorCodes.NOT_INITIALIZED, "Not initialized -- call initialize first");
     }
@@ -99,7 +143,7 @@ export class Router {
       // default to a local-admin view in that case. Hosted transports
       // always pass an explicit ctx.
       const effectiveCtx: TenantContext = ctx ?? localAdminContext(null);
-      const result = await handler(params, notify ?? noop, effectiveCtx);
+      const result = await handler(params, notify ?? noop, effectiveCtx, subscription);
       return createResponse(req.id, result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
