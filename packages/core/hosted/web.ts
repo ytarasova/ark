@@ -146,9 +146,10 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   // scope so whichever path the RPC handler resolves through gets a wired
   // dispatcher.
   const registerDispatcher = (svc: typeof app.sessionService, scopeApp: typeof app) => {
-    svc.registerDefaultDispatcher((sessionId) => {
-      void scopeApp.dispatchService.dispatch(sessionId).catch((err) => {
-        logDebug("web", `dispatch ${sessionId} failed: ${err?.message ?? err}`);
+    svc.registerDefaultDispatcher((session) => {
+      if (!session) return;
+      void scopeApp.dispatchService.dispatch(session.id).catch((err) => {
+        logDebug("web", `dispatch ${session.id} failed: ${err?.message ?? err}`);
       });
     });
   };

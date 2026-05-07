@@ -55,6 +55,20 @@ export async function resolveTargetAndHandle(app: AppContext, session: Session):
 
   const persisted = readPersistedHandle(session);
   if (persisted) {
+    // Persisted handle round-trips through JSON, which strips method bindings
+    // (spawnProcess / killProcess / getMetrics / ...). Rehydrate by passing the
+    // saved meta back through `attachExistingHandle`, which re-attaches the
+    // helper methods on top of the persisted instance state. Without this,
+    // second-stage dispatch (verify, pr, ...) on the same session throws
+    // "compute kind 'X' has no spawnProcess on its handle".
+    if (target.compute.attachExistingHandle) {
+      const rehydrated = target.compute.attachExistingHandle({
+        name: persisted.name,
+        status: compute?.status ?? "running",
+        config: { ...(compute?.config ?? {}), ...((persisted.meta ?? {}) as Record<string, unknown>) },
+      });
+      if (rehydrated) return { target, handle: rehydrated };
+    }
     return { target, handle: persisted };
   }
 

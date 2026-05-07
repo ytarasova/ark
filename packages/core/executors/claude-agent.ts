@@ -159,7 +159,7 @@ export const claudeAgentExecutor: Executor = {
       ARK_SESSION_DIR: workerSessionDir,
       ARK_WORKTREE: workerWorkdir ?? session.workdir ?? session.repo ?? "",
       ARK_PROMPT_FILE: workerPromptFile,
-      ARK_ARKD_URL: "http://localhost:19300",
+      ARK_ARKD_URL: process.env.ARK_ARKD_URL ?? `http://localhost:${app.config.ports.arkd}`,
     };
     // Stage is baked in at provision time -- once the runtime is up, this
     // label is immutable and stamped onto every hook the agent emits.

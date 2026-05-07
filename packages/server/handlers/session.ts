@@ -51,13 +51,27 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       }
     }
 
+    // Synthesize session.repo from config.remoteRepo when only the URL was
+    // passed. Mirrors the CLI's `--remote-repo` handling (formerly in
+    // packages/cli/services/session-start.ts) -- moved server-side so every
+    // entry point (CLI, web New Session form, MCP, raw JSON-RPC) produces an
+    // identical DB row. Downstream readers (`create_pr`, `merge`, ...) consult
+    // `session.repo` only; without this synthesis remote-first dispatches via
+    // non-CLI callers leave the column null and the action stages bail with
+    // "Session has no repo".
+    const cfg = (opts.config ?? null) as { remoteRepo?: string } | null;
+    const startOpts: SessionStartParams =
+      cfg?.remoteRepo && !opts.repo
+        ? { ...opts, repo: cfg.remoteRepo.match(/\/([^/]+?)(?:\.git)?$/)?.[1] ?? cfg.remoteRepo }
+        : opts;
+
     // Atomic create + dispatch: splitting these across two RPCs used to force
     // every caller (CLI, web, tests) to remember the second call or live with
     // a session stuck at status=ready until the conductor's 60s poll tick.
     //
     // `start()` emits `session_created` before returning; the default
     // dispatcher listener (registered above) kicks the background launcher.
-    const session = await scoped.sessionLifecycle.start(opts, {
+    const session = await scoped.sessionLifecycle.start(startOpts, {
       onCreated: (id) => scoped.sessionService.emitSessionCreated(id),
     });
     notify("session/created", { session });

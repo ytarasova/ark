@@ -104,11 +104,11 @@ export class SessionStartService {
     }
 
     // ── --remote-repo handling ──────────────────────────────────────
+    // Pass remoteRepo through in `config`. Server-side `session/start` now
+    // synthesizes `session.repo` from the URL basename when `repo` is unset
+    // (was previously done here in the CLI; moved up so non-CLI callers --
+    // web form, MCP, raw RPC -- get the same DB row shape).
     if (opts.remoteRepo) {
-      if (!repo) {
-        const urlMatch = opts.remoteRepo.match(/\/([^/]+?)(?:\.git)?$/);
-        repo = urlMatch?.[1] ?? opts.remoteRepo;
-      }
       sessionConfig = { ...sessionConfig, remoteRepo: opts.remoteRepo };
       notes.push({ kind: "info", message: `Remote repo: ${opts.remoteRepo}` });
     }

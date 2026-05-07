@@ -126,8 +126,11 @@ export async function cloneRemoteRepoIfNeeded(
   log: (msg: string) => void,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!session.config?.remoteRepo || session.workdir) return { ok: true };
-  // Hosted dispatch defers cloning to the compute target.
-  if (deps.getApp().mode.kind === "hosted") {
+  // Hosted dispatch normally defers cloning to the compute target. Laptop-hosted
+  // mode (ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE=1) lets the conductor handle it,
+  // because the conductor and worker are the same host and LocalCompute has no
+  // prepareWorkspace impl -- without this the clone never happens.
+  if (deps.getApp().mode.kind === "hosted" && process.env.ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE !== "1") {
     log("Skipping conductor-side remote-repo clone in hosted mode (deferred to compute target)");
     return { ok: true };
   }
