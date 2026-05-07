@@ -1,0 +1,8 @@
+name: stub-runner
+description: "E2E stub runner -- subprocess executor with session context injection. Used by e2e-docs flow tests only."
+type: stub-runner
+# No model, no secrets, no MCP servers -- the stub script needs none of them.
+# The plugin executor (written to <arkDir>/plugins/executors/stub-runner.js
+# before server boot) handles ARK_SESSION_ID / ARK_STAGE injection.
+billing:
+  mode: none

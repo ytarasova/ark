@@ -1,0 +1,16 @@
+name: e2e-docs
+description: "E2E harness flow: plan -> implement -> close. Mirrors the docs flow but uses close_ticket for the final stage so no GitHub API is required."
+stages:
+  - name: plan
+    agent: stub-planner
+    gate: auto
+
+  - name: implement
+    agent: stub-implementer
+    gate: auto
+    depends_on: [plan]
+
+  - name: close
+    action: close_ticket
+    gate: auto
+    depends_on: [implement]

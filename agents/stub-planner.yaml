@@ -1,0 +1,16 @@
+name: stub-planner
+description: "E2E stub agent for the plan stage. Used by e2e-docs flow tests only."
+runtime: stub-runner
+# No model, system_prompt, or tools needed -- the stub-runner executor
+# runs e2e/fixtures/stub-agent.sh which posts a canned CompletionReport
+# directly to the conductor's channel HTTP endpoint.
+model: stub
+max_turns: 1
+system_prompt: "stub"
+tools: []
+mcp_servers: []
+skills: []
+memories: []
+context: []
+permission_mode: bypassPermissions
+env: {}
