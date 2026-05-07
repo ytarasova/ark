@@ -11,6 +11,9 @@ import {
 import { ArkdClient } from "../arkd/client/index.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
 import { handleMcpRequest } from "./mcp/index.js";
+import { proxyToRouter } from "./mounts/llm-proxy.js";
+import { handlePRMergeWebhook } from "./mounts/pr-merge-webhook.js";
+import { handleHookStatus } from "./mounts/hooks.js";
 
 export interface ServerConnection {
   id: string;
@@ -355,11 +358,36 @@ export class ArkServer {
           });
         }
 
-        const data: RpcData = { kind: "rpc", authorizationHeader, queryToken };
-        if (server.upgrade(req, { data })) return;
+        // ── External REST surfaces (must run before WS upgrade) ──────────
+        // These routes are preserved for external callers that speak plain
+        // HTTP: OpenAI-compat clients (/v1/*), GitHub webhooks (/hooks/*),
+        // and liveness probes (/health). They were previously served by the
+        // old conductor port (19100); now they live here on the merged port.
+
         if (url.pathname === "/health") {
           return Response.json({ status: "ok", pid: process.pid, uptime: process.uptime() });
         }
+
+        if (url.pathname === "/v1/chat/completions" || url.pathname === "/v1/models") {
+          const routerApp = self.app ?? app;
+          if (!routerApp) return Response.json({ error: "LLM proxy requires AppContext" }, { status: 503 });
+          return proxyToRouter(routerApp, req, url.pathname);
+        }
+
+        if (url.pathname === "/hooks/status") {
+          const hooksApp = self.app ?? app;
+          if (!hooksApp) return Response.json({ error: "hooks route requires AppContext" }, { status: 503 });
+          return handleHookStatus(hooksApp, req, url);
+        }
+
+        if (url.pathname === "/hooks/github/merge") {
+          const webhookApp = self.app ?? app;
+          if (!webhookApp) return Response.json({ error: "webhook route requires AppContext" }, { status: 503 });
+          return handlePRMergeWebhook(webhookApp, req);
+        }
+
+        const data: RpcData = { kind: "rpc", authorizationHeader, queryToken };
+        if (server.upgrade(req, { data })) return;
         // Friendly landing page for /. Other unknown paths get a JSON 404
         // so any future SDK probe that JSON.parses the response doesn't
         // explode on plain text. See #421.
