@@ -13,8 +13,7 @@ export const DEFAULT_CONDUCTOR_HOST = process.env.ARK_CONDUCTOR_HOST || "0.0.0.0
 export const DEFAULT_CONDUCTOR_PORT = parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19400", 10);
 
 /** Default conductor URL (env: ARK_CONDUCTOR_URL) -- derives from DEFAULT_CONDUCTOR_PORT */
-export const DEFAULT_CONDUCTOR_URL =
-  process.env.ARK_CONDUCTOR_URL || `http://localhost:${DEFAULT_CONDUCTOR_PORT}`;
+export const DEFAULT_CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL || `http://localhost:${DEFAULT_CONDUCTOR_PORT}`;
 
 /** Default arkd URL (env: ARK_ARKD_URL) */
 export const DEFAULT_ARKD_URL = process.env.ARK_ARKD_URL || "http://localhost:19300";

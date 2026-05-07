@@ -59,6 +59,9 @@ import { registerWorkerHandlers } from "./handlers/worker.js";
 import { registerChannelHandlers } from "./handlers/channel.js";
 import { registerHookHandlers } from "./handlers/hook.js";
 // --- END task-B4-B6 ---
+// --- BEGIN task-B9: terminal/subscribe, terminal/input ---
+import { registerTerminalHandlers } from "./handlers/terminal.js";
+// --- END task-B9 ---
 
 /**
  * Register every shared handler, then conditionally mount local-only handlers
@@ -129,6 +132,10 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerChannelHandlers(router, app);
   registerHookHandlers(router, app);
   // --- END task-B4-B6 ---
+
+  // --- BEGIN task-B9: terminal/subscribe, terminal/input ---
+  registerTerminalHandlers(router, app);
+  // --- END task-B9 ---
 }
 
 /**

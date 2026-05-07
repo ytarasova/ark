@@ -101,11 +101,7 @@ export async function controlPlaneDefaults(): Promise<ProfileDefaults> {
  * collide. Dirs live under `os.tmpdir()` namespaced by PID.
  */
 export async function testDefaults(): Promise<ProfileDefaults> {
-  const [conductor, arkd, web] = await Promise.all([
-    allocatePort(),
-    allocatePort(),
-    allocatePort(),
-  ]);
+  const [conductor, arkd, web] = await Promise.all([allocatePort(), allocatePort(), allocatePort()]);
   const channelsBase = await allocateBasePort(1000);
   const arkDir = mkdtempSync(join(tmpdir(), `ark-test-${process.pid}-`));
 

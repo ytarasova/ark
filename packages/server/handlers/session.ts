@@ -1,4 +1,4 @@
-import { promises as fsPromises } from "fs";
+import { promises as fsPromises, watch as fsWatch } from "fs";
 import { join } from "path";
 import { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
@@ -789,5 +789,111 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     });
 
     return { tree: initialRoot };
+  });
+
+  // ── log/subscribe -- tail a forensic log file with live push ──────────────
+  //
+  // Returns the current file contents as `initial` (empty string when file
+  // doesn't exist yet). Subsequent appends arrive as `log/chunk` notifications
+  // with base64-encoded bytes.
+  //
+  // Implementation: `fs.watch` on the file (or its parent directory when the
+  // file doesn't exist yet). On each "change" event we read from the last known
+  // byte offset to end-of-file and push the diff as a base64 chunk.
+  //
+  // Cleanup via `subscription.onClose()` so the watcher is torn down when the
+  // WS connection closes.
+
+  router.handle("log/subscribe", async (params, notify, ctx, subscription) => {
+    const { sessionId, file } = extract<{ sessionId: string; file: "stdio" | "transcript" }>(params, [
+      "sessionId",
+      "file",
+    ]);
+    if (file !== "stdio" && file !== "transcript") {
+      throw new RpcError(`file must be "stdio" or "transcript", got "${file}"`, ErrorCodes.INVALID_PARAMS);
+    }
+    const scoped = resolveTenantApp(app, ctx);
+    const session = await scoped.sessions.get(sessionId);
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+
+    const fileName = file === "stdio" ? "stdio.log" : "transcript.jsonl";
+    const filePath = join(scoped.config.dirs.tracks, sessionId, fileName);
+
+    // Read current contents up to the 2MB cap.
+    const { readForensicFile } = await import("../../core/services/session-forensic.js");
+    const initial = await readForensicFile(scoped.config.dirs.tracks, sessionId, fileName);
+
+    // Track the byte offset after the initial read so we only push new bytes.
+    let offset = initial.exists ? initial.size : 0;
+    let watcherClosed = false;
+
+    // Callback: read from `offset` to EOF, push any new bytes as a base64 chunk.
+    const pushNewBytes = async (): Promise<void> => {
+      if (watcherClosed) return;
+      let stat: { size: number };
+      try {
+        stat = await fsPromises.stat(filePath);
+      } catch {
+        return; // file disappeared -- ignore
+      }
+      if (stat.size <= offset) return; // no new data
+      const len = stat.size - offset;
+      const buf = Buffer.alloc(len);
+      let fh: import("fs").promises.FileHandle | null = null;
+      try {
+        fh = await fsPromises.open(filePath, "r");
+        await fh.read(buf, 0, len, offset);
+        offset = stat.size;
+        notify("log/chunk", {
+          sessionId,
+          file,
+          bytes: buf.toString("base64"),
+        });
+      } catch {
+        // Ignore transient read errors (file being rotated, etc.)
+      } finally {
+        await fh?.close().catch(() => {});
+      }
+    };
+
+    // Use fs.watch on the file path. When the file doesn't exist yet, watch
+    // the parent directory and filter to the target filename.
+    let watcher: ReturnType<typeof fsWatch> | null = null;
+    try {
+      // Ensure the session directory exists so we can watch it even when the
+      // file hasn't been written yet.
+      const sessionDir = join(scoped.config.dirs.tracks, sessionId);
+      await fsPromises.mkdir(sessionDir, { recursive: true });
+
+      // Watch the file directly if it exists, otherwise watch the parent dir.
+      const watchTarget = initial.exists ? filePath : join(scoped.config.dirs.tracks, sessionId);
+      watcher = fsWatch(watchTarget, { persistent: false }, (event, watchedName) => {
+        if (watcherClosed) return;
+        // When watching a directory, filter to our target filename.
+        if (watchedName && watchedName !== fileName && watchedName !== null) return;
+        void pushNewBytes();
+      });
+      watcher.on("error", () => {
+        // Watcher errors (ENOENT on deletion, EMFILE, etc.) are non-fatal.
+      });
+    } catch {
+      // fs.watch may fail on some platforms (e.g., no inotify slots). We still
+      // return the initial content -- new bytes just won't be pushed.
+    }
+
+    subscription?.onClose(() => {
+      watcherClosed = true;
+      try {
+        watcher?.close();
+      } catch {
+        /* ignore */
+      }
+    });
+
+    return {
+      initial: initial.content,
+      size: initial.size,
+      exists: initial.exists,
+    };
   });
 }
