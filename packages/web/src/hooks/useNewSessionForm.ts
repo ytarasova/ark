@@ -107,7 +107,9 @@ export function useNewSessionForm({
   const showTicket =
     !!currentFlow &&
     ((currentFlow.description || "").toLowerCase().includes("ticket") ||
-      (currentFlow.stages || []).some((s) => s.toLowerCase().includes("ticket")));
+      (currentFlow.stages || []).some((s) =>
+        (typeof s === "string" ? s : (s.name ?? "")).toLowerCase().includes("ticket"),
+      ));
 
   const submit = handleSubmit(onSubmit);
 

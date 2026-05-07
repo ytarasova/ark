@@ -33,6 +33,8 @@ import * as m014 from "./014_workspaces.js";
 // Migration 015: drop legacy `provider` columns from compute + compute_templates;
 // firecracker data fixup. See docs/superpowers/plans/2026-05-05-compute-cleanup.md.
 import * as m015 from "./015_drop_legacy_provider_columns.js";
+// Migration 016: add pty_cols / pty_rows to sessions (postgres schema parity).
+import * as m016 from "./016_pty_cols.js";
 
 export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m001.VERSION, name: m001.NAME, up: m001.up },
@@ -54,4 +56,5 @@ export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m013.VERSION, name: m013.NAME, up: m013.up },
   { version: m014.VERSION, name: m014.NAME, up: m014.up },
   { version: m015.VERSION, name: m015.NAME, up: m015.up },
+  { version: m016.VERSION, name: m016.NAME, up: m016.up },
 ];

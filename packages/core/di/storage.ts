@@ -45,12 +45,18 @@ export function registerStorage(container: AppContainer): void {
           });
         }
         // Hosted mode rejects the local fallback: the conductor pod's
-        // ephemeral disk is not a valid place for tenant blobs.
-        if (c.mode.kind === "hosted") {
+        // ephemeral disk is not a valid place for tenant blobs. The
+        // ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE escape hatch keeps the
+        // laptop dev loop usable (`make dev-stack` + the control-plane
+        // profile) without standing up MinIO. NEVER set this in
+        // production -- the loss-of-tenant-isolation bullet in the
+        // throw above is real.
+        if (c.mode.kind === "hosted" && process.env.ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE !== "1") {
           throw new Error(
             "storage.blobBackend must be 's3' in hosted mode -- LocalDiskBlobStore is " +
               "pod-ephemeral and not tenant-isolated. Set storage.blobBackend=s3 + " +
-              "storage.s3.{bucket,region} (or ARK_BLOB_BACKEND=s3 + ARK_S3_BUCKET + ARK_S3_REGION).",
+              "storage.s3.{bucket,region} (or ARK_BLOB_BACKEND=s3 + ARK_S3_BUCKET + ARK_S3_REGION). " +
+              "For laptop dev, set ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE=1 (NOT for prod).",
           );
         }
         // Local disk: single tree under arkDir/blobs, tenant id = first path segment.

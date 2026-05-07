@@ -1,0 +1,7 @@
+-- Bootstrap DDL for the dev-stack smoke test.
+--
+-- All schema workarounds previously tracked here have been resolved:
+--   * knowledge tables (section 5.1): moot -- knowledge table removed from product (migration 013 no-op)
+--   * pty_cols / pty_rows (section 5.2): fixed in schema-postgres.ts + migration 015
+--
+-- Idempotent. Safe to re-run after `docker compose down -v`.

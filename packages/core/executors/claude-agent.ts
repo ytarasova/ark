@@ -42,7 +42,14 @@ export function buildAgentSdkRuntimeEnv(runtimeDef: unknown): Record<string, str
   const compat = Array.isArray(def?.compat)
     ? (def.compat as unknown[]).filter((c): c is string => typeof c === "string" && c.length > 0)
     : [];
-  if (compat.length > 0) env.ARK_COMPAT = compat.join(",");
+  // Dev escape hatch: when ARK_DEV_FORCE_DIRECT=1 is set in the operator's
+  // environment, skip propagating the runtime's `compat: ["bedrock"]` flag
+  // to the launcher. This routes the agent to direct Anthropic API instead
+  // of the TrueFoundry/Bedrock proxy. NEVER set this in real deployments --
+  // production wants centralized routing for cost / auth / audit control.
+  if (compat.length > 0 && process.env.ARK_DEV_FORCE_DIRECT !== "1") {
+    env.ARK_COMPAT = compat.join(",");
+  }
 
   const haiku = def?.runtime_config?.["claude-agent"]?.default_haiku_model;
   if (typeof haiku === "string" && haiku.length > 0) {
@@ -62,14 +69,15 @@ export const claudeAgentExecutor: Executor = {
       return { ok: false, handle: "", message: `Session ${opts.sessionId} not found` };
     }
 
-    if (app.mode.kind === "hosted") {
+    if (app.mode.kind === "hosted" && process.env.ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE !== "1") {
       return {
         ok: false,
         handle: "",
         message:
           "claude-agent executor is local-mode only -- per-session state writes to the conductor's " +
           "tracks dir which lives on the pod's ephemeral disk in hosted mode. Use claude-code on a " +
-          "real compute target for hosted deployments.",
+          "real compute target for hosted deployments. " +
+          "For laptop dev (docker-compose), set ARK_DEV_ALLOW_LOCAL_HOSTED_STORAGE=1.",
       };
     }
 
@@ -169,6 +177,15 @@ export const claudeAgentExecutor: Executor = {
 
     const runtimeDef = await app.runtimes?.get?.("claude-agent");
     Object.assign(arkEnv, buildAgentSdkRuntimeEnv(runtimeDef));
+
+    // Propagate the dev-direct escape hatch into the launcher's child env so
+    // launch.ts's hard ANTHROPIC_API_KEY check can fall through to the bundled
+    // claude binary's native auth (~/.claude/credentials.json on linux,
+    // macOS keychain on darwin) when no API key is configured. Pairs with the
+    // matching gates in resolve-stage.ts and Model.transportKey.
+    if (process.env.ARK_DEV_FORCE_DIRECT === "1") {
+      arkEnv.ARK_DEV_FORCE_DIRECT = "1";
+    }
 
     // Secrets (ANTHROPIC_API_KEY etc.) take precedence -- last-write-wins.
     const secretEnv = opts.env ?? {};

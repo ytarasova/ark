@@ -1,0 +1,60 @@
+# Local Postgres + Redis for Ark control-plane mode dev.
+#
+# Brings up:
+#   - ark-postgres : Postgres 16 on :15433, db `ark`, user/pass `ark`/`ark`.
+#                    (Non-default host port so it can't clash with a host-side
+#                    Postgres or an RDS SSH tunnel that already grabbed :5432.)
+#   - ark-redis    : Redis 7 on :6379, no auth.
+#
+# Both are intentionally distinct from the Temporal stack
+# (`docker-compose.temporal.yaml`) so the two compose projects can run
+# side-by-side without volume / port conflicts.
+#
+# Usage:
+#   make dev-stack         # bring up + wait for health
+#   make dev-stack-down    # stop + remove volumes
+#
+# Wire Ark to this stack by sourcing `.env.control-plane` (or copying it
+# to `.env`) before `bun packages/cli/index.ts server start --hosted`.
+
+name: ark-dev
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ark-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ark
+      POSTGRES_PASSWORD: ark
+      POSTGRES_DB: ark
+    ports:
+      - "15433:5432"
+    volumes:
+      - ark-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ark -d ark"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: ark-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - ark-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  ark-postgres-data:
+    name: ark-dev-postgres-data
+  ark-redis-data:
+    name: ark-dev-redis-data

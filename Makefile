@@ -11,7 +11,7 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down claude-tfy web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down dev-control-plane dev-control-plane-down claude-tfy web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
         docs-cli \
@@ -36,7 +36,7 @@ CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|dev-stack|dev-stack-down|dev-control-plane|dev-control-plane-down|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -113,6 +113,39 @@ dev-temporal: ## Start local Temporal cluster (server :7233 + UI :8088) for Phas
 dev-temporal-down: ## Stop and remove the local Temporal cluster + its data volume
 	docker compose -f .infra/docker-compose.temporal.yaml -p ark-temporal down -v
 	@echo "Ark local Temporal cluster stopped."
+
+# Pick whichever docker compose CLI is on PATH. Modern installs ship the
+# plugin (`docker compose`); older engines + the standalone v2 release
+# ship as `docker-compose`. Some laptop setups have only one of the two.
+DOCKER_COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
+
+dev-stack: build-web ## Start local Ark dev stack (Postgres :15433 + Redis :6379), build web bundle, and apply bootstrap SQL
+	@command -v docker >/dev/null 2>&1 || { echo "Docker required. Install Docker Desktop."; exit 1; }
+	@echo "\033[1mStarting Ark dev stack (Postgres + Redis)...\033[0m"
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.dev.yaml -p ark-dev up -d --wait
+	@echo "\033[1mApplying bootstrap SQL...\033[0m"
+	docker exec -i ark-postgres psql -U ark -d ark < .infra/dev-stack-bootstrap.sql
+	@echo ""
+	@echo "  Postgres:  postgres://ark:ark@localhost:15433/ark"
+	@echo "  Redis:     redis://localhost:6379"
+	@echo ""
+	@echo "  Next: source .env.control-plane && bun packages/cli/index.ts server start --hosted"
+
+dev-stack-down: ## Stop and remove the local Ark dev stack + its data volumes
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.dev.yaml -p ark-dev down -v
+	@echo "Ark local dev stack stopped."
+
+dev-control-plane: dev-stack ## Boot Ark in control-plane (hosted) mode against local Postgres + Redis
+	@test -f .env.control-plane || { echo ".env.control-plane missing -- copy from repo"; exit 1; }
+	@echo "\033[1mStarting Ark control-plane (hosted)...\033[0m"
+	@set -a && . ./.env.control-plane && set +a && \
+	  echo "  ARK_PROFILE=$$ARK_PROFILE  WEB=:$$ARK_WEB_PORT  DB=$$DATABASE_URL" && \
+	  exec $(BUN) packages/cli/index.ts server start --hosted --port $$ARK_WEB_PORT
+
+dev-control-plane-down: ## Stop the running hosted server (port from .env.control-plane)
+	@set -a && . ./.env.control-plane && set +a && \
+	  pid=$$(lsof -nP -iTCP:$$ARK_WEB_PORT -sTCP:LISTEN -t 2>/dev/null | head -1); \
+	  if [ -n "$$pid" ]; then echo "Killing hosted server PID $$pid on :$$ARK_WEB_PORT"; kill $$pid; else echo "No hosted server listening on :$$ARK_WEB_PORT"; fi
 
 spike-temporal-bun: ## Run the Phase 0 Bun / Temporal worker compat spike
 	@./scripts/spike-temporal-bun.sh
