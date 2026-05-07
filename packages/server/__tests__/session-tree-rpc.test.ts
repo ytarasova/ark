@@ -3,7 +3,7 @@ import { AppContext } from "../../core/app.js";
 import { registerSessionHandlers } from "../handlers/session.js";
 import { Router } from "../router.js";
 import { createRequest, type JsonRpcResponse } from "../../protocol/types.js";
-import { startConductor, type ConductorHandle } from "../../core/conductor/server/conductor.js";
+import { startConductor, type ConductorHandle } from "../../core/__tests__/_util/start-test-server.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import { eventBus } from "../../core/hooks.js";
 

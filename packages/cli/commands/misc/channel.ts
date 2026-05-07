@@ -6,6 +6,6 @@ export function registerChannelCommand(program: Command): void {
     .command("channel")
     .description("Run the MCP channel server (used by remote agents)")
     .action(async () => {
-      await import("../../../core/conductor/client/channel.js");
+      await import("../../../core/services/channel/channel-server.js");
     });
 }

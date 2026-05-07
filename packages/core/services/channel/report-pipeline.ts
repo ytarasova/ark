@@ -1,7 +1,7 @@
 /**
  * Channel-report processing pipeline.
  *
- * The `/api/channel/:sessionId` route and the `/hooks/status` non-hook
+ * The `channel/deliver` JSON-RPC handler and the `/hooks/status` non-hook
  * passthrough both feed reports through `handleReport`. This module owns
  * that pipeline: log events, persist messages, emit bus events, apply
  * store updates, run stage handoff, and trigger completion side-effects
@@ -9,13 +9,13 @@
  */
 
 import type { AppContext } from "../../app.js";
-import { createWorktreePR } from "../../services/worktree/index.js";
+import { createWorktreePR } from "../worktree/index.js";
 import { eventBus } from "../../hooks.js";
-import type { OutboundMessage } from "../common/channel-types.js";
+import type { OutboundMessage } from "./channel-types.js";
 import { safeAsync } from "../../safe.js";
 import { logDebug, logError, logInfo, logWarn } from "../../observability/structured-log.js";
 import { sendOSNotification } from "../../notify.js";
-import { markDispatchFailedShared } from "../../services/session-dispatch-listeners.js";
+import { markDispatchFailedShared } from "../session-dispatch-listeners.js";
 
 export async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
   const result = await app.sessionHooks.applyReport(sessionId, report);

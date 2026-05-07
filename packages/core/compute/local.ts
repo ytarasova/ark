@@ -106,7 +106,7 @@ export class LocalCompute implements Compute {
     // every UI feature that depends on the event stream. Idempotent:
     // startArkdEventsConsumer is a no-op for an already-attached compute.
     const arkdUrl = this.getArkdUrl(h);
-    const { startArkdEventsConsumer } = await import("../conductor/server/arkd-events-consumer.js");
+    const { startArkdEventsConsumer } = await import("../services/channel/arkd-events-consumer.js");
     startArkdEventsConsumer(this.app, h.name, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
   }
 

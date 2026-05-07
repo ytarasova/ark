@@ -15,7 +15,7 @@ import type {
   InboundMessage,
   OutboundMessage,
   ChannelMessage,
-} from "../conductor/common/channel-types.js";
+} from "../services/channel/channel-types.js";
 
 describe("channel-types", () => {
   // ── Inbound messages (Conductor -> Agent) ──────────────────────────────

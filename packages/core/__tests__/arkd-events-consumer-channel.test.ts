@@ -26,7 +26,7 @@ import {
   startArkdEventsConsumer,
   stopArkdEventsConsumer,
   _resetArkdEventsConsumers,
-} from "../conductor/server/arkd-events-consumer.js";
+} from "../services/channel/arkd-events-consumer.js";
 import { allocatePort } from "../config/port-allocator.js";
 import { SUBSCRIBED_ACK } from "../../arkd/common/index.js";
 

@@ -30,10 +30,10 @@
 
 import type { Session } from "../../../types/index.js";
 import type { AppContext } from "../../app.js";
-import { handleHookStatus } from "./hook-status-handler.js";
+import { processHookPayload } from "./hook-status.js";
 import { handleReport } from "./report-pipeline.js";
-import type { OutboundMessage } from "../common/channel-types.js";
-import { deliverToChannel } from "./deliver-to-channel.js";
+import type { OutboundMessage } from "./channel-types.js";
+import { deliverToChannel } from "./deliver.js";
 import { logDebug, logInfo, logWarn } from "../../observability/structured-log.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
 
@@ -225,25 +225,21 @@ async function dispatchFrame(app: AppContext, line: string): Promise<void> {
     return;
   }
   if (frame.kind === "hook") {
-    // Build a synthetic Request that matches the shape `handleHookStatus`
-    // expects on the live `/hooks/status` HTTP endpoint, then dispatch.
-    // The handler reads:
-    //   - URL search params (we re-attach the original query string)
-    //   - req.json() for the payload (we serialise the parsed body back)
-    //   - tenant from `appForRequest(app, req)` -- single-tenant default
-    //     mode resolves to the localAdminContext, which is what the old
-    //     `-R` path also used for hook callbacks.
+    // Build a synthetic Request/URL that the handler can read session + payload from.
     const url = new URL(`http://internal/hooks/status${frame.query ? "?" + frame.query : ""}`);
-    const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(frame.body),
-    });
+    const sessionId = url.searchParams.get("session");
+    if (!sessionId) {
+      logWarn("conductor", `arkd-events: hook frame missing session param`);
+      return;
+    }
     try {
-      const resp = await handleHookStatus(app, req, url);
-      if (!resp.ok) {
-        logDebug("conductor", `arkd-events: hook handler returned ${resp.status} for session=${frame.session}`);
+      const s = await app.sessions.get(sessionId);
+      if (!s) {
+        logDebug("conductor", `arkd-events: hook handler session not found session=${sessionId}`);
+        return;
       }
+      const payload = frame.body as Record<string, unknown>;
+      await processHookPayload(app, sessionId, s, payload);
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message ?? String(err);
       logWarn("conductor", `arkd-events: hook dispatch threw: ${msg}`);

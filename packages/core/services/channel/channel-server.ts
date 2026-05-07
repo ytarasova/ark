@@ -15,7 +15,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { OutboundMessage } from "../common/channel-types.js";
+import type { OutboundMessage } from "./channel-types.js";
 import { DEFAULT_ARKD_URL } from "../../constants.js";
 import { logDebug } from "../../observability/structured-log.js";
 

@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { startConductor } from "../conductor/server/conductor.js";
+import { startConductor } from "./_util/start-test-server.js";
 import { allocatePort } from "../config/port-allocator.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";

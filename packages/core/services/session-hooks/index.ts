@@ -5,7 +5,7 @@
  */
 
 import type { Session } from "../../../types/index.js";
-import type { OutboundMessage } from "../../conductor/common/channel-types.js";
+import type { OutboundMessage } from "../channel/channel-types.js";
 import { HookStatusApplier } from "./hook-status.js";
 import { ReportApplier } from "./report.js";
 import { HandoffMediator } from "./handoff.js";
