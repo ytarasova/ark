@@ -490,7 +490,63 @@ export async function createWorktreePR(
       // Strip the embedded token from the error text before surfacing.
       let reason = e?.stderr || e?.message || String(e);
       if (githubToken) reason = reason.replaceAll(githubToken, "***");
-      return { ok: false, message: `git push failed: ${reason}` };
+
+      // Recoverable: the remote already has commits on this branch from a
+      // prior session/agent that diverge from ours. The whole flow just ran
+      // 6+ stages of real work; failing the PR action over a branch-name
+      // collision throws all that away. Auto-rename the branch to a
+      // session-unique name and retry the push exactly once. Emits a clear
+      // event so the operator can see the rename happened.
+      //
+      // Skipped when:
+      //   - the branch is already session-owned (`ark-s-<sid>`) -- it can
+      //     only collide with itself, which means the agent self-pushed
+      //     mid-flow and the original `--force` push already handled that.
+      //   - the branch already carries our session-suffix from an earlier
+      //     rename in this same session (avoid runaway suffix stacking).
+      const sessionSuffix = `-s-${sessionId.slice(0, 8)}`;
+      const isAlreadyRenamed = branch.endsWith(sessionSuffix);
+      const looksLikeNonFastForward = /non-fast-forward|\[rejected\]|failed to push some refs/i.test(reason);
+      if (looksLikeNonFastForward && !isSessionOwnedBranch && !isAlreadyRenamed) {
+        const originalBranch = branch;
+        const renamedBranch = `${originalBranch}${sessionSuffix}`;
+        try {
+          // Rename the local branch so HEAD now points at the unique name.
+          await runGit(app, session, ["branch", "-m", originalBranch, renamedBranch], {
+            timeout: 15_000,
+            localCwd: routing.remote ? undefined : localPushDir,
+          });
+          const retryArgs = ["push", "-u", "origin", renamedBranch];
+          const r = await runGit(app, session, retryArgs, {
+            timeout: 60_000,
+            localCwd: routing.remote ? undefined : localPushDir,
+          });
+          pushStdout = r.stdout;
+          pushStderr = r.stderr;
+          // Persist the rename so the PR-create step + every downstream
+          // observer (status poller, web UI, retry path) sees the right ref.
+          await app.sessions.update(sessionId, { branch: renamedBranch });
+          (session as { branch: string | null }).branch = renamedBranch;
+          branch = renamedBranch;
+          await app.events.log(sessionId, "branch_renamed_on_conflict", {
+            actor: "system",
+            data: { from: originalBranch, to: renamedBranch, reason: "non-fast-forward push rejected" },
+          });
+          logInfo(
+            "session",
+            `createWorktreePR: renamed ${sessionId} branch ${originalBranch} -> ${renamedBranch} on push conflict`,
+          );
+        } catch (retryErr: any) {
+          let retryReason = retryErr?.stderr || retryErr?.message || String(retryErr);
+          if (githubToken) retryReason = retryReason.replaceAll(githubToken, "***");
+          return {
+            ok: false,
+            message: `git push failed (also failed retry on session-suffixed branch): ${reason} | retry: ${retryReason}`,
+          };
+        }
+      } else {
+        return { ok: false, message: `git push failed: ${reason}` };
+      }
     } finally {
       // Always restore the original origin URL so the token doesn't
       // persist in the worker's git config. Best-effort: a failure
