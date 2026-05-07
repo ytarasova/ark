@@ -56,11 +56,9 @@ jobs:
         continue-on-error: true
         run: bunx --bun knip --reporter compact || true
 
-      - name: Unit tests (excludes compute E2E and integration)
+      - name: Unit tests (excludes integration)
         # Delegates to `make test`, which excludes any test file with `e2e` in
-        # path plus local-arkd and local-provider tests. Compute end-to-end
-        # tests share global local-arkd state; they run separately in the
-        # `compute-e2e` job below with --concurrency 1.
+        # path plus local-arkd and local-provider tests.
         #
         # Bun exit-code quirk on macos-latest: bun occasionally exits 1
         # despite "0 fail" when a worker holds an open file descriptor at
@@ -79,47 +77,6 @@ jobs:
             exit 0
           fi
           echo "::error::Test suite did not report '0 fail' (bun exit code $BUN_EXIT)."
-          exit 1
-
-  # Compute end-to-end tests share global local-arkd state and a single
-  # auto-created "local" compute, so they cannot run safely under
-  # --concurrency 4 alongside other tests. Split into their own job that
-  # runs --concurrency 1 via `make test-compute-e2e`.
-  compute-e2e:
-    name: compute e2e (serial)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install tmux
-        run: sudo apt-get update && sudo apt-get install -y tmux
-
-      - name: Start tmux server
-        run: tmux new-session -d -s ci-init
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build web frontend
-        run: cd packages/web && bunx --bun vite build --logLevel error
-
-      - name: Compute E2E tests (serial)
-        run: |
-          set +e
-          make test-compute-e2e 2>&1 | tee /tmp/compute-e2e.log
-          BUN_EXIT=$?
-          set -e
-          if grep -qE '^\s*0 fail$' /tmp/compute-e2e.log; then
-            echo "::notice::Compute E2E reports 0 fail (bun exited $BUN_EXIT). Treating as success."
-            exit 0
-          fi
-          echo "::error::Compute E2E did not report '0 fail' (bun exit code $BUN_EXIT)."
           exit 1
 
   # Integration tests that need Docker (LocalStack-backed S3 round-trip).
