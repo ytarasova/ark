@@ -200,6 +200,25 @@ test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.te
 
 test-e2e: test-web-e2e ## Run all end-to-end tests (web Playwright)
 
+# Control-plane e2e: real `ark server start --hosted` against an isolated
+# Docker compose stack (Postgres :15434 + Redis :6380). Distinct from the
+# dev stack so this can run alongside `make dev-stack`.
+#
+# CI must have docker + (for Phase 2) tmux on PATH. The test boots the
+# stack, spawns the real server binary, and exercises the dispatch chain
+# via /api/rpc -- never imports AppContext directly.
+test-e2e-control-plane: ## Run control-plane e2e against isolated Postgres+Redis
+	@command -v docker >/dev/null 2>&1 || { echo "Docker required for control-plane e2e."; exit 1; }
+	@command -v tmux >/dev/null 2>&1 || { echo "tmux required for control-plane e2e (brew install tmux / apt-get install tmux)."; exit 1; }
+	@echo "\033[1mRunning control-plane e2e (Postgres :15434 + Redis :6380)...\033[0m"
+	$(BUN) test e2e/control-plane.test.ts
+
+test-e2e-control-plane-up: ## Bring up the e2e Docker stack only (debug aid)
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.e2e.yaml -p ark-e2e up -d --wait
+
+test-e2e-control-plane-down: ## Tear down the e2e Docker stack and volumes
+	$(DOCKER_COMPOSE) -f .infra/docker-compose.e2e.yaml -p ark-e2e down -v
+
 test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web dashboard)
 	@# `bunx --bun playwright test` runs Playwright under Bun, which is
 	@# required: fixtures/web-server.ts uses Bun APIs (`import { spawn }
