@@ -1,7 +1,7 @@
 # Ark Architecture Reference
 
 > Canonical technical reference for the Ark codebase. Terse, factual, no tutorials.
-> Last updated: 2026-04-10
+> Last updated: 2026-05-07
 
 ## Table of Contents
 
@@ -532,6 +532,8 @@ See [Section 7](#7-channels----agent-communication). ArkD is the hop between the
 ## 5. Conductor (Control Plane HTTP Server)
 
 The HTTP surface of the control plane. Lives in `packages/core/conductor.ts` (with helpers under `packages/core/conductor/`).
+
+As of PR #530 (May 2026), the conductor and Ark server share a single listener on `:19400`; the standalone `:19100` HTTP server is retired and references to `:19100` elsewhere in this section are historical.
 
 - **Port:** `19100` (hardcoded -- referenced in `conductor.ts`, `channel.ts`, tests, and `constants.ts`)
 - **Started by:** the server daemon (`ark server daemon start`, for local mode) and hosted mode entry (`hosted.ts`)
