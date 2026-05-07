@@ -37,6 +37,8 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
       tenant_id TEXT NOT NULL DEFAULT 'default',
       workspace_id TEXT,
       orchestrator TEXT NOT NULL DEFAULT 'custom',
+      workflow_id TEXT,
+      workflow_run_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

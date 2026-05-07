@@ -140,18 +140,21 @@ export interface Session {
   workspace_id: string | null;
   /**
    * Orchestrator that drives this session's state machine. `"custom"` is the
-   * in-tree engine under `packages/core/services/flow.ts`. A Temporal-backed
-   * alternative is in design (#374) and will ship as a second enum value;
-   * the column exists today so that the eventual cutover doesn't need a
-   * simultaneous schema change.
+   * in-tree engine under `packages/core/services/flow.ts`. `"temporal"` routes
+   * through a Temporal workflow (see packages/core/temporal/).
    */
   orchestrator: SessionOrchestrator;
+  /**
+   * Temporal workflow ID for sessions managed by the Temporal orchestrator.
+   * Format: `session-<sessionId>`. Null for sessions using the custom engine.
+   */
+  workflow_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/** Enum of supported orchestrators. Only `custom` is implemented today. */
-export type SessionOrchestrator = "custom";
+/** Enum of supported orchestrators. `custom` is the in-tree engine; `temporal` routes through a Temporal workflow. */
+export type SessionOrchestrator = "custom" | "temporal";
 
 export interface SessionInputs {
   /** Role-keyed absolute paths to files the session should consume. */
@@ -274,6 +277,13 @@ export interface CreateSessionOpts {
    * at the service boundary (RF-5) so Temporal can serialize activity inputs.
    */
   attachments?: Array<{ name: string; content?: string; type: string; locator?: string }>;
+  /**
+   * Orchestrator override. Defaults to `"custom"` (in-tree engine). Pass
+   * `"temporal"` when creating a session that will be driven by Temporal.
+   * Injected by `SessionService.start()` when `features.temporalOrchestration`
+   * is enabled -- callers outside the service layer should leave this unset.
+   */
+  orchestrator?: SessionOrchestrator;
 }
 
 export interface SessionListFilters {

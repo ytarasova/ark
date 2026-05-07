@@ -73,9 +73,14 @@ export class SessionService {
     // non-null compute_name (the compute panel filter relies on this).
     // Tests that need the legacy NULL behaviour go through
     // `app.sessions.create()` directly. See #472.
+    const app = this._app;
+    const usesTemporal =
+      app !== null && app.mode.kind === "hosted" && app.config.features.temporalOrchestration === true;
+
     const session = await this.sessions.create({
       ...opts,
       compute_name: opts.compute_name ?? "local",
+      orchestrator: usesTemporal ? "temporal" : "custom",
     });
 
     // Apply agent override if specified
@@ -92,6 +97,24 @@ export class SessionService {
         agent: opts.agent ?? null,
       },
     });
+
+    if (usesTemporal) {
+      const { getTemporalClient } = await import("../temporal/client.js");
+      const client = await getTemporalClient(app.config.temporal);
+      const wfId = `session-${session.id}`;
+      await client.workflow.start("sessionWorkflow", {
+        taskQueue: `ark.${app.tenantId ?? "default"}.stages`,
+        workflowId: wfId,
+        args: [
+          {
+            sessionId: session.id,
+            tenantId: app.tenantId ?? "default",
+            flowName: (opts as any).flow ?? "default",
+          },
+        ],
+      });
+      await this.sessions.update(session.id, { workflow_id: wfId } as Partial<Session>);
+    }
 
     return (await this.sessions.get(session.id))!;
   }
