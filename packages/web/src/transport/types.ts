@@ -23,4 +23,18 @@ export interface WebTransport {
    * to localStorage); `MockTransport` just remembers it for assertions.
    */
   setToken(token: string | null): void;
+  /**
+   * Subscribe to live tree snapshots for a root session via the JSON-RPC
+   * WebSocket on the server daemon. Returns the initial tree snapshot and an
+   * `unsubscribe` function. `onUpdate` is called with each subsequent root
+   * snapshot pushed by the server.
+   *
+   * Replaces the old SSE-based `/api/sessions/:id/tree/stream` consumer so
+   * the session tree stays live over the same JSON-RPC connection used for
+   * terminal and log subscriptions.
+   */
+  sessionTreeStream(
+    sessionId: string,
+    onUpdate: (root: unknown) => void,
+  ): Promise<{ tree: unknown; unsubscribe: () => void }>;
 }

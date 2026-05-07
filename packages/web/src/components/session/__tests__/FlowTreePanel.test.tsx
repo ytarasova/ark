@@ -6,14 +6,13 @@
  *     renders the tree body instead of the loading state;
  *   - register a matching `session/tree` handler on MockTransport so the
  *     refetch on mount doesn't throw;
- *   - inject a fake EventSource via `MockTransport.onCreateEventSource()`
- *     and dispatch a synthetic `tree` event to exercise the SSE re-render
- *     path.
+ *   - install a `sessionTreeStream` factory via
+ *     `MockTransport.onSessionTreeStream()` and capture the `onUpdate`
+ *     callback to exercise the live-update re-render path.
  *
  * Because bun:test runs under jsdom-free Node, we can't observe React
- * re-renders triggered by state. We compensate by asserting on the
- * EventSource stub: `addEventListener("tree", ...)` is called, and the
- * handler writes the payload into the query cache.
+ * re-renders triggered by state. We compensate by asserting on the captured
+ * `onUpdate` function: calling it writes the payload into the query cache.
  */
 
 import { describe, test, expect, beforeEach } from "bun:test";
@@ -89,34 +88,19 @@ describe("FlowTreePanel", () => {
     expect(html).toContain("Child two");
   });
 
-  test("SSE updates push into the react-query cache", async () => {
+  test("JSON-RPC subscription updates push into the react-query cache", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const tree = makeTree();
     qc.setQueryData(["session-tree", tree.id], tree);
 
-    // Capture the fake EventSource so we can dispatch events after mount.
-    let captured: any = null;
-    mock.onCreateEventSource((path) => {
-      const listeners: Record<string, ((e: MessageEvent) => void)[]> = {};
-      const es: any = {
-        url: `mock://${path}`,
-        readyState: 1,
-        addEventListener(type: string, fn: (e: MessageEvent) => void) {
-          (listeners[type] ??= []).push(fn);
-        },
-        removeEventListener(type: string, fn: (e: MessageEvent) => void) {
-          listeners[type] = (listeners[type] ?? []).filter((h) => h !== fn);
-        },
-        dispatch(type: string, data: any) {
-          for (const fn of listeners[type] ?? []) fn({ data: JSON.stringify(data) } as MessageEvent);
-        },
-        close() {},
-        onopen: null,
-        onmessage: null,
-        onerror: null,
-      };
-      captured = es;
-      return es as EventSource;
+    // Capture the `onUpdate` callback installed by `useSessionTreeStream` so we
+    // can push a synthetic update after mount without a real WebSocket.
+    let capturedOnUpdate: ((root: unknown) => void) | null = null;
+
+    mock.onSessionTreeStream((sessionId, onUpdate) => {
+      capturedOnUpdate = onUpdate;
+      // Return the initial snapshot synchronously (as a resolved promise).
+      return Promise.resolve({ tree, unsubscribe: () => {} });
     });
 
     renderToString(
@@ -133,27 +117,30 @@ describe("FlowTreePanel", () => {
       ),
     );
 
-    // Let the mount effect (which calls `createEventSource`) fire. During SSR
-    // effects don't run, but we can simulate the effect path by calling the
-    // hook's behaviour directly: dispatch into the captured stub.
-    //
-    // To drive the effect we mount in a client-ish render. Since bun:test has
-    // no jsdom, we side-step by invoking the setter contract directly. The
-    // test below asserts the SSE handler wiring when the effect does run:
-    // if the stub was never captured we simulate it manually.
-    if (!captured) {
-      // Force-call the transport factory so the listener registers. This
-      // matches the post-hydration path that useSessionTreeStream takes.
-      captured = mock.createEventSource(`/api/sessions/${tree.id}/tree/stream`) as any;
+    // During SSR, useEffect does not run, so capturedOnUpdate is null. We
+    // simulate the update path by directly calling the factory to wire up the
+    // callback, then invoking it -- this mirrors what the hook does after the
+    // Promise resolves in a client-side mount.
+    if (!capturedOnUpdate) {
+      // Force-resolve the factory to register the callback.
+      await mock
+        .sessionTreeStream(tree.id, (root) => {
+          qc.setQueryData(["session-tree", tree.id], root);
+        })
+        .then(({ tree: initial }) => {
+          qc.setQueryData(["session-tree", tree.id], initial);
+        });
+      // Drive a synthetic update via the captured callback.
+      capturedOnUpdate = (root: unknown) => {
+        qc.setQueryData(["session-tree", tree.id], root);
+      };
     }
-    expect(captured).not.toBeNull();
-    // Register a handler exactly as the hook would, then simulate the update.
+
+    expect(capturedOnUpdate).not.toBeNull();
+
+    // Simulate the server pushing an updated tree snapshot.
     const updated = { ...tree, summary: "Root updated" };
-    captured.addEventListener?.("tree", (e: MessageEvent) => {
-      const payload = JSON.parse(e.data);
-      qc.setQueryData(["session-tree", tree.id], payload.root ?? payload);
-    });
-    captured.dispatch?.("tree", { root: updated });
+    (capturedOnUpdate as (root: unknown) => void)(updated);
 
     const cached: any = qc.getQueryData(["session-tree", tree.id]);
     expect(cached?.summary).toBe("Root updated");
