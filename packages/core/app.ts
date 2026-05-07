@@ -433,7 +433,7 @@ export class AppContext {
         if (!handle) continue;
         const arkdUrl = computeImpl.getArkdUrl(handle);
         if (!arkdUrl) continue;
-        const { startArkdEventsConsumer } = await import("./conductor/server/arkd-events-consumer.js");
+        const { startArkdEventsConsumer } = await import("./services/channel/arkd-events-consumer.js");
         startArkdEventsConsumer(tenantApp, computeName, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
         consumers++;
       } catch (err: any) {
@@ -788,15 +788,12 @@ export class AppContext {
 
   // ── Infra launcher accessors (container-managed internal state) ──────
 
-  /** Legacy compat: expose the conductor handle (null when skipConductor). */
+  /**
+   * Conductor is gone (merged into the server daemon on port 19400).
+   * Kept as a null getter for back-compat with callers that check liveness.
+   */
   get conductor(): { stop(): void } | null {
-    if (this.phase !== "ready") return null;
-    try {
-      const launcher = this._container.cradle.conductorLauncher;
-      return launcher.running ? { stop: () => launcher.stop() } : null;
-    } catch {
-      return null;
-    }
+    return null;
   }
 
   /** Legacy compat: expose the arkd handle (null when skipConductor). */

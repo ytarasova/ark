@@ -37,7 +37,7 @@ import { ServiceWiring } from "../infra/service-wiring.js";
 import { ComputeProvidersBoot } from "../infra/compute-providers-boot.js";
 import { TensorZeroLauncher } from "../infra/tensorzero-launcher.js";
 import { RouterLauncher } from "../infra/router-launcher.js";
-import { ConductorLauncher } from "../infra/conductor-launcher.js";
+import { ServerPollers } from "../infra/server-pollers.js";
 import { ArkdLauncher } from "../infra/arkd-launcher.js";
 import { MetricsPoller } from "../infra/metrics-poller.js";
 import { MaintenancePollers } from "../infra/maintenance-pollers.js";
@@ -189,9 +189,9 @@ export function registerRuntime(container: AppContainer): void {
       },
     ),
 
-    conductorLauncher: asFunction(
-      (c: { app: AppContext; config: ArkConfig; bootOptions: AppBootOptions }) =>
-        new ConductorLauncher(c.app, c.config, { skip: c.bootOptions.skipConductor }),
+    serverPollers: asFunction(
+      (c: { app: AppContext; bootOptions: AppBootOptions }) =>
+        new ServerPollers(c.app, { skip: c.bootOptions.skipConductor }),
       {
         lifetime: Lifetime.SINGLETON,
         dispose: (s) => s.stop(),

@@ -42,8 +42,8 @@ import type { BlobStore } from "./storage/blob-store.js";
 import type { AppContext } from "./app.js";
 import type { AppMode } from "./modes/app-mode.js";
 import type { Lifecycle } from "./lifecycle.js";
-import type { ConductorLauncher } from "./infra/conductor-launcher.js";
 import type { ArkdLauncher } from "./infra/arkd-launcher.js";
+import type { ServerPollers } from "./infra/server-pollers.js";
 import type { RouterLauncher } from "./infra/router-launcher.js";
 import type { TensorZeroLauncher } from "./infra/tensorzero-launcher.js";
 import type { MetricsPoller } from "./infra/metrics-poller.js";
@@ -146,7 +146,7 @@ export interface Cradle {
   computeProvidersBoot: ComputeProvidersBoot;
   tensorZeroLauncher: TensorZeroLauncher;
   routerLauncher: RouterLauncher;
-  conductorLauncher: ConductorLauncher;
+  serverPollers: ServerPollers;
   arkdLauncher: ArkdLauncher;
   metricsPoller: MetricsPoller;
   maintenancePollers: MaintenancePollers;
