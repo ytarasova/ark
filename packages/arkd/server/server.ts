@@ -38,7 +38,7 @@ export type { ArkdOpts };
 
 export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void; setConductorUrl(url: string): void } {
   // Mutable runtime config
-  let conductorUrl: string | null = opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100";
+  let conductorUrl: string | null = opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "ws://localhost:19400";
   const bindHost = opts?.hostname ?? "0.0.0.0";
 
   // Auth token setup -- persists token to disk and pre-computes the expected
@@ -46,8 +46,19 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   const arkdToken: string | null = opts?.token ?? process.env.ARK_ARKD_TOKEN ?? null;
   const expectedAuth = setupAuth(arkdToken);
 
-  // Control plane registration + heartbeat (no-op when ARK_CONTROL_PLANE_URL unset).
-  const controlPlane = startControlPlane(port);
+  // Control plane registration + heartbeat (no-op when ARK_CONTROL_PLANE_URL /
+  // ARK_CONDUCTOR_URL unset). Async -- resolves a handle after the WS connects.
+  // We store it in a mutable let so stop() can deregister once the promise
+  // settles. The heartbeat timer fires regardless and is a no-op until the
+  // handle is set.
+  let controlPlane: Awaited<ReturnType<typeof startControlPlane>> = null;
+  startControlPlane(port, arkdToken)
+    .then((h) => {
+      controlPlane = h;
+    })
+    .catch(() => {
+      /* startControlPlane itself swallows errors; this is belt-and-braces */
+    });
 
   // RouteCtx shared with every route-family module.
   const ctx = createRouteCtx({
