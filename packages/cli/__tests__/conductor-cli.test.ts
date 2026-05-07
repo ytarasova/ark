@@ -1,8 +1,9 @@
 /**
- * Tests for the `ark daemon` CLI command module.
+ * Tests for the `ark conductor` CLI command module (arkd lifecycle subcommands).
  *
  * Exercises PID file management, foreground daemon start/stop lifecycle,
- * and status checking against a live arkd server.
+ * and status checking against a live arkd server. These subcommands were
+ * previously under `ark daemon`, which has been retired.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
@@ -67,7 +68,7 @@ function readPidFile(): DaemonPidInfo | null {
 
 // ── PID file management tests ─────────────────────────────────────────────────
 
-describe("daemon PID file management", () => {
+describe("conductor PID file management", () => {
   afterEach(() => {
     try {
       rmSync(pidFilePath());
@@ -129,7 +130,7 @@ describe("daemon PID file management", () => {
 
 // ── Daemon server lifecycle tests ─────────────────────────────────────────────
 
-describe("daemon start/stop lifecycle", async () => {
+describe("conductor start/stop lifecycle", async () => {
   let server: { stop(): void } | null = null;
 
   afterEach(() => {
@@ -200,7 +201,7 @@ describe("daemon start/stop lifecycle", async () => {
 
 // ── Status detection tests ──────────────────────────────────────────────────
 
-describe("daemon status detection", async () => {
+describe("conductor status detection", async () => {
   it("detects daemon is not running on unused port", async () => {
     // Freshly-allocated ephemeral port with nothing bound.
     const probePort = await allocatePort();
