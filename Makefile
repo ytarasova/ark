@@ -5,13 +5,14 @@
 # Quick reference:
 #   make install       Install deps + symlink ark CLI
 #   make claude-tfy    Claude Code -> TrueFoundry (direct; --continue + skip-permissions on by default)
+#   make pi-tfy        pi.dev CLI -> TrueFoundry (uses ~/.pi/agent/models.json's `truefoundry` provider)
 #   make dev           Hot-reload CLI + Web UI (two processes)
 #   make test          Run all unit tests (sequential)
 #   make test-e2e      Run Playwright E2E tests against Web UI
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down claude-tfy web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down claude-tfy pi-tfy web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
         docs-cli \
@@ -36,7 +37,7 @@ CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|pi-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -140,6 +141,21 @@ claude-tfy: ## Claude Code -> TrueFoundry (direct; --continue unless CLAUDE_CONT
 	  else \
 	    exec claude $(CLAUDE_DANGEROUSLY_SKIP_FLAGS) $(CLAUDE_CONTINUE_FLAGS) $(ARGS); \
 	  fi
+
+# pi.dev (https://pi.dev) reads its provider table from ~/.pi/agent/models.json.
+# This target assumes you've already populated that file with a `truefoundry`
+# provider whose api=anthropic-messages and apiKey=<TFY JWT>. The model id
+# defaults to TRUEFOUNDRY_ANTHROPIC_MODEL_DEFAULT (same Bedrock allowlist slug
+# claude-tfy uses); override per-invocation with `make pi-tfy PI_MODEL=<id>`.
+# Pass extra pi args via ARGS, e.g. `make pi-tfy ARGS="-p 'one-shot prompt'"`.
+pi-tfy: ## pi.dev CLI -> TrueFoundry (reads ~/.pi/agent/models.json)
+	@command -v pi >/dev/null 2>&1 || { echo "pi not found. Install: https://pi.dev"; exit 1; }
+	@test -f $$HOME/.pi/agent/models.json || { \
+	  echo "Missing ~/.pi/agent/models.json -- configure providers first."; \
+	  echo "Schema: https://pi.dev/docs/latest/models"; \
+	  exit 1; }
+	@pi_m="$${PI_MODEL:-$(TRUEFOUNDRY_ANTHROPIC_MODEL_DEFAULT)}"; \
+	  exec pi --provider truefoundry --model "$$pi_m" $(ARGS)
 
 self: ## Dispatch full SDLC (plan->implement->review->PR) against THIS repo
 	@test -n "$(TASK)" || (echo 'Usage: make self TASK="<description>"'; exit 1)
