@@ -139,6 +139,22 @@ export interface ComputeHandle {
 }
 
 /**
+ * `ComputeHandle` after the methods are guaranteed-present. Returned by every
+ * production code path: `attachComputeMethods`, `Compute.provision`,
+ * `Compute.attachExistingHandle`, and `Compute.rehydrateHandle`. Consumers
+ * (claude-agent, status-poller, ...) that receive a `MethodedComputeHandle`
+ * can call `spawnProcess` / `killProcess` / `statusProcess` / `getMetrics`
+ * directly, no null check needed.
+ *
+ * The base `ComputeHandle` keeps the methods optional so test stubs and
+ * data-shape literals don't have to fabricate stub closures. Anywhere a
+ * tightened guarantee matters (post-attach, post-rehydrate), use
+ * `MethodedComputeHandle`.
+ */
+export type MethodedComputeHandle = ComputeHandle &
+  Required<Pick<ComputeHandle, "spawnProcess" | "killProcess" | "statusProcess" | "getMetrics">>;
+
+/**
  * Options for `ComputeHandle.spawnProcess`. Mirrors arkd's `/process/spawn`
  * request shape exactly.
  */
@@ -298,6 +314,22 @@ export interface AttachExistingComputeRow {
   config: Record<string, unknown>;
 }
 
+/**
+ * JSON-safe snapshot of a `ComputeHandle`. The full handle carries method
+ * closures (`spawnProcess`, `killProcess`, ...) over a live `ArkdClient`;
+ * those don't survive `JSON.stringify` into `session.config.compute_handle`.
+ *
+ * Persistence stores this state-only shape; `Compute.rehydrateHandle(state)`
+ * is the single seam that re-attaches methods on the way back. Treat the
+ * persisted column as opaque -- only the originating Compute impl knows
+ * what's inside `meta`.
+ */
+export interface PersistedComputeHandleState {
+  kind: ComputeKind;
+  name: string;
+  meta: Record<string, unknown>;
+}
+
 // ── Errors ─────────────────────────────────────────────────────────────────
 
 /**
@@ -357,8 +389,32 @@ export interface Compute {
    * defaults to `provision()` for those).
    *
    * Pure: must not perform I/O. Just maps `row.config` -> handle meta.
+   *
+   * Returns a `MethodedComputeHandle` (not bare `ComputeHandle`) -- every
+   * production impl wires through `attachComputeMethods`, so callers get
+   * the guaranteed-methoded shape. Distinct from `rehydrateHandle`:
+   * `attachExistingHandle` consumes a `compute` ROW (gates on
+   * `instance_id` / `pod_name` and returns null when those are absent),
+   * while `rehydrateHandle` consumes prior persisted HANDLE STATE that's
+   * known to be valid by construction.
    */
-  attachExistingHandle?(row: AttachExistingComputeRow): ComputeHandle | null;
+  attachExistingHandle?(row: AttachExistingComputeRow): MethodedComputeHandle | null;
+
+  /**
+   * Re-attach method closures to a previously-persisted handle state.
+   *
+   * `target-resolver` writes only `PersistedComputeHandleState` (kind / name
+   * / meta) into `session.config.compute_handle`; on the next dispatch it
+   * routes the read state through this seam to get back a fully-methoded
+   * `ComputeHandle`. Without this seam the rehydrated object is a plain
+   * struct and any caller hitting `handle.spawnProcess(...)` crashes on a
+   * missing function.
+   *
+   * Pure: no I/O. Just rebuild the same handle the prior provision returned,
+   * with `attachComputeMethods` (or equivalent) wiring the arkd client
+   * factory + URL resolver.
+   */
+  rehydrateHandle(state: PersistedComputeHandleState): MethodedComputeHandle;
 
   /** Where arkd listens. URL reachable from the ark host conductor. */
   getArkdUrl(h: ComputeHandle): string;

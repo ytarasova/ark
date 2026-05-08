@@ -34,7 +34,7 @@ import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/session.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
 import { logInfo } from "../../observability/structured-log.js";
-import { attachComputeMethods, type ArkdClientFactory } from "../handle-helpers.js";
+import { attachComputeMethods, rehydrateArkdBackedHandle, type ArkdClientFactory } from "../handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -42,6 +42,8 @@ import type {
   ComputeKind,
   EnsureReachableOpts,
   FlushPlacementOpts,
+  MethodedComputeHandle,
+  PersistedComputeHandleState,
   PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
@@ -272,7 +274,11 @@ export class FirecrackerCompute implements Compute {
   // `arkdUrl` (for kill/captureOutput/checkAlive/getMetrics via the helpers)
   // -- start/stop/destroy/snapshot still need a live `FirecrackerVm` from
   // `provision`, which is the documented constraint.
-  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+  attachExistingHandle(row: {
+    name: string;
+    status: string;
+    config: Record<string, unknown>;
+  }): MethodedComputeHandle | null {
     const cfg = row.config as Record<string, unknown>;
     const vmId = cfg.vm_id as string | undefined;
     const arkdUrl = cfg.arkd_url as string | undefined;
@@ -294,6 +300,10 @@ export class FirecrackerCompute implements Compute {
       meta: { firecracker: meta },
     };
     return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
+  }
+
+  rehydrateHandle(state: PersistedComputeHandleState): MethodedComputeHandle {
+    return rehydrateArkdBackedHandle(state, (h) => this.getArkdUrl(h), this.clientFactory);
   }
 
   /** Resume a paused VM. If we don't have a live handle (e.g. after a

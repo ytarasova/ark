@@ -55,7 +55,7 @@ import { DEFAULT_CONDUCTOR_URL } from "../../constants.js";
 import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/session.js";
 import { ArkdClient } from "../../../arkd/client/index.js";
-import { attachComputeMethods, type ArkdClientFactory } from "../handle-helpers.js";
+import { attachComputeMethods, rehydrateArkdBackedHandle, type ArkdClientFactory } from "../handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -63,6 +63,8 @@ import type {
   ComputeKind,
   EnsureReachableOpts,
   FlushPlacementOpts,
+  MethodedComputeHandle,
+  PersistedComputeHandleState,
   PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
@@ -484,7 +486,11 @@ export class EC2Compute implements Compute {
   // Pure: maps row.config -> EC2HandleMeta. No AWS calls. ensureReachable
   // does the actual transport setup post-attach.
 
-  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+  attachExistingHandle(row: {
+    name: string;
+    status: string;
+    config: Record<string, unknown>;
+  }): MethodedComputeHandle | null {
     const cfg = row.config as Record<string, unknown>;
     const instanceId = cfg.instance_id as string | undefined;
     if (!instanceId) return null; // never provisioned -- fall through to provision()
@@ -510,6 +516,10 @@ export class EC2Compute implements Compute {
       meta: { ec2: meta },
     };
     return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
+  }
+
+  rehydrateHandle(state: PersistedComputeHandleState): MethodedComputeHandle {
+    return rehydrateArkdBackedHandle(state, (h) => this.getArkdUrl(h), this.clientFactory);
   }
 
   // ── ensureReachable ──────────────────────────────────────────────────────

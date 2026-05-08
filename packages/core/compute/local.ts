@@ -9,13 +9,15 @@
 
 import type { AppContext } from "../app.js";
 import { ArkdClient } from "../../arkd/client/index.js";
-import { attachComputeMethods, type ArkdClientFactory } from "./handle-helpers.js";
+import { attachComputeMethods, rehydrateArkdBackedHandle, type ArkdClientFactory } from "./handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
   ComputeHandle,
   ComputeKind,
   FlushPlacementOpts,
+  MethodedComputeHandle,
+  PersistedComputeHandleState,
   ProvisionOpts,
   Snapshot,
 } from "./types.js";
@@ -67,7 +69,11 @@ export class LocalCompute implements Compute {
     return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
   }
 
-  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+  attachExistingHandle(row: {
+    name: string;
+    status: string;
+    config: Record<string, unknown>;
+  }): MethodedComputeHandle | null {
     // The host is always "provisioned" -- there's no underlying instance to
     // create. Synthesize a handle directly from the row so the dispatcher
     // skips the redundant provision() call.
@@ -77,6 +83,10 @@ export class LocalCompute implements Compute {
       meta: { ...row.config },
     };
     return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
+  }
+
+  rehydrateHandle(state: PersistedComputeHandleState): MethodedComputeHandle {
+    return rehydrateArkdBackedHandle(state, (h) => this.getArkdUrl(h), this.clientFactory);
   }
 
   async start(_h: ComputeHandle): Promise<void> {

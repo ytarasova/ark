@@ -13,7 +13,15 @@
  */
 
 import type { ArkdClient } from "../../arkd/client/index.js";
-import type { AgentHandle, ComputeHandle, ComputeSnapshot, SpawnProcessOpts } from "./types.js";
+import type {
+  AgentHandle,
+  ComputeHandle,
+  ComputeKind,
+  ComputeSnapshot,
+  MethodedComputeHandle,
+  PersistedComputeHandleState,
+  SpawnProcessOpts,
+} from "./types.js";
 
 /** Factory contract -- production wires `(url) => new ArkdClient(url)`. */
 export type ArkdClientFactory = (url: string) => ArkdClient;
@@ -35,7 +43,7 @@ export function attachComputeMethods<H extends ComputeHandle>(
   handle: H,
   getUrl: () => string,
   factory: ArkdClientFactory,
-): H {
+): H & MethodedComputeHandle {
   // Cast through `any` so we can install methods on a structural type
   // without TS demanding a re-typed handle. The return type still satisfies
   // the ComputeHandle interface.
@@ -63,7 +71,33 @@ export function attachComputeMethods<H extends ComputeHandle>(
     const client = factory(getUrl());
     return client.statusProcess({ handle: procHandle });
   };
-  return handle;
+  return handle as H & MethodedComputeHandle;
+}
+
+/**
+ * Default `Compute.rehydrateHandle` for arkd-backed impls. Reconstructs the
+ * handle struct from persisted state and wires methods via
+ * `attachComputeMethods`. Each impl typically delegates to this helper:
+ *
+ *     rehydrateHandle(state) {
+ *       return rehydrateArkdBackedHandle(state, (h) => this.getArkdUrl(h), this.clientFactory);
+ *     }
+ *
+ * Trusts the persisted `meta` shape -- by construction it was built by the
+ * impl's own `provision` / `attachExistingHandle` so the typed fields each
+ * impl reads (instance_id, pod_name, vm_id, ...) are guaranteed present.
+ */
+export function rehydrateArkdBackedHandle<MetaT extends Record<string, unknown>>(
+  state: PersistedComputeHandleState,
+  getUrl: (h: ComputeHandle) => string,
+  factory: ArkdClientFactory,
+): MethodedComputeHandle {
+  const handle: ComputeHandle = {
+    kind: state.kind as ComputeKind,
+    name: state.name,
+    meta: state.meta as MetaT,
+  };
+  return attachComputeMethods(handle, () => getUrl(handle), factory);
 }
 
 /**

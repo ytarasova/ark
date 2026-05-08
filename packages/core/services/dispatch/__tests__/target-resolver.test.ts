@@ -83,4 +83,62 @@ describe("resolveTargetAndHandle", () => {
     const persisted = (refetched.config as { compute_handle?: unknown }).compute_handle;
     expect(persisted).toBeDefined();
   });
+
+  test("rehydrated handle has live method closures (not a stripped JSON object)", async () => {
+    // Regression for the conductor+server-daemon merge bug: persisting the
+    // full ComputeHandle dropped its method closures via JSON.stringify, so
+    // the next-stage dispatch crashed with "compute kind 'local' has no
+    // spawnProcess on its handle". The fix routes every read through
+    // Compute.rehydrateHandle, which re-attaches spawnProcess / killProcess /
+    // statusProcess / getMetrics. This test asserts the contract directly
+    // so the regression can never silently come back.
+    await app.computes.insert({
+      name: "local-methods",
+      compute: "local",
+      isolation: "direct",
+      compute_kind: "local",
+      isolation_kind: "direct",
+      status: "running",
+      config: {},
+    } as never);
+    const s = await app.sessions.create({ summary: "methods", compute_name: "local-methods" });
+    // Round-trip through JSON.stringify to mimic what the SQLite JSON
+    // column does on write -- functions are stripped, only data survives.
+    const persisted = JSON.parse(JSON.stringify({ kind: "local", name: "local-methods", meta: {} })) as Record<
+      string,
+      unknown
+    >;
+    await app.sessions.update(s.id, {
+      config: { ...((s.config as object | null) ?? {}), compute_handle: persisted },
+    });
+    const refetched = (await app.sessions.get(s.id))!;
+    const r = await resolveTargetAndHandle(app, refetched);
+    expect(r.handle).not.toBeNull();
+    expect(typeof r.handle!.spawnProcess).toBe("function");
+    expect(typeof r.handle!.killProcess).toBe("function");
+    expect(typeof r.handle!.statusProcess).toBe("function");
+    expect(typeof r.handle!.getMetrics).toBe("function");
+  });
+
+  test("persisted handle column stores state-only shape (no method closures)", async () => {
+    // The write-side guarantee: persistHandleState strips method closures
+    // before update so the column can never accumulate undefined-typed
+    // function fields that confuse later readers.
+    await app.computes.insert({
+      name: "local-persist",
+      compute: "local",
+      isolation: "direct",
+      compute_kind: "local",
+      isolation_kind: "direct",
+      status: "running",
+      config: {},
+    } as never);
+    const s = await app.sessions.create({ summary: "persist", compute_name: "local-persist" });
+    await resolveTargetAndHandle(app, s);
+    const refetched = (await app.sessions.get(s.id))!;
+    const persisted = (refetched.config as { compute_handle?: Record<string, unknown> }).compute_handle!;
+    expect(Object.keys(persisted).sort()).toEqual(["kind", "meta", "name"]);
+    expect(persisted.spawnProcess).toBeUndefined();
+    expect(persisted.killProcess).toBeUndefined();
+  });
 });

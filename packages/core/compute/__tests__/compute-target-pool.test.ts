@@ -66,6 +66,30 @@ class StubCompute implements Compute {
   async restore(_s: Snapshot): Promise<ComputeHandle> {
     return { kind: this.kind, name: "restored", meta: {} };
   }
+  rehydrateHandle(state: { kind: ComputeKind; name: string; meta: Record<string, unknown> }) {
+    return {
+      kind: state.kind,
+      name: state.name,
+      meta: state.meta,
+      async spawnProcess() {
+        return { pid: 0 };
+      },
+      async killProcess() {
+        return { wasRunning: false };
+      },
+      async statusProcess() {
+        return { running: false };
+      },
+      async getMetrics() {
+        return {
+          cpu: { count: 1, loadAvg: 0, processes: 0 },
+          memory: { totalMB: 0, usedMB: 0 },
+          disk: { totalMB: 0, usedMB: 0 },
+          uptimeSec: 0,
+        } as never;
+      },
+    };
+  }
 }
 
 class StubRuntime implements Runtime {

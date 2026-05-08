@@ -28,7 +28,7 @@ import type { AppContext } from "../app.js";
 import type { Session } from "../../types/session.js";
 import { ArkdClient } from "../../arkd/client/index.js";
 import { allocatePort } from "../config/port-allocator.js";
-import { attachComputeMethods, type ArkdClientFactory } from "./handle-helpers.js";
+import { attachComputeMethods, rehydrateArkdBackedHandle, type ArkdClientFactory } from "./handle-helpers.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -36,6 +36,8 @@ import type {
   ComputeKind,
   EnsureReachableOpts,
   FlushPlacementOpts,
+  MethodedComputeHandle,
+  PersistedComputeHandleState,
   PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
@@ -291,7 +293,11 @@ export class K8sCompute implements Compute {
   // Pure: maps row.config -> K8sHandleMeta. No k8s API calls. The caller's
   // `ensureReachable` runs `setupPortForward` post-attach to (re)establish
   // the local tunnel that `getArkdUrl(h)` resolves to.
-  attachExistingHandle(row: { name: string; status: string; config: Record<string, unknown> }): ComputeHandle | null {
+  attachExistingHandle(row: {
+    name: string;
+    status: string;
+    config: Record<string, unknown>;
+  }): MethodedComputeHandle | null {
     const cfg = row.config as Record<string, unknown>;
     const podName = cfg.pod_name as string | undefined;
     if (!podName) return null; // never provisioned -- fall through to provision()
@@ -312,6 +318,10 @@ export class K8sCompute implements Compute {
       meta: { k8s: meta },
     };
     return attachComputeMethods(handle, () => this.getArkdUrl(handle), this.clientFactory);
+  }
+
+  rehydrateHandle(state: PersistedComputeHandleState): MethodedComputeHandle {
+    return rehydrateArkdBackedHandle(state, (h) => this.getArkdUrl(h), this.clientFactory);
   }
 
   // ── ensureReachable ──────────────────────────────────────────────────────

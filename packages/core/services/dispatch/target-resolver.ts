@@ -11,10 +11,12 @@
  *
  *   1. `app.resolveComputeTarget(session)` returns the `(target,
  *      compute)` pair; on no compute we early-return null.
- *   2. If `session.config.compute_handle` exists, we rehydrate it. This
+ *   2. If `session.config.compute_handle` holds a persisted state
+ *      blob, route it through `Compute.rehydrateHandle(state)`. This
  *      is the steady-state path for second-stage dispatches (verify,
  *      pr, merge) on the same session and for resume-after-conductor-
- *      restart.
+ *      restart. Method closures don't survive `JSON.stringify`, so
+ *      rehydration is the seam that re-attaches them.
  *   3. Else if the Compute can synthesize a handle from the row
  *      (`Compute.attachExistingHandle`), use that. This is the fast
  *      path for "live" persistent computes -- LocalCompute (always)
@@ -31,15 +33,16 @@
  *      provision is invisible to the UI until the dispatch watchdog
  *      fires (5min).
  *
- * Persisting the handle on the session row is intentional: the handle
- * IS session state. Compute lifetime is per-session for templates
- * (k8s pod, docker container) and per-fleet for persistent EC2; either
- * way the session is the canonical owner of the handle.
+ * Persistence shape: only `PersistedComputeHandleState` (kind / name /
+ * meta) goes into `session.config.compute_handle`. The methoded
+ * `ComputeHandle` is in-memory only; treating it as serialisable was
+ * the bug behind "compute kind 'X' has no spawnProcess on its handle"
+ * after a multi-stage dispatch read the methodless JSON back out.
  */
 
 import type { AppContext } from "../../app.js";
 import type { Session } from "../../../types/index.js";
-import type { ComputeHandle } from "../../compute/types.js";
+import type { ComputeHandle, PersistedComputeHandleState } from "../../compute/types.js";
 import type { ComputeTarget } from "../../compute/compute-target.js";
 import { logInfo } from "../../observability/structured-log.js";
 import { provisionStep } from "../provisioning-steps.js";
@@ -53,9 +56,12 @@ export async function resolveTargetAndHandle(app: AppContext, session: Session):
   const { target, compute } = await app.resolveComputeTarget(session);
   if (!target) return { target: null, handle: null };
 
-  const persisted = readPersistedHandle(session);
-  if (persisted) {
-    return { target, handle: persisted };
+  const persistedState = readPersistedHandleState(session);
+  if (persistedState) {
+    // Persisted state is JSON-only -- no method closures survive the DB
+    // round-trip. `Compute.rehydrateHandle` is the single seam that
+    // re-attaches them, so callers always see a fully-methoded handle.
+    return { target, handle: target.compute.rehydrateHandle(persistedState) };
   }
 
   // Fast path: ask the Compute impl whether it can synthesize a handle
@@ -72,7 +78,7 @@ export async function resolveTargetAndHandle(app: AppContext, session: Session):
       config: (compute.config as Record<string, unknown> | null) ?? {},
     });
     if (existing) {
-      await persistHandle(app, session, existing);
+      await persistHandleState(app, session, existing);
       logInfo(
         "dispatch",
         `attached to existing compute for session ${session.id} (${existing.kind}/${existing.name})`,
@@ -96,7 +102,7 @@ export async function resolveTargetAndHandle(app: AppContext, session: Session):
       context: { computeKind: target.compute.kind },
     },
   );
-  await persistHandle(app, session, handle);
+  await persistHandleState(app, session, handle);
   logInfo("dispatch", `provisioned new handle for session ${session.id} (${handle.kind}/${handle.name})`, {
     sessionId: session.id,
     computeKind: handle.kind,
@@ -105,13 +111,32 @@ export async function resolveTargetAndHandle(app: AppContext, session: Session):
   return { target, handle };
 }
 
-function readPersistedHandle(session: Session): ComputeHandle | null {
-  const cfg = session.config as { compute_handle?: ComputeHandle } | null | undefined;
-  return cfg?.compute_handle ?? null;
+/**
+ * Read the persisted handle state from `session.config.compute_handle`.
+ *
+ * Stored shape is `PersistedComputeHandleState` (kind / name / meta) -- the
+ * methoded `ComputeHandle` is a runtime-only construct that has to be
+ * rehydrated via `Compute.rehydrateHandle` on every read, since method
+ * closures don't survive `JSON.stringify` into the session config.
+ *
+ * Legacy rows that wrote the full handle object are still readable: we only
+ * touch the three state fields and ignore any stale method-named keys that
+ * may have been serialised as undefined.
+ */
+function readPersistedHandleState(session: Session): PersistedComputeHandleState | null {
+  const cfg = session.config as { compute_handle?: PersistedComputeHandleState } | null | undefined;
+  const stored = cfg?.compute_handle;
+  if (!stored || typeof stored.kind !== "string" || typeof stored.name !== "string") return null;
+  return { kind: stored.kind, name: stored.name, meta: (stored.meta as Record<string, unknown> | undefined) ?? {} };
 }
 
-async function persistHandle(app: AppContext, session: Session, handle: ComputeHandle): Promise<void> {
+async function persistHandleState(app: AppContext, session: Session, handle: ComputeHandle): Promise<void> {
+  // Strip method closures before persisting -- they can't survive JSON
+  // serialisation, and writing them in just produces undefined fields that
+  // confuse later readers. Persist only the data fields; rehydrateHandle
+  // re-attaches behaviour on read.
+  const state: PersistedComputeHandleState = { kind: handle.kind, name: handle.name, meta: handle.meta };
   await app.sessions.update(session.id, {
-    config: { ...((session.config as object | null) ?? {}), compute_handle: handle },
+    config: { ...((session.config as object | null) ?? {}), compute_handle: state },
   });
 }
