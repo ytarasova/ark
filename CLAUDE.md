@@ -1,3 +1,5 @@
+<!-- This file was a 193-line guide condensed to its current form. -->
+
 # Ark
 
 Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with 11 compute providers, knowledge graph, LLM router, and multi-tenant control plane. Supports Claude Code, Codex, Gemini CLI, and Goose runtimes. Bun + tmux only.
